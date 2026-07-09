@@ -1,0 +1,502 @@
+import React, { useState, useEffect, useContext, useRef } from "react";
+import { SettingsContext } from "../App";
+import axios from "axios";
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  MenuItem,
+  FormControl,
+  Select,
+} from "@mui/material";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  Card,
+  TableRow,
+} from "@mui/material";
+import { Snackbar, Alert } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import Unauthorized from "../components/Unauthorized";
+import LoadingOverlay from "../components/LoadingOverlay";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  People,
+  School,
+  SupervisorAccount,
+  AdminPanelSettings,
+} from "@mui/icons-material";
+import API_BASE_URL from "../apiConfig";
+import DateField from "../components/DateField";
+
+const SuperAdminApplicantResetPassword = () => {
+  const settings = useContext(SettingsContext);
+
+  const [titleColor, setTitleColor] = useState("#000000");
+  const [subtitleColor, setSubtitleColor] = useState("#555555");
+  const [borderColor, setBorderColor] = useState("#000000");
+  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
+  const [stepperColor, setStepperColor] = useState("#000000");
+
+  const [companyName, setCompanyName] = useState("");
+  const [shortTerm, setShortTerm] = useState("");
+  const [campusAddress, setCampusAddress] = useState("");
+
+  useEffect(() => {
+    if (!settings) return;
+    if (settings.title_color) setTitleColor(settings.title_color);
+    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
+    if (settings.border_color) setBorderColor(settings.border_color);
+    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
+    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (settings.company_name) setCompanyName(settings.company_name);
+    if (settings.short_term) setShortTerm(settings.short_term);
+    if (settings.campus_address) setCampusAddress(settings.campus_address);
+  }, [settings]);
+
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  const tabs = [
+    { label: "Applicant Reset Password", to: "/superadmin_applicant_reset_password", icon: <People fontSize="large" /> },
+    { label: "Student Reset Password", to: "/superadmin_student_reset_password", icon: <School fontSize="large" /> },
+    { label: "Faculty Reset Password", to: "/superadmin_faculty_reset_password", icon: <SupervisorAccount fontSize="large" /> },
+    { label: "Registrar Reset Password", to: "/superadmin_registrar_reset_password", icon: <AdminPanelSettings fontSize="large" /> },
+  ];
+
+  const navigate = useNavigate();
+  const [activeStep, setActiveStep] = useState(0);
+
+  const handleStepClick = (index, to) => {
+    setActiveStep(index);
+    navigate(to);
+  };
+
+  const [userID, setUserID] = useState("");
+  const [user, setUser] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [hasAccess, setHasAccess] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userInfo, setUserInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [resetMsg, setResetMsg] = useState(""); // ✅ FIXED: was referenced but never declared
+  const pageId = 81;
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [employeeID, setEmployeeID] = useState("");
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const storedID = localStorage.getItem("person_id");
+    const storedEmployeeID = localStorage.getItem("employee_id");
+
+    if (storedUser && storedRole && storedID) {
+      setUser(storedUser);
+      setUserRole(storedRole);
+      setUserID(storedID);
+      setEmployeeID(storedEmployeeID);
+      if (storedRole === "registrar") {
+        checkAccess(storedEmployeeID);
+      } else {
+        window.location.href = "/login";
+      }
+    } else {
+      window.location.href = "/login";
+    }
+  }, []);
+
+  const checkAccess = async (employeeID) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
+      if (response.data?.page_privilege === 1) {
+        setHasAccess(true);
+      } else {
+        setHasAccess(false);
+      }
+    } catch (error) {
+      setHasAccess(false);
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      if (!searchQuery) {
+        setUserInfo(null);
+        setSearchError("");
+        return;
+      }
+      setLoading(true);
+      setResetMsg("");
+      setSearchError("");
+      try {
+        const res = await axios.post(`${API_BASE_URL}/api/superadmin-get-applicant`, {
+          email: searchQuery,
+        });
+        setUserInfo(res.data);
+      } catch (err) {
+        setSearchError(err.response?.data?.message || "No applicant found.");
+        setUserInfo(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const delayDebounce = setTimeout(fetchInfo, 600);
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
+  const [applicants, setApplicants] = useState([]);
+
+  const auditFields = () => ({
+    audit_actor_id:
+      employeeID ||
+      localStorage.getItem("employee_id") ||
+      localStorage.getItem("email") ||
+      "unknown",
+    audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+  });
+
+  useEffect(() => {
+    const fetchApplicants = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/superadmin-get-all-applicants`);
+        setApplicants(res.data);
+      } catch (err) {
+        console.error("Failed to fetch applicants", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchApplicants();
+  }, []);
+
+  const handleReset = async () => {
+    if (!userInfo) return;
+    setResetLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/superadmin-reset-applicant`, {
+        email: userInfo.email,
+        ...auditFields(),
+      });
+      // ✅ Store pending flag keyed to the target user's email
+
+      setSnackbar({ open: true, message: res.data.message, severity: "success" });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || "Error resetting password.",
+        severity: "error",
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (e) => {
+    const newStatus = parseInt(e.target.value, 10);
+    setUserInfo((prev) => ({ ...prev, status: newStatus }));
+    try {
+      await axios.post(`${API_BASE_URL}/api/superadmin-update-status-applicant`, {
+        email: userInfo.email,
+        status: newStatus,
+        ...auditFields(),
+      });
+    } catch (err) {
+      console.error("Failed to update status", err);
+    }
+  };
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 20;
+  const totalPages = Math.ceil(applicants.length / rowsPerPage);
+  const indexOfLastRow = currentPage * rowsPerPage;
+  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+  const currentRows = applicants.slice(indexOfFirstRow, indexOfLastRow);
+
+  const headerStyle = {
+    textAlign: "center",
+    fontSize: "12px",
+    border: `1px solid ${borderColor}`,
+  };
+
+  const paginationButtonStyle = {
+    minWidth: 70,
+    color: "white",
+    borderColor: "white",
+    backgroundColor: "transparent",
+    "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
+    "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+  };
+
+  const paginationSelectStyle = {
+    fontSize: "12px",
+    height: 36,
+    color: "white",
+    border: "2px solid white",
+    backgroundColor: "transparent",
+    ".MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+    "& svg": { color: "white" },
+  };
+
+  const handleNameClick = async (applicant) => {
+    setSearchQuery(applicant.email);
+    setPageLoading(true);
+    setSearchError("");
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/superadmin-get-applicant`, {
+        email: applicant.email,
+      });
+      setUserInfo(res.data);
+    } catch (err) {
+      setSearchError(err.response?.data?.message || "No applicant found.");
+      setUserInfo(null);
+    } finally {
+      setPageLoading(false);
+    }
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  };
+
+  const formatDateLong = (dateStr) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!userInfo) return;
+    setStatusLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/superadmin-update-status-applicant`, {
+        email: userInfo.email,
+        status: userInfo.status,
+        ...auditFields(),
+      });
+      setApplicants((prev) =>
+        prev.map((a) =>
+          a.email === userInfo.email ? { ...a, status: userInfo.status } : a,
+        ),
+      );
+      setSnackbar({ open: true, message: res.data.message || "Status updated successfully", severity: "success" });
+    } catch (err) {
+      setSnackbar({ open: true, message: err.response?.data?.message || "Failed to update status", severity: "error" });
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  if (accessLoading) return <LoadingOverlay open message="Checking Access..." />;
+  if (!hasAccess) return <Unauthorized />;
+
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
+
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+
+  const PaginationControls = () => (
+    <Box display="flex" alignItems="center" gap={1}>
+      <Button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} variant="outlined" size="small" sx={paginationButtonStyle}>First</Button>
+      <Button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1} variant="outlined" size="small" sx={paginationButtonStyle}>Prev</Button>
+      <FormControl size="small" sx={{ minWidth: 90 }}>
+        <Select value={currentPage} onChange={(e) => setCurrentPage(Number(e.target.value))} sx={paginationSelectStyle} MenuProps={{ PaperProps: { sx: { maxHeight: 200 } } }}>
+          {Array.from({ length: totalPages }, (_, i) => (
+            <MenuItem key={i + 1} value={i + 1}>Page {i + 1}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Typography fontSize="12px" color="white">of {totalPages} page{totalPages > 1 ? "s" : ""}</Typography>
+      <Button onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages} variant="outlined" size="small" sx={paginationButtonStyle}>Next</Button>
+      <Button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} variant="outlined" size="small" sx={paginationButtonStyle}>Last</Button>
+    </Box>
+  );
+
+  const PaginationBar = () => (
+    <TableRow>
+      <TableCell colSpan={6} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography fontSize="14px" fontWeight="bold" color="white">Total Applicant's Records: {applicants.length}</Typography>
+          <PaginationControls />
+        </Box>
+      </TableCell>
+    </TableRow>
+  );
+
+
+
+  return (
+    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+      {/* Header */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", mb: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}>
+          APPLICANT RESET PASSWORD
+        </Typography>
+        <TextField
+          size="small"
+          placeholder="Search Applicant Name / Email / Applicant ID"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ width: 450, backgroundColor: "#fff", borderRadius: 1, "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
+        />
+      </Box>
+
+      {searchError && <Typography color="error">{searchError}</Typography>}
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+      <br /><br />
+
+      {/* Tab Cards */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", flexWrap: "nowrap", width: "100%", mt: 1, gap: 2 }}>
+        {tabs.map((tab, index) => (
+          <Card
+            key={index}
+            onClick={() => handleStepClick(index, tab.to)}
+            sx={{
+              flex: `1 1 ${100 / tabs.length}%`,
+              height: 135,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              borderRadius: 2,
+              border: `1px solid ${borderColor}`,
+              backgroundColor: activeStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
+              color: activeStep === index ? "#fff" : "#000",
+              boxShadow: activeStep === index ? "0px 4px 10px rgba(0,0,0,0.3)" : "0px 2px 6px rgba(0,0,0,0.15)",
+              transition: "0.3s ease",
+              "&:hover": { backgroundColor: activeStep === index ? "#000000" : "#f5d98f" },
+            }}
+          >
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
+              <Typography sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}>{tab.label}</Typography>
+            </Box>
+          </Card>
+        ))}
+      </Box>
+      <br /><br />
+
+      {/* Section Label */}
+      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}` }}>
+        <Table>
+          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+            <TableRow>
+              <TableCell sx={{ color: "white", textAlign: "center" }}>Applicant Information</TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </TableContainer>
+
+      {/* Info Panel */}
+      <Paper sx={{ p: 3, border: `1px solid ${borderColor}` }}>
+        <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }} gap={2}>
+          <TextField label="Applicant Number" value={userInfo?.applicant_number || ""} fullWidth InputProps={{ readOnly: true }} />
+          <TextField label="Email" value={userInfo?.email || ""} fullWidth InputProps={{ readOnly: true }} />
+          <TextField label="Full Name" value={userInfo?.fullName || ""} fullWidth InputProps={{ readOnly: true }} />
+          <DateField label="Birthdate" value={userInfo?.birthdate || ""} fullWidth InputProps={{ readOnly: true }} />
+          <TextField
+            select
+            label="Status"
+            value={userInfo?.status ?? ""}
+            fullWidth
+            onChange={(e) => setUserInfo((prev) => ({ ...prev, status: parseInt(e.target.value, 10) }))}
+          >
+            <MenuItem value={1}>Active</MenuItem>
+            <MenuItem value={0}>Inactive</MenuItem>
+          </TextField>
+        </Box>
+        <Box mt={3} display="flex" gap={2}>
+          <Button variant="contained" color="primary" onClick={handleUpdateStatus} disabled={!userInfo || statusLoading || resetLoading}>
+            {statusLoading ? "Updating..." : "Update Status"}
+          </Button>
+          <Button variant="contained" color="secondary" onClick={handleReset} disabled={!userInfo || resetLoading || statusLoading}>
+            {resetLoading ? "Processing..." : "Reset Password"}
+          </Button>
+        </Box>
+      </Paper>
+      <br /><br />
+
+      {/* Table */}
+      <TableContainer component={Paper} sx={{ width: "100%" }}>
+        <Table size="small">
+          <TableHead>
+            <PaginationBar />
+            <TableRow>
+              {["#", "Applicant Number", "Full Name", "Birthday", "Email", "Status"].map((h) => (
+                <TableCell key={h} sx={{ ...headerStyle, backgroundColor: "white", color: "black" }}>{h}</TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {currentRows.length === 0 ? (
+              <TableRow><TableCell colSpan={6} align="center">No applicants found.</TableCell></TableRow>
+            ) : (
+              currentRows.map((applicant, index) => (
+                <TableRow key={index} sx={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "lightgray" }}>
+                  <TableCell align="center" sx={{ border: `1px solid ${borderColor}` }}>{indexOfFirstRow + index + 1}</TableCell>
+                  <TableCell align="center" sx={{ border: `1px solid ${borderColor}`, color: "blue", cursor: "pointer", "&:hover": { textDecoration: "underline" } }} onClick={() => handleNameClick(applicant)}>{applicant.applicant_number}</TableCell>
+                  <TableCell align="left" sx={{ border: `1px solid ${borderColor}`, color: "blue", cursor: "pointer", "&:hover": { textDecoration: "underline" } }} onClick={() => handleNameClick(applicant)}>{applicant.fullName}</TableCell>
+                  <TableCell align="center" sx={{ border: `1px solid ${borderColor}` }}>{formatDateLong(applicant.birthdate)}</TableCell>
+                  <TableCell align="center" sx={{ border: `1px solid ${borderColor}` }}>{applicant.email}</TableCell>
+                  <TableCell align="center" sx={{ border: `1px solid ${borderColor}`, fontWeight: "bold", color: applicant.status === 1 ? "green" : "red" }}>
+                    {applicant.status === 1 ? "Active" : "Inactive"}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Bottom Pagination */}
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead><PaginationBar /></TableHead>
+        </Table>
+      </TableContainer>
+
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((p) => ({ ...p, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar((p) => ({ ...p, open: false }))} sx={{ width: "100%" }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default SuperAdminApplicantResetPassword;

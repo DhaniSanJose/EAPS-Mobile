@@ -1,0 +1,3251 @@
+import {
+  Box,
+  Button,
+  Typography,
+  TextField,
+  Snackbar,
+  Alert,
+  Avatar,
+  Card,
+  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Paper,
+  Checkbox,
+  FormControl,
+  Select,
+  MenuItem,
+} from "@mui/material";
+import React, { useState, useEffect, useContext, useRef } from "react";
+import { SettingsContext } from "../App";
+import EaristLogo from "../assets/EaristLogo.png";
+import { InsertPageBreak, Search } from "@mui/icons-material";
+import { useLocation } from "react-router-dom";
+import axios from "axios";
+import Unauthorized from "../components/Unauthorized";
+import LoadingOverlay from "../components/LoadingOverlay";
+import ListAltIcon from "@mui/icons-material/ListAlt";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import ClassIcon from "@mui/icons-material/Class";
+import SearchIcon from "@mui/icons-material/Search";
+import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
+import GradeIcon from "@mui/icons-material/Grade";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import SchoolIcon from "@mui/icons-material/School";
+import { useNavigate } from "react-router-dom";
+import { FcPrint } from "react-icons/fc";
+import API_BASE_URL from "../apiConfig";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import AssignmentIcon from "@mui/icons-material/Assignment";
+import PersonIcon from "@mui/icons-material/Person";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import AddIcon from '@mui/icons-material/Add';
+const TOR = () => {
+  const settings = useContext(SettingsContext);
+
+  const [titleColor, setTitleColor] = useState("#000000");
+  const [subtitleColor, setSubtitleColor] = useState("#555555");
+  const [borderColor, setBorderColor] = useState("#000000");
+  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
+  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
+
+  const [fetchedLogo, setFetchedLogo] = useState(null);
+  const [companyName, setCompanyName] = useState("");
+  const [shortTerm, setShortTerm] = useState("");
+  const [branches, setBranches] = useState([]);
+
+  useEffect(() => {
+    if (!settings) return;
+
+    // 🎨 Colors
+    if (settings.title_color) setTitleColor(settings.title_color);
+    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
+    if (settings.border_color) setBorderColor(settings.border_color);
+    if (settings.main_button_color)
+      setMainButtonColor(settings.main_button_color);
+    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
+    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+
+    // 🏫 Logo
+    if (settings.logo_url) {
+      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    } else {
+      setFetchedLogo(EaristLogo);
+    }
+
+    // 🏷️ School Information
+    if (settings.company_name) setCompanyName(settings.company_name);
+    if (settings.short_term) setShortTerm(settings.short_term);
+    const settingsBranches = settings?.branches || settings?.branch;
+    if (settingsBranches) {
+      try {
+        const parsed =
+          typeof settingsBranches === "string"
+            ? JSON.parse(settingsBranches)
+            : settingsBranches;
+        setBranches(Array.isArray(parsed) ? parsed : []);
+      } catch (err) {
+        console.error("Failed to parse branches:", err);
+        setBranches([]);
+      }
+    }
+  }, [settings]);
+
+  const [person, setPerson] = useState({
+    profile_img: "",
+    campus: "",
+    academicProgram: "",
+    classifiedAs: "",
+    program: "",
+    program2: "",
+    program3: "",
+    yearLevel: "",
+    last_name: "",
+    first_name: "",
+    middle_name: "",
+    extension: "",
+    nickname: "",
+    height: "",
+    weight: "",
+    lrnNumber: "",
+    gender: "",
+    pwdType: "",
+    pwdId: "",
+    birthOfDate: "",
+    age: "",
+    birthPlace: "",
+    languageDialectSpoken: "",
+    citizenship: "",
+    religion: "",
+    civilStatus: "",
+    tribeEthnicGroup: "",
+    otherEthnicGroup: "",
+    cellphoneNumber: "",
+    emailAddress: "",
+    telephoneNumber: "",
+    facebookAccount: "",
+    presentStreet: "",
+    presentBarangay: "",
+    presentZipCode: "",
+    presentRegion: "",
+    presentProvince: "",
+    presentMunicipality: "",
+    presentDswdHouseholdNumber: "",
+    permanentStreet: "",
+    permanentBarangay: "",
+    permanentZipCode: "",
+    permanentRegion: "",
+    permanentProvince: "",
+    permanentMunicipality: "",
+    permanentDswdHouseholdNumber: "",
+    father_deceased: "",
+    father_family_name: "",
+    father_given_name: "",
+    father_middle_name: "",
+    father_ext: "",
+    father_contact: "",
+    father_occupation: "",
+    father_income: "",
+    father_email: "",
+    mother_deceased: "",
+    mother_family_name: "",
+    mother_given_name: "",
+    mother_middle_name: "",
+    mother_contact: "",
+    mother_occupation: "",
+    mother_income: "",
+    guardian: "",
+    guardian_family_name: "",
+    guardian_given_name: "",
+    guardian_middle_name: "",
+    guardian_ext: "",
+    guardian_nickname: "",
+    guardian_address: "",
+    guardian_contact: "",
+    guardian_email: "",
+  });
+
+  const [campusAddress, setCampusAddress] = useState("");
+  const [gradeConversion, setGradeConversions] = useState([]);
+
+  // ✅ Fetch person data from backend
+  const fetchPersonData = async (id) => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      setPerson(res.data); // make sure backend returns the correct format
+    } catch (error) {
+      console.error("Failed to fetch person:", error);
+    }
+  };
+
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const queryPersonId = queryParams.get("person_id");
+  const [signatures, setSignatures] = useState([]);
+  const [selectedPreparedBy, setSelectedPreparedBy] = useState(null);
+  const [selectedCheckedBy, setSelectedCheckedBy] = useState(null);
+  const [selectedRegistrar, setSelectedRegistrar] = useState(null);
+  const [signaturePage, setSignaturePage] = useState(0);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const storedID = localStorage.getItem("person_id");
+
+    if (storedUser && storedRole && storedID) {
+      setUser(storedUser);
+      setUserRole(storedRole);
+      setUserID(storedID);
+
+      if (storedRole === "applicant" || storedRole === "registrar") {
+        fetchPersonData(storedID);
+      } else {
+        window.location.href = "/login";
+      }
+    } else {
+      window.location.href = "/login";
+    }
+  }, []);
+
+  const [userID, setUserID] = useState("");
+  const [user, setUser] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [employeeID, setEmployeeID] = useState("");
+  const [studentData, setStudentData] = useState([]);
+  const [studentNumber, setStudentNumber] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [studentDetails, setStudentDetails] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+
+  const [activeStep, setActiveStep] = useState(5);
+  const [clickedSteps, setClickedSteps] = useState([]);
+
+  useEffect(() => {
+    if (!settings) return;
+
+    const branchId =
+      studentData?.campus ||
+      studentData?.branch_id ||
+      person?.campus ||
+      person?.branch_id;
+    const matchedBranch = branches.find(
+      (branch) =>
+        String(branch?.id ?? branch?.branch_id) === String(branchId),
+    );
+
+    if (
+      matchedBranch?.address ||
+      matchedBranch?.branch_address ||
+      matchedBranch?.campus_address
+    ) {
+      setCampusAddress(
+        matchedBranch.address ||
+        matchedBranch.branch_address ||
+        matchedBranch.campus_address,
+      );
+      return;
+    }
+
+    if (settings.campus_address) {
+      setCampusAddress(settings.campus_address);
+      return;
+    }
+
+    setCampusAddress(settings.address || "");
+  }, [
+    settings,
+    branches,
+    studentData?.campus,
+    studentData?.branch_id,
+    person?.campus,
+    person?.branch_id,
+  ]);
+
+  const navigate = useNavigate();
+
+  const tabs = [
+    { label: "Student List", to: "/registrar_student_list", icon: <SchoolIcon fontSize="large" /> },
+    { label: "Student Profile", to: "/student_registrar_personal_information", icon: <PersonIcon fontSize="large" /> },
+    { label: "Student Online Requirements Registrar", to: "/student_online_requirements_registrar", icon: <AssignmentIcon fontSize="large" /> },
+    { label: "Course Tagging", to: "/registrar_class_list", icon: <AddIcon fontSize="large" /> },
+    { label: "Search Certificate of Registration", to: "/registrar_course_tagging_summer", icon: <ListAltIcon fontSize="large" /> },
+    { label: "Report of Grades", to: "/report_of_grades", icon: <GradeIcon fontSize="large" /> },
+    { label: "Transcript of Records", to: "/transcript_of_records", icon: <ReceiptLongIcon fontSize="large" /> },
+  ];
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const personIdFromUrl = queryParams.get("person_id");
+
+    if (!personIdFromUrl) return;
+
+    // fetch info of that person
+    axios
+      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
+      .then((res) => {
+        if (res.data?.applicant_number) {
+          // AUTO-INSERT applicant_number into search bar
+          setSearchQuery(res.data.applicant_number);
+
+          // If you have a fetchUploads() or fetchExamScore() — call it
+          if (typeof fetchUploadsByApplicantNumber === "function") {
+            fetchUploadsByApplicantNumber(res.data.applicant_number);
+          }
+
+          if (typeof fetchApplicants === "function") {
+            fetchApplicants();
+          }
+        }
+      })
+      .catch((err) => console.error("Auto search failed:", err));
+  }, [location.search]);
+
+  const handleStepClick = (index, to) => {
+    setActiveStep(index);
+
+    const pid = localStorage.getItem("admin_edit_person_id");
+    console.log(pid);
+    if (pid && pid !== "undefined" && pid !== "null" && pid.length >= 9) {
+      navigate(`${to}?student_number=${pid}`);
+    } else {
+      navigate(to);
+    }
+  };
+
+  useEffect(() => {
+    const storedId = localStorage.getItem("admin_edit_person_id");
+
+    if (
+      storedId &&
+      storedId !== "undefined" &&
+      storedId !== "null" &&
+      storedId.length >= 9
+    ) {
+      setSearchQuery(storedId);
+    }
+  }, []);
+
+  const [hasAccess, setHasAccess] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const pageId = 62;
+  const SIGNATURES_PER_PAGE = 5;
+
+  //Put this After putting the code of the past code
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const storedID = localStorage.getItem("person_id");
+    const storedEmployeeID = localStorage.getItem("employee_id");
+
+    if (storedUser && storedRole && storedID) {
+      setUser(storedUser);
+      setUserRole(storedRole);
+      setUserID(storedID);
+      setEmployeeID(storedEmployeeID);
+
+      if (storedRole === "registrar") {
+        checkAccess(storedEmployeeID);
+      } else {
+        window.location.href = "/login";
+      }
+    } else {
+      window.location.href = "/login";
+    }
+  }, []);
+
+  const checkAccess = async (employeeID) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
+      if (response.data && response.data.page_privilege === 1) {
+        setHasAccess(true);
+      } else {
+        setHasAccess(false);
+      }
+    } catch (error) {
+      console.error("Error checking access:", error);
+      setHasAccess(false);
+      if (error.response && error.response.data.message) {
+        console.log(error.response.data.message);
+      } else {
+        console.log("An unexpected error occurred.");
+      }
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 5) {
+      setSelectedStudent(null);
+      setStudentData([]);
+      return;
+    }
+
+    const fetchStudent = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/program_evaluation/${searchQuery}`,
+        );
+        const data = await res.json();
+
+        if (data) {
+          setSelectedStudent(data);
+          setStudentData(data);
+
+          if (searchQuery) {
+            localStorage.setItem("admin_edit_person_id", searchQuery);
+          }
+
+          const detailsRes = await fetch(
+            `${API_BASE_URL}/api/program_evaluation/details/${searchQuery}`,
+          );
+          const detailsData = await detailsRes.json();
+          if (Array.isArray(detailsData) && detailsData.length > 0) {
+            setStudentDetails(detailsData);
+          } else {
+            setStudentDetails([]);
+            setSnackbarMessage("No enrolled subjects found for this student.");
+            setOpenSnackbar(true);
+          }
+        } else {
+          setSelectedStudent(null);
+          setStudentData([]);
+          setStudentDetails([]);
+          setSnackbarMessage("No student data found.");
+          setOpenSnackbar(true);
+        }
+      } catch (err) {
+        console.error("Error fetching student", err);
+        setSnackbarMessage("Server error. Please try again.");
+        localStorage.removeItem("admin_edit_person_id");
+        setOpenSnackbar(true);
+      }
+    };
+
+    fetchStudent();
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const fetchSignatures = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/signature`);
+        setSignatures(res.data?.success ? res.data.data || [] : []);
+        setSignaturePage(0);
+      } catch (err) {
+        console.error(err);
+        setSignatures([]);
+      }
+    };
+    fetchSignatures();
+  }, []);
+
+  useEffect(() => {
+    fetchGradeConversionDic();
+  }, [])
+
+  const fetchGradeConversionDic = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/admin/grade-conversion`);
+      setGradeConversions(Array.isArray(res.data) ? res.data : []);
+
+      console.log("Fetch successful");
+    } catch (err) {
+      console.log("Error Fetching Data: ", err);
+      setGradeConversions([]);
+    }
+  };
+
+  const paginatedSignatures = signatures.slice(
+    signaturePage * SIGNATURES_PER_PAGE,
+    signaturePage * SIGNATURES_PER_PAGE + SIGNATURES_PER_PAGE,
+  );
+  const totalSignaturePages = Math.max(
+    1,
+    Math.ceil(signatures.length / SIGNATURES_PER_PAGE),
+  );
+
+  const getSignatureImageSrc = (signature) =>
+    signature?.signature_image
+      ? `${API_BASE_URL}/uploads/${signature.signature_image}`
+      : "";
+
+  const totalUnitPerSubject = (course_unit, lab_unit) => {
+    const lec = Number(course_unit) || 0;
+    const lab = Number(lab_unit) || 0;
+    return lec + lab;
+  };
+
+  const groupedDetails = {};
+  if (Array.isArray(studentDetails)) {
+    studentDetails.forEach((item) => {
+      const key = `${item.school_year}-${item.semester_description}`;
+      if (!groupedDetails[key]) {
+        groupedDetails[key] = [];
+      }
+      groupedDetails[key].push(item);
+    });
+  }
+
+  function convertSemester(semester) {
+    if (!semester) return "";
+
+    const normalized = semester?.replace(/\s+/g, "").toUpperCase();
+
+    switch (normalized) {
+      case "FIRSTSEMESTER":
+        return "1st Semester";
+      case "SECONDSEMESTER":
+        return "2nd Semester";
+      case "THIRDSEMESTER":
+        return "3rd Semester";
+      case "FOURTHSEMESTER":
+        return "4th Semester";
+      default:
+        return semester;
+    }
+  }
+
+  const groupedSubjects = Object.entries(groupedDetails).map(
+    ([key, courses]) => ({
+      termKey: key,
+      year: courses[0]?.current_year,
+      nextYear: courses[0]?.next_year,
+      semester: courses[0]?.semester_description,
+      subjects: courses,
+    }),
+  );
+
+  // Constants
+  const MAX_PAGE_HEIGHT_REM = 47;
+  const SUBJECT_HEIGHT_REM = 1.1;
+  const MAX_SUBJECTS_PER_PAGE = Math.floor(
+    MAX_PAGE_HEIGHT_REM / SUBJECT_HEIGHT_REM,
+  );
+
+  // Function to chunk subjects into pages
+  const chunkArray = (arr, maxSubjects) => {
+    const result = [];
+    let currentPage = [];
+    let currentCount = 0;
+
+    for (const group of arr) {
+      let remainingSubjects = [...group.subjects];
+      let isContinuation = false;
+
+      while (remainingSubjects.length > 0) {
+        const availableSpace = maxSubjects - currentCount;
+
+        if (remainingSubjects.length <= availableSpace) {
+          // All subjects fit on this page
+          currentPage.push({
+            ...group,
+            subjects: remainingSubjects,
+            isContinuation,
+          });
+          currentCount += remainingSubjects.length;
+          remainingSubjects = [];
+        } else {
+          // Some subjects fit, others overflow → split group
+          const fitSubjects = remainingSubjects.slice(0, availableSpace);
+          const overflowSubjects = remainingSubjects.slice(availableSpace);
+
+          currentPage.push({
+            ...group,
+            subjects: fitSubjects,
+            isContinuation,
+          });
+          result.push(currentPage);
+
+          // start new page with remaining subjects
+          currentPage = [];
+          currentCount = 0;
+          remainingSubjects = overflowSubjects;
+          isContinuation = true; // mark next split as continuation
+        }
+
+        if (currentCount >= maxSubjects) {
+          result.push(currentPage);
+          currentPage = [];
+          currentCount = 0;
+        }
+      }
+    }
+
+    if (currentPage.length > 0) result.push(currentPage);
+
+    return result;
+  };
+
+  const paginatedSubjects = chunkArray(groupedSubjects, MAX_SUBJECTS_PER_PAGE);
+
+  const formattedDate = (dateString) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const todayDate = new Date().toLocaleDateString("en-US", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const divToPrintRef = useRef();
+
+  const printDiv = () => {
+    window.print();
+  };
+
+  const handlePreparedByChange = (signature) => {
+    setSelectedPreparedBy((prev) =>
+      prev?.id === signature.id ? null : signature,
+    );
+  };
+
+  const handleCheckedByChange = (signature) => {
+    setSelectedCheckedBy((prev) =>
+      prev?.id === signature.id ? null : signature,
+    );
+  };
+
+  const handleRegistrarChange = (signature) => {
+    setSelectedRegistrar((prev) =>
+      prev?.id === signature.id ? null : signature,
+    );
+  };
+
+  const isSignatureSelectedForAnotherRole = (signature, currentRole) => {
+    const selections = {
+      prepared: selectedPreparedBy,
+      checked: selectedCheckedBy,
+      registrar: selectedRegistrar,
+    };
+
+    return Object.entries(selections).some(
+      ([role, selected]) => role !== currentRole && selected?.id === signature.id,
+    );
+  };
+
+  const handleGradeConversion = (grade) => {
+    if (grade === null || grade === undefined || grade === "") return "";
+
+    const normalizedGrade = String(grade).trim().toUpperCase();
+
+    if (normalizedGrade === "0" || Number(normalizedGrade) === 0) return "";
+    if (normalizedGrade === "INC") return "INC";
+    if (normalizedGrade === "DROP" || normalizedGrade === "DRP") return "DRP";
+
+    const numericGrade = Number(normalizedGrade);
+    if (Number.isNaN(numericGrade)) return grade;
+
+    if (numericGrade > 0 && numericGrade <= 5) {
+      return Number.isInteger(numericGrade)
+        ? String(numericGrade)
+        : numericGrade.toFixed(2);
+    }
+
+    const matchedConversion = gradeConversion.find((row) => {
+      const minScore = Number(row.min_score);
+      const maxScore = Number(row.max_score);
+
+      return (
+        Number.isFinite(minScore) &&
+        Number.isFinite(maxScore) &&
+        numericGrade >= minScore &&
+        numericGrade <= maxScore
+      );
+    });
+
+    if (!matchedConversion?.equivalent_grade) {
+      return grade;
+    }
+
+    const equivalentGrade = Number(matchedConversion.equivalent_grade);
+    return Number.isNaN(equivalentGrade)
+      ? matchedConversion.equivalent_grade
+      : equivalentGrade.toFixed(2);
+  };
+
+  // Put this at the very bottom before the return
+  if (loading || hasAccess === null) {
+    return <LoadingOverlay open={loading} message="Loading..." />;
+  }
+
+  if (!hasAccess) {
+    return <Unauthorized />;
+  }
+
+     // 🔒 Disable right-click
+    document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    document.addEventListener("keydown", (e) => {
+        const isBlockedKey =
+            e.key === "F12" ||
+            e.key === "F11" ||
+            (e.ctrlKey &&
+                e.shiftKey &&
+                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+            (e.ctrlKey && e.key.toLowerCase() === "u") ||
+            (e.ctrlKey && e.key.toLowerCase() === "p");
+
+        if (isBlockedKey) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+  return (
+    <Box
+      sx={{
+        height: "calc(100vh - 150px)",
+        overflowY: "auto",
+        paddingRight: 1,
+        backgroundColor: "transparent",
+        mt: 1,
+        padding: 2,
+      }}
+    >
+      <Box
+        className="navbars"
+        sx={{
+          display: "flex",
+          background: "white",
+          alignItems: "center",
+          justifyContent: "space-between",
+
+          mb: 2,
+        }}
+      >
+        {/* Left: Title */}
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: "bold",
+            color: titleColor,
+            fontSize: "36px",
+            background: "white",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          TRANSCRIPT OF RECORDS
+        </Typography>
+
+        {/* Right: Search + Print grouped together */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <TextField
+            variant="outlined"
+            placeholder="Enter Student Number"
+            size="small"
+            value={studentNumber}
+            onChange={(e) => {
+              setStudentNumber(e.target.value);
+              setSearchQuery(e.target.value);
+            }}
+            sx={{
+              width: 450,
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+
+          <button
+            onClick={printDiv}
+            style={{
+              width: "300px",
+              padding: "10px 20px",
+              border: "2px solid black",
+              backgroundColor: "#f0f0f0",
+              color: "black",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontSize: "16px",
+              fontWeight: "bold",
+              transition: "background-color 0.3s, transform 0.2s",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
+            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
+            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+          >
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <FcPrint size={20} />
+              Print TOR
+            </span>
+          </button>
+        </Box>
+      </Box>
+
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+      <br />
+
+      <br />
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          width: "100%",
+          mt: 2,
+        }}
+      >
+        {tabs.map((tab, index) => (
+          <React.Fragment key={index}>
+            {/* Step Card */}
+            <Card
+              onClick={() => handleStepClick(index, tab.to)}
+              sx={{
+                flex: 1,
+                maxWidth: `${100 / tabs.length}%`, // evenly fit 100%
+                height: 140,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                borderRadius: 2,
+                border: `1px solid ${borderColor}`,
+                backgroundColor:
+                  activeStep === index
+                    ? settings?.header_color || "#1976d2"
+                    : "#E8C999",
+                color: activeStep === index ? "#fff" : "#000",
+                boxShadow:
+                  activeStep === index
+                    ? "0px 4px 10px rgba(0,0,0,0.3)"
+                    : "0px 2px 6px rgba(0,0,0,0.15)",
+                transition: "0.3s ease",
+                "&:hover": {
+                  backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <Box sx={{ fontSize: 32, mb: 0.5 }}>{tab.icon}</Box>
+                <Typography
+                  sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
+                >
+                  {tab.label}
+                </Typography>
+              </Box>
+            </Card>
+
+            {/* Spacer instead of line */}
+            {index < tabs.length - 1 && (
+              <Box
+                sx={{
+                  flex: 0.1,
+                  mx: 1, // margin to keep spacing
+                }}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </Box>
+      <br />
+      <br />
+      <style>
+        {`
+            /* ===== Screen-only "separate pages" look =====
+               These rules are NOT inside @media print, so they apply
+               only to normal on-screen viewing. Each print-container
+               (one per physical page) gets its own card styling with
+               a fixed page size, border, shadow and gap so pages look
+               visually separated instead of one continuous block. */
+            .page-container {
+                background: #e7e7e7;
+                padding-top: 2rem;
+            }
+            .page-card {
+                background: white;
+                border: 1px solid #b8b8b8;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+                box-sizing: border-box;
+                width: fit-content;
+                min-width: 215.9mm;
+                min-height: 356mm;
+                padding: 10mm 12mm;
+                margin: 0 auto 2.5rem;
+            }
+
+            @media print {
+                @page {
+                    margin: 0 !important; 
+                    padding: 0 !important;
+                    size: 216mm 356mm;
+                }
+                html, body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    height: auto;
+                    position: relative
+                }
+                body * {
+                    visibility: hidden;
+                }
+                .body, .page {
+                    display: block !important;
+                    overflow: visible !important;
+                    height: auto !important;
+                    max-height: none !important;
+                }
+                .page {
+                    zoom: 0.85 !important;
+                    position: absolute;
+                    top: 0;
+                    left: 26%;
+                }
+                .print-container, .print-container *, .page, .page *{
+                    visibility: visible;
+                }
+                .print-container {
+                    display: block;
+                    width: 100%;
+                    position: relative;
+                    margin-top: 0 !mportant;
+                    margin-bottom: 0 !mportant;
+                    margin-right: 0 !mportant;
+                    padding: 0 !important;
+                    min-height: 13.5in;
+                    margin-left: -23.5%;
+                    font-family: "Poppins", sans-serif;
+                }
+                .print-container:first-child {
+                    page-break-after: auto;
+                }
+                .page-container{
+                    display: block !important;
+                    background: transparent !important;
+                    padding: 0 !important;
+                }   
+                .print-container:last-child {
+                    page-break-after: auto;
+                    margin-top: 0;
+                }
+                .print-container:first-child .page-header{
+                    top: 0;
+                }
+                .page-header{
+                    margin-top: -0.5rem !important;
+                    height: 10rem !important;
+                }
+                .table{
+                    height: auto !important;
+                    min-height: 0 !important;
+                    max-height: none !important;
+                    border-collapse: collapse !important;
+                }
+                .no-border{
+                    border-bottom: none !important;
+                }
+                button {
+                    display: none !important; /* hide buttons */
+                }
+
+                /* ✅ The screen-only "page card" look (border/shadow/fixed
+                   size/gap) must disappear when printing, since the print
+                   layout already handles page sizing via .print-container
+                   and the @page rule above. Note: we deliberately do NOT
+                   reset margin-left here, because .print-container relies
+                   on margin-left: -23.5% (set above) to center the page —
+                   resetting the full margin shorthand would break that. */
+                .page-card {
+                    background: transparent !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    padding: 0 !important;
+                    width: 100% !important;
+                    min-height: 13.5in !important;
+                    margin-top: 0 !important;
+                    margin-right: 0 !important;
+                    margin-bottom: 0 !important;
+                }
+
+            }
+        `}
+      </style>
+
+      <TableContainer component={Paper} sx={{ width: "100%" }}>
+        <Table>
+          <TableHead
+            sx={{
+              backgroundColor: settings?.header_color || "#1976d2",
+              border: `1px solid ${borderColor}`,
+            }}
+          >
+            <TableRow>
+              {/* Left cell: Student Number */}
+              <TableCell
+                sx={{
+                  color: "white",
+                  fontSize: "20px",
+                  fontFamily: "Poppins, sans-serif",
+                  border: "none",
+                }}
+              >
+                Student Number:&nbsp;
+                <span
+                  style={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "normal",
+                    textDecoration: "underline",
+                  }}
+                >
+                  {studentData.student_number || "N/A"}
+                </span>
+              </TableCell>
+
+              {/* Right cell: Student Name */}
+              <TableCell
+                align="right"
+                sx={{
+                  color: "white",
+                  fontSize: "20px",
+                  fontFamily: "Poppins, sans-serif",
+                  border: "none",
+                }}
+              >
+                Student Name:&nbsp;
+                <span
+                  style={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "normal",
+                    textDecoration: "underline",
+                  }}
+                >
+                  {studentData && studentData.last_name
+                    ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()} ${studentData.middle_name?.toUpperCase() || ""}`
+                    : "N/A"}
+                </span>
+              </TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </TableContainer>
+      <br />
+      <br />
+
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "center",
+          width: "100%",
+          mb: 4,
+        }}
+      >
+        <Box
+          sx={{
+            background: "white",
+            width: "100%",
+
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+              px: 2,
+              py: 1.5,
+              backgroundColor: settings?.header_color || "#1976d2",
+              color: "white",
+              borderTop: `1px solid ${borderColor}`,
+            }}
+          >
+            <Typography fontSize="14px" fontWeight="bold" color="white">
+              Total Admin's Records: {signatures.length}
+            </Typography>
+
+            <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+              <Button
+                onClick={() => setSignaturePage(0)}
+                disabled={signaturePage === 0}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                First
+              </Button>
+
+              <Button
+                onClick={() =>
+                  setSignaturePage((prev) => Math.max(prev - 1, 0))
+                }
+                disabled={signaturePage === 0}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                Prev
+              </Button>
+
+              <FormControl size="small" sx={{ minWidth: 90 }}>
+                <Select
+                  value={signaturePage + 1}
+                  onChange={(e) => setSignaturePage(Number(e.target.value) - 1)}
+                  displayEmpty
+                  sx={{
+                    fontSize: "12px",
+                    height: 36,
+                    color: "white",
+                    border: "1px solid white",
+                    backgroundColor: "transparent",
+                    ".MuiOutlinedInput-notchedOutline": {
+                      borderColor: "white",
+                    },
+                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "white",
+                    },
+                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "white",
+                    },
+                    "& svg": {
+                      color: "white",
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        maxHeight: 200,
+                        backgroundColor: "#fff",
+                      },
+                    },
+                  }}
+                >
+                  {Array.from({ length: totalSignaturePages }, (_, i) => (
+                    <MenuItem key={i + 1} value={i + 1}>
+                      Page {i + 1}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Typography fontSize="11px" color="white">
+                of {totalSignaturePages} page
+                {totalSignaturePages > 1 ? "s" : ""}
+              </Typography>
+
+              <Button
+                onClick={() =>
+                  setSignaturePage((prev) =>
+                    Math.min(prev + 1, totalSignaturePages - 1),
+                  )
+                }
+                disabled={signaturePage >= totalSignaturePages - 1}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                Next
+              </Button>
+
+              <Button
+                onClick={() => setSignaturePage(totalSignaturePages - 1)}
+                disabled={signaturePage >= totalSignaturePages - 1}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                Last
+              </Button>
+            </Box>
+          </Box>
+          <TableContainer
+            component={Paper}
+            elevation={2}
+            sx={{
+              overflowX: "auto",
+              width: "100%",
+              margin: "0 auto",
+            }}
+          >
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {["#", "Full Name", "Designation", "Prepared By", "Checked By", "Registrar"].map((header) => (
+                    <TableCell
+                      key={header}
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        fontWeight: 600,
+                        color: titleColor,
+                        textAlign: "center",
+                        fontSize: "13px",
+                        padding: "6px 10px", // smaller height
+                      }}
+                    >
+                      {header}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {paginatedSignatures.map((signature, index) => (
+                  <TableRow key={signature.id}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                        color: titleColor,
+                        padding: "4px 8px",
+                      }}
+                    >
+                      {signaturePage * SIGNATURES_PER_PAGE + index + 1}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                        color: titleColor,
+                        padding: "4px 8px",
+                      }}
+                    >
+                      {signature.full_name}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        color: titleColor,
+                        fontSize: "12px",
+                        padding: "4px 8px",
+                      }}
+                    >
+                      {signature.designation}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        color: titleColor,
+                        padding: "4px 6px",
+                      }}
+                    >
+                      <Checkbox
+                        size="small"
+                        color="primary"
+                        checked={selectedPreparedBy?.id === signature.id}
+                        onChange={() => handlePreparedByChange(signature)}
+                        disabled={isSignatureSelectedForAnotherRole(signature, "prepared")}
+                      />
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        color: titleColor,
+                        padding: "4px 6px",
+                      }}
+                    >
+                      <Checkbox
+                        size="small"
+                        color="secondary"
+                        checked={selectedCheckedBy?.id === signature.id}
+                        onChange={() => handleCheckedByChange(signature)}
+                        disabled={isSignatureSelectedForAnotherRole(signature, "checked")}
+                      />
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        color: titleColor,
+                        padding: "4px 6px",
+                      }}
+                    >
+                      <Checkbox
+                        size="small"
+                        color="success"
+                        checked={selectedRegistrar?.id === signature.id}
+                        onChange={() => handleRegistrarChange(signature)}
+                        disabled={isSignatureSelectedForAnotherRole(signature, "registrar")}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {paginatedSignatures.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      align="center"
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        color: titleColor,
+                        padding: "8px",
+                        fontSize: "12px",
+                      }}
+                    >
+                      No signatures found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+              px: 2,
+              py: 1.5,
+              backgroundColor: settings?.header_color || "#1976d2",
+              color: "white",
+              borderTop: `1px solid ${borderColor}`,
+            }}
+          >
+            <Typography fontSize="14px" fontWeight="bold" color="white">
+               Total Admin's Records: {signatures.length}
+            </Typography>
+
+            <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+              <Button
+                onClick={() => setSignaturePage(0)}
+                disabled={signaturePage === 0}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                First
+              </Button>
+
+              <Button
+                onClick={() =>
+                  setSignaturePage((prev) => Math.max(prev - 1, 0))
+                }
+                disabled={signaturePage === 0}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                Prev
+              </Button>
+
+              <FormControl size="small" sx={{ minWidth: 90 }}>
+                <Select
+                  value={signaturePage + 1}
+                  onChange={(e) => setSignaturePage(Number(e.target.value) - 1)}
+                  displayEmpty
+                  sx={{
+                    fontSize: "12px",
+                    height: 36,
+                    color: "white",
+                    border: "1px solid white",
+                    backgroundColor: "transparent",
+                    ".MuiOutlinedInput-notchedOutline": {
+                      borderColor: "white",
+                    },
+                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "white",
+                    },
+                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "white",
+                    },
+                    "& svg": {
+                      color: "white",
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        maxHeight: 200,
+                        backgroundColor: "#fff",
+                      },
+                    },
+                  }}
+                >
+                  {Array.from({ length: totalSignaturePages }, (_, i) => (
+                    <MenuItem key={i + 1} value={i + 1}>
+                      Page {i + 1}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Typography fontSize="11px" color="white">
+                of {totalSignaturePages} page
+                {totalSignaturePages > 1 ? "s" : ""}
+              </Typography>
+
+              <Button
+                onClick={() =>
+                  setSignaturePage((prev) =>
+                    Math.min(prev + 1, totalSignaturePages - 1),
+                  )
+                }
+                disabled={signaturePage >= totalSignaturePages - 1}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                Next
+              </Button>
+
+              <Button
+                onClick={() => setSignaturePage(totalSignaturePages - 1)}
+                disabled={signaturePage >= totalSignaturePages - 1}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: 80,
+                  color: "white",
+                  borderColor: "white",
+                  backgroundColor: "transparent",
+                  "&:hover": {
+                    borderColor: "white",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
+                  "&.Mui-disabled": {
+                    color: "white",
+                    borderColor: "white",
+                    backgroundColor: "transparent",
+                    opacity: 1,
+                  },
+                }}
+              >
+                Last
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box
+        style={{ width: "100%", display: "flex", justifyContent: "center" }}
+        className="page-container"
+      >
+        <Box
+          ref={divToPrintRef}
+          className="page"
+          style={{ minWidth: "215.9mm" }}
+        >
+          {paginatedSubjects.map((pageGroups, pageIndex) => (
+            <Box
+              key={pageIndex}
+              className={`print-container print-container-${pageIndex + 1} page-card`}
+              style={{
+                pageBreakAfter: "always",
+                breakAfter: "page",
+                paddingRight: "3.5rem",
+                marginTop: "3rem",
+                paddingBottom: "1.5rem",
+              }}
+            >
+                {/* Start Of Header */}
+                <Box
+                  className="page-header"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    height: "10rem",
+                    width: "80rem",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Box
+                    style={{
+                      paddingTop: "1.5rem",
+                      marginLeft: "-10rem",
+                      paddingRight: "3rem",
+                    }}
+                  >
+                    <img
+                      src={fetchedLogo || EaristLogo} // use dynamic logo if available
+                      alt="Logo"
+                      style={{
+                        width: "8rem",
+                        height: "8rem",
+                        borderRadius: "50%",
+                      }}
+                    />
+                  </Box>
+                  <Box style={{ marginTop: "1.5rem", textAlign: "center" }}>
+                    <div style={{ fontFamily: "Arial", fontSize: "13px" }}>
+                      Republic of the Philippines
+                    </div>
+
+                    {companyName &&
+                      (() => {
+                        const words = companyName.trim().split(" ");
+                        const middle = Math.ceil(words.length / 2);
+                        const firstLine = words.slice(0, middle).join(" ");
+                        const secondLine = words.slice(middle).join(" ");
+                        return (
+                          <>
+                            <Typography
+                              style={{
+                                marginTop: "0rem",
+                                lineHeight: "1",
+                                fontSize: "1.6rem",
+                                letterSpacing: "-1px",
+                                fontWeight: "600",
+                                fontFamily: "Times new roman",
+                              }}
+                            >
+                              {firstLine}
+                            </Typography>
+                            {secondLine && (
+                              <Typography
+                                style={{
+                                  lineHeight: "1",
+                                  fontSize: "1.6rem",
+                                  letterSpacing: "-1px",
+                                  fontWeight: "600",
+                                  fontFamily: "Times new roman",
+                                }}
+                              >
+                                {secondLine}
+                              </Typography>
+                            )}
+                          </>
+                        );
+                      })()}
+
+                    <Typography style={{ fontFamily: "Arial", fontSize: "13px" }}>
+                      {campusAddress}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography
+                  style={{
+                    height: "1.5rem",
+                    marginLeft: "1rem",
+                    textAlign: "center",
+                    width: "80rem",
+                    fontSize: "1.6rem",
+                    letterSpacing: "-1px",
+                    fontWeight: "500",
+                  }}
+                >
+                  OFFICE OF THE REGISTRAR
+                </Typography>
+                <Typography
+                  style={{
+                    height: "2.5rem",
+                    marginLeft: "1rem",
+                    marginTop: "-0.5rem",
+                    width: "80rem",
+                    textAlign: "center",
+                    fontSize: "2.75rem",
+                    letterSpacing: "-1px",
+                    fontWeight: "600",
+                  }}
+                >
+                  OFFICIAL TRANSCRIPT OF RECORDS
+                </Typography>
+                <Box style={{ display: "flex", marginTop: "1rem" }}>
+                  <Box>
+                    <Box
+                      style={{
+                        display: "flex",
+                        height: "17.5rem",
+                        marginLeft: "1rem",
+                        width: "80rem",
+                        borderBottom: "solid black 1px",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          padding: "1rem",
+                          width: "80rem",
+                        }}
+                      >
+                        <Box>
+                          <Box style={{ display: "flex", width: "40rem" }}>
+                            <Typography
+                              style={{
+                                width: "20rem",
+                                fontSize: "22px",
+                                letterSpacing: "-2px",
+                                wordSpacing: "14rem",
+                              }}
+                            >
+                              NAME :
+                            </Typography>
+
+                            <Typography
+                              style={{
+                                display: "flex",
+                                fontSize: "24px",
+                                fontWeight: "600",
+                                letterSpacing: "-1.5px",
+                                wordSpacing: "3px",
+                                alignItems: "center",
+                                height: "36px",
+                              }}
+                            >
+                              {studentData && studentData.last_name
+                                ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()}`
+                                : ""}
+                            </Typography>
+                          </Box>
+                          <Box style={{ display: "flex", marginTop: "-6px" }}>
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "20px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-1px",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span>DATE OF BIRTH</span>
+                              <span>:</span>
+                            </Typography>
+                            <Typography
+                              style={{
+                                fontSize: "21px",
+                                marginTop: "-5px",
+                                marginLeft: "2.3rem",
+                                fontWeight: "400",
+                                letterSpacing: "-1px",
+                                wordSpacing: "3px",
+                              }}
+                            >
+                              {formattedDate(studentData.birthOfDate)}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box>
+                          <Box
+                            style={{
+                              display: "flex",
+                              width: "62rem",
+                              marginTop: "0.6rem",
+                            }}
+                          >
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "20px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-2.3px",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span>ADMISSION CREDENTIALS</span>
+                              <span>:</span>
+                            </Typography>
+                            {studentData && studentData.requirements && (
+                              <Typography
+                                style={{
+                                  fontSize: "21px",
+                                  marginTop: "-5px",
+                                  height: "30px",
+                                  marginLeft: "2.3rem",
+                                  fontWeight: "400",
+                                  letterSpacing: "-2px",
+                                  wordSpacing: "1px",
+                                }}
+                              >
+                                {studentData.requirements
+                                  .map((reqId) =>
+                                    reqId === 0
+                                      ? "No Document"
+                                      : reqId === 1
+                                        ? "F138"
+                                        : reqId === 2
+                                          ? "Certificate Of Good Moral Character"
+                                          : reqId === 3
+                                            ? "NSO Birth Certificate"
+                                            : reqId === 4
+                                              ? "F137"
+                                              : "",
+                                  )
+                                  .join("/")}
+                              </Typography>
+                            )}
+                          </Box>
+                          <Box style={{ display: "flex", marginTop: "-1px" }}>
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "20px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-2.3px",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span style={{ wordSpacing: "2px" }}>
+                                LAST SCHOOL ATTENDED
+                              </span>
+                              <span>:</span>
+                            </Typography>
+                            <Typography
+                              style={{
+                                fontSize: "22px",
+                                marginTop: "-5px",
+                                marginLeft: "2.3rem",
+                                fontWeight: "400",
+                                letterSpacing: "-1.5px",
+                                wordSpacing: "5px",
+                              }}
+                            >
+                              {studentData.schoolLastAttended}
+                            </Typography>
+                          </Box>
+                          <Box style={{ display: "flex", marginTop: "-3px" }}>
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "30px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-2.3px",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span style={{ wordSpacing: "3px" }}>
+                                DATE GRADUATED
+                              </span>
+                              <span>:</span>
+                            </Typography>
+                            <Typography
+                              style={{
+                                fontSize: "22px",
+                                marginTop: "-5px",
+                                marginLeft: "2.3rem",
+                                fontWeight: "400",
+                                letterSpacing: "-1.5px",
+                                wordSpacing: "5px",
+                              }}
+                            >
+                              {studentData.previous_year} -{" "}
+                              {studentData.yearGraduated}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box>
+                          <Box
+                            style={{
+                              display: "flex",
+                              width: "38rem",
+                              marginTop: "0.9rem",
+                            }}
+                          >
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "20px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-1px",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span>STUDENT NUMBER</span>
+                              <span>:</span>
+                            </Typography>
+
+                            <Typography
+                              style={{
+                                fontSize: "21px",
+                                marginTop: "-5px",
+                                marginLeft: "2.3rem",
+                                fontWeight: "500",
+                                letterSpacing: "-1px",
+                                wordSpacing: "3px",
+                                height: "30px",
+                              }}
+                            >
+                              {studentData.student_number}
+                            </Typography>
+                          </Box>
+                          <Box style={{ display: "flex" }}>
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "20px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-1px",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span>DEGREE/TITLE EARNED</span>
+                              <span>:</span>
+                            </Typography>
+                            <Typography
+                              style={{
+                                fontSize: "22px",
+                                marginLeft: "2.3rem",
+                                marginTop: "-5.5px",
+                                fontWeight: "500",
+                                letterSpacing: "-1.5px",
+                                wordSpacing: "5px",
+                                height: "30px",
+                              }}
+                            >
+                              {studentData && studentData.program_description
+                                ? `${studentData.program_description?.toUpperCase()}`
+                                : ""}
+                            </Typography>
+                          </Box>
+                          <Box style={{ display: "flex", marginTop: "1px" }}>
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "20px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-1.5px",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span>MAJOR</span>
+                              <span>:</span>
+                            </Typography>
+                            <Typography
+                              style={{
+                                fontSize: "22px",
+                                marginTop: "-5px",
+                                marginLeft: "2.3rem",
+                                fontWeight: "500",
+                                letterSpacing: "-1.5px",
+                                wordSpacing: "5px",
+                                height: "30px",
+                              }}
+                            >
+                              {studentData && studentData.major
+                                ? `${studentData.major?.toUpperCase()}`
+                                : ""}
+                            </Typography>
+                          </Box>
+                          <Box style={{ display: "flex", marginTop: "1px" }}>
+                            <Typography
+                              style={{
+                                display: "flex",
+                                width: "17.8rem",
+                                height: "20px",
+                                alignItems: "center",
+                                fontSize: "22px",
+                                letterSpacing: "-2px",
+                                justifyContent: "space-between",
+                                wordSpacing: "4px",
+                              }}
+                            >
+                              <span>DATE OF GRADUATION</span>
+                              <span>:</span>
+                            </Typography>
+                            <Typography
+                              style={{
+                                fontSize: "22px",
+                                marginTop: "-5px",
+                                marginLeft: "2.3rem",
+                                fontWeight: "500",
+                                letterSpacing: "-1.5px",
+                                wordSpacing: "5px",
+                              }}
+                            ></Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+                      <Box
+                        style={{ marginLeft: "-12.6rem", marginTop: "1.3rem" }}
+                      >
+                        {!studentData?.profile_image ? (
+                          <Avatar
+                            sx={{
+                              width: 225,
+                              height: 225,
+                              mx: "auto",
+                              border: "1px solid black",
+                              color: "maroon",
+                              bgcolor: "transparent",
+                            }}
+                            variant="square"
+                          />
+                        ) : (
+                          <Avatar
+                            src={`${API_BASE_URL}/uploads/Student1by1/${studentData.profile_image}`}
+                            sx={{
+                              width: 225,
+                              height: 225,
+                              mx: "auto",
+                              border: "1px solid black"
+                            }}
+                            variant="square"
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                    {/* End of Header */}
+                    {/* Start of Main Content */}
+                    <Box
+                      style={{
+                        display: "flex",
+                        marginLeft: "1rem",
+                        marginTop: "0.5rem",
+                        flexWrap: "wrap",
+                        width: "80rem",
+                        borderTop: "solid black 1px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Box
+                        style={{
+                          flex: "0 0 50%",
+                          marginBottom: "1rem",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <table
+                          className="table"
+                          style={{
+                            height: "auto",
+                            minHeight: 0,
+                            borderCollapse: "collapse",
+                          }}
+                        >
+                          <thead>
+                            <tr
+                              style={{
+                                display: "flex",
+                                height: "65px",
+                                borderBottom: "solid 1px black",
+                              }}
+                            >
+                              <td
+                                style={{
+                                  fontWeight: "600",
+                                  fontSize: "20px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  letterSpacing: "0.8px",
+                                  width: "13rem",
+                                }}
+                              >
+                                <span>TERM</span>
+                              </td>
+                              <td
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: "38rem",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "600",
+                                    fontSize: "20px",
+                                    textAlign: "center",
+                                    letterSpacing: "-1px",
+                                    width: "28rem",
+                                  }}
+                                >
+                                  SUBJECTS
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "600",
+                                    fontSize: "20px",
+                                    textAlign: "center",
+                                    letterSpacing: "-1px",
+                                    width: "28rem",
+                                    wordSpacing: "3px",
+                                  }}
+                                >
+                                  CODE NUMBER WITH DESCRIPTIVE TITLE
+                                </div>
+                              </td>
+                              <td>
+                                <div
+                                  style={{
+                                    fontWeight: "600",
+                                    textAlign: "center",
+                                    fontSize: "20px",
+                                    letterSpacing: "-1px",
+                                    width: "13rem",
+                                  }}
+                                >
+                                  <span style={{ marginLeft: "-1.6rem" }}>
+                                    GRADES
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontWeight: "600",
+                                      fontSize: "20px",
+                                      textAlign: "center",
+                                      letterSpacing: "-1px",
+                                      width: "6rem",
+                                    }}
+                                  >
+                                    <span>FINAL</span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      textAlign: "center",
+                                      fontWeight: "600",
+                                      fontSize: "20px",
+                                      marginLeft: "-2rem",
+                                      letterSpacing: "-1px",
+                                      width: "7rem",
+                                    }}
+                                  >
+                                    <span>RE-EXAM</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td
+                                style={{
+                                  fontWeight: "600",
+                                  display: "flex",
+                                  fontSize: "20px",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  letterSpacing: "-1px",
+                                  width: "7rem",
+                                }}
+                              >
+                                <span>CREDITS</span>
+                              </td>
+                              <td
+                                style={{
+                                  fontWeight: "600",
+                                  display: "flex",
+                                  fontSize: "20px",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  letterSpacing: "-1px",
+                                  width: "8.9rem",
+                                }}
+                              >
+                                <span>REMARKS</span>
+                              </td>
+                            </tr>
+                          </thead>
+                          <tbody
+                            style={{ maxWidth: "650px", overflowY: "hidden" }}
+                          >
+                            <tr>
+                              <td
+                                style={{
+                                  fontWeight: "500",
+                                  textUnderlineOffset: "3px",
+                                  textDecoration: "underline",
+                                  letterSpacing: "-1px",
+                                  paddingLeft: "1.5rem",
+                                  fontSize: "20px",
+                                }}
+                              >
+                                {studentData && studentData.program_description
+                                  ? `${studentData.program_description?.toUpperCase()}`
+                                  : ""}
+                              </td>
+                            </tr>
+
+                            {pageGroups.map((group, groupIndex) => {
+                              const compactTermLabel =
+                                pageIndex === paginatedSubjects.length - 1 &&
+                                groupIndex === pageGroups.length - 1 &&
+                                group.subjects.length <= 6;
+
+                              return (
+                                <React.Fragment key={group.termKey}>
+                                  {group.subjects.map((p, index) => {
+                                    const isCompactTermRow =
+                                      compactTermLabel && index === 0;
+
+                                    return (
+                                      <tr
+                                        style={{
+                                          display: "flex",
+                                          alignItems: isCompactTermRow
+                                            ? "center"
+                                            : "flex-start",
+                                          lineHeight: "22px",
+                                          minHeight: isCompactTermRow
+                                            ? "38px"
+                                            : "22px",
+                                        }}
+                                        key={p.enrolled_id}
+                                      >
+                                        <td
+                                          style={{
+                                            width: "13rem",
+                                            fontWeight: "400",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            justifyContent: compactTermLabel
+                                              ? "center"
+                                              : "center",
+                                            alignItems: "flex-start",
+                                            position: "relative",
+                                            lineHeight: compactTermLabel ? "18px" : "22px",
+                                            paddingTop: index === 0 ? "0" : "0",
+                                          }}
+                                        >
+                                          {!group.isContinuation && index === 0 && (
+                                            <>
+                                              <span
+                                                style={{
+                                                  fontSize: compactTermLabel
+                                                    ? "17px"
+                                                    : "18px",
+                                                  textAlign: "center",
+                                                  width: "14rem",
+                                                  fontWeight: "500",
+                                                  lineHeight: compactTermLabel ? "18px" : "22px",
+                                                }}
+                                              >
+                                                {convertSemester(
+                                                  p.semester_description,
+                                                )}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  fontSize: compactTermLabel
+                                                    ? "16px"
+                                                    : "17px",
+                                                  marginTop: compactTermLabel ? 0 : "3rem",
+                                                  position: compactTermLabel
+                                                    ? "static"
+                                                    : "absolute",
+                                                  textAlign: "center",
+                                                  width: "13.5rem",
+                                                  fontWeight: "500",
+                                                  lineHeight: compactTermLabel ? "18px" : "22px",
+                                                }}
+                                              >
+                                                {p.current_year} - {p.next_year}
+                                              </span>
+                                            </>
+                                          )}
+                                        </td>
+                                        <td
+                                          style={{
+                                            display: "flex",
+                                            alignItems: isCompactTermRow
+                                              ? "center"
+                                              : "flex-start",
+                                            width: "38rem",
+                                            lineHeight: "22px",
+                                            padding: 0,
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              width: "9.5rem",
+                                              flex: "0 0 9.5rem",
+                                              margin: "0",
+                                              padding: "0",
+                                              fontSize: "18px",
+                                              lineHeight: "22px",
+                                              letterSpacing: "-0.5px",
+                                              whiteSpace: "normal",
+                                            }}
+                                          >
+                                            {p.course_code}
+                                          </span>
+                                          <span
+                                            style={{
+                                              flex: "1 1 auto",
+                                              marginLeft: 0,
+                                              padding: "0",
+                                              fontSize: "18px",
+                                              lineHeight: "22px",
+                                              letterSpacing: "-0.5px",
+                                            }}
+                                          >
+                                            {p.course_description
+                                              ? p.course_description?.toUpperCase()
+                                              : ""}
+                                            &nbsp;
+                                            {p.component === 1
+                                              ? "CWTS"
+                                              : p.component === 2
+                                                ? "LTS"
+                                                : p.component === 3
+                                                  ? "MTS"
+                                                  : ""}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              minHeight: isCompactTermRow
+                                                ? "38px"
+                                                : "22px",
+                                              lineHeight: "22px",
+                                            }}
+                                          >
+                                            <div
+                                              style={{
+                                                fontSize: "18px",
+                                                width: "6rem",
+                                                textAlign: "center",
+                                                lineHeight: "22px",
+                                              }}
+                                            >
+                                              <span>
+                                                {handleGradeConversion(
+                                                  p.final_grade || p.numeric_grade,
+                                                )}
+                                              </span>
+                                            </div>
+                                            <div
+                                              style={{
+                                                fontSize: "18px",
+                                                textAlign: "center",
+                                                width: "7rem",
+                                                marginLeft: "-2rem",
+                                                lineHeight: "22px",
+                                              }}
+                                            >
+                                              <span></span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              fontSize: "18px",
+                                              alignItems: "center",
+                                              minHeight: isCompactTermRow
+                                                ? "38px"
+                                                : "22px",
+                                              width: "7rem",
+                                              marginLeft: "1.7rem",
+                                              justifyContent: "center",
+                                              lineHeight: "22px",
+                                            }}
+                                          >
+                                            {totalUnitPerSubject(
+                                              p.course_unit,
+                                              p.lab_unit,
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              minHeight: isCompactTermRow
+                                                ? "38px"
+                                                : "22px",
+                                              width: "8.9rem",
+                                              fontSize: "18px",
+                                              justifyContent: "center",
+                                              lineHeight: "22px",
+                                            }}
+                                          >
+                                            {p.en_remarks === 0
+                                              ? "Ongoing"
+                                              : p.en_remarks === 1
+                                                ? "Passed"
+                                                : p.en_remarks === 2
+                                                  ? "Failed"
+                                                  : p.en_remarks === 3
+                                                    ? "Incomplete"
+                                                    : p.en_remarks === 4
+                                                      ? "Dropped"
+                                                      : ""}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              );
+                            })}
+
+                            <tr
+                              style={{
+                                display: "flex",
+                                height: "auto",
+                                lineHeight: 1,
+                              }}
+                            >
+                              {pageIndex === paginatedSubjects.length - 1 ? (
+                                <td
+                                  className="table-cell-padding"
+                                  style={{
+                                    textAlign: "center",
+                                    width: "79.9rem",
+                                    padding: "1px 0 0",
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      display: "block",
+                                      fontSize: "17px",
+                                      fontWeight: "600",
+                                      lineHeight: 1,
+                                      whiteSpace: "nowrap",
+                                      width: "100%",
+                                      overflow: "hidden",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: "14px",
+                                        marginRight: "2px",
+                                      }}
+                                    >
+                                      {shortTerm?.toLowerCase().repeat(13)} xxx{" "}
+                                    </span>
+                                    NOTHING FOLLOWS
+                                    <span
+                                      style={{
+                                        fontSize: "14px",
+                                        marginLeft: "2px",
+                                      }}
+                                    >
+                                      {" "}
+                                      xxx {shortTerm?.toLowerCase().repeat(13)}
+                                    </span>
+                                  </span>
+                                </td>
+                              ) : (
+                                <td
+                                  style={{
+                                    textAlign: "center",
+                                    borderTop: "dashed 1px black",
+                                    width: "79.9rem",
+                                    padding: "1px 0 0",
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "17px",
+                                      fontWeight: "600",
+                                    }}
+                                  >
+                                    - continue on next page -
+                                  </span>
+                                </td>
+                              )}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </Box>
+                    </Box>
+                    {/* End of Main Content */}
+                    {/* Start Of Footer */}
+                    <Box
+                      className="page-footer"
+                      style={{
+                        display: "flex",
+                        marginLeft: "1rem",
+                        marginTop: "-1rem",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Box
+                        style={{
+                          flex: "0 0 50%",
+                          marginBottom: "1rem",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <table>
+                          <thead>
+                            <tr
+                              className="grading_sytse_tble"
+                              style={{
+                                display: "flex",
+                                height: "145px",
+                                borderTop: "solid 1px black",
+                              }}
+                            >
+                              <td
+                                style={{
+                                  fontWeight: "400",
+                                  fontSize: "18px",
+                                  display: "flex",
+                                  alignItems: "start",
+                                  justifyContent: "center",
+                                  letterSpacing: "-1px",
+                                  width: "13rem",
+                                }}
+                              >
+                                <span>GRADING SYSTEM</span>
+                              </td>
+                              <td
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "start",
+                                  width: "4.5rem",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "0px",
+                                    paddingTop: "3px",
+                                  }}
+                                >
+                                  1.00
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "0px",
+                                  }}
+                                >
+                                  1.25
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "0px",
+                                  }}
+                                >
+                                  1.50
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "0px",
+                                  }}
+                                >
+                                  1.75
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  2.00
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  2.25
+                                </div>
+                              </td>
+                              <td
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "start",
+                                  width: "6.5rem",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                    paddingTop: "3px",
+                                  }}
+                                >
+                                  (97-100)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  (94-96)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  (91-93)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  (88-90)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  (85-87)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  (82-84)
+                                </div>
+                              </td>
+                              <td
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "start",
+                                  width: "15.5rem",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                    paddingTop: "3px",
+                                  }}
+                                >
+                                  Marked Excellence
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Excellent
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Very Superior
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Superior
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Very Good
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Good
+                                </div>
+                              </td>
+                              <td
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "start",
+                                  width: "4.5rem",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                    paddingTop: "3px",
+                                  }}
+                                >
+                                  2.50
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  2.75
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  3.00
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  5.00
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  INC
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  DRP
+                                </div>
+                              </td>
+                              <td
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "start",
+                                  width: "14rem",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                    paddingTop: "3px",
+                                  }}
+                                >
+                                  (79-81)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  (76-78)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                  }}
+                                >
+                                  (75)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1.5px",
+                                  }}
+                                >
+                                  (Below 75)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1.5px",
+                                  }}
+                                >
+                                  (Incomplete)
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1.5px",
+                                  }}
+                                >
+                                  (Dropped Officially/Unofficialy)
+                                </div>
+                              </td>
+                              <td
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "start",
+                                  width: "22rem",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                    paddingTop: "3px",
+                                  }}
+                                >
+                                  Satisfactory
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Fair
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Passed
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Failed
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Incomplete
+                                </div>
+                                <div
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                  }}
+                                >
+                                  Dropped
+                                </div>
+                              </td>
+                            </tr>
+                            <tr
+                              style={{
+                                display: "flex",
+                                paddingLeft: "2rem",
+                                height: "35px",
+                                borderBottom: "solid 1px black",
+                              }}
+                            >
+                              <td>
+                                <span style={{ fontSize: "18px" }}>
+                                  CREDITS, O
+                                </span>
+                                <span>
+                                  ne college units is at least (17) full hours of
+                                  instruction in academic or professional subject
+                                  within a semester.
+                                </span>
+                              </td>
+                            </tr>
+                            <tr
+                              style={{
+                                display: "flex",
+                                paddingLeft: "2rem",
+                                height: "65px",
+                                borderBottom: "solid 1px black",
+                              }}
+                            >
+                              <td style={{ marginTop: "8px" }}>
+                                <span
+                                  style={{
+                                    fontSize: "18px",
+                                    marginRight: "8px",
+                                    letterSpacing: "-0.8px",
+                                    wordSpacing: "1px",
+                                  }}
+                                >
+                                  {companyName?.toUpperCase()}
+                                </span>
+                                <span
+                                  style={{
+                                    letterSpacing: "-0.8px",
+                                    fontSize: "17px",
+                                    wordSpacing: "1px",
+                                  }}
+                                >
+                                  is a State College; hence, a SPECIAL ORDER is
+                                  not issued to its graduates. The <br />
+                                  issuance of the Official Transcript of Records
+                                  and Diploma is a sufficient proof for
+                                  Graduation.
+                                </span>
+                              </td>
+                            </tr>
+                            <tr
+                              style={{
+                                display: "flex",
+                                paddingLeft: "1rem",
+                                marginTop: "0.3rem",
+                                height: "65px",
+                                borderTop: "solid 1px black",
+                                borderBottom: "solid 1px black",
+                              }}
+                            >
+                              <td style={{ marginTop: "8px" }}>
+                                <span
+                                  style={{
+                                    fontSize: "18px",
+                                    fontWeight: "600",
+                                    marginRight: "8px",
+                                    letterSpacing: "-0.8px",
+                                    wordSpacing: "1px",
+                                  }}
+                                >
+                                  REMARKS:
+                                </span>
+                              </td>
+                            </tr>
+                            <tr
+                              style={{
+                                display: "flex",
+                                paddingLeft: "1rem",
+                                marginTop: "0.3rem",
+                                height: "35px",
+                              }}
+                            >
+                              <td style={{ marginTop: "3px" }}>
+                                <span
+                                  style={{
+                                    fontSize: "18px",
+                                    fontWeight: "400",
+                                    marginRight: "2.4rem",
+                                    letterSpacing: "-0.8px",
+                                    wordSpacing: "1px",
+                                  }}
+                                >
+                                  DATE ISSUED:
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "18px",
+                                    letterSpacing: "-1px",
+                                    wordSpacing: "3px",
+                                  }}
+                                >
+                                  {todayDate}
+                                </span>
+                              </td>
+                            </tr>
+                            <tr
+                              className="no-border"
+                              style={{
+                                display: "flex",
+                                paddingLeft: "1rem",
+                                marginTop: "0.3rem",
+                                height: "9rem",
+                                borderBottom: "solid black 1px",
+                              }}
+                            >
+                              <td style={{ marginTop: "3px", width: "17rem" }}>
+                                <div>
+                                  <span
+                                    style={{
+                                      fontSize: "18px",
+                                      letterSpacing: "-1px",
+                                      wordSpacing: "3px",
+                                    }}
+                                  ></span>
+                                  <span></span>
+                                </div>
+                              </td>
+                              <td style={{ marginTop: "3px", width: "20rem" }}>
+                                <span
+                                  style={{
+                                    fontSize: "18px",
+                                    fontWeight: "400",
+                                    marginRight: "2.4rem",
+                                    letterSpacing: "-0.8px",
+                                    wordSpacing: "1px",
+                                  }}
+                                >
+                                  PREPARED BY:
+                                </span>
+                                <div style={{ marginTop: "0.4rem", textAlign: "left" }}>
+                                  {selectedPreparedBy?.signature_image && (
+                                    <img
+                                      src={getSignatureImageSrc(selectedPreparedBy)}
+                                      alt={selectedPreparedBy.signature_name || "Prepared by signature"}
+                                      style={{
+                                        width: "11rem",
+                                        height: "2.7rem",
+                                        objectFit: "contain",
+                                        display: "block",
+                                        margin: "0 0 -0.2rem",
+                                      }}
+                                    />
+                                  )}
+                                  <span
+                                    style={{
+                                      display: "block",
+                                      fontSize: "20px",
+                                      fontWeight: "500",
+                                      letterSpacing: "-1px",
+                                      wordSpacing: "3px",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {selectedPreparedBy?.full_name?.toUpperCase() || ""}
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ marginTop: "3px", width: "20rem" }}>
+                                <span
+                                  style={{
+                                    fontSize: "18px",
+                                    fontWeight: "400",
+                                    marginRight: "2.4rem",
+                                    letterSpacing: "-0.8px",
+                                    wordSpacing: "1px",
+                                  }}
+                                >
+                                  CHECKED BY:
+                                </span>
+                                <div style={{ marginTop: "0.4rem", textAlign: "left" }}>
+                                  {selectedCheckedBy?.signature_image && (
+                                    <img
+                                      src={getSignatureImageSrc(selectedCheckedBy)}
+                                      alt={selectedCheckedBy.signature_name || "Checked by signature"}
+                                      style={{
+                                        width: "11rem",
+                                        height: "2.7rem",
+                                        objectFit: "contain",
+                                        display: "block",
+                                        margin: "0 0 -0.2rem",
+                                      }}
+                                    />
+                                  )}
+                                  <span
+                                    style={{
+                                      display: "block",
+                                      fontSize: "20px",
+                                      fontWeight: "500",
+                                      letterSpacing: "-1px",
+                                      wordSpacing: "3px",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {selectedCheckedBy?.full_name?.toUpperCase() || ""}
+                                  </span>
+                                </div>
+                              </td>
+                              <td
+                                style={{
+                                  marginTop: "-3px",
+                                  width: "21rem",
+                                  justifyContent: "center",
+                                  alignContent: "center",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  {selectedRegistrar?.signature_image && (
+                                    <img
+                                      src={getSignatureImageSrc(selectedRegistrar)}
+                                      alt={selectedRegistrar.signature_name || "Registrar signature"}
+                                      style={{
+                                        width: "11rem",
+                                        height: "2.7rem",
+                                        objectFit: "contain",
+                                        display: "block",
+                                        margin: "0 auto -0.2rem",
+                                      }}
+                                    />
+                                  )}
+                                  <span
+                                    style={{
+                                      fontSize: "24px",
+                                      letterSpacing: "-2px",
+                                      wordSpacing: "3px",
+                                    }}
+                                  >
+                                    {selectedRegistrar?.full_name?.toUpperCase() || ""}
+                                  </span>
+                                  <hr />
+                                  <span
+                                    style={{
+                                      fontSize: "18px",
+                                      letterSpacing: "-1px",
+                                      wordSpacing: "3px",
+                                    }}
+                                  >REGISTRAR
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          </thead>
+                        </table>
+                      </Box>
+                    </Box>
+                    {/* End Of Footer */}
+                  </Box>
+                </Box>
+              </Box>
+          ))}
+        </Box>
+      </Box>
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={4000}
+        onClose={() => setOpenSnackbar(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setOpenSnackbar(false)}
+          severity="warning"
+          sx={{ width: "100%" }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default TOR;

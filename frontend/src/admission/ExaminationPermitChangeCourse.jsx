@@ -1,0 +1,1476 @@
+import React, { useState, useEffect, useContext, useRef } from "react";
+import { SettingsContext } from "../App";
+import axios from "axios";
+import {
+  Box,
+  Typography,
+  TextField,
+  TableContainer,
+  Paper,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  Container,
+  TableBody,
+  Card,
+  Button,
+  FormControl,
+  Select,
+  MenuItem,
+  Checkbox,
+} from "@mui/material";
+import EaristLogo from "../assets/EaristLogo.png";
+import "../styles/Print.css";
+import API_BASE_URL from "../apiConfig";
+import { postAuditEvent } from "../utils/auditEvents";
+import { FcPrint } from "react-icons/fc";
+import { useLocation, useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
+import SchoolIcon from "@mui/icons-material/School";
+import AssignmentIcon from "@mui/icons-material/Assignment";
+import ScheduleIcon from "@mui/icons-material/Schedule";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
+import Unauthorized from "../components/Unauthorized";
+import LoadingOverlay from "../components/LoadingOverlay";
+import SearchIcon from "@mui/icons-material/Search";
+import ScoreIcon from "@mui/icons-material/Score";
+import PersonIcon from "@mui/icons-material/Person";
+import Autocomplete from "@mui/material/Autocomplete";
+import PrintIcon from "@mui/icons-material/Print";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import DescriptionIcon from "@mui/icons-material/Description";
+import ArticleIcon from "@mui/icons-material/Article";
+import BadgeIcon from "@mui/icons-material/Badge";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+
+const FORM_OPTIONS = [
+  {
+    key: "permit",
+    label: "Examination Permit",
+    description: "Official exam permit with schedule, room, and QR code",
+    icon: <BadgeIcon sx={{ fontSize: 36 }} />,
+    color: "#1565c0",
+    bg: "#e3f2fd",
+  },
+  {
+    key: "changeCourse",
+    label: "Change Course Form",
+    description: "With Campus Dean approval (pre-filled applicant data)",
+    icon: <SwapHorizIcon sx={{ fontSize: 36 }} />,
+    color: "#2e7d32",
+    bg: "#e8f5e9",
+  },
+  {
+    key: "newForm",
+    label: "Empty Change of Course Form",
+    description: "Blank form with Campus Dean (no pre-filled name)",
+    icon: <ArticleIcon sx={{ fontSize: 36 }} />,
+    color: "#6a1b9a",
+    bg: "#f3e5f5",
+  },
+  {
+    key: "changeCourse1",
+    label: "Change Course Form",
+    description: "With Campus Director only (pre-filled applicant data)",
+    icon: <SwapHorizIcon sx={{ fontSize: 36 }} />,
+    color: "#e65100",
+    bg: "#fff3e0",
+  },
+  {
+    key: "newForm1",
+    label: "Empty Change of Course Form",
+    description: "Blank form with Campus Director only",
+    icon: <DescriptionIcon sx={{ fontSize: 36 }} />,
+    color: "#37474f",
+    bg: "#eceff1",
+  },
+];
+
+const ExaminationProfile = () => {
+  const settings = useContext(SettingsContext);
+  const [fetchedLogo, setFetchedLogo] = useState(null);
+  const [companyName, setCompanyName] = useState("");
+  const [campusAddress, setCampusAddress] = useState("");
+  const [titleColor, setTitleColor] = useState("#000000");
+  const [borderColor, setBorderColor] = useState("#000000");
+
+  // NEW: which form is selected for preview
+  const [selectedForm, setSelectedForm] = useState(null);
+
+  useEffect(() => {
+    if (!settings) return;
+    if (settings.title_color) setTitleColor(settings.title_color);
+    if (settings.border_color) setBorderColor(settings.border_color);
+    setFetchedLogo(settings.logo_url ? `${API_BASE_URL}${settings.logo_url}` : EaristLogo);
+    if (settings.company_name) setCompanyName(settings.company_name);
+    if (settings.campus_address || settings.address) {
+      setCampusAddress(settings.campus_address || settings.address);
+    }
+  }, [settings]);
+
+  const words = companyName.trim().split(" ");
+  const middle = Math.ceil(words.length / 2);
+  const firstLine = words.slice(0, middle).join(" ");
+  const secondLine = words.slice(middle).join(" ");
+
+  const tabs = [
+    { label: "Applicant List", to: "/admission_applicant_list", icon: <SchoolIcon fontSize="large" /> },
+    { label: "Applicant Profile", to: "/admission_personal_information", icon: <PersonIcon fontSize="large" /> },
+    { label: "Applicant Online Requirements", to: "/admission_online_requirements", icon: <AssignmentIcon fontSize="large" /> },
+    { label: "Verify Schedule Management", to: "/verify_document_schedule_management", icon: <ScheduleIcon fontSize="large" /> },
+    { label: "Entrance Exam Schedule Management", to: "/entrance_exam_schedule_management", icon: <ScheduleIcon fontSize="large" /> },
+    { label: "Examination Permit", to: "/examination_permit_change_course", icon: <PersonSearchIcon fontSize="large" /> },
+    { label: "Entrance Examination Score", to: "/applicant_entrance_exam_score", icon: <ScoreIcon fontSize="large" /> },
+  ];
+
+  const location = useLocation();
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const personIdFromUrl = queryParams.get("person_id");
+    if (!personIdFromUrl) return;
+    axios
+      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
+      .then((res) => {
+        if (res.data?.person_id) {
+          setSelectedPerson(res.data);
+          setPerson((prev) => ({ ...prev, ...res.data }));
+          sessionStorage.setItem("admin_edit_person_id", res.data.person_id);
+        }
+        if (res.data?.applicant_number) {
+          setSearchQuery(res.data.applicant_number);
+          setApplicantNumber(res.data.applicant_number);
+        }
+      })
+      .catch((err) => console.error("Auto search failed:", err));
+  }, [location.search]);
+
+  const navigate = useNavigate();
+  const [activeStep, setActiveStep] = useState(5);
+
+  const handleStepClick = (index, to) => {
+    setActiveStep(index);
+    const pid = sessionStorage.getItem("admin_edit_person_id");
+    if (pid) navigate(`${to}?person_id=${pid}`);
+    else navigate(to);
+  };
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [persons, setPersons] = useState([]);
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [person, setPerson] = useState({
+    campus: "", profile_img: "", last_name: "", first_name: "",
+    middle_name: "", extension: "", created_at: "",
+  });
+
+  const [hasAccess, setHasAccess] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const pageId = 48;
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const storedID = localStorage.getItem("person_id");
+    const storedEmployeeID = localStorage.getItem("employee_id");
+    if (storedUser && storedRole && storedID) {
+      if (storedRole === "registrar") checkAccess(storedEmployeeID);
+      else window.location.href = "/login";
+    } else {
+      window.location.href = "/login";
+    }
+  }, []);
+
+  const checkAccess = async (employeeID) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      setHasAccess(response.data?.page_privilege === 1 ? true : false);
+    } catch (error) {
+      console.error("Error checking access:", error);
+      setHasAccess(false);
+      setLoading(false);
+    }
+  };
+
+  const [selectedPreparedBy, setSelectedPreparedBy] = useState(null);
+
+  const formatPersonName = (item) =>
+    item?.full_name ||
+    [item?.first_name, item?.middle_name, item?.last_name, item?.extension_name || item?.extension]
+      .filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+
+  const handlePreparedByChange = async (signature) => {
+    const isSelected = selectedPreparedBy?.id === signature.id;
+    setSelectedPreparedBy(isSelected ? null : signature);
+    if (isSelected) return;
+    try {
+      await postAuditEvent("examination_profile_prepared_by_set", {
+        prepared_by_name: formatPersonName(signature),
+        prepared_by_employee_id: signature.employee_id || signature.id || "N/A",
+        applicant_name: formatPersonName(selectedPerson || person),
+        applicant_number: selectedPerson?.applicant_number || applicantNumber || "N/A",
+      });
+    } catch (err) {
+      console.error("Error inserting prepared by audit log:", err);
+    }
+  };
+
+  const [curriculumOptions, setCurriculumOptions] = useState([]);
+  const [examSchedule, setExamSchedule] = useState(null);
+  const [applicantNumber, setApplicantNumber] = useState("");
+  const [scheduledBy, setScheduledBy] = useState("");
+
+  useEffect(() => {
+    const fetchPersons = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+        setPersons(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Error fetching persons:", err);
+      }
+    };
+    fetchPersons();
+  }, []);
+
+  const fetchPersonData = async (id) => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
+      setPerson(res.data);
+    } catch (error) {
+      console.error("Failed to fetch person:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedPerson?.person_id) {
+      fetchPersonData(selectedPerson.person_id);
+      if (selectedPerson.applicant_number) setApplicantNumber(selectedPerson.applicant_number);
+    }
+  }, [selectedPerson]);
+
+  useEffect(() => {
+    const fetchCurriculums = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        setCurriculumOptions(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Error fetching curriculum options:", error);
+      }
+    };
+    fetchCurriculums();
+  }, []);
+
+  const [isVerified, setIsVerified] = useState(false);
+  const [verifiedAt, setVerifiedAt] = useState(null); // ✅ NEW: when documents were verified
+
+
+
+
+  // Exam schedule ONLY drives examSchedule (Date of Exam, Bldg, Room, Time).
+  // It no longer touches isVerified/verifiedAt — those come from actual
+  // document verification status, fetched separately below.
+  useEffect(() => {
+    if (selectedPerson?.applicant_number) {
+      axios
+        .get(`${API_BASE_URL}/api/exam-schedule/${selectedPerson.applicant_number}`)
+        .then((res) => {
+          setExamSchedule(res.data);
+        })
+        .catch(() => {
+          setExamSchedule(null);
+        });
+    } else {
+      setExamSchedule(null);
+    }
+  }, [selectedPerson]);
+
+  // Document verification status ("VERIFIED" watermark + Date Verified field)
+  // comes from /api/document-verification/:applicant_number, which checks
+  // requirement_uploads directly — independent of the exam schedule.
+  useEffect(() => {
+    if (selectedPerson?.applicant_number) {
+      axios
+        .get(`${API_BASE_URL}/api/document-verification/${selectedPerson.applicant_number}`)
+        .then((res) => {
+          setIsVerified(Boolean(res.data?.verified));
+          setVerifiedAt(res.data?.verified ? res.data.verified_at : null);
+        })
+        .catch(() => {
+          setIsVerified(false);
+          setVerifiedAt(null);
+        });
+    } else {
+      setIsVerified(false);
+      setVerifiedAt(null);
+    }
+  }, [selectedPerson]);
+
+
+  useEffect(() => {
+    axios
+      .get(`${API_BASE_URL}/api/scheduled-by/registrar`)
+      .then((res) => { if (res.data?.fullName) setScheduledBy(res.data.fullName); })
+      .catch((err) => console.error("Error fetching registrar name:", err));
+  }, []);
+
+  const getOrdinal = (n) => {
+    if (!n) return "";
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+
+  const permitRef = useRef();
+  const changeCourseRef = useRef();
+  const newFormRef = useRef();
+  const changeCourseRef1 = useRef();
+  const newFormRef1 = useRef();
+
+  const refMap = {
+    permit: permitRef,
+    changeCourse: changeCourseRef,
+    newForm: newFormRef,
+    changeCourse1: changeCourseRef1,
+    newForm1: newFormRef1,
+  };
+
+  const printDiv = (ref) => {
+    const divToPrint = ref.current;
+    if (divToPrint) {
+      const newWin = window.open("", "Print-Window");
+      newWin.document.open();
+      newWin.document.write(`
+        <html>
+          <head>
+            <title>Print</title>
+            <style>
+              @page { size: Legal; margin: 0; }
+              body { margin: 0; padding: 0; font-family: Arial; }
+              .student-table { margin-top: 35px !important; }
+              button { display: none; }
+            </style>
+          </head>
+          <body onload="window.print(); setTimeout(() => window.close(), 200);">
+            <div class="print-container">${divToPrint.innerHTML}</div>
+          </body>
+        </html>
+      `);
+      newWin.document.close();
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!selectedPerson || !selectedForm) return;
+    await fetchPersonData(selectedPerson.person_id);
+    setTimeout(() => printDiv(refMap[selectedForm]), 200);
+  };
+
+  const [signatures, setSignatures] = useState([]);
+  const [signaturePage, setSignaturePage] = useState(0);
+  const SIGNATURES_PER_PAGE = 5;
+
+  useEffect(() => {
+    const fetchSignatures = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/signature`);
+        setSignatures(res.data?.success ? res.data.data || [] : []);
+        setSignaturePage(0);
+      } catch (err) {
+        setSignatures([]);
+      }
+    };
+    fetchSignatures();
+  }, []);
+
+  const paginatedSignatures = signatures.slice(
+    signaturePage * SIGNATURES_PER_PAGE,
+    signaturePage * SIGNATURES_PER_PAGE + SIGNATURES_PER_PAGE
+  );
+  const totalSignaturePages = Math.max(1, Math.ceil(signatures.length / SIGNATURES_PER_PAGE));
+
+  const getSignatureImageSrc = (signature) =>
+    signature?.signature_image ? `${API_BASE_URL}/uploads/${signature.signature_image}` : "";
+
+     document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    document.addEventListener("keydown", (e) => {
+        const isBlockedKey =
+            e.key === "F12" ||
+            e.key === "F11" ||
+            (e.ctrlKey &&
+                e.shiftKey &&
+                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+            (e.ctrlKey && e.key.toLowerCase() === "u") ||
+            (e.ctrlKey && e.key.toLowerCase() === "p");
+
+        if (isBlockedKey) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+  if (loading || hasAccess === null) return <LoadingOverlay open={loading} message="Loading..." />;
+  if (!hasAccess) return <Unauthorized />;
+
+
+
+  // ─── Shared header block ──────────────────────────────────────────────────
+  const SchoolHeader = ({ showProfile = false }) => (
+    <table style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", textAlign: "center", tableLayout: "fixed" }}>
+      <tbody>
+        <tr>
+          <td colSpan={40} style={{ height: "0.5in", textAlign: "center" }}>
+            <table width="100%" style={{ borderCollapse: "collapse", marginTop: "15px", fontFamily: "Arial" }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: "20%", textAlign: "center" }}>
+                    <img src={fetchedLogo} alt="School Logo" style={{ marginLeft: "-10px", width: "120px", height: "120px", borderRadius: "50%", objectFit: "cover" }} />
+                  </td>
+                  <td style={{ width: "60%", textAlign: "center", lineHeight: "1" }}>
+                    <div style={{ fontSize: "13px", fontFamily: "Arial" }}>Republic of the Philippines</div>
+                    <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "16px", textTransform: "Uppercase" }}>{firstLine}</div>
+                    <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "16px", textTransform: "Uppercase" }}>{secondLine}</div>
+                    {campusAddress && <div style={{ fontSize: "13px", fontFamily: "Arial" }}>{campusAddress}</div>}
+                    {showProfile && (
+                      <div style={{ marginTop: "30px" }}>
+                        <b style={{ fontSize: "24px", letterSpacing: "1px", fontWeight: "bold" }}>EXAMINATION PERMIT</b>
+                      </div>
+                    )}
+                  </td>
+                  {showProfile && (
+                    <td colSpan={4} rowSpan={6} style={{ textAlign: "center", position: "relative", width: "4.5cm", height: "4.5cm" }}>
+                      <div style={{ width: "4.70cm", height: "4.70cm", marginRight: "10px", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", border: "2px solid black", overflow: "hidden", borderRadius: "4px" }}>
+                        {person.profile_img
+                          ? <img src={`${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : <span style={{ fontSize: "12px", color: "#888" }}>No Image</span>}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  );
+
+  // ─── Change Course header (with profile photo on right) ───────────────────
+  const ChangeCourseHeader = () => (
+    <div className="student-table" style={{ width: "8in", maxWidth: "100%", margin: "0 auto", marginTop: "10px", boxSizing: "border-box", padding: "10px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "nowrap" }}>
+        <div style={{ flexShrink: 0 }}>
+          <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+        </div>
+        <div style={{ flexGrow: 1, textAlign: "center", fontSize: "12px", fontFamily: "Arial", lineHeight: 1.4 }}>
+          <div style={{ fontSize: "13px" }}>Republic of the Philippines</div>
+          <div style={{ fontWeight: "bold", fontSize: "16px", textTransform: "Uppercase" }}>{firstLine}</div>
+          {secondLine && <div style={{ fontWeight: "bold", fontSize: "16px", textTransform: "Uppercase" }}>{secondLine}</div>}
+          {campusAddress && <div style={{ fontSize: "13px" }}>{campusAddress}</div>}
+          <div style={{ fontWeight: "bold", fontSize: "13px", letterSpacing: "1px" }}>OFFICE OF THE ADMISSION SERVICES</div>
+          <br />
+          <div style={{ fontSize: "20px", fontWeight: "bold", marginBottom: "5px" }}>Applicant's Change Course Form</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginRight: "10px", gap: "10px" }}>
+          <div style={{ width: "1.3in", height: "1.3in", border: "1px solid black", overflow: "hidden", flexShrink: 0, marginTop: "-15px" }}>
+            {person?.profile_img
+              ? <img src={`${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <span style={{ fontSize: "12px", color: "#888" }}>No Image</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Empty form header (centered, no profile photo)
+  const EmptyFormHeader = () => (
+    <div className="student-table" style={{ width: "8in", maxWidth: "100%", margin: "0 auto", marginTop: "10px", boxSizing: "border-box", padding: "10px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+        <div style={{ position: "absolute", left: 0 }}>
+          <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+        </div>
+        <div style={{ textAlign: "center", fontSize: "12px", fontFamily: "Arial", lineHeight: 1.4 }}>
+          <div style={{ fontSize: "13px" }}>Republic of the Philippines</div>
+          <div style={{ fontWeight: "bold", fontSize: "16px", textTransform: "Uppercase" }}>{firstLine}</div>
+          {secondLine && <div style={{ fontWeight: "bold", fontSize: "16px", textTransform: "Uppercase" }}>{secondLine}</div>}
+          {campusAddress && <div style={{ fontSize: "13px" }}>{campusAddress}</div>}
+          <div style={{ fontWeight: "bold", fontSize: "13px", letterSpacing: "1px" }}>OFFICE OF THE ADMISSION SERVICES</div>
+          <br />
+          <div style={{ fontSize: "20px", fontWeight: "bold", marginBottom: "5px" }}>Applicant's Change Course Form</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Shared change course body (filled) ───────────────────────────────────
+  const ChangeCourseBody = ({ showDean = true }) => (
+    <table style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", marginTop: "-30px", textAlign: "center", tableLayout: "fixed" }}>
+      <tbody>
+        <tr style={{ fontSize: "13px" }}>
+          <td colSpan={40}>
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", width: "100%" }}>
+              <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Applicant ID No.:</label>
+              <div style={{ width: "200px", borderBottom: "1px solid black", display: "flex", justifyContent: "center", alignItems: "center", fontSize: "12px", height: "1.3em" }}>{person.applicant_number}</div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td colSpan={40} style={{ fontSize: "13px", paddingTop: "5px" }}>
+            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <span style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Name of Student:</span>
+              <div style={{ flexGrow: 1, display: "flex", justifyContent: "space-between" }}>
+                {["last_name", "first_name", "middle_name", "extension"].map((f) => (
+                  <span key={f} style={{ width: "25%", textAlign: "center", fontSize: "14.5px", borderBottom: "1px solid black" }}>{person[f]}</span>
+                ))}
+              </div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td colSpan={40} style={{ fontSize: "12px", paddingTop: "2px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginLeft: "-30px" }}>
+              {["(Pls. PRINT)", "Last Name", "Given Name", "Middle Name", "Ext. Name"].map((l) => (
+                <span key={l} style={{ width: "20%", textAlign: "center" }}>{l}</span>
+              ))}
+            </div>
+          </td>
+        </tr>
+        <tr style={{ fontSize: "13px" }}>
+          <td colSpan={20}>
+            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Date Applied</label>
+              <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.3em", fontSize: "12px" }}>
+                {(() => {
+                  if (!person.created_at?.split("T")[0]) return "";
+                  const d = new Date(person.created_at.split("T")[0]);
+                  return isNaN(d) ? person.created_at.split("T")[0] : d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+                })()}
+              </span>
+            </div>
+          </td>
+          <td colSpan={20}>
+            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Date Examination:</label>
+              <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.3em", fontSize: "12px" }}>
+                {examSchedule?.schedule_created_at ? new Date(examSchedule.schedule_created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : ""}
+              </span>
+            </div>
+          </td>
+        </tr>
+        <EcatRow />
+        <ProgramRow filled />
+        <ReasonsRow />
+        {showDean ? <DeanApprovalRows /> : <DirectorApprovalRows />}
+        <AcceptanceRow />
+      </tbody>
+    </table>
+  );
+
+  // Shared change course body (empty / blank)
+  const EmptyChangeCourseBody = ({ showDean = true }) => (
+    <table style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", marginTop: "-30px", textAlign: "center", tableLayout: "fixed" }}>
+      <tbody>
+        <tr style={{ fontSize: "13px" }}>
+          <td colSpan={40}>
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", width: "100%" }}>
+              <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Applicant ID No.:</label>
+              <div style={{ width: "200px", borderBottom: "1px solid black", display: "flex", justifyContent: "center", alignItems: "center", fontSize: "12px", height: "1.3em" }}>{person.applicant_number}</div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td colSpan={40} style={{ fontSize: "13px", paddingTop: "5px" }}>
+            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <span style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Name of Student:</span>
+              <div style={{ flexGrow: 1, display: "flex", justifyContent: "space-between", height: "20px" }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <span key={i} style={{ width: "25%", textAlign: "center", fontSize: "14.5px", borderBottom: "1px solid black" }}></span>
+                ))}
+              </div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td colSpan={40} style={{ fontSize: "12px", paddingTop: "2px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginLeft: "-30px" }}>
+              {["(Pls. PRINT)", "Last Name", "Given Name", "Middle Name", "Ext. Name"].map((l) => (
+                <span key={l} style={{ width: "20%", textAlign: "center" }}>{l}</span>
+              ))}
+            </div>
+          </td>
+        </tr>
+        <tr style={{ fontSize: "13px" }}>
+          <td colSpan={20}>
+            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Date Applied</label>
+              <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.3em", fontSize: "12px" }}></span>
+            </div>
+          </td>
+          <td colSpan={20}>
+            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Date Examination:</label>
+              <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.3em", fontSize: "12px" }}></span>
+            </div>
+          </td>
+        </tr>
+        <EcatRow />
+        <ProgramRow filled={false} />
+        <ReasonsRow />
+        {showDean ? <DeanApprovalRows /> : <DirectorApprovalRows />}
+        <AcceptanceRow />
+      </tbody>
+    </table>
+  );
+
+  const EcatRow = () => (
+    <tr style={{ fontSize: "13px" }}>
+      <td colSpan={40}>
+        <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "10px" }}>
+          <label style={{ fontWeight: "bold", whiteSpace: "nowrap", fontSize: "12px", marginRight: "10px" }}>ECAT Examination Result/Score:</label>
+          <span style={{ display: "inline-block", width: "100px", height: "1px", marginRight: "15px", borderBottom: "1px solid black" }}></span>
+          <div style={{ display: "flex", alignItems: "center", marginRight: "20px" }}>
+            <input type="checkbox" style={{ width: "30px", height: "30px", marginRight: "8px" }} />
+            <span style={{ fontSize: "12px", fontWeight: "bold" }}>Passed</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <input type="checkbox" style={{ width: "30px", height: "30px", marginRight: "8px" }} />
+            <span style={{ fontSize: "12px", fontWeight: "bold" }}>Failed</span>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+
+  const ProgramRow = ({ filled }) => {
+    const programText = filled && curriculumOptions.length > 0
+      ? `${curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.program_description || person?.program || ""} ${curriculumOptions.find((c) => c.curriculum_id?.toString() === (person?.program ?? "").toString())?.major || ""}`
+      : "";
+    return (
+      <tr>
+        <td colSpan={19} style={{ padding: 0 }}>
+          <span style={{ fontSize: "12px", fontWeight: "bold", display: "block", marginBottom: "2px", textAlign: "left" }}>FROM DEGREE/PROGRAM APPLIED</span>
+          <div style={{ border: "1px solid black", width: "100%", height: "25px", lineHeight: "25px", fontSize: "12px" }}>{filled ? (curriculumOptions.length > 0 ? programText : "Loading...") : ""}</div>
+        </td>
+        <td colSpan={2}></td>
+        <td colSpan={19} style={{ padding: 0 }}>
+          <span style={{ fontSize: "12px", display: "block", textAlign: "left", marginBottom: "2px" }}>Change to <b>NEW DEGREE/PROGRAM</b></span>
+          <div style={{ border: "1px solid black", width: "100%", height: "25px", lineHeight: "25px", fontSize: "12px" }}></div>
+        </td>
+      </tr>
+    );
+  };
+
+  const ReasonsRow = () => (
+    <tr style={{ fontSize: "13px" }}>
+      <td colSpan={40} style={{ padding: 0 }}>
+        <div style={{ position: "relative", width: "100%", paddingTop: "6px", marginTop: "10px", paddingBottom: "6px", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span style={{ fontWeight: "700", whiteSpace: "nowrap", marginRight: "6px", fontSize: "12px" }}>Reason's for Change:</span>
+            <div style={{ flexGrow: 1, borderBottom: "1px solid #000", height: "1.15em", marginTop: "-4px", marginRight: "260px" }}></div>
+          </div>
+          <div style={{ position: "absolute", right: "6px", top: "6.50px", width: "240px", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+            <div style={{ width: "100%", borderBottom: "1px solid #000", height: "1.15em", marginBottom: "-3px" }}></div>
+            <div style={{ fontSize: "12px", whiteSpace: "nowrap", textAlign: "center" }}>Applicant's Signature</div>
+          </div>
+          <div style={{ marginTop: "12px", width: "64.5%", borderBottom: "1px solid #000", height: "1.1em", marginLeft: "6px" }}></div>
+        </div>
+      </td>
+    </tr>
+  );
+
+  const DeanApprovalRows = () => (
+    <>
+      <tr style={{ fontSize: "13px" }}>
+        <td colSpan={40}><div style={{ fontWeight: "bold", textAlign: "left", fontSize: "12px" }}>College Approval from current program applied:</div></td>
+      </tr>
+      <tr style={{ fontSize: "13px" }}>
+        <td colSpan={40}>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", marginTop: "5px" }}>
+            {["College Code", "Program Head", "College Dean"].map((l) => (
+              <div key={l} style={{ width: "30%" }}>
+                <div style={{ borderBottom: "1px solid black", height: "1.2em" }}></div>
+                <div style={{ marginTop: "3px" }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </td>
+      </tr>
+      <tr style={{ fontSize: "13px" }}>
+        <td colSpan={40}><div style={{ fontWeight: "bold", textAlign: "left", fontSize: "12px" }}>College Acceptance to new program applied:</div></td>
+      </tr>
+      <tr style={{ fontSize: "13px" }}>
+        <td colSpan={40}>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", marginTop: "5px" }}>
+            {["College Code", "Program Head", "College Dean"].map((l) => (
+              <div key={l} style={{ width: "30%" }}>
+                <div style={{ borderBottom: "1px solid black", height: "1.2em" }}></div>
+                <div style={{ marginTop: "3px" }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </td>
+      </tr>
+    </>
+  );
+
+  const DirectorApprovalRows = () => (
+    <tr>
+      <td colSpan={40} style={{ padding: 0 }}>
+        <div style={{ width: "100%", marginTop: "18px", padding: "0 12px", boxSizing: "border-box", fontFamily: "Arial" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "40px" }}>
+            {[
+              { title: "Approval from current program applied:", label: "Course Code" },
+              { title: "Acceptance to new program applied:", label: "Course Code" },
+            ].map(({ title }, i) => (
+              <div key={i} style={{ width: "48%" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", marginBottom: "8px", textAlign: "left" }}>{title}</div>
+                <div style={{ display: "flex", gap: "18px" }}>
+                  {["Course Code", "Program Head"].map((l) => (
+                    <div key={l} style={{ flex: 1, textAlign: "center" }}>
+                      <div style={{ borderBottom: "1px solid #000", height: "18px", marginBottom: "3px" }}></div>
+                      <span style={{ fontSize: "12px" }}>{l}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          {selectedPreparedBy && (
+            <div style={{ marginTop: "28px", display: "flex", justifyContent: "center" }}>
+              <div style={{ width: "260px", textAlign: "center" }}>
+                <div style={{ borderBottom: "1px solid #000", minHeight: "18px", marginBottom: "3px" }}>
+                  {selectedPreparedBy?.signature_image && (
+                    <img src={getSignatureImageSrc(selectedPreparedBy)} alt="Signature" style={{ width: "140px", height: "34px", objectFit: "contain", display: "block", margin: "-18px auto -2px" }} />
+                  )}
+                </div>
+                <div style={{ fontSize: "12px", fontWeight: "700" }}>{selectedPreparedBy.full_name?.toUpperCase() || ""}</div>
+                <div style={{ fontSize: "12px" }}>{selectedPreparedBy.designation || "Campus Administrator"}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+
+  const AcceptanceRow = () => (
+    <tr style={{ fontSize: "13px" }}>
+      <td colSpan={40}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "20px", marginTop: "10px" }}>
+          {["Accepted", "Not Accepted"].map((l) => (
+            <label key={l} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <input type="checkbox" style={{ width: "25px", height: "25px" }} />{l}
+            </label>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <input type="checkbox" style={{ width: "25px", height: "25px" }} />Other/s:
+            </label>
+            <div style={{ borderBottom: "1px solid black", width: "250px", marginTop: "15px" }}></div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+
+  const CopyLabel = ({ label }) => (
+    <div style={{ width: "8in", maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "10px 0", marginTop: "20px" }}>
+      <hr style={{ width: "100%", borderTop: "1px solid black", marginTop: "-5px" }} />
+      <div style={{ width: "100%", textAlign: "right", fontWeight: "normal", fontSize: "12px", color: "black", marginTop: "10px" }}>{label}</div>
+    </div>
+  );
+
+  const DashedSeparator = () => (
+    <div style={{ width: "8in", maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "10px 0" }}>
+      <hr style={{ width: "100%", border: "none", borderTop: "1px dashed black", margin: "10px auto" }} />
+    </div>
+  );
+
+  const Watermark = ({ top = "23%" }) => (
+    <div style={{
+      position: "absolute", top, left: "50%",
+      transform: "translate(-50%, -50%)", fontSize: "120px", fontWeight: "900",
+      color: isVerified ? "rgba(0,128,0,0.15)" : "rgba(255,0,0,0.18)",
+      textTransform: "uppercase", whiteSpace: "nowrap", pointerEvents: "none",
+      userSelect: "none", zIndex: 0, fontFamily: "Arial", letterSpacing: "0.3rem",
+      textAlign: "center", lineHeight: isVerified ? "1" : "0.8",
+    }}>
+      {isVerified ? "VERIFIED" : <><div>NOT</div><div>VERIFIED</div></>}
+    </div>
+  );
+
+  // ─── Form preview components ──────────────────────────────────────────────
+
+  const PermitForm = () => (
+    <div ref={permitRef} style={{ position: "relative" }}>
+      <Watermark top="23%" />
+      <div className="section">
+        <SchoolHeader showProfile />
+        <div style={{ height: "30px" }}></div>
+        <table className="student-table" style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", textAlign: "center", tableLayout: "fixed" }}>
+          <tbody>
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={40}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", width: "100%", gap: "10px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Applicant No.:</label>
+                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", minWidth: "278px", height: "1.2em", display: "flex", alignItems: "center" }}>{selectedPerson?.applicant_number}</div>
+                </div>
+              </td>
+            </tr>
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", width: "100%", gap: "10px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Name:</label>
+                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", minWidth: "328px", height: "1.2em", display: "flex", alignItems: "center" }}>
+                    {selectedPerson?.last_name?.toUpperCase()}, {selectedPerson?.first_name?.toUpperCase()} {selectedPerson?.middle_name?.toUpperCase() || ""} {selectedPerson?.extension?.toUpperCase() || ""}
+                  </div>
+                </div>
+              </td>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Permit No.:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", textAlign: "left" }}>{selectedPerson?.applicant_number}</span>
+                </div>
+              </td>
+            </tr>
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%", gap: "10px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Course Applied:</label>
+                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", minWidth: "265px", width: "100%", display: "flex", alignItems: "center", paddingRight: "5px", overflowWrap: "break-word" }}>
+                    {curriculumOptions.length > 0 ? curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.program_description || (person?.program ?? "") : "Loading..."}
+                  </div>
+                </div>
+              </td>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%", gap: "10px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Major:</label>
+                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", width: "100%", display: "flex", alignItems: "center", paddingRight: "5px" }}>
+                    {curriculumOptions.length > 0 ? curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.major || "" : "Loading..."}
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Date of Exam:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
+                    {examSchedule?.schedule_created_at ? new Date(examSchedule.schedule_created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : ""}
+
+                  </span>
+                </div>
+              </td>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  <label
+                    style={{
+                      fontWeight: "bold",
+                      whiteSpace: "nowrap",
+                      marginRight: "10px",
+                    }}
+                  >
+                    Time :
+                  </label>
+                  <span
+                    style={{
+                      flexGrow: 1,
+                      borderBottom: "1px solid black",
+                      height: "1.2em",
+                      fontFamily: "Arial",
+                      textAlign: "left",
+                    }}
+                  >
+                    {examSchedule
+                      ? new Date(`1970-01-01T${examSchedule.start_time}`).toLocaleTimeString(
+                        "en-US",
+                        { hour: "numeric", minute: "2-digit", hour12: true }
+                      )
+                      : ""}
+                  </span>
+                </div>
+              </td>
+
+            </tr>
+
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>
+                    Bldg. :
+                  </label>
+                  <span
+                    style={{
+                      flexGrow: 1,
+                      borderBottom: "1px solid black",
+                      height: "1.2em",
+                      fontFamily: "Arial",
+                      textAlign: "left",
+                    }}
+                  >
+                    {examSchedule?.building_description || ""}
+                  </span>
+                </div>
+              </td>
+
+              {/* Room No. + QR side by side */}
+              <td colSpan={20}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%",
+                    justifyContent: "space-between", // space text & QR
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", marginTop: "-130px" }}>
+                    <label style={{ fontWeight: "bold", marginRight: "10px", width: "80px" }}>
+                      Room No.:
+                    </label>
+                    <span
+                      style={{
+                        flexGrow: 1,
+                        borderBottom: "1px solid black",
+                        fontFamily: "Arial",
+                        width: "150px",
+                      }}
+                    >
+                      {examSchedule?.room_description || ""}
+                    </span>
+                  </div>
+
+                  {selectedPerson?.applicant_number && (
+                    <div
+                      style={{
+                        width: "4.5cm",
+                        height: "4.5cm",
+                        borderRadius: "4px",
+                        background: "#fff",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        position: "relative",
+                        overflow: "hidden",
+                        marginLeft: "10px"
+                      }}
+                    >
+                      <QRCodeSVG
+                        value={`${window.location.origin}/applicant_profile/${person.applicant_number}`}
+                        size={150}
+                        level="H"
+                      />
+
+                      <div
+                        style={{
+                          position: "absolute",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          color: "maroon",
+                          background: "white",
+                          padding: "2px 4px",
+                          borderRadius: "2px",
+                        }}
+                      >
+                        {selectedPerson.applicant_number}
+                      </div>
+                    </div>
+                  )}
+
+
+                </div>
+              </td>
+            </tr>
+
+
+
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-148px" }}>
+                  <label
+                    style={{
+                      fontWeight: "bold",
+                      whiteSpace: "nowrap",
+                      marginRight: "10px",
+                    }}
+                  >
+                    Date Verified:
+                  </label>
+                  <span
+                    style={{
+                      flexGrow: 1,
+                      borderBottom: "1px solid black",
+                      height: "1.2em",
+                      fontFamily: "Arial",
+                      textAlign: "left",
+                    }}
+                  >
+
+                    {verifiedAt
+                      ? new Date(verifiedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                      : ""}
+
+                  </span>
+                </div>
+              </td>
+
+            </tr>
+
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-128px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Scheduled by:</label>
+                  <span
+                    style={{
+                      flexGrow: 1,
+                      borderBottom: "1px solid black",
+                      fontFamily: "Arial",
+                    }}
+                  >
+                    {scheduledBy || "N/A"}
+                  </span>
+
+                </div>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+        <table className="student-table" style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", textAlign: "center", tableLayout: "fixed", border: "1px solid black" }}>
+          <tbody>
+            <tr>
+              <td colSpan={40} style={{ color: "black", padding: "12px", lineHeight: "1.6", textAlign: "left", fontSize: "14px", fontFamily: "Arial" }}>
+                <strong>IMPORTANT REMINDERS FOR APPLICANTS:</strong>
+                <ul style={{ marginTop: "8px" }}>
+                  <strong>Step 1:</strong> Check your Examination Date, Time, and Room Number indicated on your permit.<br />
+                  <strong>Step 2:</strong> Bring all required items on the exam day:
+                  <ul><li>Official Examination Permit with VERIFIED watermark on it</li><li>No. 2 Pencil (any brand)</li><li>2 Short bond papers</li></ul>
+                  <strong>Step 3:</strong> Wear the proper attire:
+                  <ul><li>Plain white T-shirt or plain white polo shirt <strong>(no prints, no logos, no designs)</strong></li><li>Pants (Shorts and ripped jeans are not allowed)</li><li>Closed shoes (no crocs, sandals, slippers)</li></ul>
+                  <strong>Step 4:</strong> Keep the two paper sheets attached to your exam permit.<br />
+                  <strong>Step 5:</strong> Please Arrive at least 1 hour before your examination time. Late applicants will NOT be allowed to enter once the exam room door closes.
+                  <br /><br />
+                  <div style={{ textAlign: "center", marginLeft: "-50px" }}><strong>GOOD LUCK TO ALL ASPIRING APPLICANTS!</strong></div>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const ChangeCourseFormWithDean = ({ formRef, watermarkTop2 = "66%" }) => (
+    <div ref={formRef} style={{ position: "relative" }}>
+      <Container>
+        <Watermark top="18%" />
+        <ChangeCourseHeader />
+        <br /><br />
+        <ChangeCourseBody showDean />
+      </Container>
+      <CopyLabel label="College Dean's Copy" />
+      <DashedSeparator />
+      <Container>
+        <div style={{ position: "absolute", top: watermarkTop2, left: "50%", transform: "translate(-50%, -50%)", fontSize: "120px", fontWeight: "900", color: isVerified ? "rgba(0,128,0,0.15)" : "rgba(255,0,0,0.18)", textTransform: "uppercase", textAlign: "center", pointerEvents: "none", userSelect: "none", zIndex: 0, fontFamily: "Arial", letterSpacing: "0.3rem", lineHeight: isVerified ? "1" : "0.8", whiteSpace: "nowrap" }}>
+          {isVerified ? "VERIFIED" : <><div>NOT</div><div>VERIFIED</div></>}
+        </div>
+        <ChangeCourseHeader />
+        <br /><br />
+        <ChangeCourseBody showDean />
+        <div style={{ width: "8in", maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "10px 0", marginTop: "20px" }}>
+          <hr style={{ width: "100%", borderTop: "1px solid black", marginTop: "-5px" }} />
+          <div style={{ width: "100%", textAlign: "right", fontSize: "12px", color: "black", marginTop: "10px" }}>Admission Services Copy</div>
+        </div>
+      </Container>
+    </div>
+  );
+
+  const EmptyFormWithDean = ({ formRef }) => (
+    <div ref={formRef} style={{ position: "relative" }}>
+      <Container>
+        <EmptyFormHeader />
+        <br /><br />
+        <EmptyChangeCourseBody showDean />
+      </Container>
+      <CopyLabel label="College Dean's Copy" />
+      <DashedSeparator />
+      <Container>
+        <EmptyFormHeader />
+        <br /><br />
+        <EmptyChangeCourseBody showDean />
+        <div style={{ width: "8in", maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "10px 0", marginTop: "20px" }}>
+          <hr style={{ width: "100%", borderTop: "1px solid black", marginTop: "-5px" }} />
+          <div style={{ width: "100%", textAlign: "right", fontSize: "12px", color: "black", marginTop: "10px" }}>Admission Services Copy</div>
+        </div>
+      </Container>
+    </div>
+  );
+
+  const ChangeCourseFormWithDirector = ({ formRef }) => (
+    <div ref={formRef} style={{ position: "relative" }}>
+      <Container>
+        <Watermark top="18%" />
+        <ChangeCourseHeader />
+        <br /><br />
+        <ChangeCourseBody showDean={false} />
+      </Container>
+      <DashedSeparator />
+      <Container>
+        <div style={{ position: "absolute", top: "66%", left: "50%", transform: "translate(-50%,-50%)", fontSize: "120px", fontWeight: "900", color: isVerified ? "rgba(0,128,0,0.15)" : "rgba(255,0,0,0.18)", textTransform: "uppercase", textAlign: "center", pointerEvents: "none", userSelect: "none", zIndex: 0, fontFamily: "Arial", letterSpacing: "0.3rem", lineHeight: isVerified ? "1" : "0.8", whiteSpace: "nowrap" }}>
+          {isVerified ? "VERIFIED" : <><div>NOT</div><div>VERIFIED</div></>}
+        </div>
+        <ChangeCourseHeader />
+        <br /><br />
+        <ChangeCourseBody showDean={false} />
+      </Container>
+    </div>
+  );
+
+  const EmptyFormWithDirector = ({ formRef }) => (
+    <div ref={formRef} style={{ position: "relative" }}>
+      <Container>
+        <EmptyFormHeader />
+        <br /><br />
+        <EmptyChangeCourseBody showDean={false} />
+      </Container>
+      <DashedSeparator />
+      <Container>
+        <EmptyFormHeader />
+        <br /><br />
+        <EmptyChangeCourseBody showDean={false} />
+        <br /><br />
+      </Container>
+    </div>
+  );
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+  return (
+    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+      {/* Title + Search */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}>
+      EXAMINATION PERMIT CHANGE COURSE
+        </Typography>
+        <Autocomplete
+          options={persons}
+          value={selectedPerson}
+          inputValue={searchQuery}
+          isOptionEqualToValue={(option, value) => option?.person_id === value?.person_id || option?.applicant_number === value?.applicant_number}
+          getOptionLabel={(option) => option ? `${option.applicant_number || ""} - ${option.last_name || ""}, ${option.first_name || ""} ${option.middle_name || ""} (${option.emailAddress || ""})` : ""}
+          onInputChange={(event, newInputValue, reason) => { if (reason !== "reset") setSearchQuery(newInputValue); }}
+          filterOptions={(options, state) => {
+            const query = state.inputValue.toLowerCase();
+            return options.filter((p) => {
+              const fullString = `${p.first_name ?? ""} ${p.middle_name ?? ""} ${p.last_name ?? ""} ${p.emailAddress ?? ""}`.toLowerCase();
+              return (p.applicant_number || "").toLowerCase().includes(query) || fullString.includes(query);
+            });
+          }}
+          onChange={(event, newValue) => {
+            if (newValue) {
+              setSelectedPerson(newValue);
+              fetchPersonData(newValue.person_id);
+              setApplicantNumber(newValue.applicant_number);
+              setSearchQuery(newValue.applicant_number || "");
+              sessionStorage.setItem("admin_edit_person_id", newValue.person_id);
+              setSelectedForm(null); // reset form selection on new applicant
+            } else {
+              setSelectedPerson(null);
+              setApplicantNumber("");
+              setSearchQuery("");
+              setSelectedForm(null);
+            }
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params} variant="outlined"
+              placeholder="Search Applicant Name / Email / Applicant ID"
+              size="small"
+              sx={{ width: 450, backgroundColor: "#fff", borderRadius: 1, "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+              InputProps={{ ...params.InputProps, startAdornment: (<><SearchIcon sx={{ mr: 1, color: "gray" }} />{params.InputProps.startAdornment}</>) }}
+            />
+          )}
+        />
+      </Box>
+
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+      <br />
+      <br />
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          flexWrap: "nowrap", // ❌ prevent wrapping
+          width: "100%",
+
+          gap: 2,
+        }}
+      >
+        {tabs.map((tab, index) => (
+          <Card
+            key={index}
+            onClick={() => handleStepClick(index, tab.to)}
+            sx={{
+              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
+              height: 135,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              borderRadius: 2,
+              border: `1px solid ${borderColor}`,
+              backgroundColor:
+                activeStep === index
+                  ? settings?.header_color || "#1976d2"
+                  : "#E8C999",
+              color: activeStep === index ? "#fff" : "#000",
+              boxShadow:
+                activeStep === index
+                  ? "0px 4px 10px rgba(0,0,0,0.3)"
+                  : "0px 2px 6px rgba(0,0,0,0.15)",
+              transition: "0.3s ease",
+              "&:hover": {
+                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
+              },
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
+              <Typography
+                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
+              >
+                {tab.label}
+              </Typography>
+            </Box>
+          </Card>
+        ))}
+      </Box>
+
+
+      <br /><br />
+
+      {/* Applicant info bar */}
+      <TableContainer component={Paper} sx={{ width: "100%" }}>
+        <Table>
+          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}` }}>
+            <TableRow>
+              <TableCell sx={{ color: "white", fontSize: "20px", fontFamily: "Arial", border: "none" }}>
+                Applicant ID:&nbsp;<span style={{ fontFamily: "Arial", fontWeight: "normal", textDecoration: "underline" }}>{selectedPerson?.applicant_number || "N/A"}</span>
+              </TableCell>
+              <TableCell align="right" sx={{ color: "white", fontSize: "20px", fontFamily: "Arial", border: "none" }}>
+                Applicant Name:&nbsp;
+                <span style={{ fontFamily: "Arial", fontWeight: "normal", textDecoration: "underline" }}>
+                  {selectedPerson?.last_name?.toUpperCase()},{" "}
+                  {selectedPerson?.first_name?.toUpperCase()}{" "}
+                  {selectedPerson?.middle_name?.toUpperCase()}{" "}
+                  {selectedPerson?.extension_name?.toUpperCase() || ""}
+                </span>
+              </TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </TableContainer>
+
+      <br /><br />
+
+      {/* Signatures table */}
+      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "center", width: "100%", mb: 4 }}>
+        <Box sx={{ background: "white", width: "100%" }}>
+          {/* Pagination header */}
+          {[0, 1].map((pos) => (
+            <Box key={pos} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, px: 2, py: 1.5, backgroundColor: settings?.header_color || "#1976d2", color: "white", borderTop: `1px solid ${borderColor}` }}>
+              <Typography fontSize="14px" fontWeight="bold" color="white">Total Admin's Records {signatures.length}</Typography>
+              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                {[{ label: "First", action: () => setSignaturePage(0), disabled: signaturePage === 0 },
+                { label: "Prev", action: () => setSignaturePage((p) => Math.max(p - 1, 0)), disabled: signaturePage === 0 }].map(({ label, action, disabled }) => (
+                  <Button key={label} onClick={action} disabled={disabled} variant="outlined" size="small" sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>{label}</Button>
+                ))}
+                <FormControl size="small" sx={{ minWidth: 90 }}>
+                  <Select value={signaturePage + 1} onChange={(e) => setSignaturePage(Number(e.target.value) - 1)}
+                    sx={{ fontSize: "12px", height: 36, color: "white", border: "1px solid white", backgroundColor: "transparent", ".MuiOutlinedInput-notchedOutline": { borderColor: "white" }, "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "white" }, "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "white" }, "& svg": { color: "white" } }}
+                    MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } } }}>
+                    {Array.from({ length: totalSignaturePages }, (_, i) => (<MenuItem key={i + 1} value={i + 1}>Page {i + 1}</MenuItem>))}
+                  </Select>
+                </FormControl>
+                <Typography fontSize="11px" color="white">of {totalSignaturePages} page{totalSignaturePages > 1 ? "s" : ""}</Typography>
+                {[{ label: "Next", action: () => setSignaturePage((p) => Math.min(p + 1, totalSignaturePages - 1)), disabled: signaturePage >= totalSignaturePages - 1 },
+                { label: "Last", action: () => setSignaturePage(totalSignaturePages - 1), disabled: signaturePage >= totalSignaturePages - 1 }].map(({ label, action, disabled }) => (
+                  <Button key={label} onClick={action} disabled={disabled} variant="outlined" size="small" sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>{label}</Button>
+                ))}
+              </Box>
+            </Box>
+          )).slice(0, 1)}
+
+          <TableContainer component={Paper} elevation={2} sx={{ overflowX: "auto", width: "100%", margin: "0 auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {["#", "Full Name", "Designation", "Prepared By"].map((header) => (
+                    <TableCell key={header} sx={{ border: `1px solid ${borderColor}`, fontWeight: 600, color: titleColor, textAlign: "center", fontSize: "13px", padding: "6px 10px" }}>{header}</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedSignatures.map((signature, index) => (
+                  <TableRow key={signature.id}>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px", color: titleColor, padding: "4px 8px" }}>{signaturePage * SIGNATURES_PER_PAGE + index + 1}</TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px", color: titleColor, padding: "4px 8px" }}>{signature.full_name}</TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", color: titleColor, fontSize: "12px", padding: "4px 8px" }}>{signature.designation}</TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", color: titleColor, padding: "2px 6px" }}>
+                      <Box display="flex" justifyContent="center" alignItems="center">
+                        <Checkbox size="small" color="primary" checked={selectedPreparedBy?.id === signature.id} onChange={() => handlePreparedByChange(signature)} />
+                        <Typography fontSize="12px">Prepared By</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {paginatedSignatures.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ border: `1px solid ${borderColor}`, color: titleColor, padding: "8px", fontSize: "12px" }}>No signatures found.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Pagination footer */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, px: 2, py: 1.5, backgroundColor: settings?.header_color || "#1976d2", color: "white", borderTop: `1px solid ${borderColor}` }}>
+            <Typography fontSize="14px" fontWeight="bold" color="white">Total Admin's Records {signatures.length}</Typography>
+            <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+              {[{ label: "First", action: () => setSignaturePage(0), disabled: signaturePage === 0 },
+              { label: "Prev", action: () => setSignaturePage((p) => Math.max(p - 1, 0)), disabled: signaturePage === 0 }].map(({ label, action, disabled }) => (
+                <Button key={label} onClick={action} disabled={disabled} variant="outlined" size="small" sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>{label}</Button>
+              ))}
+              <FormControl size="small" sx={{ minWidth: 90 }}>
+                <Select value={signaturePage + 1} onChange={(e) => setSignaturePage(Number(e.target.value) - 1)}
+                  sx={{ fontSize: "12px", height: 36, color: "white", border: "1px solid white", backgroundColor: "transparent", ".MuiOutlinedInput-notchedOutline": { borderColor: "white" }, "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "white" }, "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "white" }, "& svg": { color: "white" } }}
+                  MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } } }}>
+                  {Array.from({ length: totalSignaturePages }, (_, i) => (<MenuItem key={i + 1} value={i + 1}>Page {i + 1}</MenuItem>))}
+                </Select>
+              </FormControl>
+              <Typography fontSize="11px" color="white">of {totalSignaturePages} page{totalSignaturePages > 1 ? "s" : ""}</Typography>
+              {[{ label: "Next", action: () => setSignaturePage((p) => Math.min(p + 1, totalSignaturePages - 1)), disabled: signaturePage >= totalSignaturePages - 1 },
+              { label: "Last", action: () => setSignaturePage(totalSignaturePages - 1), disabled: signaturePage >= totalSignaturePages - 1 }].map(({ label, action, disabled }) => (
+                <Button key={label} onClick={action} disabled={disabled} variant="outlined" size="small" sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>{label}</Button>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* ── FORM SELECTOR (shown when applicant is selected) ─────────────────── */}
+      {selectedPerson && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: "bold", color: titleColor, mb: 2, fontSize: "18px" }}>
+            Select a Form to Preview &amp; Print
+          </Typography>
+
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 2, mb: 3 }}>
+            {FORM_OPTIONS.map((opt) => {
+              const isActive = selectedForm === opt.key;
+              return (
+                <Card
+                  key={opt.key}
+                  onClick={() => setSelectedForm(isActive ? null : opt.key)}
+                  sx={{
+                    p: 2.5,
+                    cursor: "pointer",
+                    borderRadius: 3,
+                    border: isActive ? `2.5px solid ${opt.color}` : `1.5px solid #ddd`,
+                    backgroundColor: isActive ? opt.bg : "#fff",
+                    boxShadow: isActive ? `0 4px 16px ${opt.color}33` : "0 1px 4px rgba(0,0,0,0.1)",
+                    transition: "all 0.2s ease",
+                    "&:hover": { boxShadow: `0 4px 14px ${opt.color}44`, borderColor: opt.color, backgroundColor: opt.bg },
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: 1,
+                  }}
+                >
+                  <Box sx={{ color: isActive ? opt.color : "#888", mb: 0.5 }}>{opt.icon}</Box>
+                  <Typography sx={{ fontWeight: "bold", fontSize: "13px", color: isActive ? opt.color : "#333", lineHeight: 1.3 }}>
+                    {opt.label}
+                  </Typography>
+                  <Typography sx={{ fontSize: "11px", color: "#666", lineHeight: 1.4 }}>
+                    {opt.description}
+                  </Typography>
+                  {isActive && (
+                    <Box sx={{ mt: 0.5, px: 1, py: 0.3, backgroundColor: opt.color, borderRadius: 1 }}>
+                      <Typography sx={{ fontSize: "10px", color: "#fff", fontWeight: "bold" }}>SELECTED</Typography>
+                    </Box>
+                  )}
+                </Card>
+              );
+            })}
+          </Box>
+
+          {/* Action bar: shown once a form is selected */}
+          {selectedForm && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 2, border: "1px solid #e0e0e0" }}>
+              <Typography sx={{ fontWeight: "bold", fontSize: "14px", color: "#333", flexGrow: 1 }}>
+                Ready to print: <span style={{ color: FORM_OPTIONS.find((o) => o.key === selectedForm)?.color }}>
+                  {FORM_OPTIONS.find((o) => o.key === selectedForm)?.label}
+                </span>
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<ArrowBackIcon />}
+                onClick={() => setSelectedForm(null)}
+                sx={{ borderColor: "#bbb", color: "#555", "&:hover": { borderColor: "#999", backgroundColor: "#eee" } }}
+              >
+                Change Form
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<PrintIcon />}
+                onClick={handlePrint}
+                sx={{ backgroundColor: FORM_OPTIONS.find((o) => o.key === selectedForm)?.color, "&:hover": { opacity: 0.88 }, fontWeight: "bold", px: 3 }}
+              >
+                Print Now
+              </Button>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* ── Hidden print areas (always rendered when applicant selected) ─────── */}
+      {selectedPerson && (
+        <Box sx={{ display: "none" }}>
+          <PermitForm />
+          <ChangeCourseFormWithDean formRef={changeCourseRef} />
+          <EmptyFormWithDean formRef={newFormRef} />
+          <ChangeCourseFormWithDirector formRef={changeCourseRef1} />
+          <EmptyFormWithDirector formRef={newFormRef1} />
+        </Box>
+      )}
+
+      {/* ── Live preview of selected form ────────────────────────────────────── */}
+      {selectedPerson && selectedForm && (
+        <Box sx={{ mt: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: "bold", color: titleColor, fontSize: "16px" }}>
+              Preview — {FORM_OPTIONS.find((o) => o.key === selectedForm)?.label}
+            </Typography>
+            <Button variant="outlined" size="small" startIcon={<ArrowBackIcon />} onClick={() => setSelectedForm(null)}
+              sx={{ borderColor: "#bbb", color: "#555" }}>Back to Selection</Button>
+          </Box>
+
+          <Box sx={{ border: "1px solid #ccc", borderRadius: 2, p: 3, backgroundColor: "#fff", overflowX: "auto", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+            {selectedForm === "permit" && <PermitForm />}
+            {selectedForm === "changeCourse" && <ChangeCourseFormWithDean formRef={{ current: null }} />}
+            {selectedForm === "newForm" && <EmptyFormWithDean formRef={{ current: null }} />}
+            {selectedForm === "changeCourse1" && <ChangeCourseFormWithDirector formRef={{ current: null }} />}
+            {selectedForm === "newForm1" && <EmptyFormWithDirector formRef={{ current: null }} />}
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+export default ExaminationProfile;
