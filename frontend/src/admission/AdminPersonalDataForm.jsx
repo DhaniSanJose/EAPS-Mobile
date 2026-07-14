@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import axios from "axios";
 import { Box, Container, Typography } from "@mui/material";
@@ -8,7 +9,7 @@ import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
 import DownloadIcon from "@mui/icons-material/Download";
 
-const PersonalDataForm = () => {
+const PersonalDataForm = forwardRef(({ personId }, ref) => {
 
     const settings = useContext(SettingsContext);
 
@@ -214,6 +215,7 @@ const PersonalDataForm = () => {
     }, []);
 
     const divToPrintRef = useRef();
+    useImperativeHandle(ref, () => divToPrintRef.current);
     const printDiv = () => {
         const divToPrint = divToPrintRef.current;
         if (divToPrint) {
@@ -233,128 +235,62 @@ const PersonalDataForm = () => {
             const newWin = window.open('', 'Print-Window');
             newWin.document.open();
             newWin.document.write(`
-      <html>
-        <head>
-          <title>Print</title>
-          <style>
-            @page {
-              size: A4;
-              margin: 0;
-            }
-
-            html, body {
-              margin: 0;
-              padding: 0;
-              width: 210mm;
-              height: 297mm;
-              font-family: Arial;
-              overflow: hidden;
-            }
-
-            .print-container {
-              width: 110%;
-              height: 100%;
-              box-sizing: border-box;
-              transform: scale(0.90);
-              transform-origin: top left;
-            }
-
-            .student-table {
-              margin-top: 15px !important;
-            }
-
-            input[type="checkbox"] {
-              width: 12px;
-              height: 12px;
-              transform: scale(1);
-              margin: 2px;
-            }
-
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-
-            button {
-              display: none;
-            }
-          </style>
-        </head>
-        <body onload="window.print(); setTimeout(() => window.close(), 100);">
-          <div class="print-container">
-            ${clonedDiv.innerHTML}
-          </div>
-        </body>
-      </html>
-    `);
+         <html>
+           <head>
+             <title>Print</title>
+             <style>
+               @page {
+                 size: A4;
+                 margin: 0;
+               }
+   
+             html, body {
+     margin: 0;
+     padding: 0;
+     width: 210mm;
+     min-height: 297mm;   /* was: height: 297mm */
+     font-family: Arial;
+     overflow: visible;   /* was: overflow: hidden */
+     background: #ffffff;
+   }
+   
+               .print-container {
+                 width: 100%;
+                 height: auto;
+                 box-sizing: border-box;
+               }
+   
+               .student-table {
+                 margin-top: 15px !important;
+               }
+   
+               input[type="checkbox"] {
+                 width: 12px;
+                 height: 12px;
+                 transform: scale(1);
+                 margin: 2px;
+               }
+   
+               * {
+                 -webkit-print-color-adjust: exact !important;
+                 print-color-adjust: exact !important;
+               }
+   
+               button {
+                 display: none;
+               }
+             </style>
+           </head>
+           <body onload="window.print(); setTimeout(() => window.close(), 100);">
+             <div class="print-container">
+               ${clonedDiv.innerHTML}
+             </div>
+           </body>
+         </html>
+       `);
             newWin.document.close();
         } else {
             console.error("divToPrintRef is not set.");
-        }
-    };
-
-
-    const downloadPDF = async () => {
-        const divToPrint = divToPrintRef.current;
-        if (!divToPrint) {
-            console.error("divToPrintRef is not set.");
-            return;
-        }
-
-        setGeneratingPdf(true);
-
-        try {
-            // Clone so we can bake live DOM state (value/checked) into HTML
-            // attributes — innerHTML only serializes attributes, and React sets
-            // .value / .checked as live properties, not attributes. Puppeteer
-            // only ever sees the raw HTML string, so without this step every
-            // input would render blank and every checkbox unchecked in the PDF.
-            const clonedDiv = divToPrint.cloneNode(true);
-
-            const inputs = clonedDiv.querySelectorAll("input");
-            inputs.forEach((input) => {
-                if (input.type === "checkbox") {
-                    if (input.checked) {
-                        input.setAttribute("checked", "checked");
-                    } else {
-                        input.removeAttribute("checked");
-                    }
-                } else {
-                    input.setAttribute("value", input.value ?? "");
-                }
-            });
-
-            const response = await axios.post(
-                `${API_BASE_URL}/api/generate-personal-data-form-pdf`,
-                {
-                    html: clonedDiv.innerHTML,
-                    applicant_number: person?.applicant_number || "",
-                    last_name: person?.last_name || "",
-                    first_name: person?.first_name || "",
-                },
-                { responseType: "blob" },
-            );
-
-            const blob = new Blob([response.data], { type: "application/pdf" });
-            const url = window.URL.createObjectURL(blob);
-
-            const lastName = (person?.last_name || "Applicant").trim().replace(/\s+/g, "_");
-            const firstName = (person?.first_name || "").trim().replace(/\s+/g, "_");
-            const applicantNo = person?.applicant_number ? `_${person.applicant_number}` : "";
-            const fileName = `Personal_Data_Form_${lastName}${firstName ? "_" + firstName : ""}${applicantNo}.pdf`;
-
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Failed to generate PDF:", error);
-            alert("Something went wrong while generating the PDF. Please try again.");
-        } finally {
-            setGeneratingPdf(false);
         }
     };
 
@@ -400,103 +336,36 @@ const PersonalDataForm = () => {
         }
     });
 
+    useEffect(() => {
+        const idToUse = personId || queryPersonId || localStorage.getItem("person_id");
+        if (idToUse) fetchPersonData(idToUse);
+    }, [personId]);
+
+
+    const dataFieldStyle = (extra = {}) => ({
+        width: "100%",
+        minHeight: "18px",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        fontFamily: "Arial",
+        ...extra,
+    });
 
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    mb: 2,
-                }}
-            >
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: "bold",
-                        color: titleColor,
-                        fontSize: "36px",
-                    }}
-                >
-                    PERSONAL DATA FORM
-                </Typography>
-            </Box>
 
-            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-            <br />
-
-            {/* ✅ PRINT BUTTON (unchanged) */}
-            <button
-                onClick={printDiv}
-                style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
-                    border: "2px solid black",
-                    backgroundColor: "#f0f0f0",
-                    color: "black",
-                    borderRadius: "5px",
-                    marginTop: "20px",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    transition: "background-color 0.3s, transform 0.2s",
-                }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-            >
-                <span
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                    }}
-                >
-                    <FcPrint size={20} />
-                    Print Personal Data Form
-                </span>
-            </button>
-
-            <button
-                onClick={downloadPDF}
-                disabled={generatingPdf}
-                style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
-                    border: `2px solid ${borderColor}`,
-                    backgroundColor: generatingPdf ? "#cfd8dc" : mainButtonColor,
-                    color: "#fff",
-                    borderRadius: "5px",
-                    marginTop: "20px",
-                    marginLeft: "12px",
-                    cursor: generatingPdf ? "not-allowed" : "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    transition: "background-color 0.3s, transform 0.2s",
-                }}
-                onMouseDown={(e) => { if (!generatingPdf) e.target.style.transform = "scale(0.95)"; }}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-            >
-                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <DownloadIcon sx={{ fontSize: 20 }} />
-                    {generatingPdf ? "Generating PDF..." : "Download PDF"}
-                </span>
-            </button>
 
             <Container>
                 <div ref={divToPrintRef}>
                     <div>
                         <style>
                             {`
-             @media print {
-               button {
-                 display: none;
-               }
-             }
-           `}
+          @media print {
+            button {
+              display: none;
+            }
+          }
+        `}
                         </style>
 
 
@@ -558,7 +427,7 @@ const PersonalDataForm = () => {
                                         letterSpacing: "1px",
                                         fontWeight: "bold",
                                         fontFamily: "Arial",
-                                        fontSize: "20px",
+                                        fontSize: "18px",
                                         marginBottom: "5px"
                                     }}>
                                         {companyName}
@@ -583,6 +452,8 @@ const PersonalDataForm = () => {
                                 </div>
                             </div>
                         </div>
+                        <br />
+
 
                     </Container>
 
@@ -593,16 +464,37 @@ const PersonalDataForm = () => {
 
                         <table
                             style={{
-                                marginTop: "-23px",
+
                                 border: "1px solid black",
                                 borderCollapse: "collapse",
                                 fontFamily: "Arial",
-                                width: "8in",
+                                width: "760px",
                                 margin: "0 auto",
                                 textAlign: "center",
                                 tableLayout: "fixed",
                             }}
                         >
+                            {/*
+                              FIX: explicit 40-column colgroup.
+
+                              This table uses table-layout: fixed, but rows split the
+                              40-unit grid differently (e.g. 6+34, 6+19+15, 30+10,
+                              11+15+14, ...). Without a <colgroup> declaring the
+                              actual column grid, the browser/Chromium has to infer
+                              column boundaries from whichever row it treats as the
+                              reference row — so different rows can end up rendered
+                              against slightly different grids. That's what was
+                              causing cells like NAME EXTENSION / YEAR LEVEL / FIRST
+                              YEAR / ETHNICITY to appear cut off, shifted, or
+                              misaligned instead of lining up cleanly under one
+                              another. Declaring all 40 columns here forces every
+                              row's colSpans onto one consistent grid.
+                            */}
+                            <colgroup>
+                                {Array.from({ length: 40 }).map((_, i) => (
+                                    <col key={i} style={{ width: "19px" }} />   // ✅ exact px, not %
+                                ))}
+                            </colgroup>
                             <tbody>
 
                                 {/* Title: PERSONAL DATA FORM */}
@@ -662,15 +554,15 @@ const PersonalDataForm = () => {
 
                                         <style>
                                             {`
-         .custom-checkbox:checked::after {
-           content: '✓';
-           position: absolute;
-           top: -2px;
-           left: 3px;
-           font-size: 16px;
-           color: black;
-         }
-       `}
+      .custom-checkbox:checked::after {
+        content: '✓';
+        position: absolute;
+        top: -2px;
+        left: 3px;
+        font-size: 16px;
+        color: black;
+      }
+    `}
                                         </style>
                                     </td>
 
@@ -680,21 +572,18 @@ const PersonalDataForm = () => {
                                     {/* Right side: Date input and label */}
                                     <td colSpan={15} style={{ fontSize: "12px", fontFamily: "Arial", padding: "5px" }}>
                                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                                            <input
-                                                type="text"
-
-                                                readOnly
-                                                style={{
+                                            <div
+                                                style={dataFieldStyle({
                                                     width: "75%",
                                                     textAlign: "center",
-                                                    border: "none",
                                                     borderBottom: "1px solid black",
                                                     fontWeight: "bold",
-                                                    background: "none",
                                                     fontSize: "12px",
                                                     marginBottom: "2px",
-                                                }}
-                                            />
+                                                })}
+                                            >
+                                                {shortDate}
+                                            </div>
                                             <div style={{ fontWeight: "bold", textAlign: "center" }}>
                                                 Date of Registration
                                             </div>
@@ -728,26 +617,21 @@ const PersonalDataForm = () => {
                                     </td>
                                 </tr>
                                 {/* SURNAME */}
-                                {/* SURNAME */}
                                 <tr>
                                     <td colSpan={6} style={{ border: "1px solid black", textAlign: "center", padding: "8px", fontWeight: "bold", fontSize: "12px", fontFamily: "Arial" }}>
                                         SURNAME
                                     </td>
                                     <td colSpan={34} style={{ border: "1px solid black", padding: "8px" }}>
-                                        <input
-                                            type="text"
-                                            value={person?.last_name?.toUpperCase() || ""}
-                                            readOnly
-                                            style={{
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
+                                        <div
+                                            style={dataFieldStyle({
                                                 fontSize: "15px",
                                                 fontWeight: "bold",
-                                                letterSpacing: '3px',
-                                                fontFamily: "Arial"
-                                            }}
-                                        />
+                                                letterSpacing: "3px",
+                                                textAlign: "left",
+                                            })}
+                                        >
+                                            {person?.last_name?.toUpperCase() || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -757,21 +641,16 @@ const PersonalDataForm = () => {
                                         FIRST NAME
                                     </td>
                                     <td colSpan={34} style={{ border: "1px solid black", padding: "8px" }}>
-                                        <input
-                                            type="text"
-                                            value={person?.first_name?.toUpperCase() || ""}
-
-                                            readOnly
-                                            style={{
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
+                                        <div
+                                            style={dataFieldStyle({
                                                 fontWeight: "bold",
                                                 fontSize: "15px",
-                                                letterSpacing: '3px',
-                                                fontFamily: "Arial"
-                                            }}
-                                        />
+                                                textAlign: "left",
+                                                letterSpacing: "3px",
+                                            })}
+                                        >
+                                            {person?.first_name?.toUpperCase() || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -780,8 +659,6 @@ const PersonalDataForm = () => {
                                     {/* MIDDLE NAME */}
                                     <td colSpan={6} style={{
                                         border: "1px solid black",
-                                        textAlign: "left",
-
                                         textAlign: "Center",
                                         fontWeight: "bold",
                                         fontSize: "12px",
@@ -796,28 +673,22 @@ const PersonalDataForm = () => {
                                         padding: "8px",
 
                                     }}>
-                                        <input
-                                            type="text"
-                                            value={person?.middle_name?.toUpperCase() || ""}
-                                            readOnly
-                                            style={{
-
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
+                                        <div
+                                            style={dataFieldStyle({
                                                 fontWeight: "bold",
                                                 fontSize: "15px",
-                                                letterSpacing: '3px',
-                                                fontFamily: "Arial"
-                                            }}
-                                        />
+                                                letterSpacing: "3px",
+                                                textAlign: "left",
+                                            })}
+                                        >
+                                            {person?.middle_name?.toUpperCase() || ""}
+                                        </div>
                                     </td>
 
                                     {/* NAME EXTENSION */}
                                     <td colSpan={15} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontWeight: "bold",
                                         fontSize: "12px",
                                         verticalAlign: "top",
@@ -825,19 +696,16 @@ const PersonalDataForm = () => {
 
                                     }}>
                                         NAME EXTENSION (e.g. Jr., Sr.)
-                                        <input
-                                            type="text"
-                                            value={person?.extension?.toUpperCase() || ""}
-                                            readOnly
-                                            style={{
-                                                marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
-                                                fontSize: "12px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                        <div
+                                            style={dataFieldStyle({
+                                                fontWeight: "bold",
+                                                fontSize: "15px",
+                                                letterSpacing: "3px",
+                                                textAlign: "left",
+                                            })}
+                                        >
+                                            {person?.extension?.toUpperCase() || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -856,58 +724,42 @@ const PersonalDataForm = () => {
                                         }}
                                     >
                                         <div style={{ fontWeight: "bold" }}>COURSE (COMPLETE NAME)</div>
-                                        <input
-                                            type="text"
-                                            value={
-                                                curriculumOptions.length > 0
-                                                    ? curriculumOptions.find(
-                                                        (item) =>
-                                                            item?.curriculum_id?.toString() ===
-                                                            (person?.program ?? "").toString()
-                                                    )?.program_description?.toUpperCase() ||
-                                                    (person?.program?.toString()?.toUpperCase() ?? "")
-                                                    : "LOADING..."
-                                            }
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "12px",
-                                                fontFamily: "Arial",
-                                                textTransform: "uppercase", // visual effect
-                                            }}
-                                        />
+                                                textTransform: "uppercase",
+                                            })}
+                                        >
+                                            {curriculumOptions.length > 0
+                                                ? curriculumOptions.find(
+                                                    (item) =>
+                                                        item?.curriculum_id?.toString() ===
+                                                        (person?.program ?? "").toString()
+                                                )?.program_description?.toUpperCase() ||
+                                                (person?.program?.toString()?.toUpperCase() ?? "")
+                                                : "LOADING..."}
+                                        </div>
                                     </td>
 
                                     {/* YEAR LEVEL */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
-
                                         fontFamily: "Arial",
                                         fontSize: "12px",
                                         verticalAlign: "top"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>YEAR LEVEL (1,2,3,4,5)</div>
-                                        <input
-                                            type="text"
-                                            value={person?.yearLevel?.toUpperCase() || ""}
-
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
                                                 textTransform: "uppercase",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person?.yearLevel?.toUpperCase() || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -918,33 +770,25 @@ const PersonalDataForm = () => {
                                         border: "1px solid black",
                                         textAlign: "left",
                                         fontFamily: "Arial",
-
                                         fontSize: "12px",
                                         verticalAlign: "top"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>DATE OF BIRTH (e.g. June 15, 2019)</div>
-                                        <input
-                                            type="text"
-                                            value={
-                                                person.birthOfDate
-                                                    ? new Date(person.birthOfDate).toLocaleDateString("en-US", {
-                                                        year: "numeric",
-                                                        month: "long",
-                                                        day: "numeric"
-                                                    })
-                                                    : ""
-                                            }
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                                textTransform: "uppercase"
-                                            }}
-                                        />
+                                                textTransform: "uppercase",
+                                            })}
+                                        >
+                                            {person.birthOfDate
+                                                ? new Date(person.birthOfDate).toLocaleDateString("en-US", {
+                                                    year: "numeric",
+                                                    month: "long",
+                                                    day: "numeric"
+                                                })
+                                                : ""}
+                                        </div>
                                     </td>
 
 
@@ -952,35 +796,25 @@ const PersonalDataForm = () => {
                                     <td colSpan={15} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
-
                                         fontSize: "12px",
                                         verticalAlign: "top",
                                         fontFamily: "Arial",
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>PLACE OF BIRTH</div>
-                                        <input
-                                            type="text"
-                                            value={person.birthPlace || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                fontFamily: "Arial",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-
-
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.birthPlace || ""}
+                                        </div>
                                     </td>
 
                                     {/* ETHNICITY */}
                                     <td colSpan={14} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
                                         fontSize: "12px",
                                         verticalAlign: "top"
@@ -988,19 +822,14 @@ const PersonalDataForm = () => {
                                         <div style={{ fontWeight: "bold" }}>ETHNICITY (e.g. Tagbanua, Palaw’an)<br />
                                             Pangkat etniko / Kinaanibang pangkat</div>
 
-                                        <input
-                                            type="text"
-                                            value={person.tribeEthnicGroup || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.tribeEthnicGroup || ""}
+                                        </div>
                                     </td>
                                 </tr>
                                 {/* STUDENT ID NUMBER */}
@@ -1018,79 +847,57 @@ const PersonalDataForm = () => {
                                     >
                                         <div style={{ fontWeight: "bold" }}>APPLICANT ID:</div>
 
-                                        <input
-                                            type="text"
-                                            value={person.applicant_number || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
                                                 fontWeight: "normal",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.applicant_number || ""}
+                                        </div>
                                     </td>
 
 
-                                    {/* LEARNER’S REFERENCE NUMBER */}
+                                    {/* LEARNER'S REFERENCE NUMBER */}
                                     <td colSpan={15}
 
                                         style={{
                                             border: "1px solid black",
                                             textAlign: "left",
                                             fontFamily: "Arial",
-
                                             fontSize: "12px",
                                             verticalAlign: "top"
                                         }}>
-                                        <div style={{ fontWeight: "bold" }}>LEARNER’S REFERENCE NUMBER</div>
-                                        <input
-                                            type="text"
-                                            readOnly
-                                            value={person.lrnNumber || ""}
-
-                                            style={{
+                                        <div style={{ fontWeight: "bold" }}>LEARNER'S REFERENCE NUMBER</div>
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.lrnNumber || ""}
+                                        </div>
                                     </td>
 
                                     {/* DISABILITY */}
                                     <td colSpan={14} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
                                         fontSize: "12px",
                                         verticalAlign: "top"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>DISABILITY</div>
 
-                                        <input
-
-                                            type="text"
-                                            readOnly
-                                            value={person.pwdType || ""}
-
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.pwdType || ""}
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1100,7 +907,6 @@ const PersonalDataForm = () => {
                                         style={{
                                             border: "1px solid black",
                                             textAlign: "left",
-
                                             fontWeight: "bold",
                                             fontSize: "12px",
                                             verticalAlign: "top",
@@ -1185,15 +991,15 @@ const PersonalDataForm = () => {
                                         {/* ✅ Style block for ✓ checkmark */}
                                         <style>
                                             {`
-         .custom-checkbox:checked::after {
-           content: '✓';
-           position: absolute;
-           top: -2px;
-           left: 3px;
-           font-size: 16px;
-           color: black;
-         }
-       `}
+      .custom-checkbox:checked::after {
+        content: '✓';
+        position: absolute;
+        top: -2px;
+        left: 3px;
+        font-size: 16px;
+        color: black;
+      }
+    `}
                                         </style>
                                     </td>
 
@@ -1204,48 +1010,36 @@ const PersonalDataForm = () => {
                                     <td colSpan={15} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontSize: "12px",
                                         verticalAlign: "top",
                                         fontFamily: "Arial",
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>E-MAIL ADDRESS</div>
-                                        <input
-                                            type="text"
-                                            value={person.emailAddress || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.emailAddress || ""}
+                                        </div>
                                     </td>
                                     <td colSpan={14} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontSize: "12px",
                                         verticalAlign: "top",
                                         fontFamily: "Arial",
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>YEAR GRADUATED</div>
-                                        <input
-                                            type="text"
-                                            value={person.yearGraduated1 || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.yearGraduated1 || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -1364,15 +1158,15 @@ const PersonalDataForm = () => {
 
                                         <style>
                                             {`
-         .custom-checkbox:checked::after {
-           content: '✓';
-           position: absolute;
-           top: -2px;
-           left: 4px;
-           font-size: 16px;
-           color: black;
-         }
-       `}
+      .custom-checkbox:checked::after {
+        content: '✓';
+        position: absolute;
+        top: -2px;
+        left: 4px;
+        font-size: 16px;
+        color: black;
+      }
+    `}
                                         </style>
                                     </td>
 
@@ -1392,24 +1186,21 @@ const PersonalDataForm = () => {
                                     >
                                         <div style={{ fontWeight: "bold" }}>PERMANENT / HOME ADDRESS</div>
 
-                                        <input
-                                            type="text"
-                                            value={
-                                                person.presentStreet || person.presentBarangay || person.presentMunicipality
-                                                    ? `${person.presentStreet || ""} ${person.presentBarangay || ""}, ${person.presentMunicipality || ""}`
-                                                    : ""
-                                            }
-                                            readOnly
+                                        <div
                                             style={{
                                                 marginTop: "5px",
-                                                border: "none",
-                                                width: "100%",
                                                 fontSize: "15px",
                                                 fontFamily: "Arial",
-                                                outline: "none",
                                                 padding: "2px 4px",
+                                                minHeight: "20px",
+                                                whiteSpace: "pre-wrap",
+                                                wordBreak: "break-word",
                                             }}
-                                        />
+                                        >
+                                            {person.presentStreet || person.presentBarangay || person.presentMunicipality
+                                                ? `${person.presentStreet || ""} ${person.presentBarangay || ""}, ${person.presentMunicipality || ""}`
+                                                : ""}
+                                        </div>
 
 
 
@@ -1422,23 +1213,16 @@ const PersonalDataForm = () => {
                                                 fontSize: "12px",
                                             }}
                                         >
-                                            <div style={{ fontWeight: "bold" }}>HOUSEHOLD</div>
-                                            <input
-                                                readOnly
-                                                type="text"
-                                                value={person.presentDswdHouseholdNumber || ""}
-
-                                                style={{
-                                                    width: "100%",
+                                            <div style={{ fontWeight: "bold" }}>HOUSEHOLD #</div>
+                                            <div
+                                                style={dataFieldStyle({
                                                     marginTop: "5px",
-                                                    border: "none",
-
                                                     fontSize: "15px",
-                                                    fontFamily: "Arial",
-                                                    outline: "none",
                                                     padding: "2px 4px",
-                                                }}
-                                            />
+                                                })}
+                                            >
+                                                {person.presentDswdHouseholdNumber || ""}
+                                            </div>
 
                                         </div>
                                     </td>
@@ -1449,27 +1233,18 @@ const PersonalDataForm = () => {
                                         border: "1px solid black",
                                         verticalAlign: "top",
                                         fontSize: "12px",
-
-
                                         fontFamily: "Arial"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>ZIP CODE</div>
-                                        <input
-                                            readOnly
-                                            type="text"
-                                            value={person.presentZipCode || ""}
-                                            style={{
-                                                width: "100%",
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                border: "none",
-
                                                 fontSize: "15px",
-
-                                                fontFamily: "Arial",
-                                                outline: "none",
                                                 padding: "2px 4px",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.presentZipCode || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -1479,25 +1254,18 @@ const PersonalDataForm = () => {
                                     <td colSpan={8} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
-
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>CITIZENSHIP</div>
-                                        <input
-                                            readOnly
-                                            type="text"
-                                            value={person.citizenship || ""}
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.citizenship || ""}
+                                        </div>
                                     </td>
 
                                     {/* HEIGHT (m) */}
@@ -1508,19 +1276,14 @@ const PersonalDataForm = () => {
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>HEIGHT (m)</div>
-                                        <input
-                                            readOnly
-                                            type="text"
-                                            value={person.height || ""}
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.height || ""}
+                                        </div>
                                     </td>
 
                                     {/* WEIGHT (kg) */}
@@ -1531,42 +1294,32 @@ const PersonalDataForm = () => {
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>WEIGHT (kg)</div>
-                                        <input
-                                            readOnly
-                                            type="text"
-                                            value={person.weight || ""}
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.weight || ""}
+                                        </div>
                                     </td>
 
                                     {/* BLOOD TYPE */}
                                     <td colSpan={6} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>BLOOD TYPE</div>
-                                        <input
-                                            type="text"
-
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {""}
+                                        </div>
                                     </td>
 
                                     {/* PERMANENT CONTACT NUMBER */}
@@ -1574,24 +1327,18 @@ const PersonalDataForm = () => {
                                         border: "1px solid black",
                                         textAlign: "left",
                                         fontFamily: "Arial",
-
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}> PERMANENT CONTACT NUMBER</div>
 
-                                        <input
-                                            type="text"
-                                            value={person.cellphoneNumber || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.cellphoneNumber || ""}
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1635,77 +1382,59 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* GIVEN NAME */}
+                                    {/* SURNAME / FAMILY NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>SURNAME / FAMILY NAME</div>
 
-                                        <input
-                                            type="text"
-                                            value={person.father_family_name || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.father_family_name || ""}
+                                        </div>
+                                    </td>
+
+                                    {/* GIVEN NAME */}
+                                    <td colSpan={10} style={{
+                                        border: "1px solid black",
+                                        textAlign: "left",
+                                        fontFamily: "Arial",
+                                        fontSize: "12px"
+                                    }}>
+                                        <div style={{ fontWeight: "bold" }}>GIVEN NAME</div>
+                                        <div
+                                            style={dataFieldStyle({
+                                                marginTop: "5px",
+                                                fontSize: "15px",
+                                            })}
+                                        >
+                                            {person.father_given_name || ""}
+                                        </div>
                                     </td>
 
                                     {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
-                                        fontFamily: "Arial",
-                                        fontSize: "12px"
-                                    }}>
-                                        <div style={{ fontWeight: "bold" }}>GIVEN NAME</div>
-                                        <input
-                                            type="text"
-                                            value={person.father_given_name || ""}
-                                            readOnly
-                                            style={{
-                                                marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
-                                                fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
-                                    </td>
-
-                                    {/* PERMANENT CONTACT NUMBER */}
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>MIDDLE NAME</div>
-                                        <input
-                                            type="text"
-                                            value={person.father_middle_name || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.father_middle_name || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -1733,78 +1462,59 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* GIVEN NAME */}
+                                    {/* SURNAME (Not Yet Married) */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold", fontFamily: "Arial", }}>SURNAME (Not Yet Married)</div>
 
-                                        <input
-                                            type="text"
-                                            value={person.mother_family_name || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.mother_family_name || ""}
+                                        </div>
                                     </td>
 
-                                    {/* MIDDLE NAME (Not yet married) */}
+                                    {/* GIVEN NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
-
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold" }}>GIVEN NAME</div>
-                                        <input
-                                            type="text"
-                                            value={person.mother_given_name || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.mother_given_name || ""}
+                                        </div>
                                     </td>
                                     {/* MIDDLE NAME (Not yet married) */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
-
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
                                         <div style={{ fontWeight: "bold", fontFamily: "Arial", }}>   MIDDLE NAME (Not yet married)</div>
 
-                                        <input
-                                            type="text"
-                                            value={person.mother_middle_name || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
+                                            })}
+                                        >
+                                            {person.mother_middle_name || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -1834,9 +1544,8 @@ const PersonalDataForm = () => {
                                     </td>
                                 </tr>
 
-                                {/* STUDENT ID NUMBER */}
+                                {/* HEADER ROW */}
                                 <tr>
-                                    {/* STUDENT ID NUMBER */}
                                     <td colSpan={20} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -1850,7 +1559,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* LEARNER’S REFERENCE NUMBER */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -1864,7 +1572,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* DISABILITY */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -1903,21 +1610,14 @@ const PersonalDataForm = () => {
                                             fontFamily: "Arial",
                                             fontSize: "12px"
                                         }}>
-                                        <input
-                                            type="text"
-                                            value={`${person.father_given_name || ""} ${person.father_middle_name || ""} ${person.father_family_name || ""}`}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
-
-
+                                            })}
+                                        >
+                                            {`${person.father_given_name || ""} ${person.father_middle_name || ""} ${person.father_family_name || ""}`}
+                                        </div>
                                     </td>
 
 
@@ -1929,21 +1629,14 @@ const PersonalDataForm = () => {
                                             fontFamily: "Arial",
                                             fontSize: "12px"
                                         }}>
-                                        <input
-                                            type="text"
-                                            value={person.father_occupation || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
-
-
+                                            })}
+                                        >
+                                            {person.father_occupation || ""}
+                                        </div>
                                     </td>
 
                                     <td colSpan={10} style={{
@@ -1953,22 +1646,14 @@ const PersonalDataForm = () => {
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
-                                        <input
-                                            type="text"
-                                            value={person.father_income || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
-
-
-
+                                            })}
+                                        >
+                                            {person.father_income || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -1985,7 +1670,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* GIVEN NAME */}
                                     <td colSpan={13} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -1993,25 +1677,16 @@ const PersonalDataForm = () => {
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
-                                        <input
-                                            type="text"
-                                            value={`${person.mother_given_name || ""} ${person.mother_middle_name || ""} ${person.mother_family_name || ""}`}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
-
-
-
+                                            })}
+                                        >
+                                            {`${person.mother_given_name || ""} ${person.mother_middle_name || ""} ${person.mother_family_name || ""}`}
+                                        </div>
                                     </td>
 
-                                    {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2019,25 +1694,16 @@ const PersonalDataForm = () => {
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
-                                        <input
-                                            type="text"
-                                            value={person.mother_occupation || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
-
-
-
+                                            })}
+                                        >
+                                            {person.mother_occupation || ""}
+                                        </div>
                                     </td>
 
-                                    {/* PERMANENT CONTACT NUMBER */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2045,21 +1711,14 @@ const PersonalDataForm = () => {
                                         fontFamily: "Arial",
                                         fontSize: "12px"
                                     }}>
-                                        <input
-                                            type="text"
-                                            value={person.mother_income || ""}
-                                            readOnly
-                                            style={{
+                                        <div
+                                            style={dataFieldStyle({
                                                 marginTop: "5px",
-                                                width: "100%",
-                                                border: "none",
-                                                outline: "none",
                                                 fontSize: "15px",
-                                                fontFamily: "Arial",
-                                            }}
-                                        />
-
-
+                                            })}
+                                        >
+                                            {person.mother_income || ""}
+                                        </div>
                                     </td>
                                 </tr>
 
@@ -2079,7 +1738,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* GIVEN NAME */}
                                     <td colSpan={13} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2091,7 +1749,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2103,7 +1760,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* PERMANENT CONTACT NUMBER */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2132,7 +1788,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* GIVEN NAME */}
                                     <td colSpan={13} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2144,7 +1799,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2156,7 +1810,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* PERMANENT CONTACT NUMBER */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2186,7 +1839,6 @@ const PersonalDataForm = () => {
                                     </td>
 
 
-                                    {/* GIVEN NAME */}
                                     <td colSpan={13} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2198,7 +1850,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2210,7 +1861,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* PERMANENT CONTACT NUMBER */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2239,7 +1889,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* GIVEN NAME */}
                                     <td colSpan={13} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2251,7 +1900,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2263,7 +1911,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* PERMANENT CONTACT NUMBER */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2293,7 +1940,6 @@ const PersonalDataForm = () => {
                                     </td>
 
 
-                                    {/* GIVEN NAME */}
                                     <td colSpan={13} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2305,7 +1951,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2317,7 +1962,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* PERMANENT CONTACT NUMBER */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2346,7 +1990,6 @@ const PersonalDataForm = () => {
                                     </td>
 
 
-                                    {/* GIVEN NAME */}
                                     <td colSpan={13} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2358,7 +2001,6 @@ const PersonalDataForm = () => {
 
                                     </td>
 
-                                    {/* MIDDLE NAME */}
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2371,7 +2013,57 @@ const PersonalDataForm = () => {
                                     </td>
 
 
-                                    {/* PERMANENT CONTACT NUMBER */}
+                                    <td colSpan={10} style={{
+                                        border: "1px solid black",
+                                        textAlign: "left",
+                                        padding: "2px",  // Reduced padding to fit in 10px height
+                                        fontWeight: "bold",
+                                        fontSize: "12px"
+                                    }}>
+
+
+                                    </td>
+
+                                </tr>
+
+
+                                <tr style={{ height: "5px" }}>
+
+                                    <td colSpan={7} style={{
+                                        border: "1px solid black",
+                                        textAlign: "right",
+                                        fontFamily: "Arial",
+                                        padding: "2px",  // Reduced padding to fit in 10px height
+                                        fontWeight: "bold",
+                                        fontSize: "15px"
+                                    }}>
+
+                                    </td>
+
+
+                                    <td colSpan={13} style={{
+                                        border: "1px solid black",
+                                        textAlign: "left",
+                                        padding: "2px",  // Reduced padding to fit in 10px height
+                                        fontWeight: "bold",
+                                        fontSize: "12px"
+                                    }}>
+
+
+                                    </td>
+
+                                    <td colSpan={10} style={{
+                                        border: "1px solid black",
+                                        textAlign: "left",
+                                        padding: "2px",  // Reduced padding to fit in 10px height
+                                        fontWeight: "bold",
+                                        fontSize: "12px"
+                                    }}>
+
+
+                                    </td>
+
+
                                     <td colSpan={10} style={{
                                         border: "1px solid black",
                                         textAlign: "left",
@@ -2391,8 +2083,6 @@ const PersonalDataForm = () => {
 
 
 
-
-
                             </tbody>
                         </table>
 
@@ -2401,12 +2091,20 @@ const PersonalDataForm = () => {
                                 marginTop: "-50px",
                                 borderCollapse: "collapse",
                                 fontFamily: "Arial",
-                                width: "8in",
+                                width: "760px",
                                 margin: "0 auto",
                                 textAlign: "center",
                                 tableLayout: "fixed",
                             }}
                         >
+                            {/* Same 40-column grid as the main table above, so this
+                                table's colSpan={40} row lines up with the same
+                                8in width and doesn't drift relative to it. */}
+                            <colgroup>
+                                {Array.from({ length: 40 }).map((_, i) => (
+                                    <col key={i} style={{ width: "19px" }} />   // ✅ exact px, not %
+                                ))}
+                            </colgroup>
                             <tbody>
                                 {/* Other table rows here... */}
 
@@ -2454,7 +2152,7 @@ const PersonalDataForm = () => {
         </Box >
 
     );
-};
+});
 
 export default PersonalDataForm;
 

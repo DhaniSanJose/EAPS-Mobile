@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { Button, Box, TextField, Container, Card, Modal, TableContainer, Paper, Table, TableHead, TableRow, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel } from "@mui/material";
+import { Button, Box, TextField, Container, Card, Modal, TableContainer, Paper, Table, TableHead, TableRow, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, CircularProgress, } from "@mui/material";
 import { Link } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
@@ -28,6 +28,10 @@ import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from '@mui/icons-material/Campaign';
 import ScoreIcon from '@mui/icons-material/Score';
 import API_BASE_URL from "../apiConfig";
+import AdminECATApplicationForm from "./AdminECATApplicationForm";
+import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
+import AdminPersonalDataForm from "./AdminPersonalDataForm";
+import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 const AdminDashboard3 = () => {
 
@@ -542,51 +546,189 @@ const AdminDashboard3 = () => {
     setExamPermitError("");
   };
 
-  const handleExamPermitClick = async () => {
+
+
+  const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices" | "examPermitDownload"
+  const hiddenFormRef = useRef();
+
+  const FORM_CONFIGS = {
+    ecat: {
+      label: "ECAT Application Form",
+      endpoint: "/api/generate-ecat-form-pdf",
+      filenamePrefix: "ECAT_Application_Form",
+      Component: AdminECATApplicationForm,
+    },
+    personalData: {
+      label: "Personal Data Form",
+      endpoint: "/api/generate-personal-data-form-pdf",
+      filenamePrefix: "Personal_Data_Form",
+      Component: AdminPersonalDataForm,
+    },
+    registrar: {
+      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+      endpoint: "/api/generate-registrar-form-pdf",
+      filenamePrefix: "Office_Of_The_Registrar",
+      Component: AdminOfficeOfTheRegistrar,
+    },
+    admissionServices: {
+      label: "Application/Student Satisfactory Survey",
+      endpoint: "/api/generate-admission-services-pdf",
+      filenamePrefix: "Admission_Services_CSM_Form",
+      Component: ApplicantServicesSurvey,
+      dateStamped: true,
+    },
+  };
+
+
+  const buildClientFilename = (prefix, { lastName, firstName, applicantNumber }) => {
+    const safeLast = (lastName || "Applicant").trim().replace(/\s+/g, "_");
+    const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
+    const suffix = applicantNumber ? `_${applicantNumber}` : "";
+    return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
+  };
+
+  const generateFormPdf = async (key) => {
+    const config = FORM_CONFIGS[key];
+    if (!config || generatingKey) return;
+
+    // 🔒 Require a searched/selected applicant before generating anything
+    if (!userID || !person?.person_id) {
+      setSnackbar({
+        open: true,
+        message: "Please search and select an applicant first.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setGeneratingKey(key);
+
+    try {
+      // give the hidden Admin component time to mount + finish its own
+      // fetches for this applicant before we read its rendered HTML
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const node = hiddenFormRef.current;
+      if (!node) throw new Error(`${config.label} did not render in time.`);
+
+      const response = await axios.post(
+        `${API_BASE_URL}${config.endpoint}`,
+        {
+          html: node.innerHTML,
+          applicant_number: person?.applicant_number || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+          audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
+          audit_actor_role: userRole || "registrar",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const fileName = config.dateStamped
+        ? `${config.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`
+        : buildClientFilename(config.filenamePrefix, {
+          lastName: person?.last_name,
+          firstName: person?.first_name,
+          applicantNumber: person?.applicant_number,
+        });
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Error generating ${config.label} PDF:`, err);
+      setSnackbar({
+        open: true,
+        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+        severity: "error",
+      });
+    } finally {
+      setGeneratingKey(null);
+    }
+  };
+
+
+  const downloadExamPermitPDF = async () => {
+    if (!userID || !person?.person_id) {
+      setSnackbar({
+        open: true,
+        message: "Please search and select an applicant first.",
+        severity: "warning",
+      });
+      return;
+    }
+
     try {
       const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
-      const verified = res.data.some(a => a.person_id === parseInt(userID));
+      const verified = res.data.some((a) => a.person_id === parseInt(userID));
 
       if (!verified) {
-        setExamPermitError("❌ You cannot print the Exam Permit until all required documents are verified.");
+        setExamPermitError("❌ This applicant's documents are not yet verified.");
         setExamPermitModalOpen(true);
         return;
       }
 
-      // ✅ Render permit and print
+      setGeneratingKey("examPermitDownload");
       setShowPrintView(true);
-      setTimeout(() => {
-        printDiv();
-        setShowPrintView(false);
-      }, 500);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      const divToPrint = divToPrintRef.current;
+      if (!divToPrint) throw new Error("Exam permit content did not render in time.");
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-exam-permit-pdf`,
+        {
+          html: divToPrint.innerHTML,
+          applicant_number: person?.applicant_number || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const fileName = buildClientFilename("Exam_Permit", {
+        lastName: person?.last_name,
+        firstName: person?.first_name,
+        applicantNumber: person?.applicant_number,
+      });
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Error verifying exam permit eligibility:", err);
-      setExamPermitError("⚠️ Unable to check document verification status right now.");
+      console.error("Error downloading exam permit PDF:", err);
+      setExamPermitError("⚠️ Unable to generate the Exam Permit PDF right now.");
       setExamPermitModalOpen(true);
+    } finally {
+      setShowPrintView(false);
+      setGeneratingKey(null);
     }
   };
 
   const links = [
+    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
+    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
     {
-      to: userID ? `/admin_ecat_application_form?person_id=${userID}` : "/admin_ecat_application_form",
-      label: "ECAT Application Form",
-    },
-    {
-      to: userID ? `/admin_admission_form_process?person_id=${userID}` : "/admin_admission_form_process",
-      label: "Admission Form Process",
-    },
-    {
-      to: userID ? `/admin_personal_data_form?person_id=${userID}` : "/admin_personal_data_form",
-      label: "Personal Data Form",
-    },
-    {
-      to: userID ? `/admin_office_of_the_registrar?person_id=${userID}` : "/admin_office_of_the_registrar",
+      key: "registrar",
       label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+      onClick: () => generateFormPdf("registrar"),
     },
-    { to: "/admission_services", label: "Application/Student Satisfactory Survey" },
-    { label: "Examination Permit", onClick: handleExamPermitClick },
+    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
+    { key: "examPermitDownload", label: "Examination Permit", onClick: downloadExamPermitPDF },
   ];
-
 
 
 
@@ -641,11 +783,24 @@ const AdminDashboard3 = () => {
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
       {showPrintView && (
-        <div ref={divToPrintRef} style={{ display: "block" }}>
-          <ExamPermit personId={userID} />   {/* ✅ pass the searched person_id */}
+        <div
+          ref={divToPrintRef}
+          style={{
+            position: "absolute",
+            left: "-9999px",
+            top: 0,
+            width: "8.5in",
+            background: "#fff",
+          }}
+        >
+          <ExamPermit personId={userID} />
         </div>
       )}
-
+      {generatingKey && FORM_CONFIGS[generatingKey] && (
+        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          {React.createElement(FORM_CONFIGS[generatingKey].Component, { personId: userID })}
+        </div>
+      )}
 
       <Box
         sx={{
@@ -871,74 +1026,91 @@ const AdminDashboard3 = () => {
           gap: 2,
           mt: 2,
           pb: 1,
-          justifyContent: "center", // Centers all cards horizontally
+          justifyContent: "center",
         }}
       >
-        {links.map((lnk, i) => (
-          <motion.div
-            key={i}
-            style={{ flex: "0 0 calc(30% - 16px)" }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1, duration: 0.4 }}
-          >
-            <Card
-              sx={{
-                minHeight: 60,
-                borderRadius: 2,
-                border: `1px solid ${borderColor}`,
-                backgroundColor: "#fff",
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
-                p: 1.5,
-                cursor: "pointer",
-                transition: "all 0.3s ease-in-out",
-                "&:hover": {
-                  transform: "scale(1.05)",
-                  backgroundColor: settings?.header_color || "#1976d2",
+        {links.map((lnk, i) => {
+          const isGenerating = generatingKey === lnk.key;
+          const disabled = generatingKey !== null;
 
-                  "& .card-text": {
-                    color: "#fff", // ✅ text becomes white
-                  },
-                  "& .card-icon": {
-                    color: "#fff", // ✅ icon becomes white
-                  },
-                },
-              }}
-              onClick={() => {
-                if (lnk.onClick) {
-                  lnk.onClick(); // run handler
-                } else if (lnk.to) {
-                  navigate(lnk.to); // navigate if it has a `to`
-                }
-              }}
+          return (
+            <motion.div
+              key={i}
+              style={{ flex: "0 0 calc(30% - 16px)" }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1, duration: 0.4 }}
             >
-              {/* Icon */}
-              <PictureAsPdfIcon
-                className="card-icon"
-                sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
-              />
-
-              {/* Label */}
-              <Typography
-                className="card-text"
+              <Card
                 sx={{
-                  color: mainButtonColor,
-                  fontFamily: "Poppins, sans-serif",
-                  fontWeight: "bold",
-                  fontSize: "0.85rem",
+                  minHeight: 60,
+                  borderRadius: 2,
+                  border: `1px solid ${borderColor}`,
+                  backgroundColor: "#fff",
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  p: 1.5,
+                  cursor: disabled ? "default" : "pointer",
+                  opacity: disabled && !isGenerating ? 0.5 : 1,
+                  pointerEvents: disabled ? "none" : "auto",
+                  transition: "all 0.3s ease-in-out",
+                  "&:hover": {
+                    transform: disabled ? "none" : "scale(1.05)",
+                    backgroundColor: disabled
+                      ? "#fff"
+                      : settings?.header_color || "#1976d2",
+
+                    "& .card-text": {
+                      color: disabled ? mainButtonColor : "#fff",
+                    },
+                    "& .card-icon": {
+                      color: disabled ? mainButtonColor : "#fff",
+                    },
+                  },
+                }}
+                onClick={() => {
+                  if (disabled) return;
+
+                  if (lnk.onClick) {
+                    lnk.onClick();
+                  } else if (lnk.to) {
+                    navigate(lnk.to);
+                  }
                 }}
               >
-                {lnk.label}
-              </Typography>
-            </Card>
-          </motion.div>
-        ))}
-      </Box>
+                {/* Icon / Loading */}
+                {isGenerating ? (
+                  <CircularProgress
+                    size={26}
+                    sx={{ color: mainButtonColor, mr: 1.5 }}
+                  />
+                ) : (
+                  <PictureAsPdfIcon
+                    className="card-icon"
+                    sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
+                  />
+                )}
 
+                {/* Label */}
+                <Typography
+                  className="card-text"
+                  sx={{
+                    color: mainButtonColor,
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "bold",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {isGenerating ? "Generating PDF..." : lnk.label}
+                </Typography>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </Box>
 
 
 

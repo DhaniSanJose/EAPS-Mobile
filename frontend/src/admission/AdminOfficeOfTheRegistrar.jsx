@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import axios from "axios";
 import { Box, Container, Typography } from "@mui/material";
@@ -9,7 +10,7 @@ import API_BASE_URL from "../apiConfig";
 import DownloadIcon from "@mui/icons-material/Download";
 
 
-const OfficeOfTheRegistrar = () => {
+const OfficeOfTheRegistrar = forwardRef(({ personId }, ref) => {
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -241,6 +242,7 @@ const OfficeOfTheRegistrar = () => {
   }, [queryPersonId]);
 
   const divToPrintRef = useRef();
+  useImperativeHandle(ref, () => divToPrintRef.current);
 
   const printDiv = () => {
     const divToPrint = divToPrintRef.current;
@@ -248,120 +250,69 @@ const OfficeOfTheRegistrar = () => {
       const newWin = window.open("", "Print-Window");
       newWin.document.open();
       newWin.document.write(`
-      <html>
-        <head>
-          <title>Print</title>
-       <style>
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
-  html, body {
-    margin: 1;
-  margin: 0;        
-  margin-top: 0; 
-    padding: 0;
-    width: 210mm;
-    height: 297mm;
-    font-family: Arial;
-  }
-
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 1;
-    padding: 0;
-  }
-
-.print-container {
-  width: 100%;
-  height: auto;
-  padding: 10px ;
-}
-
-
-  button {
-    display: none;
-  }
-
-    .student-table {
-    margin-top: -10px !important;
-  }
-
-
-
-
-  svg.MuiSvgIcon-root {
-    width: 24px !important;
-    height: 24px !important;
-  }
-</style>
-
-        </head>
-        <body onload="window.print(); setTimeout(() => window.close(), 100);">
-          <div class="print-container">
-            ${divToPrint.innerHTML}
-          </div>
-        </body>
-      </html>
-    `);
+       <html>
+         <head>
+           <title>Print</title>
+        <style>
+   @page {
+     size: A4;
+     margin: 0;
+   }
+ 
+   html, body {
+     margin: 1;
+   margin: 0;        
+   margin-top: 0; 
+     padding: 0;
+     width: 210mm;
+     height: 297mm;
+     font-family: Arial;
+   }
+ 
+   *, *::before, *::after {
+     box-sizing: border-box;
+     margin: 1;
+     padding: 0;
+   }
+ 
+ .print-container {
+   width: 100%;
+   height: auto;
+   padding: 10px ;
+ }
+ 
+ 
+   button {
+     display: none;
+   }
+ 
+     .student-table {
+     margin-top: -10px !important;
+   }
+ 
+ 
+ 
+ 
+   svg.MuiSvgIcon-root {
+     width: 24px !important;
+     height: 24px !important;
+   }
+ </style>
+ 
+         </head>
+         <body onload="window.print(); setTimeout(() => window.close(), 100);">
+           <div class="print-container">
+             ${divToPrint.innerHTML}
+           </div>
+         </body>
+       </html>
+     `);
       newWin.document.close();
     } else {
       console.error("divToPrintRef is not set.");
     }
   };
 
-  const downloadPDF = async () => {
-    const divToPrint = divToPrintRef.current;
-    if (!divToPrint) {
-      console.error("divToPrintRef is not set.");
-      return;
-    }
-
-    setGeneratingPdf(true);
-
-    try {
-      // Only the "Search App. No." field is a live-bound <input>; bake its
-      // value attribute since innerHTML won't carry React's live .value.
-      const clonedDiv = divToPrint.cloneNode(true);
-      const inputs = clonedDiv.querySelectorAll("input");
-      inputs.forEach((input) => {
-        input.setAttribute("value", input.value ?? "");
-      });
-
-      const response = await axios.post(
-        `${API_BASE_URL}/api/generate-registrar-form-pdf`,
-        {
-          html: clonedDiv.innerHTML,
-          applicant_number: person?.applicant_number || "",
-          last_name: person?.last_name || "",
-          first_name: person?.first_name || "",
-        },
-        { responseType: "blob" },
-      );
-
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-
-      const lastName = (person?.last_name || "Applicant").trim().replace(/\s+/g, "_");
-      const firstName = (person?.first_name || "").trim().replace(/\s+/g, "_");
-      const applicantNo = person?.applicant_number ? `_${person.applicant_number}` : "";
-      const fileName = `Office_Of_The_Registrar_${lastName}${firstName ? "_" + firstName : ""}${applicantNo}.pdf`;
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to generate PDF:", error);
-      alert("Something went wrong while generating the PDF. Please try again.");
-    } finally {
-      setGeneratingPdf(false);
-    }
-  };
 
   const [curriculumOptions, setCurriculumOptions] = useState([]);
 
@@ -385,6 +336,11 @@ const OfficeOfTheRegistrar = () => {
     )?.program_description ||
       (person?.program ?? "");
   }
+
+  useEffect(() => {
+    const idToUse = personId || queryPersonId || localStorage.getItem("person_id");
+    if (idToUse) fetchPersonData(idToUse);
+  }, [personId]);
 
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -417,86 +373,7 @@ const OfficeOfTheRegistrar = () => {
         padding: 2,
       }}
     >
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          mb: 2,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: titleColor,
-            fontSize: "36px",
-          }}
-        >
-          OFFICE OF THE REGISTRAR
-        </Typography>
-      </Box>
 
-      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
-
-      {/* ✅ PRINT BUTTON (unchanged) */}
-      <button
-        onClick={printDiv}
-        style={{
-          marginBottom: "1rem",
-          padding: "10px 20px",
-          border: "2px solid black",
-          backgroundColor: "#f0f0f0",
-          color: "black",
-          borderRadius: "5px",
-          marginTop: "20px",
-          cursor: "pointer",
-          fontSize: "16px",
-          fontWeight: "bold",
-          transition: "background-color 0.3s, transform 0.2s",
-        }}
-        onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-        onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-        onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-        onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-      >
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <FcPrint size={20} />
-          Print Office of the Registrar
-        </span>
-        
-      </button>
-
-       <button
-          onClick={downloadPDF}
-          disabled={generatingPdf}
-          style={{
-            marginBottom: "1rem",
-            padding: "10px 20px",
-            border: `2px solid ${borderColor}`,
-            backgroundColor: generatingPdf ? "#cfd8dc" : mainButtonColor,
-            color: "#fff",
-            borderRadius: "5px",
-            marginTop: "20px",
-            marginLeft: "12px",
-            cursor: generatingPdf ? "not-allowed" : "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <DownloadIcon sx={{ fontSize: 20 }} />
-            {generatingPdf ? "Generating PDF..." : "Download PDF"}
-          </span>
-        </button>
 
       <Container>
         <div ref={divToPrintRef}>
@@ -2994,6 +2871,6 @@ const OfficeOfTheRegistrar = () => {
       </Container>
     </Box>
   );
-};
+});
 
 export default OfficeOfTheRegistrar;

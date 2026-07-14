@@ -76,7 +76,7 @@ const StudentEditPermissions3 = lazy(() => import("./account_management/StudentE
 const StudentEditPermissions4 = lazy(() => import("./account_management/StudentEditPermissions4"));
 const StudentEditPermissions5 = lazy(() => import("./account_management/StudentEditPermissions5"));
 const UserPageAccess = lazy(() => import("./account_management/UserPageAccess"));
-const AdminAdmissionFormProcess = lazy(() => import("./admission/AdminAdmissionFormProcess"));
+const AdmissionFormProcess = lazy(() => import("./admission/AdmissionFormProcess"));
 const AdmissionPersonalInformation = lazy(() => import("./admission/AdmissionPersonalInformation"));
 const AdmissionFamilyBackground = lazy(() => import("./admission/AdmissionFamilyBackground"));
 const AdmissionEducationalAttainment = lazy(() => import("./admission/AdmissionEducationalAttainment"));
@@ -100,8 +100,7 @@ const RoomRegistration = lazy(() => import("./system_management/RoomRegistration
 const AdmissionOnlineRequirements = lazy(() => import("./admission/AdmissionOnlineRequirements"));
 const VerifyDocumentScheduleManagement = lazy(() => import("./admission/VerifyDocumentScheduleManagement"));
 const VerifyDocumentRoomAssignment = lazy(() => import("./admission/VerifyDocumentRoomAssignment"));
-const AdmissionFormProcess = lazy(() => import("./applicant/AdmissionFormProcess"));
-const AdmissionServices = lazy(() => import("./applicant/AdmissionServices"));
+const ApplicantServicesSurvey = lazy(() => import("./applicant/ApplicantServicesSurvey"));
 const ApplicantResetPassword = lazy(() => import("./applicant/ApplicantResetPassword"));
 const ApplicantPersonalInformation = lazy(() => import("./applicant/ApplicantPersonalInformation"));
 const ApplicantPersonalInformationMobile = lazy(() => import("./applicant/ApplicantPersonalInformationMobile"));
@@ -230,8 +229,7 @@ const StudentOnlineRequirementsRegistrar = lazy(() => import("./registrar/Studen
 const ApplicantListRegistrar = lazy(() => import("./registrar/ApplicantListRegistrar"));
 const TranscriptOfRecords = lazy(() => import("./registrar/TranscriptOfRecords"));
 const CertificateOfRegistration = lazy(() => import("./student/CertificateOfRegistration"));
-const StudentAdmissionFormProcess = lazy(() => import("./student/StudentAdmissionFormProcess"));
-const StudentAdmissionServices = lazy(() => import("./student/StudentAdmissionServices"));
+const StudentServicesSurvey = lazy(() => import("./student/StudentServicesSurvey"));
 const StudentBalanceInfo = lazy(() => import("./student/StudentBalanceInfo"));
 const StudentBalanceManagement = lazy(() => import("./student/StudentBalanceManagement"));
 const StudentPersonalInformation = lazy(() => import("./student/StudentPersonalInformation"));
@@ -869,12 +867,12 @@ function App() {
                       <Route path="/applicant_online_requirements_registrar" element={<ProtectedRoute><ApplicantOnlineRequirementsRegistrar /></ProtectedRoute>} />
                       <Route path="/admin_ecat_application_form" element={<ProtectedRoute allowedRoles={["registrar"]}><AdminECATApplicationForm /></ProtectedRoute>} />
                       <Route path="/admin_personal_data_form" element={<ProtectedRoute allowedRoles={["registrar"]}><AdminPersonalDataForm /></ProtectedRoute>} />
-                      <Route path="/admin_admission_form_process" element={<ProtectedRoute allowedRoles={["registrar"]}><AdminAdmissionFormProcess /></ProtectedRoute>} />
+                      <Route path="/admin_admission_form_process" element={<ProtectedRoute allowedRoles={["registrar"]}><AdmissionFormProcess /></ProtectedRoute>} />
                       <Route path="/admin_office_of_the_registrar" element={<ProtectedRoute allowedRoles={["registrar"]}><AdminOfficeOfTheRegistrar /></ProtectedRoute>} />
                       <Route path="/personal_data_form" element={<ProtectedRoute allowedRoles={["applicant"]}><PersonalDataForm /></ProtectedRoute>} />
                       <Route path="/ecat_application_form" element={<ProtectedRoute allowedRoles={["applicant"]}><ECATApplicationForm /></ProtectedRoute>} />
-                      <Route path="/admission_form_process" element={<ProtectedRoute allowedRoles={["applicant", "registrar", "student"]}><AdmissionFormProcess /></ProtectedRoute>} />
-                      <Route path="/admission_services" element={<ProtectedRoute allowedRoles={["applicant", "registrar"]}><AdmissionServices /></ProtectedRoute>} />
+
+                      <Route path="/applicant_services_survey" element={<ProtectedRoute allowedRoles={["applicant", "registrar"]}><ApplicantServicesSurvey /></ProtectedRoute>} />
                       <Route path="/office_of_the_registrar" element={<ProtectedRoute allowedRoles={["applicant"]}><OfficeOfTheRegistrar /></ProtectedRoute>} />
                       <Route path="/verify_document_schedule_management" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentRoomAssignment /></ProtectedRoute>} />
                       <Route path="/verify_document_room_assignment" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentScheduleManagement /></ProtectedRoute>} />
@@ -895,8 +893,8 @@ function App() {
                       <Route path="/student_ecat_application_form" element={<ProtectedRoute allowedRoles={["student"]}><StudentECATApplicationForm /></ProtectedRoute>} />
                       <Route path="/student_personal_data_form" element={<ProtectedRoute allowedRoles={["student"]}><StudentPersonalDataForm /></ProtectedRoute>} />
                       <Route path="/student_office_of_the_registrar" element={<ProtectedRoute allowedRoles={["student"]}><StudentOfficeOfTheRegistrar /></ProtectedRoute>} />
-                      <Route path="/student_admission_services" element={<ProtectedRoute allowedRoles={["student"]}><StudentAdmissionServices /></ProtectedRoute>} />
-                      <Route path="/student_form_process" element={<ProtectedRoute allowedRoles={["student", "registrar", "applicant"]}><StudentAdmissionFormProcess /></ProtectedRoute>} />
+                      <Route path="/student_services_survey" element={<ProtectedRoute allowedRoles={["student"]}><StudentServicesSurvey /></ProtectedRoute>} />
+
                       <Route path="/student_grade_file" element={<ProtectedRoute><StudentGradeFile /></ProtectedRoute>} />
                       <Route path="/student_curriculum_subjects" element={<ProtectedRoute allowedRoles={"student"}><StudentCurriculumSubjects /></ProtectedRoute>} />
                       <Route path="/student_enrollment" element={<ProtectedRoute><StudentEnrollment /></ProtectedRoute>} />

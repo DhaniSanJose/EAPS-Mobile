@@ -459,11 +459,10 @@ router.post("/generate-personal-data-form-pdf", async (req, res) => {
     }
 
     .print-container {
-      width: 110%;
-      height: 100%;
-      box-sizing: border-box;
-      transform: scale(0.90);
-      transform-origin: top left;
+    width: 100%;
++    height: 100%;
+    box-sizing: border-box;
+   zoom: 0.90;
     }
 
     .student-table {
@@ -845,12 +844,12 @@ router.post("/generate-admission-services-pdf", async (req, res) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const pdfBuffer = await page.pdf({
-      format: "Letter",
+      format: "A4",
       printBackground: true,
       preferCSSPageSize: false,
       // Matches @page { size: 8.5in 11in; margin: 0.25in; } from the
       // component's own embedded print styles.
-      margin: { top: "0.25in", bottom: "0.25in", left: "0.25in", right: "0.25in" },
+      margin: { top: "0.25in", bottom: "0.25in", left: "0in", right: "0in" },
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {

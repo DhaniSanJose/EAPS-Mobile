@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import axios from "axios";
 import { Box, Container, Typography } from "@mui/material";
@@ -7,7 +8,7 @@ import { FcPrint } from "react-icons/fc";
 import { useLocation } from "react-router-dom";
 
 import API_BASE_URL from "../apiConfig";
-const StudentOfficeOfTheRegistrar = () => {
+const StudentOfficeOfTheRegistrar = forwardRef((props, ref) => {
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -239,6 +240,7 @@ const StudentOfficeOfTheRegistrar = () => {
   }, [queryPersonId]);
 
   const divToPrintRef = useRef();
+  useImperativeHandle(ref, () => divToPrintRef.current);
 
   const printDiv = () => {
     const divToPrint = divToPrintRef.current;
@@ -246,68 +248,69 @@ const StudentOfficeOfTheRegistrar = () => {
       const newWin = window.open("", "Print-Window");
       newWin.document.open();
       newWin.document.write(`
-      <html>
-        <head>
-          <title>Print</title>
-       <style>
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
-  html, body {
-    margin: 1;
-  margin: 0;        
-  margin-top: 0; 
-    padding: 0;
-    width: 210mm;
-    height: 297mm;
-    font-family: Arial;
-  }
-
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 1;
-    padding: 0;
-  }
-
-.print-container {
-  width: 100%;
-  height: auto;
-  padding: 10px ;
-}
-
-
-  button {
-    display: none;
-  }
-
-    .student-table {
-    margin-top: -10px !important;
-  }
-
-
-
-
-  svg.MuiSvgIcon-root {
-    width: 24px !important;
-    height: 24px !important;
-  }
-</style>
-
-        </head>
-        <body onload="window.print(); setTimeout(() => window.close(), 100);">
-          <div class="print-container">
-            ${divToPrint.innerHTML}
-          </div>
-        </body>
-      </html>
-    `);
+       <html>
+         <head>
+           <title>Print</title>
+        <style>
+   @page {
+     size: A4;
+     margin: 0;
+   }
+ 
+   html, body {
+     margin: 1;
+   margin: 0;        
+   margin-top: 0; 
+     padding: 0;
+     width: 210mm;
+     height: 297mm;
+     font-family: Arial;
+   }
+ 
+   *, *::before, *::after {
+     box-sizing: border-box;
+     margin: 1;
+     padding: 0;
+   }
+ 
+ .print-container {
+   width: 100%;
+   height: auto;
+   padding: 10px ;
+ }
+ 
+ 
+   button {
+     display: none;
+   }
+ 
+     .student-table {
+     margin-top: -10px !important;
+   }
+ 
+ 
+ 
+ 
+   svg.MuiSvgIcon-root {
+     width: 24px !important;
+     height: 24px !important;
+   }
+ </style>
+ 
+         </head>
+         <body onload="window.print(); setTimeout(() => window.close(), 100);">
+           <div class="print-container">
+             ${divToPrint.innerHTML}
+           </div>
+         </body>
+       </html>
+     `);
       newWin.document.close();
     } else {
       console.error("divToPrintRef is not set.");
     }
   };
+
 
   const [curriculumOptions, setCurriculumOptions] = useState([]);
 
@@ -360,62 +363,7 @@ const StudentOfficeOfTheRegistrar = () => {
         padding: 2,
       }}
     >
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          mb: 2,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: titleColor,
-            fontSize: "36px",
-          }}
-        >
-          OFFICE OF THE REGISTRAR
-        </Typography>
-      </Box>
 
-      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
-
-      {/* ✅ PRINT BUTTON (unchanged) */}
-      <button
-        onClick={printDiv}
-        style={{
-          marginBottom: "1rem",
-          padding: "10px 20px",
-          border: "2px solid black",
-          backgroundColor: "#f0f0f0",
-          color: "black",
-          borderRadius: "5px",
-          marginTop: "20px",
-          cursor: "pointer",
-          fontSize: "16px",
-          fontWeight: "bold",
-          transition: "background-color 0.3s, transform 0.2s",
-        }}
-        onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-        onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-        onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-        onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-      >
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <FcPrint size={20} />
-          Print Office of the Registrar
-        </span>
-      </button>
 
       <Container>
         <div ref={divToPrintRef}>
@@ -778,11 +726,11 @@ const StudentOfficeOfTheRegistrar = () => {
                 >
                   {person.created_at
                     ? new Date(person.created_at).toLocaleDateString("en-US", {
-                        month: "short", // ✅ “Oct”
-                        day: "2-digit", // ✅ “18”
-                        year: "numeric", // ✅ “2025”
-                        timeZone: "Asia/Manila", // ✅ force PH time
-                      })
+                      month: "short", // ✅ “Oct”
+                      day: "2-digit", // ✅ “18”
+                      year: "numeric", // ✅ “2025”
+                      timeZone: "Asia/Manila", // ✅ force PH time
+                    })
                     : ""}
                 </td>
               </tr>
@@ -816,13 +764,13 @@ const StudentOfficeOfTheRegistrar = () => {
                 >
                   {curriculumOptions.length > 0
                     ? curriculumOptions
-                        .find(
-                          (item) =>
-                            item?.curriculum_id?.toString() ===
-                            (person?.program ?? "").toString(),
-                        )
-                        ?.program_description?.toUpperCase() ||
-                      (person?.program?.toString()?.toUpperCase() ?? "")
+                      .find(
+                        (item) =>
+                          item?.curriculum_id?.toString() ===
+                          (person?.program ?? "").toString(),
+                      )
+                      ?.program_description?.toUpperCase() ||
+                    (person?.program?.toString()?.toUpperCase() ?? "")
                     : "LOADING..."}
                 </td>
 
@@ -1532,7 +1480,7 @@ const StudentOfficeOfTheRegistrar = () => {
                     <span>
                       (
                       {person.citizenship &&
-                      person.citizenship.toLowerCase() !== "filipino"
+                        person.citizenship.toLowerCase() !== "filipino"
                         ? "✓"
                         : " "}
                       ) Foreign:
@@ -2913,6 +2861,6 @@ const StudentOfficeOfTheRegistrar = () => {
       </Container>
     </Box>
   );
-};
+});
 
 export default StudentOfficeOfTheRegistrar;

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import { Box, Container, Typography } from "@mui/material";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -9,7 +10,7 @@ import API_BASE_URL from "../apiConfig";
 import DownloadIcon from "@mui/icons-material/Download";
 
 
-const ECATApplicationForm = () => {
+const ECATApplicationForm = forwardRef(({ personId }, ref) => {
 
   const settings = useContext(SettingsContext);
 
@@ -246,123 +247,66 @@ const ECATApplicationForm = () => {
   }, []);
 
   const divToPrintRef = useRef();
-
-
+  useImperativeHandle(ref, () => divToPrintRef.current);
 
   const printDiv = () => {
     const divToPrint = divToPrintRef.current;
     if (divToPrint) {
-      const newWin = window.open("", "Print-Window");
+      const newWin = window.open('', 'Print-Window');
       newWin.document.open();
       newWin.document.write(`
-<html>
-  <head>
-    <title>Print</title>
-    <style>
-      @page {
-        size: A4;
-        margin: 10mm 10mm 10mm 10mm; /* reasonable print margins */
-      }
-
-      html, body {
-        margin: 0;
-        margin-top: -100px;
-        padding: 0;
-        font-family: Arial;
-        width: auto;
-        height: auto;
-        overflow: visible;
-      }
-
-      .print-container {
-        width: 100%;
-        box-sizing: border-box;
-      }
-
-         .student-table {
-    margin-top: 170px !important;
-  }
-
-
-      * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      button {
-        display: none;
-      }
-    </style>
-  </head>
-  <body onload="window.print(); setTimeout(() => window.close(), 100);">
-    <div class="print-container">
-      ${divToPrint.innerHTML}
-    </div>
-  </body>
-</html>
-`);
+ <html>
+   <head>
+     <title>Print</title>
+     <style>
+       @page {
+         size: A4;
+         margin: 10mm 10mm 10mm 10mm; /* reasonable print margins */
+       }
+ 
+       html, body {
+         margin: 0;
+         margin-top: 10px;
+         padding: 0;
+         font-family: Arial, sans-serif;
+         width: auto;
+         height: auto;
+         overflow: visible;
+       }
+ 
+       .print-container {
+         width: 100%;
+         box-sizing: border-box;
+       }
+ 
+          .student-table {
+     margin-top: 150px !important;
+   }
+ 
+ 
+       * {
+         -webkit-print-color-adjust: exact !important;
+         print-color-adjust: exact !important;
+       }
+ 
+       button {
+         display: none;
+       }
+     </style>
+   </head>
+   <body onload="window.print(); setTimeout(() => window.close(), 100);">
+     <div class="print-container">
+       ${divToPrint.innerHTML}
+     </div>
+   </body>
+ </html>
+ `);
 
       newWin.document.close();
     } else {
       console.error("divToPrintRef is not set.");
     }
   };
-
-  const downloadPDF = async () => {
-    const divToPrint = divToPrintRef.current;
-    if (!divToPrint) {
-      console.error("divToPrintRef is not set.");
-      return;
-    }
-
-    setGeneratingPdf(true);
-
-    try {
-      // Only "Year Graduated" is a live-bound <input> — bake its value
-      // attribute. The other <input>s (Document No., Revision No.,
-      // Process Type, Effective Date, Date of Graduation, Transferee from)
-      // are intentionally blank/unbound, so nothing to bake there.
-      const clonedDiv = divToPrint.cloneNode(true);
-      const inputs = clonedDiv.querySelectorAll("input");
-      inputs.forEach((input) => {
-        input.setAttribute("value", input.value ?? "");
-      });
-
-      const response = await axios.post(
-        `${API_BASE_URL}/api/generate-ecat-form-pdf`,
-        {
-          html: clonedDiv.innerHTML,
-          applicant_number: person?.applicant_number || "",
-          last_name: person?.last_name || "",
-          first_name: person?.first_name || "",
-        },
-        { responseType: "blob" },
-      );
-
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-
-      const lastName = (person?.last_name || "Applicant").trim().replace(/\s+/g, "_");
-      const firstName = (person?.first_name || "").trim().replace(/\s+/g, "_");
-      const applicantNo = person?.applicant_number ? `_${person.applicant_number}` : "";
-      const fileName = `ECAT_Application_Form_${lastName}${firstName ? "_" + firstName : ""}${applicantNo}.pdf`;
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to generate PDF:", error);
-      alert("Something went wrong while generating the PDF. Please try again.");
-    } finally {
-      setGeneratingPdf(false);
-    }
-  };
-
-
 
   const [curriculumOptions, setCurriculumOptions] = useState([]);
 
@@ -386,6 +330,11 @@ const ECATApplicationForm = () => {
     )?.program_description || (person?.program ?? "")
 
   }
+
+  useEffect(() => {
+    const idToUse = personId || queryPersonId || localStorage.getItem("person_id");
+    if (idToUse) fetchPersonData(idToUse);
+  }, [personId]);
 
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -422,89 +371,7 @@ const ECATApplicationForm = () => {
           </style>
         </div>
 
-        {/* ✅ HEADER - Full layout like ApplicantResetPassword */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "flex-start",
-            alignItems: "center",
-            flexWrap: "wrap",
-            mb: 2,
-          }}
-        >
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold",
-              color: titleColor,
-              fontSize: "36px",
-              textAlign: "left",
-            }}
-          >
-            ECAT APPLICATION FORM
-          </Typography>
-        </Box>
 
-        <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-        <br />
-
-        {/* ✅ PRINT BUTTON (unchanged) */}
-        <button
-          onClick={printDiv}
-          style={{
-            marginBottom: "1rem",
-            padding: "10px 20px",
-            border: "1px solid black",
-            backgroundColor: "#f0f0f0",
-            color: "black",
-            borderRadius: "5px",
-            marginTop: "20px",
-            cursor: "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-            transition: "background-color 0.3s, transform 0.2s",
-          }}
-          onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-          onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-          onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <FcPrint size={20} />
-            Print ECAT Application Form
-          </span>
-
-
-        </button>
-
-        <button
-          onClick={downloadPDF}
-          disabled={generatingPdf}
-          style={{
-            marginBottom: "1rem",
-            padding: "10px 20px",
-            border: `2px solid ${borderColor}`,
-            backgroundColor: generatingPdf ? "#cfd8dc" : mainButtonColor,
-            color: "#fff",
-            borderRadius: "5px",
-            marginTop: "20px",
-            marginLeft: "12px",
-            cursor: generatingPdf ? "not-allowed" : "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <DownloadIcon sx={{ fontSize: 20 }} />
-            {generatingPdf ? "Generating PDF..." : "Download PDF"}
-          </span>
-        </button>
         <table
           className="student-table"
           style={{
@@ -1700,7 +1567,7 @@ const ECATApplicationForm = () => {
       </div>
     </Box >
   );
-};
+});
 
 export default ECATApplicationForm;
 

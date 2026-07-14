@@ -257,47 +257,7 @@ const AdmissionServices = forwardRef((props, ref) => {
         }
     };
 
-    const downloadPDF = async () => {
-        const divToPrint = divToPrintRef.current;
-        if (!divToPrint) {
-            console.error("divToPrintRef is not set.");
-            return;
-        }
-
-        setGeneratingPdf(true);
-
-        try {
-            // Every input on this form is uncontrolled (blank template, filled by
-            // hand after printing), so no value/checked baking is needed here —
-            // unlike PersonalDataForm or OfficeOfTheRegistrar.
-            const response = await axios.post(
-                `${API_BASE_URL}/api/generate-admission-services-pdf`,
-                {
-                    html: divToPrint.innerHTML,
-                },
-                { responseType: "blob" },
-            );
-
-            const blob = new Blob([response.data], { type: "application/pdf" });
-            const url = window.URL.createObjectURL(blob);
-
-            const timestamp = new Date().toISOString().slice(0, 10);
-            const fileName = `Admission_Services_CSM_Form_${timestamp}.pdf`;
-
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error("Failed to generate PDF:", error);
-            alert("Something went wrong while generating the PDF. Please try again.");
-        } finally {
-            setGeneratingPdf(false);
-        }
-    };
+   
 
 
 

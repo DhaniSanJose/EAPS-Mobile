@@ -527,7 +527,7 @@ const StudentDashboard2Mobile = () => {
 
   const docLinks = [
     { label: "ECAT Application Form", to: "/student_ecat_application_form" },
-    { label: "Admission Form Process", to: "/student_form_process" },
+   
     { label: "Personal Data Form", to: "/student_personal_data_form" },
     {
       label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission`,

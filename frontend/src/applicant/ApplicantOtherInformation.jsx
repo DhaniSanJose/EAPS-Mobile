@@ -33,7 +33,7 @@ import API_BASE_URL from "../apiConfig";
 import DownloadIcon from "@mui/icons-material/Download";
 import PersonalDataForm from "./PersonalDataForm";
 import OfficeOfTheRegistrar from "./OfficeOfTheRegistrar";
-import AdmissionServices from "./AdmissionServices";
+import AdmissionServices from "./ApplicantServicesSurvey";
 import ECATApplicationForm from "./ECATApplicationForm";
 const ApplicantOtherInformation = (props) => {
   const settings = useContext(SettingsContext);
@@ -547,7 +547,7 @@ const ApplicantOtherInformation = (props) => {
       onClick: () => generateFormPdf("admissionServices"),
     },
 
-    { key: "examPermitDownload", label: "Download Examination Permit (PDF)", onClick: downloadExamPermitPDF },
+    { key: "examPermitDownload", label: "Examination Permit", onClick: downloadExamPermitPDF },
   ];
 
 

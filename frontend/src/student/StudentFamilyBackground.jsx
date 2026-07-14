@@ -314,7 +314,7 @@ const StudentDashboard2 = () => {
 
   const links = [
     { to: `/student_ecat_application_form`, label: "ECAT Application Form" },
-    { to: `/student_form_process`, label: "Admission Form Process" },
+    
     { to: `/student_personal_data_form`, label: "Personal Data Form" },
     { to: `/student_office_of_the_registrar`, label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission` },
     { to: `/student_admission_services`, label: "Admission Services" },

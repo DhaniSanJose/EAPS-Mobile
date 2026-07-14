@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import { Box, Container, Typography } from "@mui/material";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -10,7 +11,7 @@ import API_BASE_URL from "../apiConfig";
 import { QRCodeSVG } from "qrcode.react";
 import DownloadIcon from "@mui/icons-material/Download";
 
-const AdminAdmissionFormProcess = () => {
+const AdminAdmissionFormProcess = forwardRef((props, ref) => {
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -2851,7 +2852,7 @@ const AdminAdmissionFormProcess = () => {
         </div>
       </Container>
     </Box >
-  );
-};
+    );
+});
 
 export default AdminAdmissionFormProcess;

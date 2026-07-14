@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import { Box, Container, Typography } from "@mui/material";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -11,7 +12,7 @@ import { FcPrint } from "react-icons/fc";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
-const StudentAdmissionServices = () => {
+const StudentAdmissionServices = forwardRef((props, ref) => {
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -221,77 +222,79 @@ const StudentAdmissionServices = () => {
     };
 
     const divToPrintRef = useRef();
+    useImperativeHandle(ref, () => divToPrintRef.current);
 
     const printDiv = () => {
         const divToPrint = divToPrintRef.current;
         if (divToPrint) {
-            const newWin = window.open("", "Print-Window");
+            const newWin = window.open('', 'Print-Window');
             newWin.document.open();
             newWin.document.write(`
-      <html>
-        <head>
-          <title>Print</title>
-          <style>
-            @page {
-              size: A4;
-              margin: 0;
-            }
-
-            html, body {
-              margin: 0;
-              padding: 0;
-              width: 210mm;
-              height: 297mm;
-              font-family: Arial;
-              overflow: hidden;
-            }
-
-            .print-container {
-              width: 115%;
-              height: 100%;
-              box-sizing: border-box;
-              transform: scale(0.85);
-              transform-origin: top left;
-                     margin-left: 10px;
-            }
-
-            input[type="checkbox"] {
-              width: 12px;
-              height: 12px;
-              transform: scale(1);
-              margin: 2px;
-            }
-
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-
-            button {
-              display: none;
-            }
-
-              /* FIX ICON SIZE ON PRINT */
-        svg.MuiSvgIcon-root {
-          width: 50px !important;
-          height: 50xpx !important;
-        }
-          </style>
-        </head>
-        <body onload="window.print(); setTimeout(() => window.close(), 100);">
-          <div class="print-container">
-            ${divToPrint.innerHTML}
-          </div>
-        </body>
-      </html>
-    `);
+         <html>
+           <head>
+             <title>Print</title>
+             <style>
+               @page {
+                 size: A4;
+                 margin: 0;
+               }
+   
+               html, body {
+                 margin: 0;
+                 padding: 0;
+                 width: 210mm;
+                 height: 297mm;
+                 font-family: Arial;
+                 overflow: hidden;
+               }
+   
+               .print-container {
+                 width: 115%;
+                 height: 100%;
+                 box-sizing: border-box;
+                 transform: scale(0.85);
+                 transform-origin: top left;
+                        margin-left: 10px;
+               }
+   
+               input[type="checkbox"] {
+                 width: 12px;
+                 height: 12px;
+                 transform: scale(1);
+                 margin: 2px;
+               }
+   
+               * {
+                 -webkit-print-color-adjust: exact !important;
+                 print-color-adjust: exact !important;
+               }
+   
+               button {
+                 display: none;
+               }
+   
+                 /* FIX ICON SIZE ON PRINT */
+           svg.MuiSvgIcon-root {
+             width: 50px !important;
+             height: 50xpx !important;
+           }
+             </style>
+           </head>
+           <body onload="window.print(); setTimeout(() => window.close(), 100);">
+             <div class="print-container">
+               ${divToPrint.innerHTML}
+             </div>
+           </body>
+         </html>
+       `);
             newWin.document.close();
         } else {
             console.error("divToPrintRef is not set.");
         }
     };
 
-   // 🔒 Disable right-click
+
+    // 🔒 Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
     // 🔒 Block DevTools shortcuts + Ctrl+P silently
@@ -313,55 +316,9 @@ const StudentAdmissionServices = () => {
 
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    mb: 2,
-                }}
-            >
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: "bold",
-                        color: titleColor,
-                        fontSize: "36px",
-                    }}
-                >
-                    ADMISSION SERVICES
-                </Typography>
-            </Box>
+    
 
-            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-            <br />
-
-            <button
-                onClick={printDiv}
-                style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
-                    border: "2px solid black",
-                    backgroundColor: "#f0f0f0",
-                    color: "black",
-                    borderRadius: "5px",
-                    marginTop: "20px",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    transition: "background-color 0.3s, transform 0.2s",
-                }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-            >
-                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <FcPrint size={20} />
-                    Print Admission Services
-                </span>
-            </button>
+    
 
             <Container className="mt-8">
 
@@ -369,12 +326,12 @@ const StudentAdmissionServices = () => {
                     <div>
                         <style>
                             {`
-             @media print {
-               button {
-                 display: none;
-               }
-             }
-           `}
+          @media print {
+            button {
+              display: none;
+            }
+          }
+        `}
                         </style>
 
                         <br />
@@ -1728,6 +1685,6 @@ const StudentAdmissionServices = () => {
             </Container>
         </Box>
     );
-};
+});
 
 export default StudentAdmissionServices;
