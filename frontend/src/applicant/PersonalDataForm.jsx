@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import axios from "axios";
 import { Box, Container, Typography } from "@mui/material";
@@ -7,7 +8,7 @@ import { FcPrint } from "react-icons/fc";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
 
-const PersonalDataForm = () => {
+const PersonalDataForm = forwardRef((props, ref) => {
 
     const settings = useContext(SettingsContext);
 
@@ -215,6 +216,7 @@ const PersonalDataForm = () => {
     }, []);
 
     const divToPrintRef = useRef();
+    useImperativeHandle(ref, () => divToPrintRef.current);
     const printDiv = () => {
         const divToPrint = divToPrintRef.current;
         if (divToPrint) {
@@ -243,14 +245,15 @@ const PersonalDataForm = () => {
               margin: 0;
             }
 
-            html, body {
-              margin: 0;
-              padding: 0;
-              width: 210mm;
-              height: 297mm;
-              font-family: Arial;
-              overflow: hidden;
-            }
+          html, body {
+  margin: 0;
+  padding: 0;
+  width: 210mm;
+  min-height: 297mm;   /* was: height: 297mm */
+  font-family: Arial;
+  overflow: visible;   /* was: overflow: hidden */
+  background: #ffffff;
+}
 
             .print-container {
               width: 110%;
@@ -341,62 +344,7 @@ const PersonalDataForm = () => {
 
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    mb: 2,
-                }}
-            >
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: "bold",
-                        color: titleColor,
-                        fontSize: "36px",
-                    }}
-                >
-                    PERSONAL DATA FORM
-                </Typography>
-            </Box>
 
-            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-            <br />
-
-            {/* ✅ PRINT BUTTON (unchanged) */}
-            <button
-                onClick={printDiv}
-                style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
-                    border: "2px solid black",
-                    backgroundColor: "#f0f0f0",
-                    color: "black",
-                    borderRadius: "5px",
-                    marginTop: "20px",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    transition: "background-color 0.3s, transform 0.2s",
-                }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-            >
-                <span
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                    }}
-                >
-                    <FcPrint size={20} />
-                    Print Personal Data Form
-                </span>
-            </button>
 
             <Container>
                 <div ref={divToPrintRef}>
@@ -470,7 +418,7 @@ const PersonalDataForm = () => {
                                         letterSpacing: "1px",
                                         fontWeight: "bold",
                                         fontFamily: "Arial",
-                                        fontSize: "20px",
+                                        fontSize: "18px",
                                         marginBottom: "5px"
                                     }}>
                                         {companyName}
@@ -511,12 +459,33 @@ const PersonalDataForm = () => {
                                 border: "1px solid black",
                                 borderCollapse: "collapse",
                                 fontFamily: "Arial",
-                                width: "8in",
+                                width: "760px",
                                 margin: "0 auto",
                                 textAlign: "center",
                                 tableLayout: "fixed",
                             }}
                         >
+                            {/*
+                              FIX: explicit 40-column colgroup.
+
+                              This table uses table-layout: fixed, but rows split the
+                              40-unit grid differently (e.g. 6+34, 6+19+15, 30+10,
+                              11+15+14, ...). Without a <colgroup> declaring the
+                              actual column grid, the browser/Chromium has to infer
+                              column boundaries from whichever row it treats as the
+                              reference row — so different rows can end up rendered
+                              against slightly different grids. That's what was
+                              causing cells like NAME EXTENSION / YEAR LEVEL / FIRST
+                              YEAR / ETHNICITY to appear cut off, shifted, or
+                              misaligned instead of lining up cleanly under one
+                              another. Declaring all 40 columns here forces every
+                              row's colSpans onto one consistent grid.
+                            */}
+                            <colgroup>
+                                {Array.from({ length: 40 }).map((_, i) => (
+                                    <col key={i} style={{ width: "19px" }} />   // ✅ exact px, not %
+                                ))}
+                            </colgroup>
                             <tbody>
 
                                 {/* Title: PERSONAL DATA FORM */}
@@ -659,7 +628,8 @@ const PersonalDataForm = () => {
                                                 fontSize: "15px",
                                                 fontWeight: "bold",
                                                 letterSpacing: '3px',
-                                                fontFamily: "Arial"
+                                                fontFamily: "Arial",
+                                                border: "1px solid black"
                                             }}
                                         />
                                     </td>
@@ -683,6 +653,7 @@ const PersonalDataForm = () => {
                                                 fontWeight: "bold",
                                                 fontSize: "15px",
                                                 letterSpacing: '3px',
+                                                border: "1px solid black",
                                                 fontFamily: "Arial"
                                             }}
                                         />
@@ -722,6 +693,7 @@ const PersonalDataForm = () => {
                                                 fontWeight: "bold",
                                                 fontSize: "15px",
                                                 letterSpacing: '3px',
+                                                 border: "1px solid black",
                                                 fontFamily: "Arial"
                                             }}
                                         />
@@ -749,6 +721,7 @@ const PersonalDataForm = () => {
                                                 border: "none",
                                                 outline: "none",
                                                 fontSize: "12px",
+                                                 border: "1px solid black",
                                                 fontFamily: "Arial",
                                             }}
                                         />
@@ -789,6 +762,7 @@ const PersonalDataForm = () => {
                                                 border: "none",
                                                 outline: "none",
                                                 fontSize: "12px",
+                                                 border: "1px solid black",
                                                 fontFamily: "Arial",
                                                 textTransform: "uppercase", // visual effect
                                             }}
@@ -817,6 +791,7 @@ const PersonalDataForm = () => {
 
                                                 border: "none",
                                                 outline: "none",
+                                                 border: "1px solid black",
                                                 fontSize: "15px",
                                                 fontFamily: "Arial",
                                                 textTransform: "uppercase",
@@ -854,6 +829,7 @@ const PersonalDataForm = () => {
                                                 width: "100%",
                                                 border: "none",
                                                 outline: "none",
+                                                 border: "1px solid black",
                                                 fontSize: "15px",
                                                 fontFamily: "Arial",
                                                 textTransform: "uppercase"
@@ -882,6 +858,7 @@ const PersonalDataForm = () => {
                                                 fontFamily: "Arial",
                                                 width: "100%",
                                                 border: "none",
+                                                 border: "1px solid black",
                                                 outline: "none",
                                                 fontSize: "15px",
 
@@ -2365,12 +2342,20 @@ const PersonalDataForm = () => {
                                 marginTop: "-50px",
                                 borderCollapse: "collapse",
                                 fontFamily: "Arial",
-                                width: "8in",
+                                width: "760px",
                                 margin: "0 auto",
                                 textAlign: "center",
                                 tableLayout: "fixed",
                             }}
                         >
+                            {/* Same 40-column grid as the main table above, so this
+                                table's colSpan={40} row lines up with the same
+                                8in width and doesn't drift relative to it. */}
+                            <colgroup>
+                                {Array.from({ length: 40 }).map((_, i) => (
+                                    <col key={i} style={{ width: "19px" }} />   // ✅ exact px, not %
+                                ))}
+                            </colgroup>
                             <tbody>
                                 {/* Other table rows here... */}
 
@@ -2418,8 +2403,6 @@ const PersonalDataForm = () => {
         </Box >
 
     );
-};
+});
 
 export default PersonalDataForm;
-
-

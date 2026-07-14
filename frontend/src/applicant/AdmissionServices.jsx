@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import { Box, Container, Typography } from "@mui/material";
 import SentimentVerySatisfiedIcon from '@mui/icons-material/SentimentVerySatisfied';
@@ -9,7 +10,9 @@ import SentimentSatisfiedIcon from '@mui/icons-material/SentimentSatisfied';
 import { FcPrint } from "react-icons/fc";
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
-const AdmissionServices = () => {
+import DownloadIcon from "@mui/icons-material/Download";
+
+const AdmissionServices = forwardRef((props, ref) => {
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -121,6 +124,8 @@ const AdmissionServices = () => {
         mother_contact: "", mother_occupation: "", mother_income: "", guardian: "", guardian_family_name: "", guardian_given_name: "",
         guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "",
     });
+    const [generatingPdf, setGeneratingPdf] = useState(false);
+
 
     useEffect(() => {
         if (!settings) return;
@@ -181,6 +186,7 @@ const AdmissionServices = () => {
 
 
     const divToPrintRef = useRef();
+    useImperativeHandle(ref, () => divToPrintRef.current);
 
     const printDiv = () => {
         const divToPrint = divToPrintRef.current;
@@ -251,79 +257,75 @@ const AdmissionServices = () => {
         }
     };
 
+    const downloadPDF = async () => {
+        const divToPrint = divToPrintRef.current;
+        if (!divToPrint) {
+            console.error("divToPrintRef is not set.");
+            return;
+        }
+
+        setGeneratingPdf(true);
+
+        try {
+            // Every input on this form is uncontrolled (blank template, filled by
+            // hand after printing), so no value/checked baking is needed here —
+            // unlike PersonalDataForm or OfficeOfTheRegistrar.
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-admission-services-pdf`,
+                {
+                    html: divToPrint.innerHTML,
+                },
+                { responseType: "blob" },
+            );
+
+            const blob = new Blob([response.data], { type: "application/pdf" });
+            const url = window.URL.createObjectURL(blob);
+
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const fileName = `Admission_Services_CSM_Form_${timestamp}.pdf`;
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Failed to generate PDF:", error);
+            alert("Something went wrong while generating the PDF. Please try again.");
+        } finally {
+            setGeneratingPdf(false);
+        }
+    };
 
 
-  // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+    // 🔒 Disable right-click
+    document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+    // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    document.addEventListener("keydown", (e) => {
+        const isBlockedKey =
+            e.key === "F12" ||
+            e.key === "F11" ||
+            (e.ctrlKey &&
+                e.shiftKey &&
+                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+            (e.ctrlKey && e.key.toLowerCase() === "u") ||
+            (e.ctrlKey && e.key.toLowerCase() === "p");
+
+        if (isBlockedKey) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
 
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    mb: 2,
-                }}
-            >
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: "bold",
-                        color: titleColor,
-                        fontSize: "36px",
-                    }}
-                >
-                    ADMISSION SERVICES
-                </Typography>
-            </Box>
+    
 
-            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-            <br />
-
-            <button
-                onClick={printDiv}
-                style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
-                    border: "2px solid black",
-                    backgroundColor: "#f0f0f0",
-                    color: "black",
-                    borderRadius: "5px",
-                    marginTop: "20px",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    transition: "background-color 0.3s, transform 0.2s",
-                }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-            >
-                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <FcPrint size={20} />
-                    Print Admission Services
-                </span>
-            </button>
+    
 
             <Container className="mt-8">
 
@@ -436,9 +438,9 @@ const AdmissionServices = () => {
                                                     </div>
                                                 )}
                                             </div>
-                                      
+
                                             <br />
-                                          
+
 
                                             <div style={{
                                                 fontSize: "20px",
@@ -1690,6 +1692,6 @@ const AdmissionServices = () => {
             </Container>
         </Box>
     );
-};
+});
 
 export default AdmissionServices;

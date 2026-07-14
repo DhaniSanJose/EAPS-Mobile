@@ -6,6 +6,8 @@ import EaristLogo from "../assets/EaristLogo.png";
 import { FcPrint } from "react-icons/fc";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
+import DownloadIcon from "@mui/icons-material/Download";
+
 
 const OfficeOfTheRegistrar = () => {
   const settings = useContext(SettingsContext);
@@ -150,6 +152,8 @@ const OfficeOfTheRegistrar = () => {
 
   const [campusAddress, setCampusAddress] = useState("");
   const [activeSchoolYear, setActiveSchoolYear] = useState(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
 
   useEffect(() => {
     const fetchActiveSchoolYear = async () => {
@@ -306,6 +310,59 @@ const OfficeOfTheRegistrar = () => {
       console.error("divToPrintRef is not set.");
     }
   };
+
+  const downloadPDF = async () => {
+    const divToPrint = divToPrintRef.current;
+    if (!divToPrint) {
+      console.error("divToPrintRef is not set.");
+      return;
+    }
+
+    setGeneratingPdf(true);
+
+    try {
+      // Only the "Search App. No." field is a live-bound <input>; bake its
+      // value attribute since innerHTML won't carry React's live .value.
+      const clonedDiv = divToPrint.cloneNode(true);
+      const inputs = clonedDiv.querySelectorAll("input");
+      inputs.forEach((input) => {
+        input.setAttribute("value", input.value ?? "");
+      });
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-registrar-form-pdf`,
+        {
+          html: clonedDiv.innerHTML,
+          applicant_number: person?.applicant_number || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const lastName = (person?.last_name || "Applicant").trim().replace(/\s+/g, "_");
+      const firstName = (person?.first_name || "").trim().replace(/\s+/g, "_");
+      const applicantNo = person?.applicant_number ? `_${person.applicant_number}` : "";
+      const fileName = `Office_Of_The_Registrar_${lastName}${firstName ? "_" + firstName : ""}${applicantNo}.pdf`;
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      alert("Something went wrong while generating the PDF. Please try again.");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   const [curriculumOptions, setCurriculumOptions] = useState([]);
 
   useEffect(() => {
@@ -415,7 +472,31 @@ const OfficeOfTheRegistrar = () => {
           <FcPrint size={20} />
           Print Office of the Registrar
         </span>
+        
       </button>
+
+       <button
+          onClick={downloadPDF}
+          disabled={generatingPdf}
+          style={{
+            marginBottom: "1rem",
+            padding: "10px 20px",
+            border: `2px solid ${borderColor}`,
+            backgroundColor: generatingPdf ? "#cfd8dc" : mainButtonColor,
+            color: "#fff",
+            borderRadius: "5px",
+            marginTop: "20px",
+            marginLeft: "12px",
+            cursor: generatingPdf ? "not-allowed" : "pointer",
+            fontSize: "16px",
+            fontWeight: "bold",
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <DownloadIcon sx={{ fontSize: 20 }} />
+            {generatingPdf ? "Generating PDF..." : "Download PDF"}
+          </span>
+        </button>
 
       <Container>
         <div ref={divToPrintRef}>

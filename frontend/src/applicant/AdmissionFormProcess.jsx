@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import axios from "axios";
 import { Box, Container, Typography } from "@mui/material";
@@ -9,7 +10,7 @@ import { useLocation } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import API_BASE_URL from "../apiConfig";
 
-const AdmissionFormProcess = () => {
+const AdmissionFormProcess = forwardRef((props, ref) => {
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -215,6 +216,7 @@ const AdmissionFormProcess = () => {
   }, []);
 
   const divToPrintRef = useRef();
+  useImperativeHandle(ref, () => divToPrintRef.current);
 
 
   const printDiv = () => {
@@ -378,61 +380,9 @@ const AdmissionFormProcess = () => {
         padding: 2,
       }}
     >
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          mb: 2,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: titleColor,
-            fontSize: "36px",
-          }}
-        >
-          ADMISSION FORM (PROCESS)
-        </Typography>
-      </Box>
 
-      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
 
-      <button
-        onClick={printDiv}
-        style={{
-          marginBottom: "1rem",
-          padding: "10px 20px",
-          border: "2px solid black",
-          backgroundColor: "#f0f0f0",
-          color: "black",
-          borderRadius: "5px",
-          marginTop: "20px",
-          cursor: "pointer",
-          fontSize: "16px",
-          fontWeight: "bold",
-          transition: "background-color 0.3s, transform 0.2s",
-        }}
-        onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-        onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-        onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-        onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-      >
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <FcPrint size={20} />
-          Print Admission Form
-        </span>
-      </button>
+  
 
       <Container>
         <div ref={divToPrintRef} style={{ marginBottom: "10%" }}>
@@ -2787,6 +2737,5 @@ const AdmissionFormProcess = () => {
       </Container>
     </Box >
   );
-};
-
+});
 export default AdmissionFormProcess;

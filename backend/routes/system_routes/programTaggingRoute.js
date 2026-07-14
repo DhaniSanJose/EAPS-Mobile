@@ -115,7 +115,7 @@ const insertProgramTaggingAuditLog = async ({ req, action, message }) => {
 
 router.get("/program_tagging_list", async (req, res) => {
   const readQuery = `
-  SELECT 
+SELECT 
   pt.program_tagging_id,
   pt.curriculum_id,
   c.program_id,
@@ -123,6 +123,11 @@ router.get("/program_tagging_list", async (req, res) => {
   pt.course_id,
   pt.year_level_id,
   pt.semester_id,
+  pt.lec_fee,
+  pt.lab_fee,
+  pt.iscomputer_lab,
+  pt.islaboratory_fee,
+  pt.is_nstp,
 
   CONCAT(y.year_description, ' - ', p.program_description) AS curriculum_description,
   p.program_code,
@@ -145,8 +150,8 @@ JOIN course_table co ON pt.course_id = co.course_id
 JOIN year_level_table yl ON pt.year_level_id = yl.year_level_id
 JOIN semester_table s ON pt.semester_id = s.semester_id;
 
-
 `;
+
 
   try {
     const [result] = await db3.query(readQuery);
@@ -157,12 +162,32 @@ JOIN semester_table s ON pt.semester_id = s.semester_id;
   }
 });
 
+async function getLatestTosf() {
+  const [rows] = await db3.query(
+    `SELECT *
+     FROM tosf
+     ORDER BY tosf_id DESC
+     LIMIT 1`
+  );
+
+  if (!rows.length) {
+    throw new Error("TOSF is empty");
+  }
+
+  return rows[0];
+}
+
 router.post("/program_tagging", CanCreate, async (req, res) => {
   const {
     curriculum_id,
     year_level_id,
     semester_id,
     course_id,
+    lec_fee,
+    lab_fee,
+    iscomputer_lab,
+    islaboratory_fee,
+    is_nstp,
   } = req.body;
 
   try {
@@ -180,20 +205,41 @@ router.post("/program_tagging", CanCreate, async (req, res) => {
       return res.status(400).json({ error: "Program tag already exists" });
     }
 
+
+    const tosf = await getLatestTosf();
+
+    let amount = 0;
+    if (Number(iscomputer_lab) === 1) amount = Number(tosf.computer_fees);
+    else if (Number(islaboratory_fee) === 1) amount = Number(tosf.laboratory_fees);
+    else if (Number(is_nstp) === 1) amount = Number(tosf.nstp_fees);
+
     const [result] = await db3.query(
       `INSERT INTO program_tagging_table (
         curriculum_id,
         year_level_id,
         semester_id,
-        course_id
-      ) VALUES (?, ?, ?, ?)`,
+        course_id,
+        lec_fee,
+        lab_fee,
+        iscomputer_lab,
+        islaboratory_fee,
+        is_nstp,
+        amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         curriculum_id,
         year_level_id,
         semester_id,
         course_id,
-      ],
+        Number(lec_fee) || 0,
+        Number(lab_fee) || 0,
+        Number(iscomputer_lab) || 0,
+        Number(islaboratory_fee) || 0,
+        Number(is_nstp) || 0,
+        amount
+      ]
     );
+
 
     const { actorId, actorRole } = getAuditActor(req);
     const roleLabel = formatAuditActorRole(actorRole);
@@ -207,6 +253,7 @@ router.post("/program_tagging", CanCreate, async (req, res) => {
 
     res.status(201).json({
       insertId: result.insertId,
+      amount
     });
   } catch (err) {
     console.error(err);
@@ -221,25 +268,49 @@ router.put("/program_tagging/:id", CanEdit, async (req, res) => {
     year_level_id,
     semester_id,
     course_id,
+    lec_fee,
+    lab_fee,
+    iscomputer_lab,
+    islaboratory_fee,
+    is_nstp,
   } = req.body;
 
   try {
     const tagBefore = await getProgramTaggingLabel(id);
+
+    const tosf = await getLatestTosf();
+
+    let amount = 0;
+    if (Number(iscomputer_lab) === 1) amount = Number(tosf.computer_fees);
+    else if (Number(islaboratory_fee) === 1) amount = Number(tosf.laboratory_fees);
+    else if (Number(is_nstp) === 1) amount = Number(tosf.nstp_fees);
 
     const [result] = await db3.query(
       `UPDATE program_tagging_table
        SET curriculum_id = ?,
            year_level_id = ?,
            semester_id = ?,
-           course_id = ?
+           course_id = ?,
+           lec_fee = ?,
+           lab_fee = ?,
+           iscomputer_lab = ?,
+           islaboratory_fee = ?,
+           is_nstp = ?,
+           amount = ?
        WHERE program_tagging_id = ?`,
       [
         curriculum_id,
         year_level_id,
         semester_id,
         course_id,
-        id,
-      ],
+        Number(lec_fee) || 0,
+        Number(lab_fee) || 0,
+        Number(iscomputer_lab) || 0,
+        Number(islaboratory_fee) || 0,
+        Number(is_nstp) || 0,
+        amount,
+        id
+      ]
     );
 
     if (result.affectedRows === 0) {

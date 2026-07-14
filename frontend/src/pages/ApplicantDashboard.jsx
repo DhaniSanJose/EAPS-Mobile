@@ -152,13 +152,13 @@ const ApplicantDashboard = (props) => {
     if (!applicantNumber) return;
     try {
       const { data } = await axios.get(`${API_BASE_URL}/api/applicant-schedule/${applicantNumber}`);
-      
+
       if (Number(data?.email_sent) === 1) {
         setProctor(normalizeSchedule(data));
       } else {
         setProctor(null);
       }
-      
+
     } catch (err) {
       console.error("Error fetching schedule:", err);
       try {
@@ -656,14 +656,34 @@ const ApplicantDashboard = (props) => {
         )}
         {(hasSchedule || hasScores) && <Divider sx={{ backgroundColor: "gray", height: "0.5px", my: 1.5, borderRadius: 1 }} />}
         {hasScores && (
-          <Typography variant="body2" sx={{ color: "maroon", fontWeight: "bold" }}>
+          <Typography
+            variant="body2"
+            sx={{ color: "maroon", fontWeight: "bold", lineHeight: 1.6 }}
+          >
             🎯 <strong>Entrance Examination Status:</strong>{" "}
+
             {normalizeExamStatus(examScores.status) === "PASSED" ? (
-              <span style={{ color: "green" }}>PASSED</span>
+              <>
+                <span style={{ color: "green" }}>PASSED</span>
+                <br />
+                Congratulations! You have successfully passed the entrance examination.
+                Please wait for your interview or qualifying examination schedule.
+              </>
             ) : normalizeExamStatus(examScores.status) === "FAILED" ? (
-              <span style={{ color: "red" }}>FAILED</span>
+              <>
+                <span style={{ color: "red" }}>FAILED</span>
+                <br />
+                Thank you for participating in the entrance examination. After careful
+                evaluation, you did not meet the required passing standard for this
+                admission cycle.
+              </>
             ) : (
-              <span>Pending</span>
+              <>
+                <span>Pending</span>
+                <br />
+                Your examination is still being evaluated. Please wait for the official
+                result.
+              </>
             )}
           </Typography>
         )}
@@ -733,25 +753,25 @@ const ApplicantDashboard = (props) => {
   // Mobile accordion state
   const [expandedStep, setExpandedStep] = useState(activeStep);
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
     <Box

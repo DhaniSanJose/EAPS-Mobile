@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+
 import { SettingsContext } from "../App";
 import { Box, Container, Typography } from "@mui/material";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -8,7 +9,7 @@ import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
 
 
-const ECATApplicationForm = () => {
+const ECATApplicationForm = forwardRef((props, ref) => {
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -228,6 +229,7 @@ const ECATApplicationForm = () => {
   }, []);
 
   const divToPrintRef = useRef();
+  useImperativeHandle(ref, () => divToPrintRef.current);
 
   const printDiv = () => {
     const divToPrint = divToPrintRef.current;
@@ -246,7 +248,7 @@ const ECATApplicationForm = () => {
 
       html, body {
         margin: 0;
-        margin-top: -100px;
+        margin-top: 10px;
         padding: 0;
         font-family: Arial, sans-serif;
         width: auto;
@@ -346,65 +348,7 @@ const ECATApplicationForm = () => {
           </style>
         </div>
 
-        {/* ✅ HEADER - Full layout like ApplicantResetPassword */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "flex-start",
-            alignItems: "center",
-            flexWrap: "wrap",
-            mb: 2,
-          }}
-        >
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold",
-              color: titleColor,
-              fontSize: "36px",
-              textAlign: "left",
-            }}
-          >
-            ECAT APPLICATION FORM
-          </Typography>
-        </Box>
-
-        <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-        <br />
-
-        {/* ✅ PRINT BUTTON (unchanged) */}
-        <button
-          onClick={printDiv}
-          style={{
-            marginBottom: "1rem",
-            padding: "10px 20px",
-            border: "1px solid black",
-            backgroundColor: "#f0f0f0",
-            color: "black",
-            borderRadius: "5px",
-            marginTop: "20px",
-            cursor: "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-            transition: "background-color 0.3s, transform 0.2s",
-          }}
-          onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-          onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-          onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <FcPrint size={20} />
-            Print ECAT Application Form
-          </span>
-        </button>
-
+    
         <table
           className="student-table"
           style={{
@@ -1605,7 +1549,7 @@ const ECATApplicationForm = () => {
       </div>
     </Box >
   );
-};
+});
 
 export default ECATApplicationForm;
 

@@ -120,24 +120,24 @@ const ApplicantResetPassword = () => {
 
   // 🔒 Disable right-click + block DevTools shortcuts / Ctrl+P
   // (moved into useEffect with cleanup — the original attached a fresh
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
 
   return (
     <Box
@@ -216,17 +216,30 @@ const ApplicantResetPassword = () => {
 
           <form onSubmit={handleUpdate}>
             {[
-              { key: "current", label: "Current Password", value: currentPassword, setter: setCurrentPassword },
-              { key: "new", label: "New Password", value: newPassword, setter: setNewPassword },
-              { key: "confirm", label: "Confirm Password", value: confirmPassword, setter: setConfirmPassword },
-            ].map(({ label, labelTl, value, setter, field }) => (
+              {
+                field: "current",
+                label: "Current Password",
+                value: currentPassword,
+                setter: setCurrentPassword,
+              },
+              {
+                field: "new",
+                label: "New Password",
+                value: newPassword,
+                setter: setNewPassword,
+              },
+              {
+                field: "confirm",
+                label: "Confirm Password",
+                value: confirmPassword,
+                setter: setConfirmPassword,
+              },
+            ].map(({ field, label, value, setter }) => (
               <Box mb={2} key={field}>
                 <InputLabel sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                  {label}{" "}
-                  <Typography component="span" fontStyle="italic" color="text.secondary" sx={{ fontSize: { xs: 11.5, sm: 12.5 } }}>
-                    {labelTl}
-                  </Typography>
+                  {label}
                 </InputLabel>
+
                 <TextField
                   fullWidth
                   type={showPassword[field] ? "text" : "password"}
@@ -234,12 +247,25 @@ const ApplicantResetPassword = () => {
                   variant="outlined"
                   value={value}
                   onChange={(e) => setter(e.target.value)}
-                  error={field === "confirm" && Boolean(confirmPassword && confirmPassword !== newPassword)}
-                  helperText={key === "confirm" && confirmPassword && confirmPassword !== newPassword ? "Passwords do not match" : ""}
+                  error={
+                    field === "confirm" &&
+                    Boolean(confirmPassword && confirmPassword !== newPassword)
+                  }
+                  helperText={
+                    field === "confirm" &&
+                      confirmPassword &&
+                      confirmPassword !== newPassword
+                      ? "Passwords do not match"
+                      : ""
+                  }
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
-                        <IconButton onClick={() => toggleShowPassword(field)} edge="end" size={isMobile ? "small" : "medium"}>
+                        <IconButton
+                          onClick={() => toggleShowPassword(field)}
+                          edge="end"
+                          size={isMobile ? "small" : "medium"}
+                        >
                           {showPassword[field] ? <Visibility /> : <VisibilityOff />}
                         </IconButton>
                       </InputAdornment>

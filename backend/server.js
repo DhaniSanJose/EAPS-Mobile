@@ -42,7 +42,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.50.50:5173",
+  "http://192.168.50.52:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -157,6 +157,8 @@ const applicantAdminRequirements = require("./routes/admission_routes/applicantA
 const studentAdminRequirements = require("./routes/admission_routes/studentAdminRequirements");
 const uploadApplicants = require("./routes/admission_routes/uploadApplicants");
 const workload = require("./routes/system_routes/workload");
+const downloadableFormsRoute = require("./routes/forms/downloadableFormsRoute");
+
 app.use("/api", workload);
 app.use("/api", uploadApplicants);
 app.use("/api", applicantAdminRequirements);
@@ -224,6 +226,8 @@ app.use("/api", studentAccountRoute);
 app.use("/api", yearLevelRoute);
 app.use("/api", gradeConversionRoute);
 app.use("/api", honorRoutes);
+app.use("/api", downloadableFormsRoute);
+
 
 const uploadPath = path.join(__dirname, "uploads");
 

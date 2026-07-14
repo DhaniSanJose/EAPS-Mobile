@@ -5,6 +5,8 @@ import API_BASE_URL from "../apiConfig";
 import { Box, Typography, Button, Snackbar, Alert, FormControl, InputLabel, Select, MenuItem, TextField } from "@mui/material";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { Autocomplete } from "@mui/material";
+import { useMemo } from "react";
+
 
 const CurriculumCourseMap = () => {
   const settings = useContext(SettingsContext);
@@ -407,30 +409,32 @@ const CurriculumCourseMap = () => {
         dprtmnt_id: first.dprtmnt_id,
       }, getAuditConfig());
 
-      // 🔁 SAVE PER-COURSE FEES
-      for (const course of courses) {
-        const updates = editedFees[course.program_tagging_id];
+      // 🔁 SAVE PER-COURSE FEES — run all in parallel instead of one at a time
+      await Promise.all(
+        courses.map((course) => {
+          const updates = editedFees[course.program_tagging_id];
 
-        await axios.put(
-          `${API_BASE_URL}/api/program_tagging/${course.program_tagging_id}`,
-          {
-            curriculum_id: course.curriculum_id,
-            year_level_id: course.year_level_id,
-            semester_id: course.semester_id,
-            course_id: course.course_id,
+          return axios.put(
+            `${API_BASE_URL}/api/program_tagging/${course.program_tagging_id}`,
+            {
+              curriculum_id: course.curriculum_id,
+              year_level_id: course.year_level_id,
+              semester_id: course.semester_id,
+              course_id: course.course_id,
 
-            lec_fee: updates?.lec_fee ?? course.lec_fee,
-            lab_fee: updates?.lab_fee ?? course.lab_fee,
+              lec_fee: updates?.lec_fee ?? course.lec_fee,
+              lab_fee: updates?.lab_fee ?? course.lab_fee,
 
-            // NEW FLAGS
-            is_nstp: updates?.is_nstp ?? course.is_nstp,
-            iscomputer_lab: updates?.iscomputer_lab ?? course.iscomputer_lab,
-            islaboratory_fee: updates?.islaboratory_fee ?? course.islaboratory_fee,
-            misc_fee: miscFeeValue,
-          },
-          getAuditConfig()
-        );
-      }
+              // NEW FLAGS
+              is_nstp: updates?.is_nstp ?? course.is_nstp,
+              iscomputer_lab: updates?.iscomputer_lab ?? course.iscomputer_lab,
+              islaboratory_fee: updates?.islaboratory_fee ?? course.islaboratory_fee,
+              misc_fee: miscFeeValue,
+            },
+            getAuditConfig()
+          );
+        })
+      );
 
       setSnackbar({
         open: true,
@@ -438,8 +442,9 @@ const CurriculumCourseMap = () => {
         severity: "success",
       });
 
+      // wait for the fresh server data to arrive BEFORE wiping local edits
+      await fetchTaggedPrograms();
       setEditedFees({});
-      fetchTaggedPrograms();
     } catch (err) {
       console.error(err);
       setSnackbar({
@@ -553,9 +558,12 @@ const CurriculumCourseMap = () => {
     if (!selectedCurriculum || !Object.keys(data).length) return;
 
     const loadMisc = async () => {
-      const result = {};
-      const programsInCurriculum = taggedPrograms.filter(p => p.curriculum_id == selectedCurriculum);
+      const programsInCurriculum = taggedPrograms.filter(
+        (p) => p.curriculum_id == selectedCurriculum
+      );
 
+      // Build a flat list of every (program, year, sem) combo we need to fetch
+      const requests = [];
       for (const p of programsInCurriculum) {
         const programId = p.program_id;
         const deptId = p.dprtmnt_id;
@@ -565,12 +573,21 @@ const CurriculumCourseMap = () => {
             const courses = data[year][sem];
             const yearId = courses[0].year_level_id;
             const semId = courses[0].semester_id;
+            const key = `${programId}-${yearId}-${semId}`;
 
-            const fee = await fetchMiscFee(yearId, semId, programId, deptId);
-
-            result[`${programId}-${yearId}-${semId}`] = fee;
+            requests.push(
+              fetchMiscFee(yearId, semId, programId, deptId).then((fee) => [key, fee])
+            );
           }
         }
+      }
+
+      // Fire all requests at once instead of one at a time
+      const entries = await Promise.all(requests);
+
+      const result = {};
+      for (const [key, fee] of entries) {
+        result[key] = fee;
       }
 
       setMiscFees(result);
@@ -614,6 +631,67 @@ const CurriculumCourseMap = () => {
     return `${startYear} - ${startYear + 1}`;
   };
 
+  // ⬇️ PASTE THE useMemo BLOCK HERE ⬇️
+  const semesterComputations = useMemo(() => {
+    const result = {};
+
+    Object.keys(data).forEach((year) => {
+      Object.keys(data[year]).forEach((sem) => {
+        const semesterCourses = data[year][sem];
+
+        const hasComputerLab = semesterCourses.some(
+          c => Number(editedFees[c.program_tagging_id]?.iscomputer_lab ?? c.iscomputer_lab) === 1
+        );
+        const hasNonComputerLab = semesterCourses.some(
+          c => Number(editedFees[c.program_tagging_id]?.islaboratory_fee ?? c.islaboratory_fee) === 1
+        );
+        const hasNSTP = semesterCourses.some(
+          c => Number(editedFees[c.program_tagging_id]?.is_nstp ?? c.is_nstp) === 1
+        );
+
+        const tuitionFeeAmount = semesterCourses.reduce(
+          (sum, course) =>
+            sum +
+            (editedFees[course.program_tagging_id]?.lec_fee ?? course.lec_fee ?? 0) +
+            (editedFees[course.program_tagging_id]?.lab_fee ?? course.lab_fee ?? 0),
+          0
+        );
+
+        const nstpFeeAmount = hasNSTP ? Number(tosf?.nstp_fees || 0) : 0;
+
+        const yearId = semesterCourses[0].year_level_id;
+        const semId = semesterCourses[0].semester_id;
+        const programId = semesterCourses[0].program_id;
+        const miscKey = `${programId}-${yearId}-${semId}`;
+        const miscFee = miscFees[miscKey];
+        const miscAmount =
+          miscFee && typeof miscFee === "object" && Number(miscFee.amount) > 0
+            ? Number(miscFee.amount)
+            : computeMiscFee(semesterCourses);
+
+        const isFirstYearFirstSem =
+          yearLevelIdMap[year] === 1 && semesterIdMap[sem] === 1;
+
+        const extraFeesForSem = getExtraFeesForSem(year, sem);
+        const computedExtraFees = computeExtraFees(semesterCourses);
+
+        result[`${year}-${sem}`] = {
+          hasComputerLab,
+          hasNonComputerLab,
+          hasNSTP,
+          tuitionFeeAmount,
+          nstpFeeAmount,
+          miscAmount,
+          isFirstYearFirstSem,
+          extraFeesForSem,
+          computedExtraFees,
+        };
+      });
+    });
+
+    return result;
+  }, [data, editedFees, tosf, miscFees, feeRules, extraFees]);
+  // ⬆️ END OF PASTED BLOCK ⬆️
 
   const headerStyle = {
     backgroundColor: settings?.header_color || "#1976d2",
@@ -622,6 +700,33 @@ const CurriculumCourseMap = () => {
     textAlign: "center",
     padding: "8px",
   };
+
+  useEffect(() => {
+    const handleContextMenu = (e) => e.preventDefault();
+
+    const handleKeyDown = (e) => {
+      const isBlockedKey =
+        e.key === "F12" ||
+        e.key === "F11" ||
+        (e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+        (e.ctrlKey && e.key.toLowerCase() === "u") ||
+        (e.ctrlKey && e.key.toLowerCase() === "p");
+
+      if (isBlockedKey) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
 
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
@@ -638,25 +743,7 @@ const CurriculumCourseMap = () => {
     textAlign: "center"
   };
 
-  // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
-
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
 
   return (
     <Box
@@ -827,48 +914,19 @@ const CurriculumCourseMap = () => {
                   .sort((a, b) => semesterOrder[a] - semesterOrder[b])
                   .map((sem) => {
                     const semesterCourses = data[year][sem];
+                    const computed = semesterComputations[`${year}-${sem}`];
 
-                    const hasComputerLab = semesterCourses.some(c => c.iscomputer_lab == 1);
-                    const hasNonComputerLab = semesterCourses.some(c => c.isnon_computer_lab == 1);
-
-                    const hasNSTP = semesterCourses.some(c => c.is_nstp == 1);
-
-                    const tuitionFeeAmount = semesterCourses.reduce(
-                      (sum, course) =>
-                        sum +
-                        (editedFees[course.program_tagging_id]?.lec_fee ?? course.lec_fee ?? 0) +
-                        (editedFees[course.program_tagging_id]?.lab_fee ?? course.lab_fee ?? 0),
-                      0
-                    );
-
-                    const nstpFeeAmount = hasNSTP ? Number(tosf?.nstp_fees || 0) : 0;
-
-
-
-                    const yearId = semesterCourses[0].year_level_id;
-                    const semId = semesterCourses[0].semester_id;
-                    const programId = semesterCourses[0].program_id;
-                    const miscKey = `${programId}-${yearId}-${semId}`;
-                    const miscFee = miscFees[miscKey];
-                    const miscAmount =
-                      miscFee &&
-                        typeof miscFee === "object" &&
-                        Number(miscFee.amount) > 0
-                        ? Number(miscFee.amount)
-                        : computeMiscFee(semesterCourses);
-                    // ✅ Define this here so it's available for ID Fee row
-                    const isFirstYearFirstSem = yearLevelIdMap[year] === 1 && semesterIdMap[sem] === 1;
-
-                    const tosfTotal = tosf
-                      ? Object.entries(tosf)
-                        .filter(([key]) => key !== "tosf_id") // exclude ID
-                        .reduce((sum, [, val]) => sum + Number(val || 0), 0)
-                      : 0;
-
-                    const otherExtraFeesTotal = getExtraFeesForSem(year, sem)
-                      .reduce((sum, f) => sum + Number(f.amount || 0), 0);
-
-
+                    const {
+                      hasComputerLab,
+                      hasNonComputerLab,
+                      hasNSTP,
+                      tuitionFeeAmount,
+                      nstpFeeAmount,
+                      miscAmount,
+                      isFirstYearFirstSem,
+                      extraFeesForSem,
+                      computedExtraFees,
+                    } = computed;
 
                     return (
                       <Box
@@ -943,15 +1001,7 @@ const CurriculumCourseMap = () => {
                                 const edit = editedFees[course.program_tagging_id] || {};
                                 const lecFee = edit.lec_fee ?? course.lec_fee ?? 0;
                                 const labFee = edit.lab_fee ?? course.lab_fee ?? 0;
-                                const totalLecFee = semesterCourses.reduce(
-                                  (sum, c) => sum + (editedFees[c.program_tagging_id]?.lec_fee ?? c.lec_fee ?? 0),
-                                  0
-                                );
 
-                                const totalLabFee = semesterCourses.reduce(
-                                  (sum, c) => sum + (editedFees[c.program_tagging_id]?.lab_fee ?? c.lab_fee ?? 0),
-                                  0
-                                );
 
 
 
@@ -1133,7 +1183,7 @@ const CurriculumCourseMap = () => {
 
 
 
-                              {getExtraFeesForSem(year, sem).map((fee) => (
+                              {extraFeesForSem.map((fee) => (
                                 <tr key={fee.fee_code} style={{ backgroundColor: "#f9f9ff", fontWeight: "bold" }}>
                                   <td colSpan={9} style={{ ...cellStyle, textAlign: "center" }}>
                                     {fee.description}:
@@ -1277,7 +1327,7 @@ const CurriculumCourseMap = () => {
 
 
                               {/* ===== EXTRA FEES ROWS (like NSTP) ===== */}
-                              {computeExtraFees(semesterCourses).map((fee, idx) => (
+                              {computedExtraFees.map((fee, idx) => (
                                 <tr key={`extra-${idx}`} style={{ backgroundColor: "#fafafa", }}>
                                   <td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>
                                     {fee.label}:
