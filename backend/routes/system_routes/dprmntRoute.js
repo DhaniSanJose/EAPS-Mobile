@@ -5,7 +5,7 @@ const {
   CanDelete,
   CanEdit,
 } = require("../../middleware/pagePermissions");
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 const router = express.Router();
 
 let isAllowedColumnReady = false;
@@ -54,17 +54,61 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const formatActorPersonName = (row = {}) => {
+  const lastName = String(row.last_name || "").trim();
+  const firstName = String(row.first_name || "").trim();
+  const middleName = String(row.middle_name || "").trim();
+  const middleInitial = middleName
+    ? ` ${middleName.charAt(0).toUpperCase()}.`
+    : "";
+
+  if (!lastName && !firstName) {
+    return String(row.email || "").trim();
+  }
+
+  if (!lastName) {
+    return `${firstName}${middleInitial}`.trim();
+  }
+
+  return `${lastName}, ${firstName}${middleInitial}`.trim();
+};
+
+const getAuditActor = resolveAuditActor;
+
+const getActorAuditLabel = async (req) => {
+  const { actorId, actorRole } = getAuditActor(req);
+  const roleLabel = formatAuditActorRole(actorRole);
+
+  try {
+    const [rows] = await db3.query(
+      `SELECT ua.employee_id, ua.first_name, ua.middle_name, ua.last_name, ua.email,
+              at.access_description
+       FROM user_accounts ua
+       LEFT JOIN access_table at ON at.access_id = ua.access_level
+       WHERE ua.employee_id = ?
+          OR ua.person_id = ?
+          OR ua.email = ?
+       LIMIT 1`,
+      [actorId, actorId, actorId],
+    );
+
+    if (rows?.[0]) {
+      const accessLabel = String(rows[0].access_description || "").trim();
+      const personName = formatActorPersonName(rows[0]);
+      const employeeId = rows[0].employee_id || actorId;
+
+      if (personName) {
+        return `${accessLabel || roleLabel} ${personName} (${employeeId})`;
+      }
+
+      return `${accessLabel || roleLabel} (${employeeId})`;
+    }
+  } catch (err) {
+    console.error("Department actor audit lookup failed:", err);
+  }
+
+  return `${roleLabel} (${actorId})`;
+};
 
 const insertDepartmentAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);
@@ -345,12 +389,11 @@ router.post("/department/grant-access", async (req, res) => {
 
     console.log("Department access granted:", result);
 
-    const { actorId, actorRole } = getAuditActor(req);
-    const roleLabel = formatAuditActorRole(actorRole);
+    const actorLabel = await getActorAuditLabel(req);
     await insertDepartmentAuditLog({
       req,
       action: "DEPARTMENT_GRANT_ACCESS",
-      message: `${roleLabel} (${actorId}) granted access from department ID ${request_dept_id} to department ID ${requesting_dept_id} for school year ID ${activeYearId}.`,
+      message: `${actorLabel} granted access from department ID ${request_dept_id} to department ID ${requesting_dept_id} for school year ID ${activeYearId}.`,
     });
 
     return res.status(200).json({

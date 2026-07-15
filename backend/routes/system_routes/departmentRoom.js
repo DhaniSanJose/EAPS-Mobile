@@ -1,6 +1,6 @@
 const express = require("express");
 const { db3 } = require("../database/database");
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 const {
   CanCreate,
   CanDelete,
@@ -18,17 +18,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertDepartmentRoomAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);

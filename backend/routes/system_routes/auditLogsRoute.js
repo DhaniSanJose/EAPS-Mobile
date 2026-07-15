@@ -17,6 +17,8 @@ router.get("/audit-logs", async (req, res) => {
   const sourceLimit = offset + limit;
   const search = String(req.query.search || "").trim();
   const severity = String(req.query.severity || "").trim();
+  const action = String(req.query.action || "").trim();
+  const actorId = String(req.query.actor_id || "").trim();
 
   const buildWhere = () => {
     const clauses = [];
@@ -33,6 +35,16 @@ router.get("/audit-logs", async (req, res) => {
     if (severity) {
       clauses.push("severity = ?");
       params.push(severity);
+    }
+
+    if (action) {
+      clauses.push("action = ?");
+      params.push(action);
+    }
+
+    if (actorId) {
+      clauses.push("actor_id = ?");
+      params.push(actorId);
     }
 
     return {
@@ -56,6 +68,8 @@ router.get("/audit-logs", async (req, res) => {
           SELECT
             audit_id,
             actor_id AS email,
+            role,
+            action,
             message,
             severity,
             timestamp,
@@ -98,6 +112,8 @@ router.get("/audit-logs", async (req, res) => {
         .update(`${row.source_key}:${row.audit_id}:${row.timestamp}`)
         .digest("hex"),
       email: row.email,
+      role: row.role,
+      action: row.action,
       message: row.message,
       severity: row.severity,
       timestamp: row.timestamp,

@@ -1,7 +1,7 @@
 const express = require('express');
 const { db, db3 } = require('../database/database');
 const { CanCreate, CanEdit, CanDelete } = require('../../middleware/pagePermissions');
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 const router = express.Router();
 
 const formatAuditActorRole = (role) => {
@@ -14,13 +14,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole: req.headers["x-audit-actor-role"] || "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const getCourseLabel = (course) => {
   if (!course) return "Unknown Course";

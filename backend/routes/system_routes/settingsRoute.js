@@ -3,7 +3,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { db } = require("../database/database");
-const { insertAuditLogAdmission } = require("../../utils/auditLogger");
+const { insertAuditLogAdmission, resolveAuditActor } = require("../../utils/auditLogger");
 const { computeIsOpen, syncBranchesOpenStatus } = require("../../utils/registrationWindow");
 const router = express.Router();
 
@@ -17,17 +17,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertSettingsAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);

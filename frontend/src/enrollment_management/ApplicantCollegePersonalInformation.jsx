@@ -57,6 +57,8 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import API_BASE_URL from "../apiConfig";
+import { postAuditEvent } from "../utils/auditEvents";
+import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PeopleIcon from "@mui/icons-material/People";
@@ -1550,6 +1552,27 @@ const RegistrarDashboard1 = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
+  const logPrintingApplicantDocs = async (documentLabel) => {
+    try {
+      const middleInitial = person?.middle_name
+        ? ` ${String(person.middle_name).trim().charAt(0).toUpperCase()}.`
+        : "";
+      const applicantName = person?.last_name
+        ? `${person.last_name}, ${person.first_name || ""}${middleInitial}`.trim()
+        : [person?.first_name, person?.middle_name].filter(Boolean).join(" ") ||
+          "Unknown Applicant";
+
+      await postAuditEvent("PRINTING_APPLICANT_DOCS", {
+        document_label: documentLabel,
+        applicant_name: applicantName,
+        applicant_number: person?.applicant_number || "N/A",
+        person_id: person?.person_id || userID || "",
+      });
+    } catch (err) {
+      console.error("Printing applicant docs audit failed:", err);
+    }
+  };
+
   const generateFormPdf = async (key) => {
     const config = FORM_CONFIGS[key];
     if (!config || generatingKey) return;
@@ -1605,6 +1628,7 @@ const RegistrarDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      await logPrintingApplicantDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
       setSnackbar({
@@ -1671,6 +1695,7 @@ const RegistrarDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      await logPrintingApplicantDocs("Examination Permit");
     } catch (err) {
       console.error("Error downloading exam permit PDF:", err);
       setExamPermitError("⚠️ Unable to generate the Exam Permit PDF right now.");
@@ -1798,7 +1823,8 @@ const RegistrarDashboard1 = () => {
           PERSONAL INFORMATION
         </Typography>
 
-        <TextField
+        <Box display="flex" alignItems="center" gap={2}>
+          <TextField
           size="small"
           placeholder="Search Applicant Name / Email / Applicant ID"
           value={searchQuery}
@@ -1815,6 +1841,8 @@ const RegistrarDashboard1 = () => {
             startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
           }}
         />
+          <PrintingHistoryDialog employeeId={employeeID} />
+        </Box>
       </Box>
       {searchError && <Typography color="error">{searchError}</Typography>}
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />

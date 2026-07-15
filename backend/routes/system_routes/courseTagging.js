@@ -1,7 +1,7 @@
 const express = require("express");
 const webtoken = require("jsonwebtoken");
 const { db3 } = require("../database/database");
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 const {
   formatCourseList,
   getCourseLabel,
@@ -27,17 +27,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertCourseTaggingAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);
@@ -432,6 +422,17 @@ router.post("/add-all-to-enrolled-courses", async (req, res) => {
       activeSemesterId = activeSemesterId || yearResult[0].semester_id;
     }
 
+    // Special year-level bulk enroll must not overwrite the student's real year level
+    // (e.g. keep 1st year while tagging Special Program subjects).
+    const [yearLevelMeta] = await db3.query(
+      `SELECT level_type FROM year_level_table WHERE year_level_id = ? LIMIT 1`,
+      [year_level],
+    );
+    const isSpecialYearLevel =
+      String(yearLevelMeta?.[0]?.level_type || "")
+        .trim()
+        .toLowerCase() === "special";
+
     const results = [];
     const enrolledLabels = [];
 
@@ -478,12 +479,21 @@ router.post("/add-all-to-enrolled-courses", async (req, res) => {
         [subject_id, user_id, activeSchoolYearId, curriculumID, departmentSectionID, 1],
       );
 
-      await db3.query(
-        `UPDATE student_status_table
-         SET enrolled_status = 1, active_curriculum = ?, year_level_id = ?, active_school_year_id = ?
-         WHERE student_number = ?`,
-        [curriculumID, year_level, activeSchoolYearId, user_id],
-      );
+      if (isSpecialYearLevel) {
+        await db3.query(
+          `UPDATE student_status_table
+           SET enrolled_status = 1, active_curriculum = ?, active_school_year_id = ?
+           WHERE student_number = ?`,
+          [curriculumID, activeSchoolYearId, user_id],
+        );
+      } else {
+        await db3.query(
+          `UPDATE student_status_table
+           SET enrolled_status = 1, active_curriculum = ?, year_level_id = ?, active_school_year_id = ?
+           WHERE student_number = ?`,
+          [curriculumID, year_level, activeSchoolYearId, user_id],
+        );
+      }
 
       const [getStudentNUmber] = await db3.query(
         `SELECT id, person_id FROM student_numbering_table WHERE student_number = ?`,
@@ -1148,10 +1158,10 @@ router.post("/student-tagging/dprtmnt", async (req, res) => {
 
   try {
     const whereClause = active_school_year_id
-      ? "WHERE sn.student_number = ? AND dct.dprtmnt_id = ? AND (ss.active_school_year_id = 0 OR ss.active_school_year_id = ?)"
+      ? "WHERE sn.student_number = ? AND dct.dprtmnt_id = ?"
       : "WHERE sn.student_number = ? AND dct.dprtmnt_id = ? AND (ss.active_school_year_id = 0 OR sy.astatus = 1)";
     const queryParams = active_school_year_id
-      ? [studentNumber, dprtmntId, active_school_year_id]
+      ? [studentNumber, dprtmntId]
       : [studentNumber, dprtmntId];
 
     const sql = `

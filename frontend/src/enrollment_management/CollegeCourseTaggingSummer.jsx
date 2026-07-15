@@ -4,12 +4,14 @@ import axios from "axios";
 import {
   Box,
   Button,
+  Grid,
   Typography,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Paper,
   TextField,
   MenuItem,
   Dialog,
@@ -262,6 +264,11 @@ const CourseTaggingForSummerCollege = () => {
   const [employeeID, setEmployeeID] = useState("");
   const auditConfig = {
     headers: {
+      "x-employee-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
       "x-audit-actor-id":
         employeeID ||
         localStorage.getItem("employee_id") ||
@@ -269,6 +276,7 @@ const CourseTaggingForSummerCollege = () => {
         "unknown",
       "x-audit-actor-role":
         userRole || localStorage.getItem("role") || "registrar",
+      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
     },
   };
 
@@ -357,6 +365,7 @@ const CourseTaggingForSummerCollege = () => {
   const [courseCode, setCourseCode] = useState("");
   const [courseDescription, setCourseDescription] = useState("");
   const [curriculumYear, setCurriculumYear] = useState("");
+  const [studentYearLevel, setStudentYearLevel] = useState("");
   const [, setSectionDescription] = useState("");
   const [sections, setSections] = useState([]);
   const [selectedSection, setSelectedSection] = useState("");
@@ -890,19 +899,13 @@ const CourseTaggingForSummerCollege = () => {
       });
       return;
     }
-    if (!activeSchoolYearId || !activeSemesterId) {
-      setSnack({
-        open: true,
-        message: "Summer school year is not ready yet. Please try again.",
-        severity: "warning",
-      });
-      return;
-    }
     try {
+      // Pass a school-year hint so student-tagging/dprtmnt skips semester filters.
+      // Enrollment still uses the real summer activeSchoolYearId when available.
       const scopeResult = await resolveStudentRegistrarScope(
         studentNumber.trim(),
         {
-          activeSchoolYearId,
+          activeSchoolYearId: activeSchoolYearId || true,
         },
       );
       if (scopeResult.error) {
@@ -911,8 +914,13 @@ const CourseTaggingForSummerCollege = () => {
         setCurr(null);
         setCourses([]);
         setEnrolled([]);
+        setIsEnrolled(false);
         setCurriculumYear("");
+        setStudentYearLevel("");
         setSectionDescription("");
+        setUserFirstName(null);
+        setUserMiddleName(null);
+        setUserLastName(null);
         setSelectedDepartment(null);
         setSearchedStudentProgramId(null);
         setSelectedSection("");
@@ -940,6 +948,7 @@ const CourseTaggingForSummerCollege = () => {
         activeCurriculum: effectiveProgram,
         yearLevel,
         yearDesc,
+        yearLevelDescription,
         courseCode: courseCode,
         courseDescription: courseDescription,
         firstName: first_name,
@@ -968,6 +977,7 @@ const CourseTaggingForSummerCollege = () => {
       setCourseCode(cleanDisplayValue(courseCode));
       setCourseDescription(cleanDisplayValue(courseDescription));
       setCurriculumYear(cleanDisplayValue(yearDesc));
+      setStudentYearLevel(cleanDisplayValue(yearLevelDescription));
       setPersonID(cleanDisplayValue(person_id2));
       setSectionDescription(cleanDisplayValue(section));
       setSelectedSection(
@@ -1004,8 +1014,13 @@ const CourseTaggingForSummerCollege = () => {
       setCurr(null);
       setCourses([]);
       setEnrolled([]);
+      setIsEnrolled(false);
       setCurriculumYear("");
+      setStudentYearLevel("");
       setSectionDescription("");
+      setUserFirstName(null);
+      setUserMiddleName(null);
+      setUserLastName(null);
       setSelectedDepartment(null);
       setSearchedStudentProgramId(null);
       setSelectedSection("");
@@ -1092,7 +1107,12 @@ const CourseTaggingForSummerCollege = () => {
       const res = await axios.post(
         `${API_BASE_URL}/api/import-xlsx`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            ...auditConfig.headers,
+          },
+        },
       );
       if (res.data.success) {
         setSnack({
@@ -1320,7 +1340,7 @@ const CourseTaggingForSummerCollege = () => {
       handleSearchStudent();
     }, 500);
     return () => clearTimeout(delayDebounce);
-  }, [studentNumber, activeSchoolYearId, activeSemesterId, departmentLoading]);
+  }, [studentNumber, departmentLoading]);
 
   useEffect(() => {
     const handleContextMenu = (e) => e.preventDefault();
@@ -1495,76 +1515,63 @@ const CourseTaggingForSummerCollege = () => {
               backgroundColor: "#fafafa",
             }}
           >
-            {/* Student name badge */}
+            {/* Student basic info */}
             {first_name && (
-              <Box
+              <Paper
+                variant="outlined"
                 sx={{
+                  p: 2,
                   mb: 1.5,
-                  p: 1.5,
-                  backgroundColor: TOKEN.accentSoft,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
+                  borderRadius: "10px",
+                  backgroundColor: `${headerColor}0D`,
+                  border: `1px solid ${headerColor}33`,
+                  textAlign: "left",
                 }}
               >
-                <Box
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    backgroundColor: headerColor,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Typography
-                    sx={{ color: "#fff", fontWeight: 800, fontSize: "14px" }}
-                  >
-                    {first_name?.[0]}
-                    {last_name?.[0]}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    sx={{
-                      fontWeight: 700,
-                      textAlign: "left",
-                      fontSize: "13px",
-                      color: headerColor,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Name:{" "}
-                    {joinDisplayValues(first_name, middle_name, last_name)}
-                  </Typography>
-                  <Typography sx={{ fontSize: "11px", color: TOKEN.textMid }}>
-                    {formatStudentCurriculum(
-                      curriculumYear,
-                      courseCode,
-                      courseDescription,
-                    ) || "—"}
-                  </Typography>
-                  <Typography sx={{ fontSize: "11px", color: TOKEN.textMid }}>
-                    {isenrolled
-                      ? "Currently Enrolled"
-                      : "Currently Not Enrolled"}
-                  </Typography>
-                </Box>
-                {isenrolled && (
-                  <Chip
-                    label="Enrolled"
-                    size="small"
-                    sx={{
-                      ml: "auto",
-                      backgroundColor: TOKEN.green,
-                      color: "#fff",
-                      fontWeight: 700,
-                      fontSize: "10px",
-                    }}
-                  />
-                )}
-              </Box>
+                <Typography sx={{ fontWeight: 700, mb: 1.5, color: "#222" }}>
+                  Student Information
+                </Typography>
+                <Grid container spacing={1.5}>
+                  {[
+                    [
+                      "Name",
+                      joinDisplayValues(first_name, middle_name, last_name),
+                    ],
+                    [
+                      "Curriculum",
+                      formatStudentCurriculum(
+                        curriculumYear,
+                        courseCode,
+                        courseDescription,
+                      ),
+                    ],
+                    ["Current Year Level", studentYearLevel],
+                    [
+                      "Enrolled Status",
+                      isenrolled
+                        ? "Currently Enrolled"
+                        : "Currently Not Enrolled",
+                    ],
+                  ].map(([label, value]) => (
+                    <Grid item xs={12} sm={6} key={label}>
+                      <Typography
+                        sx={{
+                          fontSize: 11,
+                          color: headerColor,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        {label}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#333" }}>
+                        {cleanDisplayValue(value, "—")}
+                      </Typography>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Paper>
             )}
 
             <Stack spacing={1}>

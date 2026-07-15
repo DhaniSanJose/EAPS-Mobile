@@ -6,7 +6,7 @@ const {
   db3,
   ensurePageAccessPermissionColumns,
 } = require("../database/database");
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 const {
   getScopesForEmployees,
   buildEmployeeScopePayload,
@@ -42,17 +42,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertAccountManagementAuditLog = async ({
   req,
@@ -310,39 +300,19 @@ router.put("/page_access/:userId/bulk-permission", CanManageUserPagePermissions,
     await conn.beginTransaction();
 
     if (Number(enabled) === 1) {
-      const [pages] = await conn.query("SELECT id FROM page_table");
-
-      for (const page of pages) {
-        const [existing] = await conn.query(
-          "SELECT id FROM page_access WHERE user_id = ? AND page_id = ? LIMIT 1",
-          [userId, page.id],
-        );
-
-        if (existing.length > 0) {
-          await conn.query(
-            `UPDATE page_access
-             SET page_privilege = 1, ${permission} = 1
-             WHERE user_id = ? AND page_id = ?`,
-            [userId, page.id],
-          );
-        } else {
-          await conn.query(
-            `INSERT INTO page_access
-             (user_id, page_id, page_privilege, can_create, can_edit, can_delete)
-             VALUES (?, ?, 1, ?, ?, ?)`,
-            [
-              userId,
-              page.id,
-              permission === "can_create" ? 1 : 0,
-              permission === "can_edit" ? 1 : 0,
-              permission === "can_delete" ? 1 : 0,
-            ],
-          );
-        }
-      }
-    } else {
+      // Only enable permission on pages the user already has access to
       await conn.query(
-        `UPDATE page_access SET ${permission} = 0 WHERE user_id = ? AND page_id != ?`,
+        `UPDATE page_access
+         SET ${permission} = 1
+         WHERE user_id = ? AND page_privilege = 1`,
+        [userId],
+      );
+    } else {
+      // Only close permission on pages the user already has access to
+      await conn.query(
+        `UPDATE page_access
+         SET ${permission} = 0
+         WHERE user_id = ? AND page_privilege = 1 AND page_id != ?`,
         [userId, PROTECTED_PAGE_ID],
       );
     }

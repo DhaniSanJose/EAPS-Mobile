@@ -4,6 +4,7 @@ import { Alert, Box, Button, FormControl, MenuItem, Select, Snackbar, Typography
 import { SettingsContext } from "../App";
 import API_BASE_URL from "../apiConfig";
 import { FaFileExcel } from "react-icons/fa";
+import { getAuditHeaders } from "../utils/auditEvents";
 
 const UploadEnrolledSubject = () => {
   const settings = useContext(SettingsContext);
@@ -62,7 +63,10 @@ const UploadEnrolledSubject = () => {
       formData.append("campus", campus);
 
       const response = await axios.post(`${API_BASE_URL}/import-xlsx-into-enrolled-subject`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+          ...getAuditHeaders(),
+        },
       });
 
       if (response.data?.success) {

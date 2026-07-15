@@ -602,7 +602,10 @@ const UploadApplicants = () => {
       formData.append("file", selectedFile);
 
       const res = await axios.post(`${API_BASE_URL}/api/import-xlsx-into-uploaded-applicants`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+          ...getAuditHeaders().headers,
+        },
       });
 
       if (res.data?.success) {

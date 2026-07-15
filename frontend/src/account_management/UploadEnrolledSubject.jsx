@@ -33,7 +33,7 @@ import {
 import API_BASE_URL from '../apiConfig';
 import LoadingOverlay from '../components/LoadingOverlay';
 import Unauthorized from '../components/Unauthorized';
-import { postAuditEvent } from '../utils/auditEvents';
+import { postAuditEvent, getAuditHeaders } from '../utils/auditEvents';
 
 const PROGRESS_STEPS = [
     { key: 'sorting', label: 'Sorting XLSX data' },
@@ -459,7 +459,10 @@ const UploadEnrolledSubject = () => {
                 `${API_BASE_URL}/api/import-xlsx-into-enrolled-subject`,
                 formData,
                 {
-                    headers: { 'Content-Type': 'multipart/form-data' },
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        ...getAuditHeaders(),
+                    },
                 },
             );
 

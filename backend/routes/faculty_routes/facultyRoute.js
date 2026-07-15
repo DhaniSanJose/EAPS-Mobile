@@ -7,7 +7,7 @@ const fs = require("fs");
 
 const { db, db3 } = require("../database/database");
 const { CanCreate, CanDelete } = require("../../middleware/pagePermissions");
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 
 require("dotenv").config();
 
@@ -40,17 +40,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const getProfessorLabel = (prof) => {
   if (!prof) return "Unknown Professor";

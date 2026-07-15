@@ -46,6 +46,10 @@ import { motion } from "framer-motion";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { FaFileExcel } from "react-icons/fa";
 import API_BASE_URL from "../apiConfig";
+import { postAuditEvent } from "../utils/auditEvents";
+import PrintingHistoryDialog, {
+  PRINTING_STUDENT_ACTION,
+} from "../components/PrintingHistoryDialog";
 import ExamPermit from "../applicant/ExamPermit";
 import { Snackbar, Alert } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
@@ -1634,6 +1638,28 @@ const MedicalDashboard1 = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
+  const logPrintingStudentDocs = async (documentLabel) => {
+    try {
+      const middleInitial = person?.middle_name
+        ? ` ${String(person.middle_name).trim().charAt(0).toUpperCase()}.`
+        : "";
+      const studentName = person?.last_name
+        ? `${person.last_name}, ${person.first_name || ""}${middleInitial}`.trim()
+        : [person?.first_name, person?.middle_name].filter(Boolean).join(" ") ||
+          "Unknown Student";
+
+      await postAuditEvent("PRINTING_STUDENT_DOCS", {
+        document_label: documentLabel,
+        student_name: studentName,
+        student_number:
+          person?.student_number || person?.applicant_number || "N/A",
+        person_id: person?.person_id || userID || "",
+      });
+    } catch (err) {
+      console.error("Printing student docs audit failed:", err);
+    }
+  };
+
   const generateFormPdf = async (key) => {
     const config = FORM_CONFIGS[key];
     if (!config || generatingKey) return;
@@ -1694,6 +1720,7 @@ const MedicalDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      await logPrintingStudentDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
       setSnack({
@@ -1823,23 +1850,30 @@ const MedicalDashboard1 = () => {
           PERSONAL INFORMATION
         </Typography>
 
-        <TextField
-          size="small"
-          placeholder="Search Student Name / Email / Student Number"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+        <Box display="flex" alignItems="center" gap={2}>
+          <TextField
+            size="small"
+            placeholder="Search Student Name / Email / Student Number"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{
+              width: 450,
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          <PrintingHistoryDialog
+            employeeId={employeeID}
+            action={PRINTING_STUDENT_ACTION}
+            title="My Student Printing History"
+          />
+        </Box>
       </Box>
       {searchError && <Typography color="error">{searchError}</Typography>}
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
@@ -2057,6 +2091,7 @@ const MedicalDashboard1 = () => {
       >
         PRINTABLE DOCUMENTS
       </h1>
+
 
       <Container>
         {/* Cards Section */}

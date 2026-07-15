@@ -5,7 +5,7 @@ const {
   CanDelete,
   CanEdit,
 } = require("../../middleware/pagePermissions");
-const { insertAuditLogAdmission } = require("../../utils/auditLogger");
+const { insertAuditLogAdmission, resolveAuditActor } = require("../../utils/auditLogger");
 const {
   isInScope,
   resolveProgramFromCurriculum,
@@ -25,17 +25,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertEmailTemplateAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);

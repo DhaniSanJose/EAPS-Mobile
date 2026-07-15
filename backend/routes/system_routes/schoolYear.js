@@ -5,7 +5,7 @@ const {
   CanDelete,
   CanEdit,
 } = require("../../middleware/pagePermissions");
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 
 const router = express.Router();
 
@@ -19,17 +19,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertSchoolYearAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);

@@ -8,10 +8,8 @@ const {
   getStoredNumericGrade,
   deriveRemarkAndStatusFromNumeric,
 } = require("../utils/gradeConversion");
-const {
-  insertAuditLogAdmission,
-  insertAuditLogEnrollment,
-} = require("../utils/auditLogger");
+const { insertAuditLogAdmission,
+  insertAuditLogEnrollment, resolveAuditActor } = require("../utils/auditLogger");
 const {
   XLSX_IMPORT_LIMITS,
   validateSpreadsheetUpload,
@@ -38,17 +36,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertEnrollmentImportAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);

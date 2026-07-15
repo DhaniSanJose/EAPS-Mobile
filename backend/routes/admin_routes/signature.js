@@ -2,7 +2,7 @@ const express = require("express");
 const { db3 } = require("../database/database");
 const multer = require("multer");
 const path = require("path");
-const { insertAuditLogAdmission } = require("../../utils/auditLogger");
+const { insertAuditLogAdmission, resolveAuditActor } = require("../../utils/auditLogger");
 const {
   CanCreate,
   CanDelete,
@@ -21,18 +21,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    req.body?.employee_id ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertSignatureAuditLog = async ({ req, action, verb, signatureName }) => {
   const { actorId, actorRole } = getAuditActor(req);

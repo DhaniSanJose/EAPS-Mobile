@@ -43,7 +43,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.50.61:5173",
+  "http://192.168.1.42:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -2963,6 +2963,14 @@ const buildAuditEventMessage = async (req) => {
       type: "search",
       message: `${actorNameWithId} searched the basic information of student ${searchedStudentName} (${searchedStudentNumber}).`,
     },
+    PRINTING_APPLICANT_DOCS: {
+      type: "Printing",
+      message: `${actorNameWithId} printed ${details.document_label || "applicant document"} for applicant ${applicantName} (${applicantNumber}).`,
+    },
+    PRINTING_STUDENT_DOCS: {
+      type: "Printing",
+      message: `${actorNameWithId} printed ${details.document_label || "student document"} for student ${searchedStudentName} (${searchedStudentNumber}).`,
+    },
   };
 
   const event = events[eventType];
@@ -2983,7 +2991,12 @@ app.post("/api/audit/event", async (req, res) => {
       return res.status(400).json({ message: "Unsupported audit event" });
     }
 
-    await insertAuditLogEnrollment({
+    const insertFn =
+      auditEvent.eventType === "PRINTING_APPLICANT_DOCS"
+        ? insertAuditLogAdmission
+        : insertAuditLogEnrollment;
+
+    await insertFn({
       actorId: auditEvent.actor.id,
       role: req.headers["x-audit-actor-role"] || req.body?.audit_actor_role || "faculty",
       action: auditEvent.eventType,
@@ -3476,12 +3489,93 @@ app.get("/api/student_edit_permissions", async (req, res) => {
 });
 
 // POST /api/student_edit_permissions
-// Body: { fieldId: true/false, ... }  — upserts all entries
+// Body: { fieldId: true/false, ... }
+//   or: {
+//         permissions: { fieldId: true/false },
+//         field_labels?: { fieldId: "Label" },
+//         field_sections?: { fieldId: "Section Title" }
+//       }
 app.post("/api/student_edit_permissions", async (req, res) => {
   try {
-    const permissions = req.body; // { classifiedAs: true, height: false, ... }
-    const entries = Object.entries(permissions);
+    const rawBody = req.body || {};
+    const permissions =
+      rawBody.permissions &&
+      typeof rawBody.permissions === "object" &&
+      !Array.isArray(rawBody.permissions)
+        ? rawBody.permissions
+        : rawBody;
+    const fieldSections =
+      rawBody.field_sections &&
+      typeof rawBody.field_sections === "object" &&
+      !Array.isArray(rawBody.field_sections)
+        ? rawBody.field_sections
+        : {};
+
+    const entries = Object.entries(permissions).filter(
+      ([key]) =>
+        key !== "permissions" &&
+        key !== "field_labels" &&
+        key !== "field_sections" &&
+        key !== "reset_to_defaults",
+    );
     if (entries.length === 0) return res.json({ success: true });
+
+    const isResetToDefaults = Boolean(rawBody.reset_to_defaults);
+
+    const fieldIds = entries.map(([fieldId]) => fieldId);
+    const [existingRows] = await db3.query(
+      `SELECT field_id, is_editable
+       FROM student_edit_permissions
+       WHERE field_id IN (?)`,
+      [fieldIds],
+    );
+    const existingMap = {};
+    (existingRows || []).forEach((row) => {
+      existingMap[row.field_id] = Number(row.is_editable) === 1;
+    });
+
+    const turnedOnBySection = {};
+    const turnedOffBySection = {};
+    entries.forEach(([fieldId, val]) => {
+      const nextValue = Boolean(val);
+      const previousValue = Object.prototype.hasOwnProperty.call(existingMap, fieldId)
+        ? existingMap[fieldId]
+        : null;
+      if (previousValue === nextValue) return;
+
+      const sectionTitle =
+        String(fieldSections[fieldId] || "").trim() || "General";
+      if (nextValue) {
+        turnedOnBySection[sectionTitle] =
+          (turnedOnBySection[sectionTitle] || 0) + 1;
+      } else {
+        turnedOffBySection[sectionTitle] =
+          (turnedOffBySection[sectionTitle] || 0) + 1;
+      }
+    });
+
+    const formatTogglePhrase = (count, direction) => {
+      const noun = count === 1 ? "toggle" : "toggles";
+      const verb = count === 1 ? "was" : "were";
+      return `${count} ${noun} ${verb} turned ${direction}`;
+    };
+
+    const changedSections = [
+      ...new Set([
+        ...Object.keys(turnedOnBySection),
+        ...Object.keys(turnedOffBySection),
+      ]),
+    ];
+    const changeParts = changedSections.map((sectionTitle) => {
+      const phrases = [];
+      if (turnedOnBySection[sectionTitle]) {
+        phrases.push(formatTogglePhrase(turnedOnBySection[sectionTitle], "on"));
+      }
+      if (turnedOffBySection[sectionTitle]) {
+        phrases.push(formatTogglePhrase(turnedOffBySection[sectionTitle], "off"));
+      }
+      return `${sectionTitle} and ${phrases.join(" and ")}`;
+    });
 
     // Build bulk upsert
     const values = entries.map(([fieldId, val]) => [fieldId, val ? 1 : 0]);
@@ -3491,6 +3585,40 @@ app.post("/api/student_edit_permissions", async (req, res) => {
        ON DUPLICATE KEY UPDATE is_editable = VALUES(is_editable)`,
       [values]
     );
+
+    const actor = await getAuditEventActorFromRequest(req);
+    const roleLabel =
+      String(actor.accessDescription || "").trim() ||
+      formatAuditActorRole(
+        req.headers["x-audit-actor-role"] ||
+          req.body?.audit_actor_role ||
+          "registrar",
+      );
+    const actorId = actor.id || "unknown";
+    const actorName = actor.name || actor.email || actorId;
+    const pageLabel =
+      String(req.headers["x-audit-change-section"] || "").trim() ||
+      "Student Edit Permissions";
+    const actorDisplay = `${roleLabel} ${actorName} (${actorId})`;
+    const lockedCount = entries.filter(([, val]) => !Boolean(val)).length;
+    const changeSummary =
+      changeParts.length > 0 ? changeParts.join("; ") : "no field changes";
+
+    const auditAction = isResetToDefaults
+      ? "STUDENT_EDIT_PERMISSIONS_RESET"
+      : "STUDENT_EDIT_PERMISSIONS_UPDATE";
+    const auditMessage = isResetToDefaults
+      ? `${actorDisplay} reset student edit permissions for ${pageLabel} to defaults (all fields locked${lockedCount ? `, ${lockedCount} toggle${lockedCount === 1 ? "" : "s"}` : ""}).`
+      : `${actorDisplay} updated student edit permissions for ${pageLabel}: ${changeSummary}.`;
+
+    await insertAuditLogEnrollment({
+      actorId,
+      role: roleLabel,
+      action: auditAction,
+      severity: "INFO",
+      message: auditMessage,
+    });
+
     res.json({ success: true });
   } catch (err) {
     console.error("POST student_edit_permissions:", err);

@@ -1,5 +1,6 @@
 const express = require("express");
 const { db3 } = require("../database/database");
+const { resolveAuditActor } = require("../../utils/auditLogger");
 const {
   isStudentNumberTaken,
   assignStudentNumberFromUploadedApplicant,
@@ -11,19 +12,24 @@ const router = express.Router();
 
 const normalizeText = (value) => String(value ?? "").trim();
 
-const getAuditActor = (req) => ({
-  auditActorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-actor-id"] ||
-    req.headers["x-person-id"] ||
-    "unknown",
-  auditActorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    req.headers["x-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = (req) => {
+  const { actorId, actorRole } = resolveAuditActor(req);
+  return {
+    auditActorId:
+      req.body?.audit_actor_id ||
+      req.headers["x-audit-actor-id"] ||
+      req.headers["x-actor-id"] ||
+      req.headers["x-person-id"] ||
+      actorId ||
+      "unknown",
+    auditActorRole:
+      req.body?.audit_actor_role ||
+      req.headers["x-audit-actor-role"] ||
+      req.headers["x-actor-role"] ||
+      actorRole ||
+      "registrar",
+  };
+};
 
 const getRequestedUploadedApplicantIds = (body) => {
   const rawIds = Array.isArray(body?.uploaded_applicant_ids)

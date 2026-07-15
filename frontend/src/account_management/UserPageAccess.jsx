@@ -291,15 +291,24 @@ const UserPageAccess = () => {
     can_delete: "delete",
   };
 
-  const setBulkPermissionState = (pagesList, currentAccess, permissionKey, enabled) => {
+  const setBulkPermissionState = (
+    pagesList,
+    currentAccess,
+    permissionKey,
+    enabled,
+    { skipProtectedOnClose = false } = {},
+  ) => {
     const nextAccess = { ...currentAccess };
     pagesList.forEach((page) => {
-      if (!enabled && isProtectedPage(page.id)) return;
+      if (!enabled && skipProtectedOnClose && isProtectedPage(page.id)) return;
 
       const current = nextAccess[page.id] || createEmptyPermission(false);
+
+      // Grant / close only on pages the user/level already has access to
+      if (!current.access) return;
+
       nextAccess[page.id] = {
         ...current,
-        access: enabled ? true : current.access,
         [permissionKey]: enabled,
       };
     });
@@ -708,6 +717,10 @@ const UserPageAccess = () => {
   };
 
   const handleCreateBulkPermission = async (permissionKey, enabled) => {
+    const affectedCount = createPages.filter(
+      (p) => createPageAccess[p.id]?.access,
+    ).length;
+
     setCreatePageAccess((prev) =>
       setBulkPermissionState(createPages, prev, permissionKey, enabled),
     );
@@ -720,7 +733,7 @@ const UserPageAccess = () => {
           permission: permissionKey,
           enabled: enabled ? 1 : 0,
           access_description: accessDescription,
-          affected_count: createPages.length,
+          affected_count: affectedCount,
         },
         auditConfig,
       );
@@ -801,6 +814,10 @@ const UserPageAccess = () => {
   };
 
   const handleEditBulkPermission = async (permissionKey, enabled) => {
+    const affectedCount = editPages.filter(
+      (p) => editPageAccess[p.id]?.access,
+    ).length;
+
     setEditPageAccess((prev) =>
       setBulkPermissionState(editPages, prev, permissionKey, enabled),
     );
@@ -814,7 +831,7 @@ const UserPageAccess = () => {
           enabled: enabled ? 1 : 0,
           access_id: editAccessId,
           access_description: editAccessDescription,
-          affected_count: editPages.length,
+          affected_count: affectedCount,
         },
         auditConfig,
       );
@@ -1035,6 +1052,7 @@ const UserPageAccess = () => {
       pageAccess,
       permissionKey,
       enabled,
+      { skipProtectedOnClose: true },
     );
 
     setPageAccess(nextAccess);
@@ -1054,8 +1072,8 @@ const UserPageAccess = () => {
         open: true,
         severity: "success",
         message: enabled
-          ? `Granted all ${permissionLabels[permissionKey]} permissions`
-          : `Closed all ${permissionLabels[permissionKey]} permissions except ${protectedLabel}`,
+          ? `Granted ${permissionLabels[permissionKey]} on pages with access`
+          : `Closed ${permissionLabels[permissionKey]} on pages with access (except ${protectedLabel})`,
       });
     } catch (err) {
       console.error(err);

@@ -1,4 +1,5 @@
 const { db, db3 } = require("../routes/database/database");
+const webtoken = require("jsonwebtoken");
 
 const DEFAULT_ACTION = "AUTH";
 const ACCESS_DESCRIPTION_EXCLUDED_ROLES = new Set([
@@ -39,6 +40,48 @@ const formatRole = (role) => {
     .split(/[\s_-]+/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
+};
+
+const getBearerPayload = (req) => {
+  const authHeader = req?.headers?.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return null;
+
+  try {
+    return webtoken.verify(token, process.env.JWT_SECRET);
+  } catch {
+    try {
+      return webtoken.decode(token);
+    } catch {
+      return null;
+    }
+  }
+};
+
+const resolveAuditActor = (req = {}) => {
+  const tokenPayload = getBearerPayload(req) || {};
+  const body = req.body || {};
+  const headers = req.headers || {};
+
+  const actorId =
+    body.audit_actor_id ||
+    headers["x-audit-actor-id"] ||
+    headers["x-employee-id"] ||
+    tokenPayload.employee_id ||
+    tokenPayload.person_id ||
+    tokenPayload.email ||
+    "unknown";
+
+  const actorRole =
+    body.audit_actor_role ||
+    headers["x-audit-actor-role"] ||
+    tokenPayload.role ||
+    "registrar";
+
+  return {
+    actorId: String(actorId || "unknown").trim() || "unknown",
+    actorRole: String(actorRole || "registrar").trim() || "registrar",
+  };
 };
 
 const getAccessDescriptionForActor = async (actorId) => {
@@ -190,4 +233,5 @@ module.exports = {
   formatAuditTimestamp,
   insertAuditLogAdmission,
   insertAuditLogEnrollment,
+  resolveAuditActor,
 };

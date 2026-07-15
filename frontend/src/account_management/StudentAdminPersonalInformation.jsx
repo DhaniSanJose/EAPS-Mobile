@@ -54,6 +54,10 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
+import { postAuditEvent } from "../utils/auditEvents";
+import PrintingHistoryDialog, {
+  PRINTING_STUDENT_ACTION,
+} from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import FormalExample from "../assets/formalexample.png";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
@@ -1099,6 +1103,28 @@ const SuperAdminStudentDashboard1 = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
+  const logPrintingStudentDocs = async (documentLabel) => {
+    try {
+      const middleInitial = person?.middle_name
+        ? ` ${String(person.middle_name).trim().charAt(0).toUpperCase()}.`
+        : "";
+      const studentName = person?.last_name
+        ? `${person.last_name}, ${person.first_name || ""}${middleInitial}`.trim()
+        : [person?.first_name, person?.middle_name].filter(Boolean).join(" ") ||
+          "Unknown Student";
+
+      await postAuditEvent("PRINTING_STUDENT_DOCS", {
+        document_label: documentLabel,
+        student_name: studentName,
+        student_number:
+          person?.student_number || person?.applicant_number || "N/A",
+        person_id: person?.person_id || userID || "",
+      });
+    } catch (err) {
+      console.error("Printing student docs audit failed:", err);
+    }
+  };
+
   const generateFormPdf = async (key) => {
     const config = FORM_CONFIGS[key];
     if (!config || generatingKey) return;
@@ -1159,6 +1185,7 @@ const SuperAdminStudentDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      await logPrintingStudentDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
       setSnack({
@@ -1305,6 +1332,11 @@ const SuperAdminStudentDashboard1 = () => {
             InputProps={{
               startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
             }}
+          />
+          <PrintingHistoryDialog
+            employeeId={employeeID}
+            action={PRINTING_STUDENT_ACTION}
+            title="My Student Printing History"
           />
         </Box>
       </Box>
@@ -1457,6 +1489,7 @@ const SuperAdminStudentDashboard1 = () => {
       >
         PRINTABLE DOCUMENTS
       </h1>
+
 
       <Container>
         {/* Cards Section */}

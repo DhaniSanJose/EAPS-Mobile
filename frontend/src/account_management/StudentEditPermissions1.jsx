@@ -15,6 +15,11 @@ import {
   Paper,
   Divider,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
@@ -161,8 +166,25 @@ const StudentEditPermissions = () => {
   const [hasAccess, setHasAccess] = useState(null);
   const [userRole, setUserRole] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const pageId = 155; // assign a unique page_id for this module
+
+  const auditConfig = {
+    headers: {
+      "x-employee-id":
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-page-id": pageId,
+      "x-audit-actor-id":
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-change-section": "Personal Information",
+    },
+  };
 
   // ── Load settings ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -201,7 +223,17 @@ const StudentEditPermissions = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/student_edit_permissions`);
       if (res.data && typeof res.data === "object") {
-        setPermissions((prev) => ({ ...prev, ...res.data }));
+        const pageFieldIds = new Set(
+          SECTIONS.flatMap((sec) =>
+            sec.fields.filter((field) => !field.system).map((field) => field.id),
+          ),
+        );
+        const next = buildDefaultState();
+        Object.entries(res.data).forEach(([fieldId, value]) => {
+          if (!pageFieldIds.has(fieldId)) return;
+          next[fieldId] = value === true || value === 1 || value === "1";
+        });
+        setPermissions(next);
       }
     } catch (err) {
       // If endpoint doesn't exist yet, we fall back to defaults silently
@@ -211,11 +243,38 @@ const StudentEditPermissions = () => {
     }
   };
 
+  const buildSectionPayload = (sourcePermissions) => {
+    const payload = {};
+    const field_labels = {};
+    const field_sections = {};
+    SECTIONS.forEach((sec) => {
+      sec.fields
+        .filter((field) => !field.system)
+        .forEach((field) => {
+          payload[field.id] = Boolean(sourcePermissions[field.id]);
+          field_labels[field.id] = field.label;
+          field_sections[field.id] = sec.title;
+        });
+    });
+    return { permissions: payload, field_labels, field_sections };
+  };
+
+  const persistPermissions = async (sourcePermissions, options = {}) => {
+    await axios.post(
+      `${API_BASE_URL}/api/student_edit_permissions`,
+      {
+        ...buildSectionPayload(sourcePermissions),
+        ...(options.isReset ? { reset_to_defaults: true } : {}),
+      },
+      auditConfig,
+    );
+  };
+
   // ── Save ───────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.post(`${API_BASE_URL}/api/student_edit_permissions`, permissions);
+      await persistPermissions(permissions);
       setSnackbar({ open: true, message: "Permissions saved successfully!", severity: "success" });
     } catch (err) {
       console.error("Save failed:", err);
@@ -226,9 +285,34 @@ const StudentEditPermissions = () => {
   };
 
   // ── Reset to defaults ──────────────────────────────────────────────────────
-  const handleReset = () => {
-    setPermissions(buildDefaultState());
-    setSnackbar({ open: true, message: "Reset to default permissions.", severity: "info" });
+  const handleReset = async () => {
+    setResetConfirmOpen(false);
+    // Locked/off is the intended "safe default" for student-editable fields.
+    const lockedDefaults = {};
+    SECTIONS.forEach((sec) =>
+      sec.fields.forEach((field) => {
+        if (!field.system) lockedDefaults[field.id] = false;
+      }),
+    );
+    setPermissions(lockedDefaults);
+    setSaving(true);
+    try {
+      await persistPermissions(lockedDefaults, { isReset: true });
+      setSnackbar({
+        open: true,
+        message: "All fields reset to Locked and saved.",
+        severity: "success",
+      });
+    } catch (err) {
+      console.error("Reset save failed:", err);
+      setSnackbar({
+        open: true,
+        message: "Defaults applied on screen, but saving failed. Please click Save.",
+        severity: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── Per-field toggle ───────────────────────────────────────────────────────
@@ -314,7 +398,8 @@ const StudentEditPermissions = () => {
           <Button
             variant="outlined"
             startIcon={<RestoreIcon />}
-            onClick={handleReset}
+            onClick={() => setResetConfirmOpen(true)}
+            disabled={saving}
             sx={{ borderColor, color: mainButtonColor, "&:hover": { backgroundColor: "#f5f5f5", borderColor } }}
           >
             Reset Defaults
@@ -481,6 +566,41 @@ const StudentEditPermissions = () => {
           </Paper>
         );
       })}
+
+      {/* ── Reset confirmation ── */}
+      <Dialog
+        open={resetConfirmOpen}
+        onClose={() => !saving && setResetConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: mainButtonColor, fontWeight: "bold" }}>
+          Reset to Defaults?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will lock all student-editable fields on this page and save
+            immediately. Do you want to continue?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setResetConfirmOpen(false)}
+            disabled={saving}
+            sx={{ color: "#666" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleReset}
+            disabled={saving}
+            sx={{ backgroundColor: mainButtonColor, "&:hover": { backgroundColor: mainButtonColor } }}
+          >
+            {saving ? "Resetting…" : "Yes, Reset"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Snackbar ── */}
       <Snackbar

@@ -3,7 +3,7 @@ const {
   db3,
   ensurePageAccessPermissionColumns,
 } = require('../database/database');
-const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 const {
   CanCreate,
   CanEdit,
@@ -31,17 +31,7 @@ const formatAuditActorRole = (role) => {
     .join(" ");
 };
 
-const getAuditActor = (req) => ({
-  actorId:
-    req.body?.audit_actor_id ||
-    req.headers["x-audit-actor-id"] ||
-    req.headers["x-employee-id"] ||
-    "unknown",
-  actorRole:
-    req.body?.audit_actor_role ||
-    req.headers["x-audit-actor-role"] ||
-    "registrar",
-});
+const getAuditActor = resolveAuditActor;
 
 const insertAccessAuditLog = async ({ req, action, message }) => {
   const { actorId, actorRole } = getAuditActor(req);
