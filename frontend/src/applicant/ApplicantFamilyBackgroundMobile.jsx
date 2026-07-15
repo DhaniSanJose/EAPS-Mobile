@@ -588,10 +588,10 @@ const ApplicantFamilyBackgroundResponsive = (props) => {
       const fileName = config.dateStamped
         ? `${config.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`
         : buildClientFilename(config.filenamePrefix, {
-            lastName: person?.last_name,
-            firstName: person?.first_name,
-            applicantNumber: person?.applicant_number,
-          });
+          lastName: person?.last_name,
+          firstName: person?.first_name,
+          applicantNumber: person?.applicant_number,
+        });
 
       const link = document.createElement("a");
       link.href = url;
@@ -691,24 +691,24 @@ const ApplicantFamilyBackgroundResponsive = (props) => {
     { key: "examPermitDownload", label: "Examination Permit", onClick: downloadExamPermitPDF },
   ];
 
-   document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   // Cards per row depending on viewport
   const cardBasis = isPhone ? "calc(50% - 6px)" : isTablet ? "calc(33.333% - 8px)" : "calc(20% - 13px)";
@@ -753,24 +753,17 @@ const ApplicantFamilyBackgroundResponsive = (props) => {
 
       <Box sx={{ maxWidth: contentMaxWidth, mx: "auto", px: { xs: 0, md: 2 } }}>
         {/* Page Title */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            mb: 1,
-            p: { xs: 1, md: 2 },
-          }}
-        >
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold",
-              color: titleColor,
-              fontSize: { xs: "22px", sm: "28px", md: "36px" },
-            }}
-          >
+        <Box sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+
+          px: { xs: 2, md: 0 },
+          pt: { xs: 2, md: 0 },
+        }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
             FAMILY BACKGROUND
           </Typography>
         </Box>
@@ -1204,12 +1197,12 @@ const ApplicantFamilyBackgroundResponsive = (props) => {
                       father_education: isChecked ? 1 : 0,
                       ...(isChecked
                         ? {
-                            father_education_level: "",
-                            father_last_school: "",
-                            father_course: "",
-                            father_year_graduated: "",
-                            father_school_address: "",
-                          }
+                          father_education_level: "",
+                          father_last_school: "",
+                          father_course: "",
+                          father_year_graduated: "",
+                          father_school_address: "",
+                        }
                         : {}),
                     };
                     setPerson(updated);
@@ -1482,12 +1475,12 @@ const ApplicantFamilyBackgroundResponsive = (props) => {
                       mother_education: isChecked ? 1 : 0,
                       ...(isChecked
                         ? {
-                            mother_education_level: "",
-                            mother_last_school: "",
-                            mother_course: "",
-                            mother_year_graduated: "",
-                            mother_school_address: "",
-                          }
+                          mother_education_level: "",
+                          mother_last_school: "",
+                          mother_course: "",
+                          mother_year_graduated: "",
+                          mother_school_address: "",
+                        }
                         : {}),
                     };
                     setPerson(updated);

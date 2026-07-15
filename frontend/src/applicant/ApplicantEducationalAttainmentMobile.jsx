@@ -539,10 +539,10 @@ const ApplicantEducationalAttainmentResponsive = (props) => {
       const fileName = config.dateStamped
         ? `${config.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`
         : buildClientFilename(config.filenamePrefix, {
-            lastName: person?.last_name,
-            firstName: person?.first_name,
-            applicantNumber: person?.applicant_number,
-          });
+          lastName: person?.last_name,
+          firstName: person?.first_name,
+          applicantNumber: person?.applicant_number,
+        });
 
       const link = document.createElement("a");
       link.href = url;
@@ -724,24 +724,17 @@ const ApplicantEducationalAttainmentResponsive = (props) => {
 
       <Box sx={{ maxWidth: contentMaxWidth, mx: "auto", px: { xs: 0, md: 2 } }}>
         {/* ── Page Header ─────────────────────────────────────────────── */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            mb: 1,
-            p: { xs: 1, md: 2 },
-          }}
-        >
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold",
-              color: titleColor,
-              fontSize: { xs: "22px", sm: "28px", md: "36px" },
-            }}
-          >
+        <Box sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+
+          px: { xs: 2, md: 0 },
+          pt: { xs: 2, md: 0 },
+        }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
             EDUCATIONAL ATTAINMENT
           </Typography>
         </Box>

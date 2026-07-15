@@ -27,6 +27,23 @@ const ensureDepartmentIsAllowedColumn = async () => {
   isAllowedColumnReady = true;
 };
 
+const ensureDepatmentGrantTableExisted = async () => {
+  try{
+    await db3.query(`
+      CREATE TABLE IF NOT EXISTS dprtmnt_grant_table (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        request_dept_id TINYINT(1) NOT NULL DEFAULT 0,
+        requesting_dept_id TINYINT(1) NOT NULL DEFAULT 0,
+        active_school_year_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_request_grant (request_dept_id, requesting_dept_id, active_school_year_id)
+      )
+    `);
+  } catch (err) {
+    console.error("Error creating table:", err);
+  }
+};
+
 const formatAuditActorRole = (role) => {
   const safeRole = String(role || "registrar").trim();
   if (!safeRole) return "Registrar";
@@ -294,6 +311,55 @@ router.put("/department/:id/is-allowed", CanEdit, async (req, res) => {
     });
   } catch (err) {
     console.error("Error updating department plotting access:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.post("/department/grant-access", async (req, res) => {
+  const { request_dept_id, requesting_dept_id } = req.body;
+
+  console.log("Grant Access Request:", { request_dept_id, requesting_dept_id });
+  try{
+    await ensureDepatmentGrantTableExisted();
+
+    if(!request_dept_id || !requesting_dept_id){
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const [activeYearRows] = await db3.query(
+      "SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1"
+    );
+
+    if (!activeYearRows.length) {
+      return res.status(400).json({ message: "No active school year found" });
+    }
+
+    const activeYearId = activeYearRows[0].id;
+
+  
+
+    const [result] = await db3.query(`
+      INSERT INTO dprtmnt_grant_table (request_dept_id, requesting_dept_id, active_school_year_id)
+      VALUES (?, ?, ?)
+    `, [request_dept_id, requesting_dept_id, activeYearId]);
+
+    console.log("Department access granted:", result);
+
+    const { actorId, actorRole } = getAuditActor(req);
+    const roleLabel = formatAuditActorRole(actorRole);
+    await insertDepartmentAuditLog({
+      req,
+      action: "DEPARTMENT_GRANT_ACCESS",
+      message: `${roleLabel} (${actorId}) granted access from department ID ${request_dept_id} to department ID ${requesting_dept_id} for school year ID ${activeYearId}.`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Access granted successfully.",
+      insertId: result.insertId,
+    });
+  } catch (err) {
+    console.error("Error granting department access:", err);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });

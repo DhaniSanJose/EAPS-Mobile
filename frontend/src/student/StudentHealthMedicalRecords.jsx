@@ -24,6 +24,7 @@ import {
   FormControlLabel,
   FormGroup,
   TableBody,
+  CircularProgress,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
@@ -47,7 +48,10 @@ import LockIcon from "@mui/icons-material/Lock";
 import API_BASE_URL from "../apiConfig";
 import DateField from "../components/DateField";
 import { Snackbar, Alert } from "@mui/material";
-
+import StudentECATApplicationForm from "./StudentECATApplicationForm";
+import StudentPersonalDataForm from "./StudentPersonalDataForm";
+import StudentOfficeOfTheRegistrar from "./StudentOfficeOfTheRegistrar";
+import StudentServicesSurvey from "./StudentServicesSurvey";
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: given a permissions object and a field key, returns true when a
 // STUDENT is allowed to edit that field.
@@ -425,16 +429,110 @@ const StudentDashboard4 = () => {
     </Box>
   );
 
-  const links = [
-    { to: `/student_ecat_application_form`, label: "ECAT Application Form" },
-    
-    { to: `/student_personal_data_form`, label: "Personal Data Form" },
-    {
-      to: `/student_office_of_the_registrar`,
-      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""}  College Admission`,
+  const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices" | "examPermitDownload"
+  const hiddenFormRef = useRef();
+
+  const FORM_CONFIGS = {
+    ecat: {
+      label: "ECAT Application Form",
+      endpoint: "/api/generate-ecat-form-pdf",
+      filenamePrefix: "ECAT_Application_Form",
+      Component: StudentECATApplicationForm,
     },
-    { to: `/student_admission_services`, label: "Admission Services" },
+    personalData: {
+      label: "Personal Data Form",
+      endpoint: "/api/generate-personal-data-form-pdf",
+      filenamePrefix: "Personal_Data_Form",
+      Component: StudentPersonalDataForm,
+    },
+    registrar: {
+      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+      endpoint: "/api/generate-registrar-form-pdf",
+      filenamePrefix: "Office_Of_The_Registrar",
+      Component: StudentOfficeOfTheRegistrar,
+    },
+    admissionServices: {
+      label: "Application/Student Satisfactory Survey",
+      endpoint: "/api/generate-admission-services-pdf",
+      filenamePrefix: "Admission_Services_CSM_Form",
+      Component: StudentServicesSurvey,
+      dateStamped: true,
+    },
+  };
+
+  const buildClientFilename = (prefix, { lastName, firstName, studentNo }) => {
+    const safeLast = (lastName || "Student").trim().replace(/\s+/g, "_");
+    const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
+    const suffix = studentNo ? `_${studentNo}` : "";
+    return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
+  };
+
+  const generateFormPdf = async (key) => {
+    const config = FORM_CONFIGS[key];
+    if (!config || generatingKey) return;
+
+    setGeneratingKey(key);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // let hidden component finish fetching
+
+      const node = hiddenFormRef.current;
+      if (!node) throw new Error(`${config.label} did not render in time.`);
+
+      const response = await axios.post(
+        `${API_BASE_URL}${config.endpoint}`,
+        {
+          html: node.innerHTML,
+          person_id: userID || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const fileName = buildClientFilename(config.filenamePrefix, {
+        lastName: person?.last_name,
+        firstName: person?.first_name,
+        studentNo: studentNumber,
+      });
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Error generating ${config.label} PDF:`, err);
+      setSnackbar({
+        open: true,
+        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+        severity: "error",
+      });
+    } finally {
+      setGeneratingKey(null);
+    }
+  };
+
+
+
+
+
+
+
+
+  const links = [
+    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
+    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
+    { key: "registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`, onClick: () => generateFormPdf("registrar") },
+    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
   ];
+
+
 
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -458,6 +556,11 @@ const StudentDashboard4 = () => {
 
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+      {generatingKey && FORM_CONFIGS[generatingKey] && (
+        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          {React.createElement(FORM_CONFIGS[generatingKey].Component)}
+        </div>
+      )}
 
       {/* Top header */}
       <Box
@@ -582,62 +685,89 @@ const StudentDashboard4 = () => {
           justifyContent: "center",
         }}
       >
-        {links.map((lnk, i) => (
-          <motion.div
-            key={i}
-            style={{ flex: "0 0 calc(30% - 16px)" }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1, duration: 0.4 }}
-          >
-            <Card
-              sx={{
-                minHeight: 60,
-                borderRadius: 2,
-                border: `1px solid ${borderColor}`,
-                backgroundColor: "#fff",
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
-                p: 1.5,
-                cursor: "pointer",
-                transition: "all 0.3s ease-in-out",
-                "&:hover": {
-                  transform: "scale(1.05)",
-                  backgroundColor: settings?.header_color || "#1976d2",
-                  "& .card-text": { color: "#fff" },
-                  "& .card-icon": { color: "#fff" },
-                },
-              }}
-              onClick={() => {
-                if (lnk.onClick) {
-                  lnk.onClick();
-                } else if (lnk.to) {
-                  navigate(lnk.to);
-                }
-              }}
+        {links.map((lnk, i) => {
+          const isGenerating = generatingKey === lnk.key;
+          const disabled = generatingKey !== null;
+
+          return (
+            <motion.div
+              key={i}
+              style={{ flex: "0 0 calc(30% - 16px)" }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1, duration: 0.4 }}
             >
-              <PictureAsPdfIcon
-                className="card-icon"
-                sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
-              />
-              <Typography
-                className="card-text"
+              <Card
                 sx={{
-                  color: mainButtonColor,
-                  fontFamily: "Arial",
-                  fontWeight: "bold",
-                  fontSize: "0.85rem",
+                  minHeight: 60,
+                  borderRadius: 2,
+                  border: `1px solid ${borderColor}`,
+                  backgroundColor: "#fff",
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  p: 1.5,
+                  cursor: disabled ? "default" : "pointer",
+                  opacity: disabled && !isGenerating ? 0.5 : 1,
+                  pointerEvents: disabled ? "none" : "auto",
+                  transition: "all 0.3s ease-in-out",
+                  "&:hover": {
+                    transform: disabled ? "none" : "scale(1.05)",
+                    backgroundColor: disabled
+                      ? "#fff"
+                      : settings?.header_color || "#1976d2",
+
+                    "& .card-text": {
+                      color: disabled ? mainButtonColor : "#fff",
+                    },
+                    "& .card-icon": {
+                      color: disabled ? mainButtonColor : "#fff",
+                    },
+                  },
+                }}
+                onClick={() => {
+                  if (disabled) return;
+
+                  if (lnk.onClick) {
+                    lnk.onClick();
+                  } else if (lnk.to) {
+                    navigate(lnk.to);
+                  }
                 }}
               >
-                {lnk.label}
-              </Typography>
-            </Card>
-          </motion.div>
-        ))}
+                {/* Icon / Loading */}
+                {isGenerating ? (
+                  <CircularProgress
+                    size={26}
+                    sx={{ color: mainButtonColor, mr: 1.5 }}
+                  />
+                ) : (
+                  <PictureAsPdfIcon
+                    className="card-icon"
+                    sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
+                  />
+                )}
+
+                {/* Label */}
+                <Typography
+                  className="card-text"
+                  sx={{
+                    color: mainButtonColor,
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "bold",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {isGenerating ? "Generating PDF..." : lnk.label}
+                </Typography>
+              </Card>
+            </motion.div>
+          );
+        })}
       </Box>
+
 
       <Container>
         <Container>

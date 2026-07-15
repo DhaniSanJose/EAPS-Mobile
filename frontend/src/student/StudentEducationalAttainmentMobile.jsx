@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { SettingsContext } from "../App";
@@ -25,7 +25,11 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { motion } from "framer-motion";
 import useStudentEditPermissions from "../account_management/useStudentEditPermissions";
-
+import { CircularProgress } from "@mui/material"; // add to your existing MUI import line
+import StudentECATApplicationForm from "./StudentECATApplicationForm";
+import StudentPersonalDataForm from "./StudentPersonalDataForm";
+import StudentOfficeOfTheRegistrar from "./StudentOfficeOfTheRegistrar";
+import StudentServicesSurvey from "./StudentServicesSurvey";
 // ─── Locked badge (matches Personal Information screen) ──────────────────────
 const LockedBadge = () => (
   <span
@@ -426,13 +430,100 @@ const StudentEducationalAttainmentResponsive = () => {
     }
   };
 
-  // ── Printable documents (student links preserved) ─────────────────────────
+  const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices"
+  const hiddenFormRef = useRef();
+
+  const FORM_CONFIGS = {
+    ecat: {
+      label: "ECAT Application Form",
+      endpoint: "/api/generate-ecat-form-pdf",
+      filenamePrefix: "ECAT_Application_Form",
+      Component: StudentECATApplicationForm,
+    },
+    personalData: {
+      label: "Personal Data Form",
+      endpoint: "/api/generate-personal-data-form-pdf",
+      filenamePrefix: "Personal_Data_Form",
+      Component: StudentPersonalDataForm,
+    },
+    registrar: {
+      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+      endpoint: "/api/generate-registrar-form-pdf",
+      filenamePrefix: "Office_Of_The_Registrar",
+      Component: StudentOfficeOfTheRegistrar,
+    },
+    admissionServices: {
+      label: "Application/Student Satisfactory Survey",
+      endpoint: "/api/generate-admission-services-pdf",
+      filenamePrefix: "Admission_Services_CSM_Form",
+      Component: StudentServicesSurvey,
+      dateStamped: true,
+    },
+  };
+
+  const buildClientFilename = (prefix, { lastName, firstName, studentNo }) => {
+    const safeLast = (lastName || "Student").trim().replace(/\s+/g, "_");
+    const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
+    const suffix = studentNo ? `_${studentNo}` : "";
+    return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
+  };
+
+  const generateFormPdf = async (key) => {
+    const config = FORM_CONFIGS[key];
+    if (!config || generatingKey) return;
+
+    setGeneratingKey(key);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // let hidden component finish fetching
+
+      const node = hiddenFormRef.current;
+      if (!node) throw new Error(`${config.label} did not render in time.`);
+
+      const response = await axios.post(
+        `${API_BASE_URL}${config.endpoint}`,
+        {
+          html: node.innerHTML,
+          person_id: userID || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const fileName = buildClientFilename(config.filenamePrefix, {
+        lastName: person?.last_name,
+        firstName: person?.first_name,
+        studentNo: userID,
+      });
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Error generating ${config.label} PDF:`, err);
+      setSnackbar({
+        open: true,
+        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+        severity: "error",
+      });
+    } finally {
+      setGeneratingKey(null);
+    }
+  };
+
   const links = [
-    { to: "/student_ecat_application_form", label: "ECAT Application Form" },
- 
-    { to: "/student_personal_data_form", label: "Personal Data Form" },
-    { to: "/student_office_of_the_registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission` },
-    { to: "/student_admission_services", label: "Admission Services" },
+    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
+    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
+    { key: "registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission`, onClick: () => generateFormPdf("registrar") },
+    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
   ];
 
   // 🔒 Disable right-click
@@ -470,6 +561,14 @@ const StudentEducationalAttainmentResponsive = () => {
         pb: { xs: 8, md: 4 },
       }}
     >
+
+      {generatingKey && FORM_CONFIGS[generatingKey] && (
+        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          {React.createElement(FORM_CONFIGS[generatingKey].Component)}
+        </div>
+      )}
+
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={2000}
@@ -483,7 +582,16 @@ const StudentEducationalAttainmentResponsive = () => {
 
       <Box sx={{ maxWidth: contentMaxWidth, mx: "auto", px: { xs: 0, md: 2 } }}>
         {/* ── Page Header ─────────────────────────────────────────────── */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", mb: 1, p: { xs: 1, md: 2 } }}>
+        <Box sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+
+          px: { xs: 2, md: 0 },
+          pt: { xs: 2, md: 0 },
+        }}>
           <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
             EDUCATIONAL ATTAINMENT
           </Typography>
@@ -574,7 +682,9 @@ const StudentEducationalAttainmentResponsive = () => {
                     borderRadius: "12px",
                     border: `1px solid ${borderColor || "#6D2323"}`,
                     backgroundColor: "#fff",
-                    cursor: "pointer",
+                    cursor: generatingKey ? "default" : "pointer",
+                    opacity: generatingKey && generatingKey !== lnk.key ? 0.5 : 1,
+                    pointerEvents: generatingKey ? "none" : "auto",
                     transition: "all 0.25s ease-in-out",
                     "&:hover": {
                       transform: { md: "scale(1.04)" },
@@ -583,9 +693,16 @@ const StudentEducationalAttainmentResponsive = () => {
                       "& .chip-text": { color: "#fff" },
                     },
                   }}
-                  onClick={() => navigate(lnk.to)}
+                  onClick={() => { if (generatingKey) return; lnk.onClick(); }}
                 >
-                  <PictureAsPdfIcon className="chip-icon" sx={{ fontSize: { xs: 18, md: 22 }, color: mainButtonColor || "#6D2323", flexShrink: 0 }} />
+                  {generatingKey === lnk.key ? (
+                    <CircularProgress size={18} sx={{ color: mainButtonColor || "#6D2323" }} />
+                  ) : (
+                    <PictureAsPdfIcon
+                      className="chip-icon"
+                      sx={{ fontSize: { xs: 18, md: 22 }, color: mainButtonColor || "#6D2323", flexShrink: 0 }}
+                    />
+                  )}
                   <Typography
                     className="chip-text"
                     sx={{
@@ -597,7 +714,7 @@ const StudentEducationalAttainmentResponsive = () => {
                       textAlign: "center",
                     }}
                   >
-                    {lnk.label}
+                    {generatingKey === lnk.key ? "Generating..." : lnk.label}
                   </Typography>
                 </Card>
               </motion.div>

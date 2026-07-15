@@ -23,6 +23,7 @@ const {
   getStudentNameByNumber,
   logStudentHistoryFromRequest,
 } = require("./utils/studentHistoryLogger");
+
 const nodemailer = require("nodemailer");
 const { error } = require("console");
 const app = express();
@@ -42,7 +43,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.10:5173",
+  "http://192.168.50.61:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -158,7 +159,8 @@ const studentAdminRequirements = require("./routes/admission_routes/studentAdmin
 const uploadApplicants = require("./routes/admission_routes/uploadApplicants");
 const workload = require("./routes/system_routes/workload");
 const downloadableFormsRoute = require("./routes/forms/downloadableFormsRoute");
-
+const changeCourseFormRoute = require("./routes/forms/changeCourseFormRoute");
+const controlNumberRoute = require("./routes/forms/controlNumberRoute");
 app.use("/api", workload);
 app.use("/api", uploadApplicants);
 app.use("/api", applicantAdminRequirements);
@@ -227,6 +229,8 @@ app.use("/api", yearLevelRoute);
 app.use("/api", gradeConversionRoute);
 app.use("/api", honorRoutes);
 app.use("/api", downloadableFormsRoute);
+app.use("/api", changeCourseFormRoute);
+app.use("/api", controlNumberRoute);
 
 
 const uploadPath = path.join(__dirname, "uploads");

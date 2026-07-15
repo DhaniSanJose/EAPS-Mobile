@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -25,7 +25,11 @@ import ErrorIcon from "@mui/icons-material/Error";
 import LockIcon from "@mui/icons-material/Lock";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import API_BASE_URL from "../apiConfig";
-
+import { CircularProgress } from "@mui/material"; // add to your existing MUI import line
+import StudentECATApplicationForm from "./StudentECATApplicationForm";
+import StudentPersonalDataForm from "./StudentPersonalDataForm";
+import StudentOfficeOfTheRegistrar from "./StudentOfficeOfTheRegistrar";
+import StudentServicesSurvey from "./StudentServicesSurvey";
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper: returns true when the current user may edit the given field.
 //   • Non-student roles (registrar, superadmin) → always editable
@@ -68,6 +72,13 @@ const StudentOtherInformationResponsive = () => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+
+  // Two-column fields stack on phone, sit side-by-side from tablet up
+  const gridCols2 = { display: "grid", gridTemplateColumns: isPhone ? "1fr" : "1fr 1fr", gap: 16 };
+
 
   // ── Theme state ─────────────────────────────────────────────────────────
   const [titleColor, setTitleColor] = useState("#000000");
@@ -312,38 +323,131 @@ const StudentOtherInformationResponsive = () => {
     setTimeout(() => navigate(stepsWithPaths[index].path), 1000);
   };
 
-  // ── Printable documents (student links preserved) ─────────────────────────
+  const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices"
+  const hiddenFormRef = useRef();
+
+  const FORM_CONFIGS = {
+    ecat: {
+      label: "ECAT Application Form",
+      endpoint: "/api/generate-ecat-form-pdf",
+      filenamePrefix: "ECAT_Application_Form",
+      Component: StudentECATApplicationForm,
+    },
+    personalData: {
+      label: "Personal Data Form",
+      endpoint: "/api/generate-personal-data-form-pdf",
+      filenamePrefix: "Personal_Data_Form",
+      Component: StudentPersonalDataForm,
+    },
+    registrar: {
+      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+      endpoint: "/api/generate-registrar-form-pdf",
+      filenamePrefix: "Office_Of_The_Registrar",
+      Component: StudentOfficeOfTheRegistrar,
+    },
+    admissionServices: {
+      label: "Application/Student Satisfactory Survey",
+      endpoint: "/api/generate-admission-services-pdf",
+      filenamePrefix: "Admission_Services_CSM_Form",
+      Component: StudentServicesSurvey,
+      dateStamped: true,
+    },
+  };
+
+  const buildClientFilename = (prefix, { lastName, firstName, studentNo }) => {
+    const safeLast = (lastName || "Student").trim().replace(/\s+/g, "_");
+    const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
+    const suffix = studentNo ? `_${studentNo}` : "";
+    return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
+  };
+
+  const generateFormPdf = async (key) => {
+    const config = FORM_CONFIGS[key];
+    if (!config || generatingKey) return;
+
+    setGeneratingKey(key);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // let hidden component finish fetching
+
+      const node = hiddenFormRef.current;
+      if (!node) throw new Error(`${config.label} did not render in time.`);
+
+      const response = await axios.post(
+        `${API_BASE_URL}${config.endpoint}`,
+        {
+          html: node.innerHTML,
+          person_id: userID || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const fileName = buildClientFilename(config.filenamePrefix, {
+        lastName: person?.last_name,
+        firstName: person?.first_name,
+        studentNo: userID,
+      });
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Error generating ${config.label} PDF:`, err);
+      setSnackbar({
+        open: true,
+        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+        severity: "error",
+      });
+    } finally {
+      setGeneratingKey(null);
+    }
+  };
+
   const links = [
-    { to: "/student_ecat_application_form", label: "ECAT Application Form" },
-    
-    { to: "/student_personal_data_form", label: "Personal Data Form" },
-    { to: "/student_office_of_the_registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission` },
-    { to: "/student_admission_services", label: "Admission Services" },
+    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
+    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
+    { key: "registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission`, onClick: () => generateFormPdf("registrar") },
+    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
   ];
+
+  // Cards per row depending on viewport
+  const cardBasis = isPhone ? "calc(50% - 6px)" : isTablet ? "calc(33.333% - 8px)" : "calc(20% - 13px)";
+
+  // Content max width so it doesn't stretch edge-to-edge on large desktop monitors
+  const contentMaxWidth = isDesktop ? 1000 : "100%";
 
   // ── Derived name helpers ────────────────────────────────────────────────
   const institutionName = shortTerm ? `${companyName || ""} (${shortTerm.toUpperCase()})` : companyName || "the institution";
   const shortName = shortTerm ? shortTerm.toUpperCase() : companyName || "the University";
 
-   // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
 
   // ── Reusable responsive style tokens ────────────────────────────────────
@@ -367,6 +471,13 @@ const StudentOtherInformationResponsive = () => {
         mt: { md: 1 },
       }}
     >
+
+      {generatingKey && FORM_CONFIGS[generatingKey] && (
+        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          {React.createElement(FORM_CONFIGS[generatingKey].Component)}
+        </div>
+      )}
+
       {/* Toast */}
       <Snackbar
         open={snackbar.open}
@@ -380,24 +491,17 @@ const StudentOtherInformationResponsive = () => {
       </Snackbar>
 
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          mb: 1,
-          px: { xs: 2, md: 0 },
-          pt: { xs: 2, md: 0 },
-        }}
-      >
-        <Typography
-          sx={{
-            fontWeight: "bold",
-            color: titleColor,
-            fontSize: { xs: 22, sm: 28, md: 34, lg: 36 },
-          }}
-        >
+      <Box sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        mb: 1,
+
+        px: { xs: 2, md: 0 },
+        pt: { xs: 2, md: 0 },
+      }}>
+        <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
           OTHER INFORMATION
         </Typography>
       </Box>
@@ -471,21 +575,14 @@ const StudentOtherInformationResponsive = () => {
         >
           PRINTABLE DOCUMENTS
         </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: { xs: 1, md: 2 }, justifyContent: "center" }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25, justifyContent: "center" }}>
           {links.map((lnk, i) => (
-            <Box
+            <motion.div
               key={i}
-              component={motion.div}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.07, duration: 0.3 }}
-              sx={{
-                width: {
-                  xs: "calc(50% - 4px)",
-                  sm: "calc(33.333% - 8px)",
-                  md: "calc(30% - 16px)",
-                },
-              }}
+              transition={{ delay: i * 0.06, duration: 0.3 }}
+              style={{ width: cardBasis, minWidth: 140 }}
             >
               <Card
                 sx={{
@@ -496,46 +593,47 @@ const StudentOtherInformationResponsive = () => {
                   gap: 0.75,
                   px: 1.5,
                   py: 1.25,
-                  minHeight: { xs: 52, md: 60 },
+                  height: { xs: 52, md: 60 },
                   width: "100%",
-                  borderRadius: { xs: "12px", md: 2 },
+                  borderRadius: "12px",
                   border: `1px solid ${borderColor || "#6D2323"}`,
                   backgroundColor: "#fff",
-                  cursor: "pointer",
+                  cursor: generatingKey ? "default" : "pointer",
+                  opacity: generatingKey && generatingKey !== lnk.key ? 0.5 : 1,
+                  pointerEvents: generatingKey ? "none" : "auto",
                   transition: "all 0.25s ease-in-out",
                   "&:hover": {
+                    transform: { md: "scale(1.04)" },
                     backgroundColor: settings?.header_color || "#6D2323",
-                    transform: { md: "scale(1.05)" },
                     "& .chip-icon": { color: "#fff" },
                     "& .chip-text": { color: "#fff" },
                   },
                 }}
-                onClick={() => navigate(lnk.to)}
+                onClick={() => { if (generatingKey) return; lnk.onClick(); }}
               >
-                <PictureAsPdfIcon
-                  className="chip-icon"
-                  sx={{
-                    fontSize: { xs: 18, md: 35 },
-                    color: mainButtonColor || "#6D2323",
-                    flexShrink: 0,
-                    mr: { md: 1.5 },
-                  }}
-                />
+                {generatingKey === lnk.key ? (
+                  <CircularProgress size={18} sx={{ color: mainButtonColor || "#6D2323" }} />
+                ) : (
+                  <PictureAsPdfIcon
+                    className="chip-icon"
+                    sx={{ fontSize: { xs: 18, md: 22 }, color: mainButtonColor || "#6D2323", flexShrink: 0 }}
+                  />
+                )}
                 <Typography
                   className="chip-text"
                   sx={{
-                    fontSize: { xs: 11, sm: 12, md: "0.85rem" },
-                    fontWeight: "bold",
+                    fontSize: { xs: 11, md: 13 },
+                    fontWeight: 600,
                     color: mainButtonColor || "#6D2323",
                     fontFamily: "Poppins, sans-serif",
                     lineHeight: 1.3,
                     textAlign: "center",
                   }}
                 >
-                  {lnk.label}
+                  {generatingKey === lnk.key ? "Generating..." : lnk.label}
                 </Typography>
               </Card>
-            </Box>
+            </motion.div>
           ))}
         </Box>
       </Box>

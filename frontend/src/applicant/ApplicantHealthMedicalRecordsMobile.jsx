@@ -263,7 +263,7 @@ const ApplicantHealthMedicalRecordsResponsive = (props) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
       setPerson(res.data);
-    } catch (error) {}
+    } catch (error) { }
   };
 
   // ── handleUpdate (do not alter) ─────────────────────────────────────────
@@ -571,24 +571,17 @@ const ApplicantHealthMedicalRecordsResponsive = (props) => {
 
       <Box sx={{ maxWidth: contentMaxWidth, mx: "auto", px: { xs: 0, md: 2 } }}>
         {/* ── Page Header ─────────────────────────────────────────────── */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            mb: 1,
-            p: { xs: 1, md: 2 },
-          }}
-        >
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold",
-              color: titleColor,
-              fontSize: { xs: "22px", sm: "28px", md: "36px" },
-            }}
-          >
+        <Box sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+
+          px: { xs: 2, md: 0 },
+          pt: { xs: 2, md: 0 },
+        }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
             HEALTH MEDICAL RECORDS
           </Typography>
         </Box>

@@ -24,6 +24,8 @@ import {
   Checkbox,
   IconButton,
   CircularProgress,
+  Snackbar,   // ✅ add
+  Alert,      // ✅ add
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
@@ -167,6 +169,12 @@ const RegistrarDashboard1 = () => {
   const [visitedSteps, setVisitedSteps] = useState(
     Array(stepsData.length).fill(false),
   );
+
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const navigate = useNavigate();
   const [explicitSelection, setExplicitSelection] = useState(false);
@@ -1419,34 +1427,35 @@ const RegistrarDashboard1 = () => {
 
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
-      if (searchQuery.trim() === "") return; // Don't search empty
+      if (searchQuery.trim() === "") return;
 
       try {
         const res = await axios.get(`${API_BASE_URL}/api/search-person`, {
           params: { query: searchQuery },
         });
 
-        if (res.data && res.data.person_id) {
-          const details = await axios.get(
-            `${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`,
-          );
-          setPerson(details.data);
-
-          sessionStorage.setItem(
-            "admin_edit_person_id",
-            details.data.person_id,
-          );
-          setUserID(details.data.person_id);
-          setSearchError("");
-        } else {
+        const idFromSearch = res.data?.person_id || res.data?.id;
+        if (!idFromSearch) {
           console.error("No valid person ID found in search result");
           setSearchError("Invalid search result");
+          return;
         }
+
+        // ✅ fetch the FULL record, same as the other dashboards
+        const details = await axios.get(
+          `${API_BASE_URL}/api/person_with_applicant/${idFromSearch}`
+        );
+        setPerson(details.data);
+        setSelectedPerson(details.data);
+
+        sessionStorage.setItem("admin_edit_person_id", details.data.person_id);
+        setUserID(details.data.person_id);
+        setSearchError("");
       } catch (err) {
         console.error("Search failed:", err);
         setSearchError("Applicant not found");
       }
-    }, 500); // debounce
+    }, 500);
 
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
@@ -1546,10 +1555,10 @@ const RegistrarDashboard1 = () => {
     if (!config || generatingKey) return;
 
     // 🔒 Require a searched/selected applicant before generating anything
-    if (!userID) {
+    if (!userID || !person?.person_id) {
       setSnackbar({
         open: true,
-        message: "Please search an applicant first.",
+        message: "Please search and select an applicant first.",
         severity: "warning",
       });
       return;
@@ -4488,6 +4497,21 @@ const RegistrarDashboard1 = () => {
           </Container>
         </form>
       </Container>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

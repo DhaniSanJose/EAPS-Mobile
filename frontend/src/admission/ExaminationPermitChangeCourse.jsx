@@ -38,11 +38,17 @@ import ScoreIcon from "@mui/icons-material/Score";
 import PersonIcon from "@mui/icons-material/Person";
 import Autocomplete from "@mui/material/Autocomplete";
 import PrintIcon from "@mui/icons-material/Print";
+import DownloadIcon from "@mui/icons-material/Download";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DescriptionIcon from "@mui/icons-material/Description";
 import ArticleIcon from "@mui/icons-material/Article";
 import BadgeIcon from "@mui/icons-material/Badge";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
+
+// ✅ Reused directly (not duplicated) so the "Admission Form (Process)"
+// option below renders/downloads exactly like its standalone page.
+import AdminAdmissionFormProcess from "./AdmissionFormProcess";
 
 const FORM_OPTIONS = [
   {
@@ -85,7 +91,29 @@ const FORM_OPTIONS = [
     color: "#37474f",
     bg: "#eceff1",
   },
+  // ✅ NEW — 6th form option, reusing AdminAdmissionFormProcess as-is.
+  {
+    key: "admissionFormProcess",
+    label: "Admission Form (Process)",
+    description: "Full admission workflow form with QR code and process steps",
+    icon: <AssignmentIndIcon sx={{ fontSize: 36 }} />,
+    color: "#8B0000",
+    bg: "#fdecea",
+  },
 ];
+
+// ✅ Maps each form key to the backend PDF route that renders it and the
+// filename prefix used for the downloaded file. "permit" and
+// "admissionFormProcess" reuse your existing routes; the four Change
+// Course variants use the new router (changeCourseFormRoutes.js).
+const FORM_ENDPOINTS = {
+  permit: { url: "/api/generate-exam-permit-pdf", prefix: "Exam_Permit" },
+  changeCourse: { url: "/api/generate-change-course-dean-pdf", prefix: "Change_Course_Dean" },
+  newForm: { url: "/api/generate-empty-change-course-dean-pdf", prefix: "Empty_Change_Course_Dean" },
+  changeCourse1: { url: "/api/generate-change-course-director-pdf", prefix: "Change_Course_Director" },
+  newForm1: { url: "/api/generate-empty-change-course-director-pdf", prefix: "Empty_Change_Course_Director" },
+  admissionFormProcess: { url: "/api/generate-admission-form-pdf", prefix: "Admission_Form_Process" },
+};
 
 const ExaminationProfile = () => {
   const settings = useContext(SettingsContext);
@@ -97,6 +125,24 @@ const ExaminationProfile = () => {
 
   // NEW: which form is selected for preview
   const [selectedForm, setSelectedForm] = useState(null);
+  const [controlNumbers, setControlNumbers] = useState({}); // { permit: "2026-0001", changeCourse: "2026-0003", ... }
+
+  const fetchControlNumber = async (formType, actionType) => {
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/generate-control-number`, {
+        form_type: formType,
+        applicant_number: selectedPerson?.applicant_number,
+        person_id: selectedPerson?.person_id,
+        action_type: actionType,
+      });
+      const number = res.data.control_number;
+      setControlNumbers((prev) => ({ ...prev, [formType]: number }));
+      return number;
+    } catch (err) {
+      console.error("Failed to generate control number:", err);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (!settings) return;
@@ -260,14 +306,8 @@ const ExaminationProfile = () => {
   }, []);
 
   const [isVerified, setIsVerified] = useState(false);
-  const [verifiedAt, setVerifiedAt] = useState(null); // ✅ NEW: when documents were verified
+  const [verifiedAt, setVerifiedAt] = useState(null);
 
-
-
-
-  // Exam schedule ONLY drives examSchedule (Date of Exam, Bldg, Room, Time).
-  // It no longer touches isVerified/verifiedAt — those come from actual
-  // document verification status, fetched separately below.
   useEffect(() => {
     if (selectedPerson?.applicant_number) {
       axios
@@ -283,9 +323,6 @@ const ExaminationProfile = () => {
     }
   }, [selectedPerson]);
 
-  // Document verification status ("VERIFIED" watermark + Date Verified field)
-  // comes from /api/document-verification/:applicant_number, which checks
-  // requirement_uploads directly — independent of the exam schedule.
   useEffect(() => {
     if (selectedPerson?.applicant_number) {
       axios
@@ -324,6 +361,9 @@ const ExaminationProfile = () => {
   const newFormRef = useRef();
   const changeCourseRef1 = useRef();
   const newFormRef1 = useRef();
+  // ✅ NEW — ref that will resolve to AdminAdmissionFormProcess's own
+  // printable div, thanks to the useImperativeHandle it now exposes.
+  const admissionFormProcessRef = useRef();
 
   const refMap = {
     permit: permitRef,
@@ -331,6 +371,7 @@ const ExaminationProfile = () => {
     newForm: newFormRef,
     changeCourse1: changeCourseRef1,
     newForm1: newFormRef1,
+    admissionFormProcess: admissionFormProcessRef,
   };
 
   const printDiv = (ref) => {
@@ -361,8 +402,69 @@ const ExaminationProfile = () => {
   const handlePrint = async () => {
     if (!selectedPerson || !selectedForm) return;
     await fetchPersonData(selectedPerson.person_id);
-    setTimeout(() => printDiv(refMap[selectedForm]), 200);
+    await fetchControlNumber(selectedForm, "print"); // mint it, updates controlNumbers state
+    setTimeout(() => printDiv(refMap[selectedForm]), 250); // small delay so the number renders into the DOM before printDiv reads innerHTML
   };
+
+  // ✅ NEW — generic PDF download, same blob → <a download> pattern used by
+  // AdminAdmissionFormProcess.jsx's own downloadPDF(). Works for all 6
+  // form options via FORM_ENDPOINTS + refMap.
+  const [downloadingKey, setDownloadingKey] = useState(null);
+
+  const handleDownloadPdf = async () => {
+    if (!selectedPerson || !selectedForm) return;
+
+    const config = FORM_ENDPOINTS[selectedForm];
+    const ref = refMap[selectedForm];
+    if (!config || !ref?.current) {
+      console.error("No endpoint/ref configured for form:", selectedForm);
+      return;
+    }
+
+    setDownloadingKey(selectedForm);
+
+    try {
+      const controlNumber = await fetchControlNumber(selectedForm, "download");
+      await fetchPersonData(selectedPerson.person_id);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const node = ref.current;
+      if (!node) throw new Error("Form did not render in time.");
+
+      const response = await axios.post(
+        `${API_BASE_URL}${config.url}`,
+        {
+          html: node.innerHTML,
+          applicant_number: selectedPerson?.applicant_number || "",
+          last_name: selectedPerson?.last_name || "",
+          first_name: selectedPerson?.first_name || "",
+          control_number: controlNumber, // 👈 pass it to the PDF route so the file matches what's on screen
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const lastName = (selectedPerson?.last_name || "Applicant").trim().replace(/\s+/g, "_");
+      const firstName = (selectedPerson?.first_name || "").trim().replace(/\s+/g, "_");
+      const applicantNo = selectedPerson?.applicant_number ? `_${selectedPerson.applicant_number}` : "";
+      const fileName = `${config.prefix}_${lastName}${firstName ? "_" + firstName : ""}${applicantNo}.pdf`;
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      alert("Something went wrong while generating the PDF. Please try again.");
+    } finally {
+      setDownloadingKey(null);
+    }
+  };
+
 
   const [signatures, setSignatures] = useState([]);
   const [signaturePage, setSignaturePage] = useState(0);
@@ -390,24 +492,23 @@ const ExaminationProfile = () => {
   const getSignatureImageSrc = (signature) =>
     signature?.signature_image ? `${API_BASE_URL}/uploads/${signature.signature_image}` : "";
 
-     document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   if (loading || hasAccess === null) return <LoadingOverlay open={loading} message="Loading..." />;
   if (!hasAccess) return <Unauthorized />;
@@ -425,6 +526,11 @@ const ExaminationProfile = () => {
                 <tr>
                   <td style={{ width: "20%", textAlign: "center" }}>
                     <img src={fetchedLogo} alt="School Logo" style={{ marginLeft: "-10px", width: "120px", height: "120px", borderRadius: "50%", objectFit: "cover" }} />
+                    {controlNumbers.permit && (
+                      <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", marginTop: "4px" }}>
+                        Document No.: {controlNumbers.permit}
+                      </div>
+                    )}
                   </td>
                   <td style={{ width: "60%", textAlign: "center", lineHeight: "1" }}>
                     <div style={{ fontSize: "13px", fontFamily: "Arial" }}>Republic of the Philippines</div>
@@ -461,6 +567,11 @@ const ExaminationProfile = () => {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "nowrap" }}>
         <div style={{ flexShrink: 0 }}>
           <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+          {controlNumbers[selectedForm] && (
+            <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+              Document No.: {controlNumbers[selectedForm]}
+            </div>
+          )}
         </div>
         <div style={{ flexGrow: 1, textAlign: "center", fontSize: "12px", fontFamily: "Arial", lineHeight: 1.4 }}>
           <div style={{ fontSize: "13px" }}>Republic of the Philippines</div>
@@ -482,12 +593,16 @@ const ExaminationProfile = () => {
     </div>
   );
 
-  // Empty form header (centered, no profile photo)
   const EmptyFormHeader = () => (
     <div className="student-table" style={{ width: "8in", maxWidth: "100%", margin: "0 auto", marginTop: "10px", boxSizing: "border-box", padding: "10px 0" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
         <div style={{ position: "absolute", left: 0 }}>
           <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+          {controlNumbers[selectedForm] && (
+            <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+              Document No.: {controlNumbers[selectedForm]}
+            </div>
+          )}
         </div>
         <div style={{ textAlign: "center", fontSize: "12px", fontFamily: "Arial", lineHeight: 1.4 }}>
           <div style={{ fontSize: "13px" }}>Republic of the Philippines</div>
@@ -502,7 +617,6 @@ const ExaminationProfile = () => {
     </div>
   );
 
-  // ─── Shared change course body (filled) ───────────────────────────────────
   const ChangeCourseBody = ({ showDean = true }) => (
     <table style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", marginTop: "-30px", textAlign: "center", tableLayout: "fixed" }}>
       <tbody>
@@ -566,7 +680,6 @@ const ExaminationProfile = () => {
     </table>
   );
 
-  // Shared change course body (empty / blank)
   const EmptyChangeCourseBody = ({ showDean = true }) => (
     <table style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", marginTop: "-30px", textAlign: "center", tableLayout: "fixed" }}>
       <tbody>
@@ -574,7 +687,7 @@ const ExaminationProfile = () => {
           <td colSpan={40}>
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", width: "100%" }}>
               <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px", fontSize: "12px" }}>Applicant ID No.:</label>
-              <div style={{ width: "200px", borderBottom: "1px solid black", display: "flex", justifyContent: "center", alignItems: "center", fontSize: "12px", height: "1.3em" }}>{person.applicant_number}</div>
+              <div style={{ width: "200px", borderBottom: "1px solid black", display: "flex", justifyContent: "center", alignItems: "center", fontSize: "12px", height: "1.3em" }}></div>
             </div>
           </td>
         </tr>
@@ -773,10 +886,39 @@ const ExaminationProfile = () => {
     </tr>
   );
 
-  const CopyLabel = ({ label }) => (
-    <div style={{ width: "8in", maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "10px 0", marginTop: "20px" }}>
-      <hr style={{ width: "100%", borderTop: "1px solid black", marginTop: "-5px" }} />
-      <div style={{ width: "100%", textAlign: "right", fontWeight: "normal", fontSize: "12px", color: "black", marginTop: "10px" }}>{label}</div>
+  const CopyLabel = ({ leftLabel, label }) => (
+    <div
+      style={{
+        width: "8in",
+        maxWidth: "100%",
+        margin: "0 auto",
+        boxSizing: "border-box",
+        padding: "10px 0",
+        marginTop: "20px",
+      }}
+    >
+      <hr
+        style={{
+          width: "100%",
+          borderTop: "1px solid black",
+          marginTop: "-5px",
+        }}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: "10px",
+          fontWeight: "normal",
+          fontSize: "12px",
+          color: "black",
+        }}
+      >
+        <span>{leftLabel}</span>
+        <span>{label}</span>
+      </div>
     </div>
   );
 
@@ -857,30 +999,13 @@ const ExaminationProfile = () => {
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Date of Exam:</label>
                   <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {examSchedule?.schedule_created_at ? new Date(examSchedule.schedule_created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : ""}
-
                   </span>
                 </div>
               </td>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-                  <label
-                    style={{
-                      fontWeight: "bold",
-                      whiteSpace: "nowrap",
-                      marginRight: "10px",
-                    }}
-                  >
-                    Time :
-                  </label>
-                  <span
-                    style={{
-                      flexGrow: 1,
-                      borderBottom: "1px solid black",
-                      height: "1.2em",
-                      fontFamily: "Arial",
-                      textAlign: "left",
-                    }}
-                  >
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Time :</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {examSchedule
                       ? new Date(`1970-01-01T${examSchedule.start_time}`).toLocaleTimeString(
                         "en-US",
@@ -890,145 +1015,63 @@ const ExaminationProfile = () => {
                   </span>
                 </div>
               </td>
-
             </tr>
 
             <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>
-                    Bldg. :
-                  </label>
-                  <span
-                    style={{
-                      flexGrow: 1,
-                      borderBottom: "1px solid black",
-                      height: "1.2em",
-                      fontFamily: "Arial",
-                      textAlign: "left",
-                    }}
-                  >
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Bldg. :</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {examSchedule?.building_description || ""}
                   </span>
                 </div>
               </td>
 
-              {/* Room No. + QR side by side */}
               <td colSpan={20}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    width: "100%",
-                    justifyContent: "space-between", // space text & QR
-                  }}
-                >
+                <div style={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", marginTop: "-130px" }}>
-                    <label style={{ fontWeight: "bold", marginRight: "10px", width: "80px" }}>
-                      Room No.:
-                    </label>
-                    <span
-                      style={{
-                        flexGrow: 1,
-                        borderBottom: "1px solid black",
-                        fontFamily: "Arial",
-                        width: "150px",
-                      }}
-                    >
+                    <label style={{ fontWeight: "bold", marginRight: "10px", width: "80px" }}>Room No.:</label>
+                    <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial", width: "150px" }}>
                       {examSchedule?.room_description || ""}
                     </span>
                   </div>
 
                   {selectedPerson?.applicant_number && (
-                    <div
-                      style={{
-                        width: "4.5cm",
-                        height: "4.5cm",
-                        borderRadius: "4px",
-                        background: "#fff",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        position: "relative",
-                        overflow: "hidden",
-                        marginLeft: "10px"
-                      }}
-                    >
+                    <div style={{ width: "4.5cm", height: "4.5cm", borderRadius: "4px", background: "#fff", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", overflow: "hidden", marginLeft: "10px" }}>
                       <QRCodeSVG
                         value={`${window.location.origin}/applicant_profile/${person.applicant_number}`}
                         size={150}
                         level="H"
                       />
-
-                      <div
-                        style={{
-                          position: "absolute",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          color: "maroon",
-                          background: "white",
-                          padding: "2px 4px",
-                          borderRadius: "2px",
-                        }}
-                      >
+                      <div style={{ position: "absolute", fontSize: "12px", fontWeight: "bold", color: "maroon", background: "white", padding: "2px 4px", borderRadius: "2px" }}>
                         {selectedPerson.applicant_number}
                       </div>
                     </div>
                   )}
-
-
                 </div>
               </td>
             </tr>
 
-
-
             <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-148px" }}>
-                  <label
-                    style={{
-                      fontWeight: "bold",
-                      whiteSpace: "nowrap",
-                      marginRight: "10px",
-                    }}
-                  >
-                    Date Verified:
-                  </label>
-                  <span
-                    style={{
-                      flexGrow: 1,
-                      borderBottom: "1px solid black",
-                      height: "1.2em",
-                      fontFamily: "Arial",
-                      textAlign: "left",
-                    }}
-                  >
-
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Date Verified:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {verifiedAt
                       ? new Date(verifiedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
                       : ""}
-
                   </span>
                 </div>
               </td>
-
             </tr>
 
             <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-128px" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Scheduled by:</label>
-                  <span
-                    style={{
-                      flexGrow: 1,
-                      borderBottom: "1px solid black",
-                      fontFamily: "Arial",
-                    }}
-                  >
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial" }}>
                     {scheduledBy || "N/A"}
                   </span>
-
                 </div>
               </td>
             </tr>
@@ -1067,7 +1110,10 @@ const ExaminationProfile = () => {
         <br /><br />
         <ChangeCourseBody showDean />
       </Container>
-      <CopyLabel label="College Dean's Copy" />
+      <CopyLabel
+        leftLabel={`${settings?.short_term || shortTerm}-QSF-AS-003 Rev. 00 (7.3.25)`}
+        label="College Dean's Copy"
+      />
       <DashedSeparator />
       <Container>
         <div style={{ position: "absolute", top: watermarkTop2, left: "50%", transform: "translate(-50%, -50%)", fontSize: "120px", fontWeight: "900", color: isVerified ? "rgba(0,128,0,0.15)" : "rgba(255,0,0,0.18)", textTransform: "uppercase", textAlign: "center", pointerEvents: "none", userSelect: "none", zIndex: 0, fontFamily: "Arial", letterSpacing: "0.3rem", lineHeight: isVerified ? "1" : "0.8", whiteSpace: "nowrap" }}>
@@ -1076,10 +1122,10 @@ const ExaminationProfile = () => {
         <ChangeCourseHeader />
         <br /><br />
         <ChangeCourseBody showDean />
-        <div style={{ width: "8in", maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "10px 0", marginTop: "20px" }}>
-          <hr style={{ width: "100%", borderTop: "1px solid black", marginTop: "-5px" }} />
-          <div style={{ width: "100%", textAlign: "right", fontSize: "12px", color: "black", marginTop: "10px" }}>Admission Services Copy</div>
-        </div>
+        <CopyLabel
+          leftLabel={`${settings?.short_term || shortTerm}-QSF-AS-003 Rev. 00 (7.3.25)`}
+          label="Admission Services Copy"
+        />
       </Container>
     </div>
   );
@@ -1091,16 +1137,19 @@ const ExaminationProfile = () => {
         <br /><br />
         <EmptyChangeCourseBody showDean />
       </Container>
-      <CopyLabel label="College Dean's Copy" />
+      <CopyLabel
+        leftLabel={`${settings?.short_term || shortTerm}-QSF-AS-003 Rev. 00 (7.3.25)`}
+        label="College Dean's Copy"
+      />
       <DashedSeparator />
       <Container>
         <EmptyFormHeader />
         <br /><br />
         <EmptyChangeCourseBody showDean />
-        <div style={{ width: "8in", maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "10px 0", marginTop: "20px" }}>
-          <hr style={{ width: "100%", borderTop: "1px solid black", marginTop: "-5px" }} />
-          <div style={{ width: "100%", textAlign: "right", fontSize: "12px", color: "black", marginTop: "10px" }}>Admission Services Copy</div>
-        </div>
+        <CopyLabel
+          leftLabel={`${settings?.short_term || shortTerm}-QSF-AS-003 Rev. 00 (7.3.25)`}
+          label="Admission Services Copy"
+        />
       </Container>
     </div>
   );
@@ -1148,7 +1197,7 @@ const ExaminationProfile = () => {
       {/* Title + Search */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}>
-      EXAMINATION PERMIT CHANGE COURSE
+          EXAMINATION PERMIT CHANGE COURSE
         </Typography>
         <Autocomplete
           options={persons}
@@ -1171,7 +1220,7 @@ const ExaminationProfile = () => {
               setApplicantNumber(newValue.applicant_number);
               setSearchQuery(newValue.applicant_number || "");
               sessionStorage.setItem("admin_edit_person_id", newValue.person_id);
-              setSelectedForm(null); // reset form selection on new applicant
+              setSelectedForm(null);
             } else {
               setSelectedPerson(null);
               setApplicantNumber("");
@@ -1199,9 +1248,8 @@ const ExaminationProfile = () => {
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
+          flexWrap: "nowrap",
           width: "100%",
-
           gap: 2,
         }}
       >
@@ -1210,7 +1258,7 @@ const ExaminationProfile = () => {
             key={index}
             onClick={() => handleStepClick(index, tab.to)}
             sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
+              flex: `1 1 ${100 / tabs.length}%`,
               height: 135,
               display: "flex",
               alignItems: "center",
@@ -1254,7 +1302,6 @@ const ExaminationProfile = () => {
 
       <br /><br />
 
-      {/* Applicant info bar */}
       <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table>
           <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}` }}>
@@ -1281,7 +1328,6 @@ const ExaminationProfile = () => {
       {/* Signatures table */}
       <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "center", width: "100%", mb: 4 }}>
         <Box sx={{ background: "white", width: "100%" }}>
-          {/* Pagination header */}
           {[0, 1].map((pos) => (
             <Box key={pos} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, px: 2, py: 1.5, backgroundColor: settings?.header_color || "#1976d2", color: "white", borderTop: `1px solid ${borderColor}` }}>
               <Typography fontSize="14px" fontWeight="bold" color="white">Total Admin's Records {signatures.length}</Typography>
@@ -1338,7 +1384,6 @@ const ExaminationProfile = () => {
             </Table>
           </TableContainer>
 
-          {/* Pagination footer */}
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, px: 2, py: 1.5, backgroundColor: settings?.header_color || "#1976d2", color: "white", borderTop: `1px solid ${borderColor}` }}>
             <Typography fontSize="14px" fontWeight="bold" color="white">Total Admin's Records {signatures.length}</Typography>
             <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
@@ -1367,7 +1412,7 @@ const ExaminationProfile = () => {
       {selectedPerson && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="h6" sx={{ fontWeight: "bold", color: titleColor, mb: 2, fontSize: "18px" }}>
-            Select a Form to Preview &amp; Print
+            Select a Form to Preview, Print &amp; Download
           </Typography>
 
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 2, mb: 3 }}>
@@ -1411,34 +1456,51 @@ const ExaminationProfile = () => {
 
           {/* Action bar: shown once a form is selected */}
           {selectedForm && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 2, border: "1px solid #e0e0e0" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 2, border: "1px solid #e0e0e0", flexWrap: "wrap" }}>
               <Typography sx={{ fontWeight: "bold", fontSize: "14px", color: "#333", flexGrow: 1 }}>
-                Ready to print: <span style={{ color: FORM_OPTIONS.find((o) => o.key === selectedForm)?.color }}>
+                Ready: <span style={{ color: FORM_OPTIONS.find((o) => o.key === selectedForm)?.color }}>
                   {FORM_OPTIONS.find((o) => o.key === selectedForm)?.label}
                 </span>
               </Typography>
+
               <Button
                 variant="outlined"
                 startIcon={<ArrowBackIcon />}
                 onClick={() => setSelectedForm(null)}
-                sx={{ borderColor: "#bbb", color: "#555", "&:hover": { borderColor: "#999", backgroundColor: "#eee" } }}
+                sx={{
+                  borderColor: "#bbb",
+                  color: "#555",
+                  minWidth: 180,
+                  height: 40,
+                  fontWeight: "bold",
+                }}
               >
-                Change Form
+                Back to Selection
               </Button>
+
               <Button
                 variant="contained"
-                startIcon={<PrintIcon />}
-                onClick={handlePrint}
-                sx={{ backgroundColor: FORM_OPTIONS.find((o) => o.key === selectedForm)?.color, "&:hover": { opacity: 0.88 }, fontWeight: "bold", px: 3 }}
+                startIcon={downloadingKey === selectedForm ? null : <DownloadIcon />}
+                onClick={handleDownloadPdf}
+                disabled={downloadingKey !== null}
+                sx={{
+                  backgroundColor: FORM_OPTIONS.find((o) => o.key === selectedForm)?.color,
+                  "&:hover": { opacity: 0.88 },
+                  minWidth: 180,
+                  height: 40,
+                  fontWeight: "bold",
+                }}
               >
-                Print Now
+                {downloadingKey === selectedForm
+                  ? "Generating PDF..."
+                  : "Download PDF"}
               </Button>
             </Box>
           )}
         </Box>
       )}
 
-      {/* ── Hidden print areas (always rendered when applicant selected) ─────── */}
+      {/* ── Hidden print/download areas (always rendered when applicant selected) ─────── */}
       {selectedPerson && (
         <Box sx={{ display: "none" }}>
           <PermitForm />
@@ -1446,6 +1508,11 @@ const ExaminationProfile = () => {
           <EmptyFormWithDean formRef={newFormRef} />
           <ChangeCourseFormWithDirector formRef={changeCourseRef1} />
           <EmptyFormWithDirector formRef={newFormRef1} />
+          <AdminAdmissionFormProcess
+            ref={admissionFormProcessRef}
+            personId={selectedPerson?.person_id}
+            controlNumber={controlNumbers.admissionFormProcess}
+          />
         </Box>
       )}
 
@@ -1456,8 +1523,7 @@ const ExaminationProfile = () => {
             <Typography variant="h6" sx={{ fontWeight: "bold", color: titleColor, fontSize: "16px" }}>
               Preview — {FORM_OPTIONS.find((o) => o.key === selectedForm)?.label}
             </Typography>
-            <Button variant="outlined" size="small" startIcon={<ArrowBackIcon />} onClick={() => setSelectedForm(null)}
-              sx={{ borderColor: "#bbb", color: "#555" }}>Back to Selection</Button>
+
           </Box>
 
           <Box sx={{ border: "1px solid #ccc", borderRadius: 2, p: 3, backgroundColor: "#fff", overflowX: "auto", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
@@ -1466,6 +1532,13 @@ const ExaminationProfile = () => {
             {selectedForm === "newForm" && <EmptyFormWithDean formRef={{ current: null }} />}
             {selectedForm === "changeCourse1" && <ChangeCourseFormWithDirector formRef={{ current: null }} />}
             {selectedForm === "newForm1" && <EmptyFormWithDirector formRef={{ current: null }} />}
+            {/* ✅ NEW — preview copy needs no functional ref, same as the others above */}
+            {selectedForm === "admissionFormProcess" && (
+              <AdminAdmissionFormProcess
+                personId={selectedPerson?.person_id}
+                controlNumber={controlNumbers.admissionFormProcess}
+              />
+            )}
           </Box>
         </Box>
       )}

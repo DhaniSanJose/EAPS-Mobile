@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -20,6 +20,8 @@ import {
   DialogActions,
   Stack,
   Chip,
+  Checkbox,
+  Select,
 } from "@mui/material";
 import LinearWithValueLabel from "../components/LinearWithValueLabel";
 import { Snackbar, Alert } from "@mui/material";
@@ -37,6 +39,7 @@ import {
   getDepartmentIdsFromAdminData,
   resolveStudentRegistrarScope,
   syncRegistrarScopeFromAdminData,
+  getScopedDepartmentIds 
 } from "../utils/registrarCurriculumRestriction";
 import PersonIcon from "@mui/icons-material/Person";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -47,6 +50,7 @@ import {
   formatStudentDisplayName,
   logBulkCourseEnrollmentHistory,
 } from "../utils/studentHistoryLogs";
+import { CheckBox } from "@mui/icons-material";
 
 /* ─── Design tokens ─── */
 const TOKEN = {
@@ -57,6 +61,12 @@ const TOKEN = {
   gold: "#f59e0b",
   green: "#16a34a",
   greenSoft: "#f0fdf4",
+  otherDeptGreen: "#c8d9ce",
+  otherDeptGreenHover: "#b7ccbf",
+  otherDeptOrange: "#e8c9a8",
+  otherDeptOrangeHover: "#dbb791",
+  otherDeptSectionGray: "#e8eaed",
+  otherDeptSectionGrayHover: "#dde1e6",
   red: "#dc2626",
   redSoft: "#fef2f2",
   orange: "#ea580c",
@@ -428,7 +438,21 @@ const CourseTaggingForCollege = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [confirmDialogMessage, setConfirmDialogMessage] = useState("");
-
+  const [otherDepartmentList, setOtherDepartmentList] = useState([]);
+  const [showOtherDepartmentList, setShowOtherDepartmentList] = useState(true);
+  const [openOtherDeptDialog, setOpenOtherDeptDialog] = useState(false);
+  const [selectedOtherDepartment, setSelectedOtherDepartment] = useState(null);
+  const [grantAccessDialogOpen, setGrantAccessDialogOpen] = useState(false);
+  const [selectedRequestorDepartment, setSelectedRequestorDepartment] = useState(null);
+  const [completeOtherDepList, setCompleteOtherDepList] = useState([]);
+  const [otherDeptCourse, setOtherDeptCourse] = useState([]);
+  const [otherDeptTaggedCourses, setOtherDeptTaggedCourses] = useState([]);
+  const [otherDeptSections, setOtherDeptSections] = useState([]);
+  const [otherDeptDataConfirmation, setOtherDeptDataConfirmation] = useState(false);
+  const [selectedGrantedDept, setSelectedGrantedDept] = useState(null);
+  const [otherDeptCurriculumDialogOpen, setOtherDeptCurriculumDialogOpen] = useState(false);
+  const [selectedOtherDeptCurriculum, setSelectedOtherDeptCurriculum] = useState("");
+  const [otherDeptCurriculumLoading, setOtherDeptCurriculumLoading] = useState(false);
   // ── all original logic (unchanged) ──
   const fetchSubjectCounts = async (sectionId) => {
     try {
@@ -467,6 +491,7 @@ const CourseTaggingForCollege = () => {
 
     const { data } = await axios.get(
       `${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`,
+      { params: { includeOtherCurricula: true } },
     );
     applyEnrolledCourses(data);
     if (selectedSection) await fetchSubjectCounts(selectedSection);
@@ -569,6 +594,265 @@ const CourseTaggingForCollege = () => {
     loadDepartments();
   }, []);
 
+  useEffect(() => {
+    if (departmentLoading) return;
+    const ownIds = departments.length
+      ? departments.map((d) => d.dprtmnt_id)
+      : getScopedDepartmentIds(); 
+    fetchAllAccessibleDepartments(ownIds);
+  }, [departmentLoading, departments]);
+
+  useEffect(() => {
+    fetchCompleteOtherDepList();
+  }, []);
+
+  const fetchAllAccessibleDepartments = async (ownDepartmentIds) => {
+    try {
+      const [deptRes, grantRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/get_department`),
+        axios.get(`${API_BASE_URL}/api/other-departments`, {
+          params: { deptIds: ownDepartmentIds },
+        }),
+      ]);
+
+      const ownIds = new Set(
+        (ownDepartmentIds || []).map((id) => String(id))
+      );
+      const grantedIds = new Set(
+        grantRes.data.map((row) => String(row.request_dept_id)),
+      );
+
+      const merged = new Map();
+
+      // Step 1: add "granted" departments first
+      deptRes.data.forEach((dept) => {
+        if (grantedIds.has(String(dept.dprtmnt_id))) {
+          merged.set(String(dept.dprtmnt_id), { ...dept, accessType: "granted" });
+        }
+      });
+
+      // Step 2: add/overwrite with "own" departments — own takes priority
+      deptRes.data.forEach((dept) => {
+        if (ownIds.has(String(dept.dprtmnt_id))) {
+          merged.set(String(dept.dprtmnt_id), { ...dept, accessType: "own" });
+        }
+      });
+
+      const result = Array.from(merged.values());
+
+      setOtherDepartmentList(result);
+      console.log(result);
+    } catch (err) {
+      console.error("Failed to fetch departments:", err);
+    }
+  };
+
+
+
+  const fetchCompleteOtherDepList = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/get_department`);
+
+      setCompleteOtherDepList(response.data);
+    } catch (err) {
+      console.error("Failed to fetch complete other departments:", err);
+    }
+  }
+
+  const handleShowDepartmentList = (event) => {
+    setShowOtherDepartmentList(event.target.checked);
+  }
+
+  const handleOpenOtherDeptDialog = (department) => {
+    setOpenOtherDeptDialog(true);
+    setSelectedOtherDepartment(department);
+  };
+
+  const handleOpenConfirmationDeptDataDialog = (dep) => {
+    setOtherDeptDataConfirmation(true);
+    setSelectedGrantedDept(dep);
+  }
+
+  const handleGrantAccessDialogOpen = () => {
+    setGrantAccessDialogOpen(true);
+  };
+
+  const handleGrantAccess = async (department) => {
+    if (!department) {
+      setSnack({
+        open: true,
+        message: "No department selected for granting access.",
+        severity: "error",
+      });
+      return;
+    }
+
+    try {
+      await axios.post(`${API_BASE_URL}/api/department/grant-access`, {
+        request_dept_id: selectedOtherDepartment.dprtmnt_id, 
+        requesting_dept_id: department,
+        auditConfig
+      });
+      setSnack({
+        open: true,
+        message: "Access granted successfully.",
+        severity: "success",
+      });
+      setGrantAccessDialogOpen(false);
+      setOpenOtherDeptDialog(false);
+    } catch (err) {
+      console.error("Failed to grant access:", err);
+      setSnack({
+        open: true,
+        message: "Failed to grant access.",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleViewDeptData = async (deptId) => {
+    if (!deptId) return;
+
+    try {
+      setOtherDeptCurriculumLoading(true);
+      setOtherDeptDataConfirmation(false);
+      setSelectedOtherDeptCurriculum("");
+
+      const { data } = await axios.get(
+        `${API_BASE_URL}/api/dprtmnt_curriculum/${deptId}`,
+      );
+      const activeCurricula = (Array.isArray(data) ? data : []).filter(
+        (c) => Number(c.lock_status) === 1,
+      );
+      setOtherDeptCourse(activeCurricula);
+      setOtherDeptCurriculumDialogOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch department curriculum:", err);
+      setOtherDeptCourse([]);
+      setSnack({
+        open: true,
+        message: "Failed to load department curriculum.",
+        severity: "error",
+      });
+    } finally {
+      setOtherDeptCurriculumLoading(false);
+    }
+  };
+
+  const getOtherDeptCurriculumLabel = (curriculum) => {
+    if (!curriculum) return "";
+    const year = curriculum.year_description || "";
+    const code = curriculum.p_code || curriculum.program_code || "";
+    const description =
+      curriculum.p_description || curriculum.program_description || "";
+    const major = curriculum.p_major || curriculum.major || "";
+    return `${year}${code ? `: (${code})` : ""}${description ? ` ${description}` : ""}${major ? ` (${major})` : ""}`.trim();
+  };
+
+  const handleContinueOtherDeptCurriculum = async () => {
+    if (!selectedOtherDeptCurriculum) return;
+
+    const curriculumId = selectedOtherDeptCurriculum;
+    const deptId = selectedGrantedDept?.dprtmnt_id;
+
+    try {
+      setOtherDeptCurriculumLoading(true);
+
+      const [courseRes, sectionRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/courses/${curriculumId}`),
+        deptId
+          ? axios.get(`${API_BASE_URL}/api/department-sections`, {
+              params: { departmentId: deptId },
+            })
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const incomingCourses = Array.isArray(courseRes.data) ? courseRes.data : [];
+      const incomingSections = (
+        Array.isArray(sectionRes.data) ? sectionRes.data : []
+      ).filter((s) => String(s.curriculum_id) === String(curriculumId));
+
+      // Keep other-dept data in separate state so main reload does not wipe it.
+      setOtherDeptTaggedCourses((prev) => {
+        const existingIds = new Set(prev.map((c) => String(c.course_id)));
+        const toAdd = incomingCourses.filter(
+          (c) => !existingIds.has(String(c.course_id)),
+        );
+        return [...prev, ...toAdd];
+      });
+
+      setOtherDeptSections((prev) => {
+        const existingIds = new Set(
+          prev.map((s) => String(s.department_and_program_section_id)),
+        );
+        const toAdd = incomingSections.filter(
+          (s) =>
+            !existingIds.has(String(s.department_and_program_section_id)),
+        );
+        return [...prev, ...toAdd];
+      });
+
+      setOtherDeptCurriculumDialogOpen(false);
+      setSelectedOtherDeptCurriculum("");
+      setSnack({
+        open: true,
+        message: `Courses and sections from ${selectedGrantedDept?.dprtmnt_name || "other department"} loaded.`,
+        severity: "success",
+      });
+    } catch (err) {
+      console.error("Failed to fetch other department courses/sections:", err);
+      setSnack({
+        open: true,
+        message: "Failed to load other department courses or sections.",
+        severity: "error",
+      });
+    } finally {
+      setOtherDeptCurriculumLoading(false);
+    }
+  };
+
+  const availableCourses = useMemo(() => {
+    const existingIds = new Set(courses.map((c) => String(c.course_id)));
+    const extras = otherDeptTaggedCourses.filter(
+      (c) => !existingIds.has(String(c.course_id)),
+    );
+    return [...courses, ...extras];
+  }, [courses, otherDeptTaggedCourses]);
+
+  const otherDeptCourseIds = useMemo(() => {
+    const existingIds = new Set(courses.map((c) => String(c.course_id)));
+    return new Set(
+      otherDeptTaggedCourses
+        .filter((c) => !existingIds.has(String(c.course_id)))
+        .map((c) => String(c.course_id)),
+    );
+  }, [courses, otherDeptTaggedCourses]);
+
+  const availableSections = useMemo(() => {
+    const existingIds = new Set(
+      sections.map((s) => String(s.department_and_program_section_id)),
+    );
+    const extras = otherDeptSections.filter(
+      (s) =>
+        !existingIds.has(String(s.department_and_program_section_id)),
+    );
+    return [...sections, ...extras];
+  }, [sections, otherDeptSections]);
+
+  const otherDeptSectionIds = useMemo(() => {
+    const existingIds = new Set(
+      sections.map((s) => String(s.department_and_program_section_id)),
+    );
+    return new Set(
+      otherDeptSections
+        .filter(
+          (s) =>
+            !existingIds.has(String(s.department_and_program_section_id)),
+        )
+        .map((s) => String(s.department_and_program_section_id)),
+    );
+  }, [sections, otherDeptSections]);
+
   const detectedDepartment = departments.find(
     (dep) => String(dep.dprtmnt_id) === String(selectedDepartment),
   );
@@ -591,6 +875,16 @@ const CourseTaggingForCollege = () => {
   };
 
   const handleSectionChange = async (e) => {
+    const sectionId = e.target.value;
+    const isOtherDeptSection = otherDeptSectionIds.has(String(sectionId));
+
+    // Other-dept sections are view/select only — never change active_curriculum
+    // or rewrite the student's program/curriculum fields.
+    if (isOtherDeptSection || sectionId === "") {
+      setSelectedSection(sectionId);
+      return;
+    }
+
     if (!canEdit) {
       setSnack({
         open: true,
@@ -599,7 +893,7 @@ const CourseTaggingForCollege = () => {
       });
       return;
     }
-    const sectionId = e.target.value;
+
     setSelectedSection(sectionId);
     try {
       await axios.put(`${API_BASE_URL}/api/update-active-curriculum`, {
@@ -677,7 +971,7 @@ const CourseTaggingForCollege = () => {
 
   useEffect(() => {
     const computePrereqStatus = async () => {
-      if (!userId || courses.length === 0 || !currId) {
+      if (!userId || availableCourses.length === 0 || !currId) {
         setPrereqMap({});
         return;
       }
@@ -688,7 +982,7 @@ const CourseTaggingForCollege = () => {
           {
             student_number: userId,
             curriculum_id: currId,
-            courses: courses.map((course) => ({
+            courses: availableCourses.map((course) => ({
               course_id: course.course_id,
               semester_id: course.semester_id,
             })),
@@ -696,7 +990,7 @@ const CourseTaggingForCollege = () => {
         );
 
         const map = {};
-        for (const course of courses) {
+        for (const course of availableCourses) {
           const result = data.results?.[String(course.course_id)];
           if (!result) continue;
           map[course.course_id] = {
@@ -712,7 +1006,7 @@ const CourseTaggingForCollege = () => {
     };
 
     computePrereqStatus();
-  }, [userId, courses, currId]);
+  }, [userId, availableCourses, currId]);
 
   const addToCart = async (course) => {
     if (!canCreate) {
@@ -720,15 +1014,6 @@ const CourseTaggingForCollege = () => {
         open: true,
         message: "You do not have permission to enroll subjects.",
         severity: "error",
-      });
-      return;
-    }
-    if (!selectedSection) {
-      setSnack({
-        open: true,
-        message:
-          "Please select a department section before enrolling in a course.",
-        severity: "warning",
       });
       return;
     }
@@ -741,6 +1026,69 @@ const CourseTaggingForCollege = () => {
       return;
     }
     if (isEnrolled(course.course_id)) return;
+
+    const isOtherDeptCourse = otherDeptCourseIds.has(String(course.course_id));
+
+    if (isOtherDeptCourse) {
+      if (
+        !selectedSection ||
+        !otherDeptSectionIds.has(String(selectedSection))
+      ) {
+        setSnack({
+          open: true,
+          message:
+            "Please select an other department section before enrolling this course.",
+          severity: "warning",
+        });
+        return;
+      }
+
+      if (!course.curriculum_id) {
+        setSnack({
+          open: true,
+          message: "Missing curriculum for this other department course.",
+          severity: "error",
+        });
+        return;
+      }
+
+      try {
+        await axios.post(
+          `${API_BASE_URL}/api/add-other-department-enrolled-course/${userId}`,
+          {
+            subject_id: course.course_id,
+            department_section_id: selectedSection,
+            curriculum_id: course.curriculum_id,
+          },
+          auditConfig,
+        );
+        await refreshEnrolledCourses();
+        if (selectedSection) await fetchSubjectCounts(selectedSection);
+        setSnack({
+          open: true,
+          message: `Enrolled ${course.course_code} successfully.`,
+          severity: "success",
+        });
+      } catch (err) {
+        setSnack({
+          open: true,
+          message: "Error enrolling in this course. Please try again.",
+          severity: "error",
+        });
+      }
+      return;
+    }
+
+    if (!selectedSection) {
+      setSnack({
+        open: true,
+        message:
+          "Please select a department section before enrolling in a course.",
+        severity: "warning",
+      });
+      return;
+    }
+
     const payload = {
       subject_id: course.course_id,
       department_section_id: selectedSection,
@@ -797,7 +1145,7 @@ const CourseTaggingForCollege = () => {
   };
 
   const getSelectedSectionLabel = () => {
-    const section = sections.find(
+    const section = availableSections.find(
       (item) =>
         String(item.department_and_program_section_id) ===
         String(selectedSection),
@@ -818,7 +1166,7 @@ const CourseTaggingForCollege = () => {
       });
       return;
     }
-    const newCourses = courses.filter(
+    const newCourses = availableCourses.filter(
       (c) =>
         !isEnrolled(c.course_id) &&
         Number(c.year_level_id) === Number(yearLevelId) &&
@@ -931,6 +1279,8 @@ const CourseTaggingForCollege = () => {
         setUserId(null);
         setCurr(null);
         setCourses([]);
+        setOtherDeptTaggedCourses([]);
+        setOtherDeptSections([]);
         setEnrolled([]);
         setIsEnrolled(false);
         setCurriculumYear("");
@@ -1006,6 +1356,8 @@ const CourseTaggingForCollege = () => {
       setUserId(null);
       setCurr(null);
       setCourses([]);
+      setOtherDeptTaggedCourses([]);
+      setOtherDeptSections([]);
       setEnrolled([]);
       setIsEnrolled(false);
       setCurriculumYear("");
@@ -1035,6 +1387,8 @@ const CourseTaggingForCollege = () => {
     setUserId(null);
     setCurr(null);
     setCourses([]);
+    setOtherDeptTaggedCourses([]);
+    setOtherDeptSections([]);
     setEnrolled([]);
     setIsEnrolled(false);
     axios
@@ -1103,20 +1457,64 @@ const CourseTaggingForCollege = () => {
 
   const getCourseRowSx = (course) => {
     const status = prereqMap[course.course_id];
-    if (!status) return {};
-    if (!status.hasPrereq || status.allowed)
+    const isOtherDept = otherDeptCourseIds.has(String(course.course_id));
+    const hasListedPrereq = Boolean(
+      course.prereq && String(course.prereq).trim(),
+    );
+
+    // Orange category:
+    // 1) API says unmet prerequisite, OR
+    // 2) other-dept course has a listed prereq but batch check didn't
+    //    recognize it (e.g. description text → hasPrereq:false / allowed)
+    const isOrangeCategory =
+      (status?.hasPrereq && !status.allowed) ||
+      (isOtherDept &&
+        hasListedPrereq &&
+        !(status?.hasPrereq && status?.allowed));
+
+    if (isOrangeCategory) {
+      return isOtherDept
+        ? {
+            backgroundColor: TOKEN.otherDeptOrange,
+            "&:hover": { backgroundColor: TOKEN.otherDeptOrangeHover },
+          }
+        : {
+            backgroundColor: TOKEN.orangeSoft,
+            "&:hover": { backgroundColor: "#fed7aa" },
+          };
+    }
+
+    if (isOtherDept) {
       return {
-        backgroundColor: TOKEN.greenSoft,
-        "&:hover": { backgroundColor: "#dcfce7" },
+        backgroundColor: TOKEN.otherDeptGreen,
+        "&:hover": { backgroundColor: TOKEN.otherDeptGreenHover },
       };
+    }
+
+    if (!status) return {};
     return {
-      backgroundColor: TOKEN.orangeSoft,
-      "&:hover": { backgroundColor: "#fed7aa" },
+      backgroundColor: TOKEN.greenSoft,
+      "&:hover": { backgroundColor: "#dcfce7" },
     };
   };
 
   const handleEnrollClick = async (course) => {
-    if (!selectedSection) {
+    const isOtherDeptCourse = otherDeptCourseIds.has(String(course.course_id));
+
+    if (isOtherDeptCourse) {
+      if (
+        !selectedSection ||
+        !otherDeptSectionIds.has(String(selectedSection))
+      ) {
+        setSnack({
+          open: true,
+          message:
+            "Please select an other department section before enrolling this course.",
+          severity: "warning",
+        });
+        return;
+      }
+    } else if (!selectedSection) {
       setSnack({
         open: true,
         message:
@@ -1125,6 +1523,7 @@ const CourseTaggingForCollege = () => {
       });
       return;
     }
+
     if (!userId) {
       setSnack({
         open: true,
@@ -1167,7 +1566,7 @@ const CourseTaggingForCollege = () => {
       });
       return;
     }
-    const newCourses = courses.filter(
+    const newCourses = availableCourses.filter(
       (c) =>
         !isEnrolled(c.course_id) &&
         Number(c.year_level_id) === Number(yearLevelId) &&
@@ -1471,6 +1870,65 @@ const CourseTaggingForCollege = () => {
             Available Courses
           </SectionHeader>
 
+          <Box sx={{display: "flex", alignItems: "center", justifyContent: "flex-start"}}>
+            <Checkbox
+              checked={showOtherDepartmentList}
+              onChange={handleShowDepartmentList}
+              sx={{ ml: 2, mt: 1 }}
+            />
+            <Typography sx={{mt: 1 }}>Show Other Department</Typography>
+          </Box>
+
+          {showOtherDepartmentList && (
+            <Box sx={{ p: 2, borderBottom: `1px solid ${TOKEN.border}` }}>
+              {otherDepartmentList.length > 0 ? (
+                <Stack
+                  direction="row"
+                  useFlexGap
+                  sx={{
+                    flexWrap: {
+                      xs: "wrap",
+                      sm: "wrap",
+                      md: "nowrap",
+                    },
+                    gap: 2,
+                  }}
+
+                >
+                  {otherDepartmentList.map((dep) => (
+                    <Typography
+                      onClick={() =>
+                        dep.accessType === "own"
+                          ? handleOpenOtherDeptDialog(dep)
+                          : handleOpenConfirmationDeptDataDialog(dep)
+                      }
+                      sx={{
+                        width: "100%",
+                        padding: "4px 9px",
+                        background: dep.accessType === "own" ? "maroon" : "#163600",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                      }}
+                      key={dep.dprtmnt_id}
+                    >
+                      {dep.dprtmnt_code}
+                      {dep.accessType === "granted" && (
+                        <span style={{ fontSize: "10px", marginLeft: 6, opacity: 0.85, }}>
+                          (Granted Access)
+                        </span>
+                      )}
+                    </Typography>
+                  ))}
+                </Stack>
+              ) : (
+                <Typography>No other departments available.</Typography>
+              )}
+            </Box>
+          )}
+
           {/* Student search */}
           <Box
             sx={{
@@ -1640,7 +2098,7 @@ const CourseTaggingForCollege = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {courses
+                {availableCourses
                   .filter((c) => {
                     const text = searchQuery.toLowerCase();
                     return (
@@ -1741,7 +2199,7 @@ const CourseTaggingForCollege = () => {
                       </StyledTd>
                     </TableRow>
                   ))}
-                {courses.length === 0 && (
+                {availableCourses.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={7}
@@ -1872,27 +2330,51 @@ const CourseTaggingForCollege = () => {
                 <MenuItem value="">
                   <em>Select a department section</em>
                 </MenuItem>
-                {sections.map((section) => (
-                  <MenuItem
-                    key={section.department_and_program_section_id}
-                    value={section.department_and_program_section_id}
-                    sx={{ fontSize: "13px" }}
-                  >
-                    <strong>
-                      {cleanDisplayValue(section.program_code)
-                        ? `(${cleanDisplayValue(section.program_code)})`
+                {availableSections.map((section) => {
+                  const isOtherDeptSection = otherDeptSectionIds.has(
+                    String(section.department_and_program_section_id),
+                  );
+                  return (
+                    <MenuItem
+                      key={section.department_and_program_section_id}
+                      value={section.department_and_program_section_id}
+                      sx={{
+                        fontSize: "13px",
+                        ...(isOtherDeptSection
+                          ? {
+                              backgroundColor: TOKEN.otherDeptSectionGray,
+                              "&:hover": {
+                                backgroundColor: TOKEN.otherDeptSectionGrayHover,
+                              },
+                              "&.Mui-selected": {
+                                backgroundColor: TOKEN.otherDeptSectionGrayHover,
+                              },
+                              "&.Mui-selected:hover": {
+                                backgroundColor: TOKEN.otherDeptSectionGrayHover,
+                              },
+                            }
+                          : {}),
+                      }}
+                    >
+                      <strong>
+                        {cleanDisplayValue(section.program_code)
+                          ? `(${cleanDisplayValue(section.program_code)})`
+                          : ""}
+                      </strong>
+                      &nbsp;
+                      {joinDisplayValues(
+                        section.program_description,
+                        section.major,
+                      )}
+                      {cleanDisplayValue(section.description)
+                        ? ` — ${cleanDisplayValue(section.description)}`
                         : ""}
-                    </strong>
-                    &nbsp;
-                    {joinDisplayValues(
-                      section.program_description,
-                      section.major,
-                    )}
-                    {cleanDisplayValue(section.description)
-                      ? ` — ${cleanDisplayValue(section.description)}`
-                      : ""}
-                  </MenuItem>
-                ))}
+                      {isOtherDeptSection
+                        ? ` [${cleanDisplayValue(section.dprtmnt_code) || "Other Dept"}]`
+                        : ""}
+                    </MenuItem>
+                  );
+                })}
               </TextField>
             )}
 
@@ -1989,12 +2471,24 @@ const CourseTaggingForCollege = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {enrolled.map((e, idx) => (
+                {enrolled.map((e, idx) => {
+                  const isOtherDeptEnrolled =
+                    currId != null &&
+                    e.curriculum_id != null &&
+                    String(e.curriculum_id) !== String(currId);
+
+                  return (
                   <TableRow
-                    key={idx}
+                    key={e.id ?? idx}
                     sx={{
-                      "&:nth-of-type(even)": { backgroundColor: "#f8fafc" },
-                      "&:hover": { backgroundColor: TOKEN.accentSoft },
+                      backgroundColor: isOtherDeptEnrolled
+                        ? TOKEN.otherDeptSectionGray
+                        : TOKEN.surface,
+                      "&:hover": {
+                        backgroundColor: isOtherDeptEnrolled
+                          ? TOKEN.otherDeptSectionGrayHover
+                          : TOKEN.accentSoft,
+                      },
                       transition: "background-color .1s",
                     }}
                   >
@@ -2061,7 +2555,8 @@ const CourseTaggingForCollege = () => {
                       </Button>
                     </StyledTd>
                   </TableRow>
-                ))}
+                  );
+                })}
                 {enrolled.length === 0 && (
                   <TableRow>
                     <TableCell
@@ -2193,6 +2688,319 @@ const CourseTaggingForCollege = () => {
             }}
           >
             Yes, Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── OTHER DEPARTMENT REQUEST FORM ── */}
+      <Dialog
+        open={openOtherDeptDialog}
+        onClose={() => setOpenOtherDeptDialog(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { boxShadow: TOKEN.shadowMd } }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "15px",
+            py: 2,
+          }}
+        >
+          ⚠ Grant Access Permission to Other Department
+        </DialogTitle>
+        <DialogContent
+          sx={{
+            marginTop: 4,
+            whiteSpace: "pre-line",
+            color: TOKEN.text,
+            fontSize: "13px",
+            lineHeight: 1.7,
+          }}
+        >
+          <Box>
+            <Typography sx={{ mb: 1.5, fontSize: "13px" }}>
+              Requested Department: <strong>{selectedOtherDepartment?.dprtmnt_name}</strong>
+            </Typography>
+            <Typography sx={{ mb: 1.5, fontSize: "13px" }}>
+              Select the department requesting access            
+            </Typography>
+            <Select
+              value={selectedRequestorDepartment}
+              onChange={(e) => setSelectedRequestorDepartment(e.target.value)}
+              displayEmpty
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="" disabled>
+                Select a department
+              </MenuItem>
+              {completeOtherDepList.map((dept) => (
+                <MenuItem key={dept.dprtmnt_id} value={dept}>
+                  {dept.dprtmnt_name}
+                </MenuItem>
+              ))}
+            </Select>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            variant="outlined"
+            sx={{
+              borderColor: TOKEN.red,
+              color: TOKEN.red,
+              fontWeight: 700,
+              textTransform: "none",
+              "&:hover": { backgroundColor: TOKEN.redSoft },
+            }}
+          onClick={() => setOpenOtherDeptDialog(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={() => handleGrantAccessDialogOpen(selectedRequestorDepartment)}
+            sx={{
+              backgroundColor: TOKEN.accent,
+              color: "#fff",
+              fontWeight: 700,
+              textTransform: "none",
+              boxShadow: "none",
+              "&:hover": {
+                backgroundColor: TOKEN.accentHover,
+                boxShadow: "none",
+              },
+            }}
+          >
+            Grant Access
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── OTHER DEPARTMENT CONFIRMATION DIALOG ── */}
+      <Dialog
+        open={grantAccessDialogOpen}
+        onClose={() => setGrantAccessDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { boxShadow: TOKEN.shadowMd } }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "15px",
+            py: 2,
+          }}
+        >
+          ⚠ Grant Access Permission to Other Department
+        </DialogTitle>
+        <DialogContent
+          sx={{
+            marginTop: 4,
+            whiteSpace: "pre-line",
+            color: TOKEN.text,
+            fontSize: "13px",
+            lineHeight: 1.7,
+          }}
+        >
+          <DialogContentText>
+            Are you sure you want to grant access permission to the department {selectedOtherDepartment?.dprtmnt_name}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            variant="outlined"
+            sx={{
+              borderColor: TOKEN.red,
+              color: TOKEN.red,
+              fontWeight: 700,
+              textTransform: "none",
+              "&:hover": { backgroundColor: TOKEN.redSoft },
+            }}
+          onClick={() => setGrantAccessDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={() => handleGrantAccess(selectedRequestorDepartment.dprtmnt_id)}
+            sx={{
+              backgroundColor: TOKEN.accent,
+              color: "#fff",
+              fontWeight: 700,
+              textTransform: "none",
+              boxShadow: "none",
+              "&:hover": {
+                backgroundColor: TOKEN.accentHover,
+                boxShadow: "none",
+              },
+            }}
+          >
+            Yes, Grant Access
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={otherDeptDataConfirmation}
+        onClose={() => setOtherDeptDataConfirmation(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { boxShadow: TOKEN.shadowMd } }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "15px",
+            py: 2,
+          }}
+        >
+          ⚠ Access Data of Other Department
+        </DialogTitle>
+        <DialogContent
+          sx={{
+            marginTop: 4,
+            whiteSpace: "pre-line",
+            color: TOKEN.text,
+            fontSize: "13px",
+            lineHeight: 1.7,
+          }}
+        >
+          <DialogContentText>
+            Do you want to display the courses and section of the {selectedGrantedDept?.dprtmnt_name}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            variant="outlined"
+            sx={{
+              borderColor: TOKEN.red,
+              color: TOKEN.red,
+              fontWeight: 700,
+              textTransform: "none",
+              "&:hover": { backgroundColor: TOKEN.redSoft },
+            }}
+          onClick={() => setOtherDeptDataConfirmation(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            disabled={otherDeptCurriculumLoading || !selectedGrantedDept?.dprtmnt_id}
+            onClick={() => handleViewDeptData(selectedGrantedDept?.dprtmnt_id)}
+            sx={{
+              backgroundColor: TOKEN.accent,
+              color: "#fff",
+              fontWeight: 700,
+              textTransform: "none",
+              boxShadow: "none",
+              "&:hover": {
+                backgroundColor: TOKEN.accentHover,
+                boxShadow: "none",
+              },
+            }}
+          >
+            {otherDeptCurriculumLoading ? "Loading..." : "Yes, Continue"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── OTHER DEPARTMENT CURRICULUM SELECT ── */}
+      <Dialog
+        open={otherDeptCurriculumDialogOpen}
+        onClose={() => setOtherDeptCurriculumDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { boxShadow: TOKEN.shadowMd } }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "15px",
+            py: 2,
+          }}
+        >
+          Select Curriculum — {selectedGrantedDept?.dprtmnt_name}
+        </DialogTitle>
+        <DialogContent
+          sx={{
+            marginTop: 4,
+            whiteSpace: "pre-line",
+            color: TOKEN.text,
+            fontSize: "13px",
+            lineHeight: 1.7,
+          }}
+        >
+          <Box>
+            <Typography sx={{ mb: 1.5, fontSize: "13px" }}>
+              Select a curriculum from{" "}
+              <strong>{selectedGrantedDept?.dprtmnt_name}</strong>
+            </Typography>
+            <Select
+              value={selectedOtherDeptCurriculum}
+              onChange={(e) => setSelectedOtherDeptCurriculum(e.target.value)}
+              displayEmpty
+              fullWidth
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="" disabled>
+                Select a curriculum
+              </MenuItem>
+              {otherDeptCourse.length === 0 ? (
+                <MenuItem value="__none" disabled>
+                  No curriculum found for this department
+                </MenuItem>
+              ) : (
+                otherDeptCourse.map((curriculum) => (
+                  <MenuItem
+                    key={curriculum.dprtmnt_curriculum_id || curriculum.curriculum_id}
+                    value={curriculum.curriculum_id}
+                  >
+                    {getOtherDeptCurriculumLabel(curriculum)}
+                  </MenuItem>
+                ))
+              )}
+            </Select>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="outlined"
+            sx={{
+              borderColor: TOKEN.red,
+              color: TOKEN.red,
+              fontWeight: 700,
+              textTransform: "none",
+              "&:hover": { backgroundColor: TOKEN.redSoft },
+            }}
+            onClick={() => {
+              setOtherDeptCurriculumDialogOpen(false);
+              setSelectedOtherDeptCurriculum("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!selectedOtherDeptCurriculum || otherDeptCurriculumLoading}
+            onClick={handleContinueOtherDeptCurriculum}
+            sx={{
+              backgroundColor: TOKEN.accent,
+              color: "#fff",
+              fontWeight: 700,
+              textTransform: "none",
+              boxShadow: "none",
+              "&:hover": {
+                backgroundColor: TOKEN.accentHover,
+                boxShadow: "none",
+              },
+            }}
+          >
+            {otherDeptCurriculumLoading ? "Loading..." : "Continue"}
           </Button>
         </DialogActions>
       </Dialog>

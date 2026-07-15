@@ -225,9 +225,10 @@ function buildStyles(s = {}, hasDept = true, collapsed = false, isMobile = false
 .sb-item.active .sb-icon { color:#fff !important; }
 .sb-item-label {
   flex:1; min-width:0;
-  white-space:normal;
+  white-space:${effectiveCollapsed ? "nowrap" : "normal"};
   word-break:break-word;
-  overflow:visible;
+  overflow:${effectiveCollapsed ? "hidden" : "visible"};
+  max-height:${effectiveCollapsed ? "0" : "200px"};
   max-width:${effectiveCollapsed ? "0" : "190px"};
   opacity:${effectiveCollapsed ? "0" : "1"};
   transform:translateX(${effectiveCollapsed ? "-6px" : "0"});
@@ -253,9 +254,10 @@ function buildStyles(s = {}, hasDept = true, collapsed = false, isMobile = false
 .sb-group-btn.open .sb-icon { color:${accent}; }
 .sb-group-label {
   flex:1; min-width:0;
-  white-space:normal;
+  white-space:${effectiveCollapsed ? "nowrap" : "normal"};
   word-break:break-word;
-  overflow:visible;
+  overflow:${effectiveCollapsed ? "hidden" : "visible"};
+  max-height:${effectiveCollapsed ? "0" : "200px"};
   max-width:${effectiveCollapsed ? "0" : "190px"};
   opacity:${effectiveCollapsed ? "0" : "1"};
   transform:translateX(${effectiveCollapsed ? "-6px" : "0"});

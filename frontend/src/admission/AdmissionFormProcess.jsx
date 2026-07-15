@@ -12,27 +12,28 @@ import { QRCodeSVG } from "qrcode.react";
 import DownloadIcon from "@mui/icons-material/Download";
 
 const AdminAdmissionFormProcess = forwardRef((props, ref) => {
+  const { personId: personIdProp, controlNumber: controlNumberProp } = props;
   const settings = useContext(SettingsContext);
+  const [ownControlNumber, setOwnControlNumber] = useState(null);
+  const controlNumber = controlNumberProp ?? ownControlNumber;
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
+  const [stepperColor, setStepperColor] = useState("#000000");
 
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
   const [shortTerm, setShortTerm] = useState("");
   const [branches, setBranches] = useState([]);
 
-  // ✅ PDF generation state
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
 
-    // 🎨 Colors
     if (settings.title_color) setTitleColor(settings.title_color);
     if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
@@ -40,18 +41,15 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
     if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
     if (settings.stepper_color) setStepperColor(settings.stepper_color);
 
-    // 🏫 Logo
     if (settings.logo_url) {
       setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
-    // 🏷️ School Info
     if (settings.company_name) setCompanyName(settings.company_name);
     if (settings.short_term) setShortTerm(settings.short_term);
 
-    // ✅ Branches (JSON stored in DB)
     if (settings.branches) {
       setBranches(
         typeof settings.branches === "string"
@@ -71,7 +69,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
   const [person, setPerson] = useState({
-
     profile_img: "",
     campus: "",
     academicProgram: "",
@@ -151,11 +148,10 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
   }, [settings, branches, person?.campus]);
 
 
-  // ✅ Fetch person data from backend
   const fetchPersonData = async (id) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
-      setPerson(res.data); // make sure backend returns the correct format
+      setPerson(res.data);
     } catch (error) {
       console.error("Failed to fetch person:", error);
     }
@@ -184,16 +180,18 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
       return;
     }
 
-    // ⭐ ONLY LOAD IF URL HAS ?person_id=
-    if (queryPersonId && queryPersonId.trim() !== "") {
-      setUserID(queryPersonId);
-      fetchPersonData(queryPersonId);
+    // ⬅️ prefer the id passed in from a parent (e.g. ExaminationProfile),
+    // fall back to the query string for the standalone page.
+    const effectivePersonId = personIdProp || queryPersonId;
+
+    if (effectivePersonId && String(effectivePersonId).trim() !== "") {
+      setUserID(effectivePersonId);
+      fetchPersonData(effectivePersonId);
     } else {
-      // CLEAR — do not load any old data
       setUserID("");
       setPerson({});
     }
-  }, [queryPersonId]);
+  }, [queryPersonId, personIdProp]); // ⬅️ add personIdProp to deps
 
 
 
@@ -205,11 +203,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
     const updateDates = () => {
       const now = new Date();
 
-      // Format 1: MM/DD/YYYY
       const formattedShort = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}/${now.getFullYear()}`;
       setShortDate(formattedShort);
 
-      // Format 2: MM DD, YYYY hh:mm:ss AM/PM
       const day = String(now.getDate()).padStart(2, "0");
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const year = now.getFullYear();
@@ -217,21 +213,24 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
       const minutes = String(now.getMinutes()).padStart(2, "0");
       const seconds = String(now.getSeconds()).padStart(2, "0");
       const ampm = now.getHours() >= 12 ? "PM" : "AM";
-
-
     };
 
-    updateDates(); // Set initial values
-    const interval = setInterval(updateDates, 1000); // Update every second
+    updateDates();
+    const interval = setInterval(updateDates, 1000);
 
-    return () => clearInterval(interval); // Cleanup on unmount
+    return () => clearInterval(interval);
   }, []);
 
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
-    const divToPrint = divToPrintRef.current;
-    if (divToPrint) {
+  useImperativeHandle(ref, () => divToPrintRef.current, []);
+
+  const printDiv = async () => {
+    await fetchOwnControlNumber("print");
+    setTimeout(() => {
+      const divToPrint = divToPrintRef.current;
+      if (!divToPrint) return console.error("divToPrintRef is not set.");
+
       const newWin = window.open("", "Print-Window");
       newWin.document.open();
       newWin.document.write(`
@@ -263,10 +262,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
               width: 100%;
               height: auto;
               padding: 10px 20px;
-
-              /* 🔹 Apply 10% zoom out */
               transform: scale(0.88);
-          
             }
 
             .student-table {
@@ -296,19 +292,25 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
       </html>
     `);
       newWin.document.close();
-    } else {
-      console.error("divToPrintRef is not set.");
+    }, 200);
+  };
+
+  const fetchOwnControlNumber = async (actionType) => {
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/generate-control-number`, {
+        form_type: "admissionFormProcess",
+        applicant_number: person?.applicant_number,
+        person_id: userID,
+        action_type: actionType,
+      });
+      setOwnControlNumber(res.data.control_number);
+      return res.data.control_number;
+    } catch (err) {
+      console.error("Failed to generate control number:", err);
+      return null;
     }
   };
 
-  // ✅ Download PDF — sends this form's HTML to the backend, which uses
-  // Puppeteer (same pattern as your existing /api/generate-cor-pdf route)
-  // to render it with the real print CSS and return an actual PDF file.
-  // Because the response comes back as a blob and we trigger the download
-  // via a hidden <a download> link, this saves straight to the Downloads
-  // folder — no print dialog, no "choose destination" step — and the
-  // layout matches the print preview exactly since Puppeteer uses the
-  // same Chromium rendering engine.
   const downloadPDF = async () => {
     const divToPrint = divToPrintRef.current;
     if (!divToPrint) {
@@ -376,10 +378,8 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
 
   }
 
-  // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
   document.addEventListener("keydown", (e) => {
     const isBlockedKey =
       e.key === "F12" ||
@@ -395,7 +395,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
       e.stopPropagation();
     }
   });
-
   return (
     <Box
       sx={{
@@ -407,97 +406,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
         padding: 2,
       }}
     >
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          mb: 2,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: titleColor,
-            fontSize: "36px",
-          }}
-        >
-          ADMISSION FORM (PROCESS)
-        </Typography>
-      </Box>
-
-      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
-
-      <Box sx={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        <button
-          onClick={printDiv}
-          style={{
-            marginBottom: "1rem",
-            padding: "10px 20px",
-            border: "2px solid black",
-            backgroundColor: "#f0f0f0",
-            color: "black",
-            borderRadius: "5px",
-            marginTop: "20px",
-            cursor: "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-            transition: "background-color 0.3s, transform 0.2s",
-          }}
-          onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-          onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-          onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <FcPrint size={20} />
-            Print Admission Form
-          </span>
-        </button>
-
-        {/* ✅ Download PDF button */}
-        <button
-          onClick={downloadPDF}
-          disabled={generatingPdf}
-          style={{
-            marginBottom: "1rem",
-            padding: "10px 20px",
-            border: `2px solid ${borderColor}`,
-            backgroundColor: generatingPdf ? "#cfd8dc" : mainButtonColor,
-            color: "#fff",
-            borderRadius: "5px",
-            marginTop: "20px",
-            cursor: generatingPdf ? "not-allowed" : "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-            transition: "background-color 0.3s, transform 0.2s",
-          }}
-          onMouseDown={(e) => {
-            if (!generatingPdf) e.target.style.transform = "scale(0.95)";
-          }}
-          onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-        >
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <DownloadIcon sx={{ fontSize: 20 }} />
-            {generatingPdf ? "Generating PDF..." : "Download PDF"}
-          </span>
-        </button>
-      </Box>
 
       <Container>
         <div ref={divToPrintRef} style={{ marginBottom: "10%" }}>
@@ -505,7 +413,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
             <div
               className="student-table"
               style={{
-                width: "8in", // matches table width assuming 8in for 40 columns
+                width: "8in",
                 maxWidth: "100%",
                 margin: "0 auto",
 
@@ -517,27 +425,19 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between", // spread logo, text, profile+QR
+                  justifyContent: "space-between",
                   flexWrap: "nowrap",
                 }}
               >
-                {/* Logo (Left Side) */}
                 <div style={{ flexShrink: 0 }}>
-                  <img
-                    src={fetchedLogo}
-                    alt="School Logo"
-                    style={{
-                      width: "120px",
-                      height: "120px",
-                      objectFit: "cover",
-                      marginLeft: "10px",
-                      marginTop: "-25px",
-                      borderRadius: "50%", // ✅ Makes it perfectly circular
-                    }}
-                  />
+                  <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+                  {controlNumber && (
+                    <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+                      Document No.: {controlNumber}
+                    </div>
+                  )}
                 </div>
 
-                {/* Text Block (Center) */}
                 <div
                   style={{
                     flexGrow: 1,
@@ -606,14 +506,13 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   </div>
                 </div>
 
-                {/* Profile + QR Code (Right Side) */}
                 <div
                   style={{
                     display: "flex",
-                    flexDirection: "row", // ✅ side by side
+                    flexDirection: "row",
                     alignItems: "center",
                     marginRight: "10px",
-                    gap: "10px", // ✅ 10px space between them
+                    gap: "10px",
                   }}
                 >
                   <div
@@ -623,10 +522,10 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
-                      border: "1px solid black", // ✅ same border as profile_img
-                      background: "#fff", // ✅ same background
+                      border: "1px solid black",
+                      background: "#fff",
                       flexShrink: 0,
-                      position: "relative", // ✅ needed for overlay text
+                      position: "relative",
                     }}
                   >
                     {person?.qr_code ? (
@@ -643,7 +542,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                       />
                     )}
 
-                    {/* Overlay applicant_number in middle */}
                     <div
                       style={{
                         position: "absolute",
@@ -676,8 +574,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
             }}
           >
             <tbody>
-              {/* Name of Student Row */}
-              {/* Name of Student Row */}
               <tr>
                 <td
                   colSpan={40}
@@ -755,7 +651,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Labels Row */}
               <tr>
                 <td
                   colSpan={40}
@@ -788,7 +683,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Email & Applicant ID */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={20}>
                   <div
@@ -847,14 +741,13 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                       }}
                     >
                       <div style={{ marginTop: "-3px" }} className="dataField">
-                        {person.emailAddress}
+                        {person.applicant_number}
                       </div>
                     </span>
                   </div>
                 </td>
               </tr>
 
-              {/* Permanent Address */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={40}>
                   <div
@@ -892,7 +785,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Cellphone No, Civil Status, Gender */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={13}>
                   <div
@@ -994,7 +886,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Date of Birth, Place of Birth, Age */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={13}>
                   <div
@@ -1050,7 +941,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                         flex: 1,
                         borderBottom: "1px solid black",
                         fontSize: "12px",
-                        minWidth: 0, // important for flex items
+                        minWidth: 0,
                         whiteSpace: "normal",
                         overflowWrap: "break-word",
                         wordBreak: "break-word",
@@ -1096,7 +987,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
               </tr>
 
               <tr style={{ fontSize: "12px" }}>
-                {/* Please Check */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -1122,12 +1012,10 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                         display: "inline-block",
                       }}
                     >
-                      {/* left blank intentionally */}
                     </span>
                   </div>
                 </td>
 
-                {/* Freshman */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -1165,7 +1053,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   </div>
                 </td>
 
-                {/* Transferee */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -1205,7 +1092,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   </div>
                 </td>
 
-                {/* Others */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -1242,7 +1128,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Last School Attended */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={40}>
                   <div
@@ -1277,7 +1162,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Degree/Program & Major */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={25} style={{ verticalAlign: "top" }}>
                   <div
@@ -1301,8 +1185,8 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                         flexGrow: 1,
                         borderBottom: "1px solid black",
                         minHeight: "1.2em",
-                        whiteSpace: "normal", // allow text wrapping
-                        wordWrap: "break-word", // break long words
+                        whiteSpace: "normal",
+                        wordWrap: "break-word",
                         lineHeight: "1.4em",
                         paddingBottom: "2px",
                       }}
@@ -1369,7 +1253,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   style={{
                     height: "0.2in",
                     fontSize: "72.5%",
-                    color: "white", // This is just a fallback; overridden below
+                    color: "white",
                   }}
                 >
                   <div
@@ -1460,9 +1344,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -1505,9 +1389,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -1599,9 +1483,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -1629,9 +1513,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -1663,13 +1547,17 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 >
                   <div
                     style={{
-                      fontWeight: "normal",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: "10px",
                       fontSize: "12px",
                       color: "black",
-                      textAlign: "right",
+                      fontWeight: "normal",
                     }}
                   >
-                    Registrar's Copy
+                    <span>{settings?.short_term || shortTerm}-QSF-AS-001 Rev. 00 (7.3.25)</span>
+                    <span>Registrar's Copy</span>
                   </div>
                 </td>
               </tr>
@@ -1689,7 +1577,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
           <Container>
             <div
               style={{
-                width: "8in", // matches table width assuming 8in for 40 columns
+                width: "8in",
                 maxWidth: "100%",
                 margin: "0 auto",
 
@@ -1701,27 +1589,19 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between", // spread logo, text, profile+QR
+                  justifyContent: "space-between",
                   flexWrap: "nowrap",
                 }}
               >
-                {/* Logo (Left Side) */}
                 <div style={{ flexShrink: 0 }}>
-                  <img
-                    src={fetchedLogo}
-                    alt="School Logo"
-                    style={{
-                      width: "120px",
-                      height: "120px",
-                      objectFit: "cover",
-                      marginLeft: "10px",
-                      marginTop: "-25px",
-                      borderRadius: "50%", // ✅ Makes it perfectly circular
-                    }}
-                  />
+                  <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+                  {controlNumber && (
+                    <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+                      Document No.: {controlNumber}
+                    </div>
+                  )}
                 </div>
 
-                {/* Text Block (Center) */}
                 <div
                   style={{
                     flexGrow: 1,
@@ -1792,14 +1672,13 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   </div>
                 </div>
 
-                {/* Profile + QR Code (Right Side) */}
                 <div
                   style={{
                     display: "flex",
-                    flexDirection: "row", // ✅ side by side
+                    flexDirection: "row",
                     alignItems: "center",
                     marginRight: "10px",
-                    gap: "10px", // ✅ 10px space between them
+                    gap: "10px",
                   }}
                 >
                   <div
@@ -1809,10 +1688,10 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
-                      border: "1px solid black", // ✅ same border as profile_img
-                      background: "#fff", // ✅ same background
+                      border: "1px solid black",
+                      background: "#fff",
                       flexShrink: 0,
-                      position: "relative", // ✅ needed for overlay text
+                      position: "relative",
                     }}
                   >
                     {person?.qr_code ? (
@@ -1829,7 +1708,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                       />
                     )}
 
-                    {/* Overlay applicant_number in middle */}
                     <div
                       style={{
                         position: "absolute",
@@ -1862,8 +1740,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
             }}
           >
             <tbody>
-              {/* Name of Student Row */}
-              {/* Name of Student Row */}
               <tr>
                 <td
                   colSpan={40}
@@ -1941,7 +1817,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Labels Row */}
               <tr>
                 <td
                   colSpan={40}
@@ -1974,7 +1849,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Email & Applicant ID */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={20}>
                   <div
@@ -2033,14 +1907,13 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                       }}
                     >
                       <div style={{ marginTop: "-3px" }} className="dataField">
-                        {person.emailAddress}
+                        {person.applicant_number}
                       </div>
                     </span>
                   </div>
                 </td>
               </tr>
 
-              {/* Permanent Address */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={40}>
                   <div
@@ -2078,7 +1951,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Cellphone No, Civil Status, Gender */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={13}>
                   <div
@@ -2180,7 +2052,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Date of Birth, Place of Birth, Age */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={13}>
                   <div
@@ -2236,7 +2107,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                         flex: 1,
                         borderBottom: "1px solid black",
                         fontSize: "12px",
-                        minWidth: 0, // important for flex items
+                        minWidth: 0,
                         whiteSpace: "normal",
                         overflowWrap: "break-word",
                         wordBreak: "break-word",
@@ -2282,7 +2153,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
               </tr>
 
               <tr style={{ fontSize: "12px" }}>
-                {/* Please Check */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -2308,12 +2178,10 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                         display: "inline-block",
                       }}
                     >
-                      {/* left blank intentionally */}
                     </span>
                   </div>
                 </td>
 
-                {/* Freshman */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -2351,7 +2219,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   </div>
                 </td>
 
-                {/* Transferee */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -2391,7 +2258,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   </div>
                 </td>
 
-                {/* Others */}
                 <td colSpan={10}>
                   <div
                     style={{
@@ -2428,7 +2294,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Last School Attended */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={40}>
                   <div
@@ -2463,7 +2328,6 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 </td>
               </tr>
 
-              {/* Degree/Program & Major */}
               <tr style={{ fontSize: "12px" }}>
                 <td colSpan={25} style={{ verticalAlign: "top" }}>
                   <div
@@ -2484,13 +2348,11 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                     </label>
                     <div
                       style={{
-                        flex: 1,
-                        minWidth: 0, // IMPORTANT
+                        flexGrow: 1,
                         borderBottom: "1px solid black",
                         minHeight: "1.2em",
                         whiteSpace: "normal",
-                        overflowWrap: "break-word",
-                        wordBreak: "break-word",
+                        wordWrap: "break-word",
                         lineHeight: "1.4em",
                         paddingBottom: "2px",
                       }}
@@ -2500,7 +2362,8 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                           (item) =>
                             item?.curriculum_id?.toString() ===
                             (person?.program ?? "").toString(),
-                        )?.program_description || (person?.program ?? "")
+                        )?.program_description ||
+                        (person?.program ?? "")
                         : "Loading..."}
                     </div>
                   </div>
@@ -2509,25 +2372,39 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 <td colSpan={15} style={{ verticalAlign: "top" }}>
                   <div
                     style={{
-                      flex: 1,
-                      minWidth: 0, // IMPORTANT
-                      borderBottom: "1px solid black",
-                      minHeight: "1.2em",
-                      whiteSpace: "normal",
-                      overflowWrap: "break-word",
-                      wordBreak: "break-word",
-                      lineHeight: "1.4em",
-                      paddingBottom: "2px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      width: "100%",
                     }}
                   >
-                    {curriculumOptions.length > 0
-                      ? curriculumOptions.find(
-                        (item) =>
-                          item?.curriculum_id?.toString() ===
-                          (person?.program ?? "").toString(),
-                      )?.major || ""
-                      : "Loading..."}
-
+                    <label
+                      style={{
+                        fontWeight: "bold",
+                        whiteSpace: "nowrap",
+                        marginRight: "10px",
+                      }}
+                    >
+                      MAJOR:
+                    </label>
+                    <div
+                      style={{
+                        flexGrow: 1,
+                        borderBottom: "1px solid black",
+                        minHeight: "1.2em",
+                        whiteSpace: "normal",
+                        wordWrap: "break-word",
+                        lineHeight: "1.4em",
+                        paddingBottom: "2px",
+                      }}
+                    >
+                      {curriculumOptions.length > 0
+                        ? curriculumOptions.find(
+                          (item) =>
+                            item?.curriculum_id?.toString() ===
+                            (person?.program ?? "").toString(),
+                        )?.major || ""
+                        : "Loading..."}
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -2542,7 +2419,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   style={{
                     height: "0.2in",
                     fontSize: "72.5%",
-                    color: "white", // This is just a fallback; overridden below
+                    color: "white",
                   }}
                 >
                   <div
@@ -2633,9 +2510,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -2678,9 +2555,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -2772,9 +2649,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -2802,9 +2679,9 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                   <ForwardIcon
                     sx={{
                       marginTop: "-53px",
-                      fontSize: 70, // normal screen size
+                      fontSize: 70,
                       "@media print": {
-                        fontSize: 14, // smaller print size
+                        fontSize: 14,
                         margin: 0,
                       },
                     }}
@@ -2835,13 +2712,17 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 >
                   <div
                     style={{
-                      fontWeight: "normal",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: "10px",
                       fontSize: "12px",
                       color: "black",
-                      textAlign: "right",
+                      fontWeight: "normal",
                     }}
                   >
-                    Dean's Copy
+                    <span>{settings?.short_term || shortTerm}-QSF-AS-001 Rev. 00 (7.3.25)</span>
+                    <span>Registrar's Copy</span>
                   </div>
                 </td>
               </tr>
@@ -2852,7 +2733,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
         </div>
       </Container>
     </Box >
-    );
+  );
 });
 
 export default AdminAdmissionFormProcess;

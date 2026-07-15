@@ -518,12 +518,13 @@ const AdminDashboard5 = () => {
 
     // 🔒 Require a searched/selected applicant before generating anything
     if (!userID || !person?.person_id) {
-      setSnackbar({
+      setSnack({
         open: true,
-        message: "Please search and select an applicant first.",
+        message: "Please search and select a applicant first.",
         severity: "warning",
       });
       return;
+
     }
 
     setGeneratingKey(key);
@@ -582,9 +583,9 @@ const AdminDashboard5 = () => {
 
   const downloadExamPermitPDF = async () => {
     if (!userID || !person?.person_id) {
-      setSnackbar({
+      setSnack({
         open: true,
-        message: "Please search and select an applicant first.",
+        message: "Please search and select a applicant first.",
         severity: "warning",
       });
       return;

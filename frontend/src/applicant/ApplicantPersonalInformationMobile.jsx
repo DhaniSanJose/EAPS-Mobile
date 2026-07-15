@@ -913,10 +913,10 @@ const ApplicantPersonalInformationResponsive = () => {
       const fileName = config.dateStamped
         ? `${config.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`
         : buildClientFilename(config.filenamePrefix, {
-            lastName: person?.last_name,
-            firstName: person?.first_name,
-            applicantNumber: person?.applicant_number,
-          });
+          lastName: person?.last_name,
+          firstName: person?.first_name,
+          applicantNumber: person?.applicant_number,
+        });
 
       const link = document.createElement("a");
       link.href = url;
@@ -1152,7 +1152,16 @@ const ApplicantPersonalInformationResponsive = () => {
 
       <Box sx={{ maxWidth: contentMaxWidth, mx: "auto", px: { xs: 0, md: 2 } }}>
         {/* Header */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", mb: 1, p: { xs: 1, md: 2 } }}>
+        <Box sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+      
+          px: { xs: 2, md: 0 },
+          pt: { xs: 2, md: 0 },
+        }}>
           <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
             PERSONAL INFORMATION
           </Typography>
@@ -1432,6 +1441,10 @@ const ApplicantPersonalInformationResponsive = () => {
                 Student Photo <span style={{ color: "#d32f2f" }}>*</span>
               </label>
               <Box
+                onClick={() => {
+                  fetchPersonData();
+                  setUploadModalOpen(true);
+                }}
                 sx={{
                   width: "100%",
                   maxWidth: { xs: 140, md: 180 },
@@ -1444,9 +1457,8 @@ const ApplicantPersonalInformationResponsive = () => {
                   justifyContent: "center",
                   overflow: "hidden",
                   backgroundColor: "#fafafa",
-                  cursor: "not-allowed",
-                  opacity: 0.8,
-                  pointerEvents: "none",
+                  cursor: "pointer",
+                  opacity: 1,
                   margin: "0 auto 12px",
                 }}
               >
@@ -1460,7 +1472,7 @@ const ApplicantPersonalInformationResponsive = () => {
                   <>
                     <div style={{ fontSize: 32 }}>📷</div>
                     <div style={{ fontSize: 11, color: errors.profile_img ? "#d32f2f" : "#888", textAlign: "center", padding: "0 8px" }}>
-                      No photo uploaded
+                      Tap to upload photo
                     </div>
                   </>
                 )}
@@ -2174,18 +2186,18 @@ const ApplicantPersonalInformationResponsive = () => {
             alignItems: "center",
             justifyContent: "center",
             height: "100vh",
-            p: { xs: 1.5, sm: 2 },
+            p: { xs: 1, sm: 2 },
           }}
         >
           <Box
             sx={{
               position: "relative",
-              width: "100%",
-              maxWidth: isPhone ? 420 : 900,
+              width: "90%",
+              maxWidth: 1100,
               bgcolor: "background.paper",
-              borderRadius: 3,
+              borderRadius: { xs: 2, sm: 3 },
               boxShadow: 24,
-              maxHeight: "92vh",
+              maxHeight: "95vh",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
@@ -2201,9 +2213,10 @@ const ApplicantPersonalInformationResponsive = () => {
                 alignItems: "center",
                 py: { xs: 1.5, sm: 2 },
                 px: { xs: 2, sm: 3 },
+                flexShrink: 0,
               }}
             >
-              <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: 15, sm: 18 } }}>
+              <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: 16, sm: 18 } }}>
                 Upload Your Photo
               </Typography>
               <IconButton
@@ -2216,8 +2229,8 @@ const ApplicantPersonalInformationResponsive = () => {
                   color: "white",
                   border: "2px solid rgba(255,255,255,0.6)",
                   borderRadius: "50%",
-                  width: { xs: 34, sm: 40 },
-                  height: { xs: 34, sm: 40 },
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 },
                   padding: 0,
                   "&:hover": {
                     backgroundColor: "rgba(255,255,255,0.2)",
@@ -2225,30 +2238,31 @@ const ApplicantPersonalInformationResponsive = () => {
                   },
                 }}
               >
-                <CloseIcon sx={{ fontSize: 16 }} />
+                <CloseIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Box>
 
-            {/* Body — stacks on phone, side-by-side on tablet/desktop */}
+            {/* Body — always stacked, sample on top, upload below */}
             <Box
               sx={{
                 p: { xs: 2, sm: 3 },
                 overflowY: "auto",
                 borderTop: "1px solid #e0e0e0",
                 borderBottom: "1px solid #e0e0e0",
+                flex: 1,
               }}
             >
               <Box
                 sx={{
                   display: "flex",
-                  flexDirection: isPhone ? "column" : "row",
-                  gap: { xs: 2.5, sm: 3 },
-                  alignItems: "flex-start",
+                  flexDirection: "column",
+                  gap: { xs: 3, sm: 3 },
+                  alignItems: "stretch",
                 }}
               >
-                {/* LEFT — Sample photo */}
-                <Box sx={{ flex: 1, width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
-                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 12, sm: 14 } }}>
+                {/* TOP — Sample photo (always visible first) */}
+                <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 13, sm: 14 } }}>
                     ✅ Sample Format (Follow this exactly)
                   </Typography>
 
@@ -2258,8 +2272,8 @@ const ApplicantPersonalInformationResponsive = () => {
                     alt="Formal Photo Example"
                     sx={{
                       width: "100%",
-                      maxWidth: isPhone ? 420 : 420,
-                      height: isPhone ? 260 : 260,
+                      maxWidth: 420,
+                      height: isPhone ? 220 : 260,
                       objectFit: "cover",
                       mx: "auto",
                       border: `1px solid ${borderColor}`,
@@ -2271,15 +2285,15 @@ const ApplicantPersonalInformationResponsive = () => {
                   <Box
                     sx={{
                       border: "2px dashed #ccc",
-                      p: { xs: 1.5, sm: 2 },
+                      p: { xs: 1.75, sm: 2 },
                       borderRadius: 2,
                       backgroundColor: "#f9f9f9",
                     }}
                   >
-                    <Typography variant="body1" fontWeight="bold" mb={1} sx={{ fontSize: { xs: 13, sm: 15 } }}>
+                    <Typography variant="body1" fontWeight="bold" mb={1} sx={{ fontSize: { xs: 14, sm: 15 } }}>
                       Guidelines:
                     </Typography>
-                    <Box sx={{ ml: 1, fontSize: { xs: 12, sm: 14 }, lineHeight: 1.7 }}>
+                    <Box sx={{ ml: 1, fontSize: { xs: 13, sm: 14 }, lineHeight: 1.8 }}>
                       - Size: 2" x 2"<br />
                       - Color: Your photo must be in colored.<br />
                       - Background: White.<br />
@@ -2291,9 +2305,9 @@ const ApplicantPersonalInformationResponsive = () => {
                   </Box>
                 </Box>
 
-                {/* RIGHT — Upload area */}
-                <Box sx={{ flex: 1, width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
-                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 12, sm: 14 } }}>
+                {/* BOTTOM — Upload area (applicant does this after seeing the sample) */}
+                <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 13, sm: 14 } }}>
                     📤 Your Photo
                   </Typography>
 
@@ -2304,8 +2318,8 @@ const ApplicantPersonalInformationResponsive = () => {
                         src={preview || `${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`}
                         alt="Preview"
                         sx={{
-                          width: isPhone ? 160 : 192,
-                          height: isPhone ? 160 : 192,
+                          width: isPhone ? 200 : 192,
+                          height: isPhone ? 200 : 192,
                           objectFit: "cover",
                           border: `1px solid ${borderColor}`,
                           borderRadius: 2,
@@ -2324,28 +2338,28 @@ const ApplicantPersonalInformationResponsive = () => {
                         sx={{
                           position: "absolute",
                           top: -10,
-                          right: `calc(50% - ${isPhone ? 80 : 96}px)`,
-                          width: 26,
-                          height: 26,
+                          right: `calc(50% - ${isPhone ? 100 : 96}px)`,
+                          width: 30,
+                          height: 30,
                           color: "#fff",
                           bgcolor: "#d32f2f",
                           "&:hover": { bgcolor: "#b71c1c" },
                         }}
                       >
-                        <CloseIcon sx={{ fontSize: 14 }} />
+                        <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Box>
                   ) : (
                     <Box
                       sx={{
-                        height: isPhone ? 140 : 192,
+                        height: isPhone ? 180 : 192,
                         border: "1px dashed #ccc",
                         borderRadius: 2,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         color: "text.secondary",
-                        fontSize: 12,
+                        fontSize: 13,
                         textAlign: "center",
                         px: 2,
                       }}
@@ -2354,7 +2368,7 @@ const ApplicantPersonalInformationResponsive = () => {
                     </Box>
                   )}
 
-                  <Typography sx={{ fontSize: { xs: 13, sm: 16 }, color: mainButtonColor, fontWeight: "bold" }}>
+                  <Typography sx={{ fontSize: { xs: 14, sm: 16 }, color: mainButtonColor, fontWeight: "bold" }}>
                     Select Your Image:
                   </Typography>
                   <input
@@ -2365,15 +2379,15 @@ const ApplicantPersonalInformationResponsive = () => {
                     style={{
                       display: "block",
                       width: "100%",
-                      padding: "10px",
+                      padding: "12px",
                       border: "1px solid #ccc",
-                      borderRadius: "4px",
-                      fontSize: 13,
+                      borderRadius: "6px",
+                      fontSize: 14,
                       boxSizing: "border-box",
                     }}
                   />
 
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: 12, sm: 13 } }}>
                     Tap the × to remove your preview, choose a new file, then press Upload.
                   </Typography>
                 </Box>
@@ -2383,11 +2397,12 @@ const ApplicantPersonalInformationResponsive = () => {
             {/* Footer */}
             <Box
               sx={{
-                p: { xs: 1.5, sm: 2 },
+                p: { xs: 2, sm: 2 },
                 display: "flex",
                 flexDirection: isPhone ? "column-reverse" : "row",
                 justifyContent: "space-between",
-                gap: 1,
+                gap: 1.5,
+                flexShrink: 0,
               }}
             >
               <Button
@@ -2399,6 +2414,7 @@ const ApplicantPersonalInformationResponsive = () => {
                 }}
                 color="error"
                 variant="outlined"
+                sx={{ height: { xs: 46, sm: 40 }, fontSize: { xs: 14, sm: 14 } }}
               >
                 Cancel
               </Button>
@@ -2408,8 +2424,7 @@ const ApplicantPersonalInformationResponsive = () => {
                 onClick={handleUpload}
                 variant="contained"
                 color="success"
-                size="small"
-                sx={{ minWidth: 140, height: 40 }}
+                sx={{ minWidth: 140, height: { xs: 46, sm: 40 }, fontSize: { xs: 14, sm: 14 } }}
               >
                 Upload
               </Button>

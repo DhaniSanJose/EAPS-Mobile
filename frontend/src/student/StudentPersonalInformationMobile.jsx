@@ -18,6 +18,7 @@ import {
   Alert,
   useTheme,
   useMediaQuery,
+  Modal
 } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
@@ -33,6 +34,11 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import FormalExample from "../assets/formalexample.png";
 import useStudentEditPermissions from "../account_management/useStudentEditPermissions";
+import { CircularProgress } from "@mui/material"; // add to your existing MUI import line
+import StudentECATApplicationForm from "./StudentECATApplicationForm";
+import StudentPersonalDataForm from "./StudentPersonalDataForm";
+import StudentOfficeOfTheRegistrar from "./StudentOfficeOfTheRegistrar";
+import StudentServicesSurvey from "./StudentServicesSurvey";
 
 // ─── Reusable field components (responsive, same visual language as the ────
 // ─── Applicant Personal Information screen) ─────────────────────────────────
@@ -289,20 +295,45 @@ const StudentPersonalInformationResponsive = () => {
       return;
     }
     setUserRole(storedRole);
+
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = queryParams.get("person_id");
-    setUserID(queryPersonId || loggedInPersonId);
+    const searchedPersonId = sessionStorage.getItem("student_edit_person_id");
+
+    setUserID(queryPersonId || searchedPersonId || loggedInPersonId);
   }, [location.search]);
 
-  useEffect(() => {
+  const fetchPersonData = React.useCallback(() => {
     if (!userID) return;
     axios
-      .get(`${API_BASE_URL}/api/student_data_as_applicant/${userID}`)
+      .get(`${API_BASE_URL}/api/student_data_as_applicant/${userID}`, {
+        params: { _: Date.now() },
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      })
       .then((res) => {
         if (res.data) setPerson(res.data);
       })
       .catch((err) => console.error("Error fetching student data:", err));
   }, [userID]);
+
+  useEffect(() => {
+    fetchPersonData();
+  }, [fetchPersonData]);
+
+  // Re-fetch whenever the tab/app regains focus — catches updates
+  // (like a profile photo) made elsewhere (e.g. on desktop) while
+  // this mobile session was already open.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchPersonData();
+    };
+    window.addEventListener("focus", fetchPersonData);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", fetchPersonData);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchPersonData]);
 
   // ── Reference data ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -589,7 +620,7 @@ const StudentPersonalInformationResponsive = () => {
     formData.append("profile_picture", selectedFile);
     formData.append("person_id", userID);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/upload-profile-picture`, formData, {
+      const response = await axios.post(`${API_BASE_URL}/api/enrollment/upload-profile-picture`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       const fileName = response.data.filename || response.data.profile_img;
@@ -636,13 +667,100 @@ const StudentPersonalInformationResponsive = () => {
     }
   };
 
-  // ── Printable documents (student links preserved) ─────────────────────────
+  const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices"
+  const hiddenFormRef = useRef();
+
+  const FORM_CONFIGS = {
+    ecat: {
+      label: "ECAT Application Form",
+      endpoint: "/api/generate-ecat-form-pdf",
+      filenamePrefix: "ECAT_Application_Form",
+      Component: StudentECATApplicationForm,
+    },
+    personalData: {
+      label: "Personal Data Form",
+      endpoint: "/api/generate-personal-data-form-pdf",
+      filenamePrefix: "Personal_Data_Form",
+      Component: StudentPersonalDataForm,
+    },
+    registrar: {
+      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+      endpoint: "/api/generate-registrar-form-pdf",
+      filenamePrefix: "Office_Of_The_Registrar",
+      Component: StudentOfficeOfTheRegistrar,
+    },
+    admissionServices: {
+      label: "Application/Student Satisfactory Survey",
+      endpoint: "/api/generate-admission-services-pdf",
+      filenamePrefix: "Admission_Services_CSM_Form",
+      Component: StudentServicesSurvey,
+      dateStamped: true,
+    },
+  };
+
+  const buildClientFilename = (prefix, { lastName, firstName, studentNo }) => {
+    const safeLast = (lastName || "Student").trim().replace(/\s+/g, "_");
+    const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
+    const suffix = studentNo ? `_${studentNo}` : "";
+    return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
+  };
+
+  const generateFormPdf = async (key) => {
+    const config = FORM_CONFIGS[key];
+    if (!config || generatingKey) return;
+
+    setGeneratingKey(key);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // let hidden component finish fetching
+
+      const node = hiddenFormRef.current;
+      if (!node) throw new Error(`${config.label} did not render in time.`);
+
+      const response = await axios.post(
+        `${API_BASE_URL}${config.endpoint}`,
+        {
+          html: node.innerHTML,
+          person_id: userID || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const fileName = buildClientFilename(config.filenamePrefix, {
+        lastName: person?.last_name,
+        firstName: person?.first_name,
+        studentNo: userID,
+      });
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Error generating ${config.label} PDF:`, err);
+      setSnackbar({
+        open: true,
+        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+        severity: "error",
+      });
+    } finally {
+      setGeneratingKey(null);
+    }
+  };
+
   const links = [
-    { to: "/student_ecat_application_form", label: "ECAT Application Form" },
-    
-    { to: "/student_personal_data_form", label: "Personal Data Form" },
-    { to: "/student_office_of_the_registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission` },
-    { to: "/student_admission_services", label: "Admission Services" },
+    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
+    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
+    { key: "registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission`, onClick: () => generateFormPdf("registrar") },
+    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
   ];
 
   // 🔒 Disable right-click
@@ -715,6 +833,13 @@ const StudentPersonalInformationResponsive = () => {
         pb: { xs: 8, md: 4 },
       }}
     >
+
+      {generatingKey && FORM_CONFIGS[generatingKey] && (
+        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          {React.createElement(FORM_CONFIGS[generatingKey].Component)}
+        </div>
+      )}
+
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
@@ -729,7 +854,16 @@ const StudentPersonalInformationResponsive = () => {
 
       <Box sx={{ maxWidth: contentMaxWidth, mx: "auto", px: { xs: 0, md: 2 } }}>
         {/* Header */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", mb: 1, p: { xs: 1, md: 2 } }}>
+        <Box sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+
+          px: { xs: 2, md: 0 },
+          pt: { xs: 2, md: 0 },
+        }}>
           <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
             PERSONAL INFORMATION
           </Typography>
@@ -819,7 +953,9 @@ const StudentPersonalInformationResponsive = () => {
                     borderRadius: "12px",
                     border: `1px solid ${borderColor || "#6D2323"}`,
                     backgroundColor: "#fff",
-                    cursor: "pointer",
+                    cursor: generatingKey ? "default" : "pointer",
+                    opacity: generatingKey && generatingKey !== lnk.key ? 0.5 : 1,
+                    pointerEvents: generatingKey ? "none" : "auto",
                     transition: "all 0.25s ease-in-out",
                     "&:hover": {
                       transform: { md: "scale(1.04)" },
@@ -828,9 +964,16 @@ const StudentPersonalInformationResponsive = () => {
                       "& .chip-text": { color: "#fff" },
                     },
                   }}
-                  onClick={() => navigate(lnk.to)}
+                  onClick={() => { if (generatingKey) return; lnk.onClick(); }}
                 >
-                  <PictureAsPdfIcon className="chip-icon" sx={{ fontSize: { xs: 18, md: 22 }, color: mainButtonColor || "#6D2323", flexShrink: 0 }} />
+                  {generatingKey === lnk.key ? (
+                    <CircularProgress size={18} sx={{ color: mainButtonColor || "#6D2323" }} />
+                  ) : (
+                    <PictureAsPdfIcon
+                      className="chip-icon"
+                      sx={{ fontSize: { xs: 18, md: 22 }, color: mainButtonColor || "#6D2323", flexShrink: 0 }}
+                    />
+                  )}
                   <Typography
                     className="chip-text"
                     sx={{
@@ -842,7 +985,7 @@ const StudentPersonalInformationResponsive = () => {
                       textAlign: "center",
                     }}
                   >
-                    {lnk.label}
+                    {generatingKey === lnk.key ? "Generating..." : lnk.label}
                   </Typography>
                 </Card>
               </motion.div>
@@ -1039,7 +1182,11 @@ const StudentPersonalInformationResponsive = () => {
                 )}
               </label>
               <Box
-                onClick={() => canEdit("profile_img") && setUploadModalOpen(true)}
+                onClick={() => {
+                  if (!canEdit("profile_img")) return;
+                  fetchPersonData();
+                  setUploadModalOpen(true);
+                }}
                 sx={{
                   width: "100%",
                   maxWidth: { xs: 140, md: 180 },
@@ -1908,27 +2055,28 @@ const StudentPersonalInformationResponsive = () => {
                 mt: 3,
               }}
             >
-              {canEdit("profile_img") && (
-                <Button
-                  fullWidth={isPhone}
-                  variant="contained"
-                  onClick={() => setUploadModalOpen(true)}
-                  sx={{
-                    backgroundColor: mainButtonColor || "#6D2323",
-                    border: `1px solid ${borderColor || "#6D2323"}`,
-                    color: "#fff",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    fontSize: 13,
-                    "&:hover": { backgroundColor: "#000" },
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <PhotoCameraIcon sx={{ mr: 1, fontSize: 18 }} />
-                  Upload Photo / Student Picture
-                </Button>
-              )}
+              <Button
+                fullWidth={isPhone}
+                variant="contained"
+                onClick={() => {
+                  fetchPersonData();
+                  setUploadModalOpen(true);
+                }}
+                sx={{
+                  backgroundColor: mainButtonColor || "#6D2323",
+                  border: `1px solid ${borderColor || "#6D2323"}`,
+                  color: "#fff",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  "&:hover": { backgroundColor: "#000" },
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <PhotoCameraIcon sx={{ mr: 1, fontSize: 18 }} />
+                Upload Photo / Student Picture
+              </Button>
 
               <Button
                 fullWidth={isPhone}
@@ -1967,18 +2115,18 @@ const StudentPersonalInformationResponsive = () => {
             alignItems: "center",
             justifyContent: "center",
             height: "100vh",
-            p: { xs: 1.5, sm: 2 },
+            p: { xs: 1, sm: 2 },
           }}
         >
           <Box
             sx={{
               position: "relative",
-              width: "100%",
-              maxWidth: isPhone ? 420 : 900,
+              width: "90%",
+              maxWidth: 1100,
               bgcolor: "background.paper",
-              borderRadius: 3,
+              borderRadius: { xs: 2, sm: 3 },
               boxShadow: 24,
-              maxHeight: "92vh",
+              maxHeight: "95vh",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
@@ -1994,9 +2142,10 @@ const StudentPersonalInformationResponsive = () => {
                 alignItems: "center",
                 py: { xs: 1.5, sm: 2 },
                 px: { xs: 2, sm: 3 },
+                flexShrink: 0,
               }}
             >
-              <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: 15, sm: 18 } }}>
+              <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: 16, sm: 18 } }}>
                 Upload Your Photo
               </Typography>
               <IconButton
@@ -2009,8 +2158,8 @@ const StudentPersonalInformationResponsive = () => {
                   color: "white",
                   border: "2px solid rgba(255,255,255,0.6)",
                   borderRadius: "50%",
-                  width: { xs: 34, sm: 40 },
-                  height: { xs: 34, sm: 40 },
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 },
                   padding: 0,
                   "&:hover": {
                     backgroundColor: "rgba(255,255,255,0.2)",
@@ -2018,30 +2167,31 @@ const StudentPersonalInformationResponsive = () => {
                   },
                 }}
               >
-                <CloseIcon sx={{ fontSize: 16 }} />
+                <CloseIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Box>
 
-            {/* Body — stacks on phone, side-by-side on tablet/desktop */}
+            {/* Body — always stacked, sample on top, upload below */}
             <Box
               sx={{
                 p: { xs: 2, sm: 3 },
                 overflowY: "auto",
                 borderTop: "1px solid #e0e0e0",
                 borderBottom: "1px solid #e0e0e0",
+                flex: 1,
               }}
             >
               <Box
                 sx={{
                   display: "flex",
-                  flexDirection: isPhone ? "column" : "row",
-                  gap: { xs: 2.5, sm: 3 },
-                  alignItems: "flex-start",
+                  flexDirection: "column",
+                  gap: { xs: 3, sm: 3 },
+                  alignItems: "stretch",
                 }}
               >
-                {/* LEFT — Sample photo */}
-                <Box sx={{ flex: 1, width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
-                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 12, sm: 14 } }}>
+                {/* TOP — Sample photo (always visible first) */}
+                <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 13, sm: 14 } }}>
                     ✅ Sample Format (Follow this exactly)
                   </Typography>
 
@@ -2051,8 +2201,8 @@ const StudentPersonalInformationResponsive = () => {
                     alt="Formal Photo Example"
                     sx={{
                       width: "100%",
-                      maxWidth: isPhone ? 420 : 420,
-                      height: isPhone ? 260 : 260,
+                      maxWidth: 420,
+                      height: isPhone ? 220 : 260,
                       objectFit: "cover",
                       mx: "auto",
                       border: `1px solid ${borderColor}`,
@@ -2064,15 +2214,15 @@ const StudentPersonalInformationResponsive = () => {
                   <Box
                     sx={{
                       border: "2px dashed #ccc",
-                      p: { xs: 1.5, sm: 2 },
+                      p: { xs: 1.75, sm: 2 },
                       borderRadius: 2,
                       backgroundColor: "#f9f9f9",
                     }}
                   >
-                    <Typography variant="body1" fontWeight="bold" mb={1} sx={{ fontSize: { xs: 13, sm: 15 } }}>
+                    <Typography variant="body1" fontWeight="bold" mb={1} sx={{ fontSize: { xs: 14, sm: 15 } }}>
                       Guidelines:
                     </Typography>
-                    <Box sx={{ ml: 1, fontSize: { xs: 12, sm: 14 }, lineHeight: 1.7 }}>
+                    <Box sx={{ ml: 1, fontSize: { xs: 13, sm: 14 }, lineHeight: 1.8 }}>
                       - Size: 2" x 2"<br />
                       - Color: Your photo must be in colored.<br />
                       - Background: White.<br />
@@ -2084,9 +2234,9 @@ const StudentPersonalInformationResponsive = () => {
                   </Box>
                 </Box>
 
-                {/* RIGHT — Upload area */}
-                <Box sx={{ flex: 1, width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
-                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 12, sm: 14 } }}>
+                {/* BOTTOM — Upload area (applicant does this after seeing the sample) */}
+                <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  <Typography variant="subtitle2" color="text.secondary" fontWeight={600} sx={{ fontSize: { xs: 13, sm: 14 } }}>
                     📤 Your Photo
                   </Typography>
 
@@ -2097,8 +2247,8 @@ const StudentPersonalInformationResponsive = () => {
                         src={preview || `${API_BASE_URL}/uploads/Student1by1/${person.profile_img}`}
                         alt="Preview"
                         sx={{
-                          width: isPhone ? 160 : 192,
-                          height: isPhone ? 160 : 192,
+                          width: isPhone ? 200 : 192,
+                          height: isPhone ? 200 : 192,
                           objectFit: "cover",
                           border: `1px solid ${borderColor}`,
                           borderRadius: 2,
@@ -2117,28 +2267,28 @@ const StudentPersonalInformationResponsive = () => {
                         sx={{
                           position: "absolute",
                           top: -10,
-                          right: `calc(50% - ${isPhone ? 80 : 96}px)`,
-                          width: 26,
-                          height: 26,
+                          right: `calc(50% - ${isPhone ? 100 : 96}px)`,
+                          width: 30,
+                          height: 30,
                           color: "#fff",
                           bgcolor: "#d32f2f",
                           "&:hover": { bgcolor: "#b71c1c" },
                         }}
                       >
-                        <CloseIcon sx={{ fontSize: 14 }} />
+                        <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Box>
                   ) : (
                     <Box
                       sx={{
-                        height: isPhone ? 140 : 192,
+                        height: isPhone ? 180 : 192,
                         border: "1px dashed #ccc",
                         borderRadius: 2,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         color: "text.secondary",
-                        fontSize: 12,
+                        fontSize: 13,
                         textAlign: "center",
                         px: 2,
                       }}
@@ -2147,7 +2297,7 @@ const StudentPersonalInformationResponsive = () => {
                     </Box>
                   )}
 
-                  <Typography sx={{ fontSize: { xs: 13, sm: 16 }, color: mainButtonColor, fontWeight: "bold" }}>
+                  <Typography sx={{ fontSize: { xs: 14, sm: 16 }, color: mainButtonColor, fontWeight: "bold" }}>
                     Select Your Image:
                   </Typography>
                   <input
@@ -2158,15 +2308,15 @@ const StudentPersonalInformationResponsive = () => {
                     style={{
                       display: "block",
                       width: "100%",
-                      padding: "10px",
+                      padding: "12px",
                       border: "1px solid #ccc",
-                      borderRadius: "4px",
-                      fontSize: 13,
+                      borderRadius: "6px",
+                      fontSize: 14,
                       boxSizing: "border-box",
                     }}
                   />
 
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: 12, sm: 13 } }}>
                     Tap the × to remove your preview, choose a new file, then press Upload.
                   </Typography>
                 </Box>
@@ -2176,11 +2326,12 @@ const StudentPersonalInformationResponsive = () => {
             {/* Footer */}
             <Box
               sx={{
-                p: { xs: 1.5, sm: 2 },
+                p: { xs: 2, sm: 2 },
                 display: "flex",
                 flexDirection: isPhone ? "column-reverse" : "row",
                 justifyContent: "space-between",
-                gap: 1,
+                gap: 1.5,
+                flexShrink: 0,
               }}
             >
               <Button
@@ -2192,6 +2343,7 @@ const StudentPersonalInformationResponsive = () => {
                 }}
                 color="error"
                 variant="outlined"
+                sx={{ height: { xs: 46, sm: 40 }, fontSize: { xs: 14, sm: 14 } }}
               >
                 Cancel
               </Button>
@@ -2201,8 +2353,7 @@ const StudentPersonalInformationResponsive = () => {
                 onClick={handleUpload}
                 variant="contained"
                 color="success"
-                size="small"
-                sx={{ minWidth: 140, height: 40 }}
+                sx={{ minWidth: 140, height: { xs: 46, sm: 40 }, fontSize: { xs: 14, sm: 14 } }}
               >
                 Upload
               </Button>

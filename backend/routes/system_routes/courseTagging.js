@@ -261,10 +261,35 @@ router.get("/courses/:currId", async (req, res) => {
     const [result] = await db3.query(sql, [currId]);
     res.json(result);
   } catch (err) {
-    console.error("Error in /courses:", err);
+    console.error("Error in fetching courses:", err);
     return res.status(500).json({ error: err.message });
   }
 });
+
+// COURSES BY DEPARTMENT
+router.get("/other-departments", async (req, res) => {
+  const {deptIds} = req.query;
+  try{
+    const [activeYearRows] = await db3.query(
+      "SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1"
+    );
+
+    if (!activeYearRows.length) {
+      return res.status(400).json({ message: "No active school year found" });
+    }
+
+    const activeYearId = activeYearRows[0].id;
+
+    const [rows] = await db3.query(
+      `SELECT request_dept_id FROM dprtmnt_grant_table WHERE requesting_dept_id IN (?) AND active_school_year_id = ?`
+    , [deptIds, activeYearId])
+
+    res.json(rows); 
+  } catch (err) {
+    console.error("Error in fetching courses:", err);
+    return res.status(500).json({ error: err.message });
+  }
+})
 
 router.get("/program-summer-subjects/check", async (req, res) => {
   const { curriculum_id, semester_id, active_school_year_id, year_level_id } =
@@ -615,6 +640,57 @@ router.post("/add-to-enrolled-courses/:userId/:currId/", async (req, res) => {
     return res.status(500).json(err);
   }
 });
+
+// Other-department course enroll: INSERT enrolled_subject only (no curriculum/student side effects)
+router.post(
+  "/add-other-department-enrolled-course/:userId",
+  async (req, res) => {
+    const { userId } = req.params;
+    const { subject_id, department_section_id, curriculum_id, active_school_year_id } =
+      req.body;
+
+    if (!subject_id || !department_section_id || !curriculum_id) {
+      return res.status(400).json({
+        error:
+          "subject_id, department_section_id, and curriculum_id are required",
+      });
+    }
+
+    try {
+      let activeSchoolYearId = active_school_year_id;
+
+      if (!activeSchoolYearId) {
+        const [yearResult] = await db3.query(
+          `SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1`,
+        );
+
+        if (yearResult.length === 0) {
+          return res.status(404).json({ error: "No active school year found" });
+        }
+
+        activeSchoolYearId = yearResult[0].id;
+      }
+
+      await db3.query(
+        `INSERT INTO enrolled_subject
+          (course_id, student_number, active_school_year_id, curriculum_id, department_section_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          subject_id,
+          userId,
+          activeSchoolYearId,
+          curriculum_id,
+          department_section_id,
+        ],
+      );
+
+      res.json({ message: "Other department course enrolled successfully" });
+    } catch (err) {
+      console.error("Error in /add-other-department-enrolled-course:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  },
+);
 
 router.post("/add-student-courses/:userId", async (req, res) => {
   const { subject_id, active_school_year_id, curriculum_id } = req.body;
@@ -1252,7 +1328,10 @@ router.post("/student-tagging/dprtmnt", async (req, res) => {
 // ENROLLED COURSES
 router.get("/enrolled_courses/:userId/:currId", async (req, res) => {
   const { userId, currId } = req.params;
-  const { activeSchoolYearId } = req.query;
+  const { activeSchoolYearId, includeOtherCurricula } = req.query;
+  const includeOther =
+    includeOtherCurricula === "1" ||
+    String(includeOtherCurricula).toLowerCase() === "true";
 
   try {
     let effectiveActiveSchoolYearId = activeSchoolYearId;
@@ -1272,6 +1351,7 @@ router.get("/enrolled_courses/:userId/:currId", async (req, res) => {
       SELECT
         es.id,
         es.course_id,
+        es.curriculum_id,
         c.course_code,
         c.course_description,
         st.description,
@@ -1326,16 +1406,18 @@ router.get("/enrolled_courses/:userId/:currId", async (req, res) => {
         AND es_count.course_id = es.course_id
       WHERE es.student_number = ?
         AND es.active_school_year_id = ?
-        AND es.curriculum_id = ?
+        ${includeOther ? "" : "AND es.curriculum_id = ?"}
         AND COALESCE(NULLIF(TRIM(c.course_code), ''), NULLIF(TRIM(c.course_description), '')) IS NOT NULL
-      ORDER BY c.course_id ASC;
+      ORDER BY
+        CASE WHEN es.curriculum_id = ? THEN 0 ELSE 1 END,
+        c.course_id ASC;
     `;
 
-    const [result] = await db3.query(sql, [
-      userId,
-      effectiveActiveSchoolYearId,
-      currId,
-    ]);
+    const params = includeOther
+      ? [userId, effectiveActiveSchoolYearId, currId]
+      : [userId, effectiveActiveSchoolYearId, currId, currId];
+
+    const [result] = await db3.query(sql, params);
     res.json(result);
   } catch (err) {
     console.error("Error in /enrolled_courses:", err);

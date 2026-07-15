@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -10,6 +10,7 @@ import {
   Alert,
   useTheme,
   useMediaQuery,
+
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -24,7 +25,11 @@ import ErrorIcon from "@mui/icons-material/Error";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import API_BASE_URL from "../apiConfig";
 import useStudentEditPermissions from "../account_management/useStudentEditPermissions";
-
+import { CircularProgress } from "@mui/material"; // add to your existing MUI import line
+import StudentECATApplicationForm from "./StudentECATApplicationForm";
+import StudentPersonalDataForm from "./StudentPersonalDataForm";
+import StudentOfficeOfTheRegistrar from "./StudentOfficeOfTheRegistrar";
+import StudentServicesSurvey from "./StudentServicesSurvey";
 // ─── Reusable field components (responsive, with locked/admin-badge support) ──
 const Field = ({ label, required, error, helperText, children, lockedBadge }) => (
   <div style={{ marginBottom: 14 }}>
@@ -504,6 +509,103 @@ const StudentDashboard2Mobile = () => {
   // ── Solo parent ──────────────────────────────────────────────────────────────
   const [soloParentChoice, setSoloParentChoice] = useState("");
 
+
+  const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices"
+  const hiddenFormRef = useRef();
+
+  const FORM_CONFIGS = {
+    ecat: {
+      label: "ECAT Application Form",
+      endpoint: "/api/generate-ecat-form-pdf",
+      filenamePrefix: "ECAT_Application_Form",
+      Component: StudentECATApplicationForm,
+    },
+    personalData: {
+      label: "Personal Data Form",
+      endpoint: "/api/generate-personal-data-form-pdf",
+      filenamePrefix: "Personal_Data_Form",
+      Component: StudentPersonalDataForm,
+    },
+    registrar: {
+      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+      endpoint: "/api/generate-registrar-form-pdf",
+      filenamePrefix: "Office_Of_The_Registrar",
+      Component: StudentOfficeOfTheRegistrar,
+    },
+    admissionServices: {
+      label: "Application/Student Satisfactory Survey",
+      endpoint: "/api/generate-admission-services-pdf",
+      filenamePrefix: "Admission_Services_CSM_Form",
+      Component: StudentServicesSurvey,
+      dateStamped: true,
+    },
+  };
+
+  const buildClientFilename = (prefix, { lastName, firstName, studentNo }) => {
+    const safeLast = (lastName || "Student").trim().replace(/\s+/g, "_");
+    const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
+    const suffix = studentNo ? `_${studentNo}` : "";
+    return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
+  };
+
+  const generateFormPdf = async (key) => {
+    const config = FORM_CONFIGS[key];
+    if (!config || generatingKey) return;
+
+    setGeneratingKey(key);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // let hidden component finish fetching
+
+      const node = hiddenFormRef.current;
+      if (!node) throw new Error(`${config.label} did not render in time.`);
+
+      const response = await axios.post(
+        `${API_BASE_URL}${config.endpoint}`,
+        {
+          html: node.innerHTML,
+          person_id: userID || "",
+          last_name: person?.last_name || "",
+          first_name: person?.first_name || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const fileName = buildClientFilename(config.filenamePrefix, {
+        lastName: person?.last_name,
+        firstName: person?.first_name,
+        studentNo: userID,
+      });
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`Error generating ${config.label} PDF:`, err);
+      setSnackbar({
+        open: true,
+        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+        severity: "error",
+      });
+    } finally {
+      setGeneratingKey(null);
+    }
+  };
+
+  const links = [
+    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
+    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
+    { key: "registrar", label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission`, onClick: () => generateFormPdf("registrar") },
+    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
+  ];
+
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -525,16 +627,6 @@ const StudentDashboard2Mobile = () => {
   });
 
 
-  const docLinks = [
-    { label: "ECAT Application Form", to: "/student_ecat_application_form" },
-   
-    { label: "Personal Data Form", to: "/student_personal_data_form" },
-    {
-      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} Admission`,
-      to: "/student_office_of_the_registrar",
-    },
-    { label: "Application/Student Satisfactory Survey", to: "/student_admission_services" },
-  ];
 
   // Cards per row depending on viewport
   const cardBasis = isPhone ? "calc(50% - 6px)" : isTablet ? "calc(33.333% - 8px)" : "calc(20% - 13px)";
@@ -549,8 +641,16 @@ const StudentDashboard2Mobile = () => {
         backgroundColor: "#f5f5f5",
         fontFamily: "'Segoe UI', sans-serif",
         pb: { xs: 8, md: 4 },
+
       }}
     >
+
+      {generatingKey && FORM_CONFIGS[generatingKey] && (
+        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          {React.createElement(FORM_CONFIGS[generatingKey].Component)}
+        </div>
+      )}
+
       {/* Toast notification */}
       <Snackbar
         open={snackbar.open}
@@ -565,24 +665,17 @@ const StudentDashboard2Mobile = () => {
 
       <Box sx={{ maxWidth: contentMaxWidth, mx: "auto", px: { xs: 0, md: 2 } }}>
         {/* Page Title */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            mb: 1,
-            p: { xs: 1, md: 2 },
-          }}
-        >
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold",
-              color: titleColor,
-              fontSize: { xs: "22px", sm: "28px", md: "36px" },
-            }}
-          >
+        <Box sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 1,
+
+          px: { xs: 2, md: 0 },
+          pt: { xs: 2, md: 0 },
+        }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
             FAMILY BACKGROUND
           </Typography>
         </Box>
@@ -659,7 +752,7 @@ const StudentDashboard2Mobile = () => {
             PRINTABLE DOCUMENTS
           </Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25, justifyContent: "center" }}>
-            {docLinks.map((lnk, i) => (
+            {links.map((lnk, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 10 }}
@@ -681,7 +774,9 @@ const StudentDashboard2Mobile = () => {
                     borderRadius: "12px",
                     border: `1px solid ${borderColor || "#6D2323"}`,
                     backgroundColor: "#fff",
-                    cursor: "pointer",
+                    cursor: generatingKey ? "default" : "pointer",
+                    opacity: generatingKey && generatingKey !== lnk.key ? 0.5 : 1,
+                    pointerEvents: generatingKey ? "none" : "auto",
                     transition: "all 0.25s ease-in-out",
                     "&:hover": {
                       transform: { md: "scale(1.04)" },
@@ -690,12 +785,16 @@ const StudentDashboard2Mobile = () => {
                       "& .chip-text": { color: "#fff" },
                     },
                   }}
-                  onClick={() => navigate(lnk.to)}
+                  onClick={() => { if (generatingKey) return; lnk.onClick(); }}
                 >
-                  <PictureAsPdfIcon
-                    className="chip-icon"
-                    sx={{ fontSize: { xs: 18, md: 22 }, color: mainButtonColor || "#6D2323", flexShrink: 0 }}
-                  />
+                  {generatingKey === lnk.key ? (
+                    <CircularProgress size={18} sx={{ color: mainButtonColor || "#6D2323" }} />
+                  ) : (
+                    <PictureAsPdfIcon
+                      className="chip-icon"
+                      sx={{ fontSize: { xs: 18, md: 22 }, color: mainButtonColor || "#6D2323", flexShrink: 0 }}
+                    />
+                  )}
                   <Typography
                     className="chip-text"
                     sx={{
@@ -707,7 +806,7 @@ const StudentDashboard2Mobile = () => {
                       textAlign: "center",
                     }}
                   >
-                    {lnk.label}
+                    {generatingKey === lnk.key ? "Generating..." : lnk.label}
                   </Typography>
                 </Card>
               </motion.div>

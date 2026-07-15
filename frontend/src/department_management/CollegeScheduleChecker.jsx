@@ -220,12 +220,22 @@ const CollegeScheduleChecker = () => {
   const [selectedReviewEmployeeId, setSelectedReviewEmployeeId] = useState("");
   const [reviewSchedules, setReviewSchedules] = useState([]);
   const [reviewScheduleLoading, setReviewScheduleLoading] = useState(false);
+  const [reviewViewMode, setReviewViewMode] = useState("professor");
+  const [reviewFilterProfessor, setReviewFilterProfessor] = useState("");
+  const [reviewFilterRoom, setReviewFilterRoom] = useState("");
+  const [reviewFilterDay, setReviewFilterDay] = useState("");
+  const [reviewFilterSection, setReviewFilterSection] = useState("");
+  const [reviewFilterDepartment, setReviewFilterDepartment] = useState("");
+  const [reviewDialogSchedules, setReviewDialogSchedules] = useState([]);
+  const [reviewDepartmentProfList, setReviewDepartmentProfList] = useState([]);
+  const [reviewDialogLoading, setReviewDialogLoading] = useState(false);
   const [professorSchedule, setProfessorSchedule] = useState([]);
   const [pickOtherDepartmentProfessor, setPickOtherDepartmentProfessor] =
     useState(false);
   const [otherDepartmentDialogOpen, setOtherDepartmentDialogOpen] =
     useState(false);
   const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [allDepartments, setAllDepartments] = useState([]);
   const [otherDepartmentId, setOtherDepartmentId] = useState("");
   const [otherDepartmentProfList, setOtherDepartmentProfList] = useState([]);
   const [otherDepartmentProfessor, setOtherDepartmentProfessor] =
@@ -475,6 +485,7 @@ const CollegeScheduleChecker = () => {
       const rows = Array.isArray(response.data) ? response.data : [];
       const blockedDepartmentIds = new Set(allowedDepartmentIds.map(String));
 
+      setAllDepartments(rows);
       setDepartmentOptions(
         rows.filter(
           (department) =>
@@ -483,6 +494,7 @@ const CollegeScheduleChecker = () => {
       );
     } catch (error) {
       console.error("Error fetching departments:", error);
+      setAllDepartments([]);
       setDepartmentOptions([]);
     }
   };
@@ -532,6 +544,107 @@ const CollegeScheduleChecker = () => {
       setReviewScheduleLoading(false);
     }
   };
+
+  const resetReviewFilters = () => {
+    setReviewFilterProfessor("");
+    setReviewFilterRoom("");
+    setReviewFilterDay("");
+    setReviewFilterSection("");
+    setReviewFilterDepartment("");
+    setReviewDepartmentProfList([]);
+    setReviewDialogSchedules([]);
+    setSelectedReviewEmployeeId("");
+    setReviewSchedules([]);
+  };
+
+  const loadReviewSchedulesForDepartments = async (departmentIds = []) => {
+    if (!departmentIds.length) {
+      setReviewDialogSchedules([]);
+      return;
+    }
+
+    setReviewDialogLoading(true);
+    try {
+      const responses = await Promise.all(
+        departmentIds.map((departmentId) =>
+          axios
+            .get(
+              `${API_BASE_URL}/api/get_college_professor_schedule/${departmentId}`,
+            )
+            .then((res) => (Array.isArray(res.data) ? res.data : []))
+            .catch(() => []),
+        ),
+      );
+      setReviewDialogSchedules(responses.flat());
+    } catch (error) {
+      console.error("Error loading review schedules:", error);
+      setReviewDialogSchedules([]);
+    } finally {
+      setReviewDialogLoading(false);
+    }
+  };
+
+  const handleOpenReviewDialog = () => {
+    resetReviewFilters();
+    setReviewViewMode("professor");
+    setOpenReviewDialog(true);
+    loadReviewSchedulesForDepartments(allowedDepartmentIds);
+  };
+
+  const handleReviewViewModeChange = (mode) => {
+    setReviewViewMode(mode);
+    resetReviewFilters();
+    if (mode === "professor") {
+      loadReviewSchedulesForDepartments(allowedDepartmentIds);
+    }
+  };
+
+  const fetchReviewDepartmentSchedule = async (departmentId) => {
+    if (!departmentId) {
+      setReviewDialogSchedules([]);
+      setReviewDepartmentProfList([]);
+      return;
+    }
+
+    setReviewDialogLoading(true);
+    try {
+      const [scheduleRows, profRes] = await Promise.all([
+        axios
+          .get(
+            `${API_BASE_URL}/api/get_college_professor_schedule/${departmentId}`,
+          )
+          .then((res) => (Array.isArray(res.data) ? res.data : []))
+          .catch(() => []),
+        axios.get(`${API_BASE_URL}/api/prof_list/${departmentId}`),
+      ]);
+      setReviewDialogSchedules(scheduleRows);
+      setReviewDepartmentProfList(
+        Array.isArray(profRes.data) ? profRes.data : [],
+      );
+    } catch (error) {
+      console.error("Error fetching department review schedule:", error);
+      setReviewDialogSchedules([]);
+      setReviewDepartmentProfList([]);
+    } finally {
+      setReviewDialogLoading(false);
+    }
+  };
+
+  const handleReviewDepartmentChange = (departmentId) => {
+    setReviewFilterDepartment(departmentId);
+    setReviewFilterProfessor("");
+    setReviewFilterRoom("");
+    setReviewFilterDay("");
+    setReviewFilterSection("");
+    fetchReviewDepartmentSchedule(departmentId);
+  };
+
+  const userDepartmentOptions = allDepartments;
+
+  const reviewProfessorOptions =
+    reviewViewMode === "department"
+      ? reviewDepartmentProfList
+      : profList;
 
   const fetchAllCollegeSchedule = async () => {
     if (!allowedDepartmentIds.length) {
@@ -1803,6 +1916,73 @@ const CollegeScheduleChecker = () => {
       })
     : [];
 
+  const reviewBaseSchedules = reviewDialogSchedules;
+
+  const filteredReviewSchedules = reviewBaseSchedules
+    .filter((row) => {
+      if (
+        reviewFilterProfessor &&
+        String(row.employee_id) !== String(reviewFilterProfessor)
+      ) {
+        return false;
+      }
+
+      if (
+        reviewFilterRoom &&
+        String(row.room_id) !== String(reviewFilterRoom)
+      ) {
+        return false;
+      }
+
+      if (reviewFilterDay) {
+        const selectedDay = dayList.find(
+          (day) => String(day.day_id) === String(reviewFilterDay),
+        );
+        if (
+          selectedDay &&
+          String(row.day || "").toUpperCase() !==
+            String(selectedDay.day_description || "").toUpperCase()
+        ) {
+          return false;
+        }
+      }
+
+      if (reviewFilterSection) {
+        const selectedSection = sectionList.find(
+          (section) =>
+            String(section.dep_section_id) === String(reviewFilterSection),
+        );
+        if (selectedSection) {
+          const sectionMatch =
+            String(row.section_description || "") ===
+            String(selectedSection.description || "");
+          const programMatch =
+            !selectedSection.program_code ||
+            String(row.program_code || "") ===
+              String(selectedSection.program_code || "");
+          if (!sectionMatch || !programMatch) return false;
+        }
+      }
+
+      return true;
+    })
+    .slice()
+    .sort((a, b) => {
+      const dayA = daySortOrder[(a.day || "").toUpperCase()] || 99;
+      const dayB = daySortOrder[(b.day || "").toUpperCase()] || 99;
+      if (dayA !== dayB) return dayA - dayB;
+
+      const startA = parseScheduleTimeToMinutes(a.school_time_start);
+      const startB = parseScheduleTimeToMinutes(b.school_time_start);
+      if (startA !== startB) return startA - startB;
+
+      const endA = parseScheduleTimeToMinutes(a.school_time_end);
+      const endB = parseScheduleTimeToMinutes(b.school_time_end);
+      return endA - endB;
+    });
+
+  const isReviewLoading = reviewDialogLoading;
+
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -2584,9 +2764,9 @@ const CollegeScheduleChecker = () => {
             <Button
               className="hover:bg-[#000000] text-white px-6 py-2 rounded w-[200px]"
               variant="contained"
-              onClick={() => setOpenReviewDialog(true)}
+              onClick={handleOpenReviewDialog}
             >
-              Review Schedule
+              View Schedule
             </Button>
           </Box>
 
@@ -3603,41 +3783,171 @@ const CollegeScheduleChecker = () => {
         fullWidth
         maxWidth="lg"
       >
-        <DialogTitle>Review Schedule</DialogTitle>
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            pr: 3,
+          }}
+        >
+          <Box component="span">Review Schedule</Box>
+          <Box sx={{ display: "flex", gap: 1.5 }}>
+            <Button
+              size="small"
+              variant={reviewViewMode === "professor" ? "contained" : "outlined"}
+              onClick={() => handleReviewViewModeChange("professor")}
+            >
+              Per Professor
+            </Button>
+            <Button
+              size="small"
+              variant={reviewViewMode === "department" ? "contained" : "outlined"}
+              onClick={() => handleReviewViewModeChange("department")}
+            >
+              Per Department
+            </Button>
+          </Box>
+        </DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 1, mb: 2 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gap: 2,
+              mt: 1,
+              mb: 2,
+              gridTemplateColumns: {
+                xs: "1fr",
+                md:
+                  reviewViewMode === "department"
+                    ? "repeat(3, 1fr)"
+                    : "repeat(2, 1fr)",
+                lg:
+                  reviewViewMode === "department"
+                    ? "repeat(5, 1fr)"
+                    : "repeat(4, 1fr)",
+              },
+            }}
+          >
+            {reviewViewMode === "department" && (
+              <FormControl fullWidth size="small">
+                <InputLabel>Department</InputLabel>
+                <Select
+                  label="Department"
+                  value={reviewFilterDepartment}
+                  onChange={(e) => handleReviewDepartmentChange(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>Select Department</em>
+                  </MenuItem>
+                  {userDepartmentOptions.map((dept) => (
+                    <MenuItem key={dept.dprtmnt_id} value={dept.dprtmnt_id}>
+                      {dept.dprtmnt_code
+                        ? `${dept.dprtmnt_code} - ${dept.dprtmnt_name}`
+                        : dept.dprtmnt_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
             <Autocomplete
-              options={profList}
+              options={reviewProfessorOptions}
               fullWidth
+              size="small"
               getOptionLabel={(option) =>
                 `${option.employee_id || ""} - ${option.fname || ""} ${option.mname?.charAt(0) || ""}${option.mname ? "." : ""} ${option.lname || ""}`.trim()
               }
               value={
-                profList.find(
-                  (prof) => String(prof.employee_id) === String(selectedReviewEmployeeId)
+                reviewProfessorOptions.find(
+                  (prof) =>
+                    String(prof.employee_id) === String(reviewFilterProfessor),
                 ) || null
               }
               onChange={(event, newValue) => {
-                setSelectedReviewEmployeeId(newValue ? newValue.employee_id : "");
+                setReviewFilterProfessor(
+                  newValue ? newValue.employee_id : "",
+                );
               }}
               isOptionEqualToValue={(option, value) =>
                 String(option.employee_id) === String(value.employee_id)
               }
+              disabled={
+                reviewViewMode === "department" && !reviewFilterDepartment
+              }
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Professor"
-                  size="small"
-                />
+                <TextField {...params} label="Professor" size="small" />
               )}
             />
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Room</InputLabel>
+              <Select
+                label="Room"
+                value={reviewFilterRoom}
+                onChange={(e) => setReviewFilterRoom(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>All Rooms</em>
+                </MenuItem>
+                {roomList.map((room) => (
+                  <MenuItem key={room.room_id} value={room.room_id}>
+                    {room.room_description}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Day</InputLabel>
+              <Select
+                label="Day"
+                value={reviewFilterDay}
+                onChange={(e) => setReviewFilterDay(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>All Days</em>
+                </MenuItem>
+                {dayList.map((day) => (
+                  <MenuItem key={day.day_id} value={day.day_id}>
+                    {day.day_description}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Section</InputLabel>
+              <Select
+                label="Section"
+                value={reviewFilterSection}
+                onChange={(e) => setReviewFilterSection(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>All Sections</em>
+                </MenuItem>
+                {sectionList.map((section) => (
+                  <MenuItem
+                    key={section.dep_section_id}
+                    value={section.dep_section_id}
+                  >
+                    {`${section.program_code || ""} ${section.description || ""}`.trim()}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Box>
 
-          {selectedReviewEmployeeId && reviewScheduleLoading ? (
+          {isReviewLoading ? (
             <Typography variant="body2" color="text.secondary">
-              Loading professor schedule...
+              Loading schedule...
             </Typography>
-          ) : selectedReviewEmployeeId ? (
+          ) : reviewViewMode === "department" && !reviewFilterDepartment ? (
+            <Typography variant="body2" color="text.secondary">
+              Select a department to review schedule.
+            </Typography>
+          ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
@@ -3655,7 +3965,7 @@ const CollegeScheduleChecker = () => {
                 </tr>
               </thead>
               <tbody>
-                {reviewedProfessorSchedules.map((row, index) => (
+                {filteredReviewSchedules.map((row, index) => (
                   <tr key={`${row.employee_id}-${row.day}-${row.school_time_start}-${row.school_time_end}-${index}`}>
                     <td style={{ textAlign: "center", border: "solid black 1px", padding: "4px", fontSize: "0.85rem" }}>{index + 1}</td>
                     <td style={{ textAlign: "center", border: "solid black 1px", padding: "4px", fontSize: "0.85rem" }}>{row.employee_id}</td>
@@ -3678,19 +3988,15 @@ const CollegeScheduleChecker = () => {
                     </td>
                   </tr>
                 ))}
-                {reviewedProfessorSchedules.length === 0 && (
+                {filteredReviewSchedules.length === 0 && (
                   <tr>
                     <td colSpan={11} style={{ textAlign: "center", border: "solid black 1px", padding: "8px", fontSize: "0.85rem" }}>
-                      No schedule found for the selected professor.
+                      No schedule found for the selected filters.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              Select a professor to review schedule.
-            </Typography>
           )}
         </DialogContent>
         <DialogActions>

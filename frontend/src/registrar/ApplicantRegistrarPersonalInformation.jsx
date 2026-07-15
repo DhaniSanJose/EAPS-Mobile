@@ -4012,7 +4012,7 @@ const AdminDashboard1 = () => {
               <Alert
                 onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
                 severity={snackbar.severity}
-                variant="filled"
+                
                 sx={{ width: "100%" }}
               >
                 {snackbar.message}

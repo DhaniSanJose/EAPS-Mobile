@@ -139,12 +139,12 @@ router.post("/generate-admission-form-pdf", async (req, res) => {
       width: 100%;
       height: auto;
       padding: 10px 20px;
-      transform: scale(0.88);
+     transform: scale(0.836);
       /* no transform-origin override — match the working print window's default (50% 50%) */
     }
 
     .student-table {
-      margin-top: -70px !important;
+      margin-top: -90px !important;
     }
 
     button {
@@ -193,7 +193,7 @@ router.post("/generate-admission-form-pdf", async (req, res) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const pdfBuffer = await page.pdf({
-      format: "Letter",
+      format: "A4",
       printBackground: true,
       preferCSSPageSize: false,
       // Matches @page { size: 8.5in 11in; margin: 0.25in; } from the

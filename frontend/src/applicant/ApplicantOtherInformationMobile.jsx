@@ -529,24 +529,17 @@ const ApplicantOtherInformationResponsive = (props) => {
       </Snackbar>
 
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          mb: 1,
-          px: { xs: 2, md: 0 },
-          pt: { xs: 2, md: 0 },
-        }}
-      >
-        <Typography
-          sx={{
-            fontWeight: "bold",
-            color: titleColor,
-            fontSize: { xs: 22, sm: 28, md: 34, lg: 36 },
-          }}
-        >
+      <Box sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        mb: 1,
+
+        px: { xs: 2, md: 0 },
+        pt: { xs: 2, md: 0 },
+      }}>
+        <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "22px", sm: "28px", md: "36px" } }}>
           OTHER INFORMATION
         </Typography>
       </Box>
