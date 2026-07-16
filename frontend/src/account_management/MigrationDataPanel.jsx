@@ -22,6 +22,7 @@ import autoTable from "jspdf-autotable";
    Main Component
 ───────────────────────────────────────────── */
 const MigrationDataPanel = () => {
+  useAccountAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -52,13 +53,14 @@ const MigrationDataPanel = () => {
     const excelInputRef = useRef(null);
     const pageId = 114;
 
-    const getAuditHeaders = () => ({
-        "x-audit-actor-id":
-            employeeID ||
-            localStorage.getItem("employee_id") ||
-            localStorage.getItem("email") ||
-            "unknown",
-        "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    const getAuditHeaders = () =>
+    getFlatAuditHeaders({
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
     });
 
     /* ── settings ── */

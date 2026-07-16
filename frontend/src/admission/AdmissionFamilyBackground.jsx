@@ -28,12 +28,16 @@ import CampaignIcon from '@mui/icons-material/Campaign';
 import ScoreIcon from '@mui/icons-material/Score';
 import ExamPermit from "../applicant/ExamPermit";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import AdminECATApplicationForm from "./AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 const AdminDashboard2 = () => {
+  useAuditMac();
 
   const settings = useContext(SettingsContext);
 
@@ -197,11 +201,6 @@ const AdminDashboard2 = () => {
     } catch (error) {
       console.error('Error checking access:', error);
       setHasAccess(false);
-      if (error.response && error.response.data.message) {
-        console.log(error.response.data.message);
-      } else {
-        console.log("An unexpected error occurred.");
-      }
       setLoading(false);
     }
   };
@@ -438,8 +437,6 @@ const AdminDashboard2 = () => {
 
       // ✅ Send update request
       await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
-
-      console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
     } catch (error) {
       console.error("❌ SuperAdmin update failed:", {
         message: error.message,
@@ -559,7 +556,6 @@ const AdminDashboard2 = () => {
 
       // ✅ Execute safe update
       await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
-      console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
     } catch (err) {
       console.error("❌ Auto-save (on blur) failed:", {
         message: err.message,
@@ -740,6 +736,7 @@ const AdminDashboard2 = () => {
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );

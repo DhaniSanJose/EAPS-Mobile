@@ -177,6 +177,7 @@ const insertAuditLog = async ({
   reason,
   message,
   severity,
+  userMacAddress,
 }) => {
   try {
     const safeActorId = actorId || "unknown";
@@ -201,14 +202,15 @@ const insertAuditLog = async ({
 
     await auditDb.query(
       `INSERT INTO audit_logs
-        (actor_id, role, action, message, severity)
-       VALUES (?, ?, ?, ?, ?)`,
+        (actor_id, role, action, message, severity, user_mac_address)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         safeActorId,
         finalRole,
         action,
         normalizedMessage,
         severity || getAuthSeverity({ outcome }),
+        userMacAddress || null,
       ],
     );
   } catch (err) {
@@ -228,10 +230,18 @@ const insertAuditLogEnrollment = (payload) =>
     auditDb: db3,
   });
 
+const insertAuditLogBoth = async (payload) => {
+  await Promise.all([
+    insertAuditLogAdmission(payload),
+    insertAuditLogEnrollment(payload),
+  ]);
+};
+
 module.exports = {
   buildAuthAuditMessage,
   formatAuditTimestamp,
   insertAuditLogAdmission,
   insertAuditLogEnrollment,
+  insertAuditLogBoth,
   resolveAuditActor,
 };

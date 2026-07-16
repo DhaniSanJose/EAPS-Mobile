@@ -26,6 +26,8 @@ import {
 } from "@mui/icons-material";
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { useNavigate } from "react-router-dom";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -78,6 +80,8 @@ const passwordRules = [
 ];
 
 const RegistrarResetPassword = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
 
   const theme = useTheme();

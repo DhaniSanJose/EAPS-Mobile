@@ -29,6 +29,8 @@ import {
   InputLabel
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import EaristLogo from "../assets/EaristLogo.png";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -157,15 +159,16 @@ export default function StudentAccounts() {
 
   const [employeeID, setEmployeeID] = useState("");
 
-  const getAuditHeaders = () => ({
-    "x-audit-actor-id":
-      employeeID ||
-      localStorage.getItem("employee_id") ||
-      localStorage.getItem("email") ||
-      "unknown",
-    "x-audit-actor-role":
-      userRole || localStorage.getItem("role") || "registrar",
-  });
+  const getAuditHeaders = () =>
+    getFlatAuditHeaders({
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role":
+        userRole || localStorage.getItem("role") || "registrar",
+    });
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -567,6 +570,7 @@ export default function StudentAccounts() {
   };
 
   const printNoEmailList = () => {
+  useAccountAuditMac();
     const noEmailStudents = persons.filter((p) => !p.emailAddress);
 
     if (noEmailStudents.length === 0) {

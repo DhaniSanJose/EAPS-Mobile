@@ -15,7 +15,6 @@ import {
     TableCell,
     TextField,
     MenuItem,
-    Card,
     InputLabel,
     TableBody,
 } from '@mui/material';
@@ -23,31 +22,30 @@ import { Snackbar, Alert } from '@mui/material';
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
-import { Link } from "react-router-dom";
 import { FaFileExcel } from "react-icons/fa";
-import SchoolIcon from "@mui/icons-material/School";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import ScheduleIcon from "@mui/icons-material/Schedule";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import PeopleIcon from "@mui/icons-material/People";
-import FactCheckIcon from "@mui/icons-material/FactCheck";
 import _ from "lodash";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
 import SearchIcon from "@mui/icons-material/Search";
 import KeyIcon from "@mui/icons-material/Key";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import {
+    isRegistrarCurriculumMatch,
+    refreshRegistrarCurriculumId,
+    restrictToRegistrarCurriculum,
+    syncRegistrarScopeFromAdminData,
+} from "../utils/registrarCurriculumRestriction";
+import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import CampaignIcon from '@mui/icons-material/Campaign';
-import ScoreIcon from '@mui/icons-material/Score';
 import DateField from "../components/DateField";
-import PersonIcon from "@mui/icons-material/Person";
 
 
 const ApplicantScoring = () => {
-
-
+  useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -81,12 +79,10 @@ const ApplicantScoring = () => {
             setFetchedLogo(EaristLogo);
         }
 
-        // 🏷️ School Info
         if (settings.company_name) setCompanyName(settings.company_name);
         if (settings.short_term) setShortTerm(settings.short_term);
         if (settings.campus_address) setCampusAddress(settings.campus_address);
 
-        // ✅ Branches (JSON stored in DB)
         if (settings?.branches) {
             try {
                 const parsed =
@@ -134,47 +130,6 @@ const ApplicantScoring = () => {
         navigate(`//admission_personal_information?person_id=${personId}`);
     };
 
-    const tabs = [
-        {
-            label: "Applicant List",
-            to: "/admission_applicant_list",
-            icon: <SchoolIcon fontSize="large" />,
-        },
-        {
-            label: "Applicant Profile",
-            to: "/admission_personal_information",
-            icon: <PersonIcon fontSize="large" />,
-        },
-        {
-            label: "Applicant Online Requirements",
-            to: "/admission_online_requirements",
-            icon: <AssignmentIcon fontSize="large" />,
-        },
-        {
-            label: "Verify Schedule Management",
-            to: "/verify_document_schedule_management",
-            icon: <ScheduleIcon fontSize="large" />,
-        },
-        {
-            label: "Entrance Exam Schedule Management",
-            to: "/entrance_exam_schedule_management",
-            icon: <ScheduleIcon fontSize="large" />,
-        },
-
-        {
-            label: "Examination Permit",
-            to: "/examination_permit_change_course",
-            icon: <PersonSearchIcon fontSize="large" />,
-        },
-
-        {
-            label: "Entrance Examination Score",
-            to: "/applicant_entrance_exam_score",
-            icon: <ScoreIcon fontSize="large" />,
-        },
-
-    ];
-
     const [hasAccess, setHasAccess] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -189,6 +144,7 @@ const ApplicantScoring = () => {
             localStorage.getItem("email") ||
             "unknown",
         audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
     });
 
     useEffect(() => {
@@ -237,10 +193,6 @@ const ApplicantScoring = () => {
 
 
     const navigate = useNavigate();
-    const [activeStep, setActiveStep] = useState(6);
-    const [clickedSteps, setClickedSteps] = useState(Array(tabs.length).fill(false));
-
-
 
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
@@ -277,17 +229,6 @@ const ApplicantScoring = () => {
         }
     }, [location, navigate]);
 
-    const handleStepClick = (index, to) => {
-        setActiveStep(index);
-
-        const pid = sessionStorage.getItem("admin_edit_person_id");
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else {
-            navigate(to);
-        }
-    };
-
 
 
 
@@ -298,6 +239,32 @@ const ApplicantScoring = () => {
     const [userID, setUserID] = useState("");
     const [user, setUser] = useState("");
     const [userRole, setUserRole] = useState("");
+    const [adminData, setAdminData] = useState({
+        dprtmnt_id: "",
+        dprtmnt_ids: [],
+    });
+    const scopeRevision = useRegistrarScopeRevision();
+
+    const fetchPersonData = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+            setAdminData(res.data);
+            syncRegistrarScopeFromAdminData(res.data);
+        } catch (err) {
+            console.error("Error fetching admin data:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (user) fetchPersonData();
+    }, [user]);
+
+    useEffect(() => {
+        if (userRole !== "registrar" || !employeeID) return;
+        refreshRegistrarCurriculumId(employeeID).catch((err) => {
+            console.error("Error refreshing registrar scope:", err);
+        });
+    }, [userRole, employeeID]);
 
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = queryParams.get("person_id")?.trim() || "";
@@ -364,6 +331,7 @@ const ApplicantScoring = () => {
 
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchError, setSearchError] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [snack, setSnack] = useState({ open: false, message: '', severity: 'info' });
     const [person, setPerson] = useState({
@@ -483,20 +451,53 @@ const ApplicantScoring = () => {
 
 
     const [curriculumOptions, setCurriculumOptions] = useState([]);
-
+    const [allCurriculums, setAllCurriculums] = useState([]);
 
     useEffect(() => {
+        const departmentIds =
+            Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+                ? adminData.dprtmnt_ids
+                : adminData.dprtmnt_id
+                    ? [adminData.dprtmnt_id]
+                    : [];
+
+        if (!departmentIds.length) return;
+
         const fetchCurriculums = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
-                setCurriculumOptions(response.data);
+                const responses = await Promise.all(
+                    departmentIds.map((departmentId) =>
+                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+                    ),
+                );
+                const merged = responses.flatMap((response) => response.data || []);
+                const restricted = restrictToRegistrarCurriculum(merged);
+                setCurriculumOptions(restricted);
+                setAllCurriculums(restricted);
             } catch (error) {
                 console.error("Error fetching curriculum options:", error);
             }
         };
 
         fetchCurriculums();
-    }, []);
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+    useEffect(() => {
+        const departmentIds =
+            Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+                ? adminData.dprtmnt_ids
+                : adminData.dprtmnt_id
+                    ? [adminData.dprtmnt_id]
+                    : [];
+
+        if (departmentIds.length) return;
+
+        axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
+            const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
+            setAllCurriculums(restrictedCurriculums);
+            setCurriculumOptions(restrictedCurriculums);
+        });
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
     const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
     const [sortBy, setSortBy] = useState("name");
@@ -507,7 +508,6 @@ const ApplicantScoring = () => {
     const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState("");
     const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
     const [department, setDepartment] = useState([]);
-    const [allCurriculums, setAllCurriculums] = useState([]);
     const filteredDepartments = department.filter((dep) =>
         allCurriculums.some(
             (curriculum) =>
@@ -610,6 +610,10 @@ const ApplicantScoring = () => {
             const programInfo = allCurriculums.find(
                 (opt) => opt.curriculum_id?.toString() === personData.program?.toString()
             );
+            const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(
+                personData.program,
+                allCurriculums,
+            );
 
             const matchesProgram =
                 selectedProgramFilter === "" ||
@@ -707,6 +711,7 @@ const ApplicantScoring = () => {
                 matchesSubmittedDocs &&
                 matchesDepartment &&
                 matchesProgram &&
+                matchesRegistrarCurriculum &&
                 matchesSchoolYear &&
                 matchesSemester &&
                 matchesDateRange &&
@@ -763,25 +768,62 @@ const ApplicantScoring = () => {
     }
 
     useEffect(() => {
+        const departmentIds =
+            Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+                ? adminData.dprtmnt_ids
+                : adminData.dprtmnt_id
+                    ? [adminData.dprtmnt_id]
+                    : [];
+
+        if (!departmentIds.length) return;
+
         const fetchDepartments = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/departments`); // ✅ Update if needed
-                setDepartment(response.data);
+                const responses = await Promise.all(
+                    departmentIds.map((departmentId) =>
+                        axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+                    ),
+                );
+                const mergedDepartments = responses.flatMap(
+                    (response) => response.data || [],
+                );
+                const uniqueDepartments = [
+                    ...new Map(
+                        mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+                    ).values(),
+                ];
+                setDepartment(uniqueDepartments);
             } catch (error) {
                 console.error("Error fetching departments:", error);
             }
         };
 
         fetchDepartments();
-    }, []);
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
+    useEffect(() => {
+        if (!department.length) return;
+
+        if (department.length === 1) {
+            const onlyDeptId = String(department[0].dprtmnt_id);
+            if (String(selectedDepartmentFilter) !== onlyDeptId) {
+                handleDepartmentChange(onlyDeptId);
+            }
+        } else if (
+            selectedDepartmentFilter &&
+            !department.some(
+                (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+            )
+        ) {
+            handleDepartmentChange("");
+        }
+    }, [department]);
 
     useEffect(() => {
         if (currentPage > totalPages) {
             setCurrentPage(totalPages || 1);
         }
     }, [filteredPersons.length, totalPages]);
-
 
     const handleSnackClose = (_, reason) => {
         if (reason === 'clickaway') return;
@@ -790,13 +832,6 @@ const ApplicantScoring = () => {
 
 
 
-    useEffect(() => {
-        axios.get(`${API_BASE_URL}/api/applied_program`)
-            .then(res => {
-                setAllCurriculums(res.data);
-                setCurriculumOptions(res.data);
-            });
-    }, []);
 
     const handleCampusChange = (branchId) => {
         setPerson(prev => ({ ...prev, campus: branchId }));
@@ -1072,6 +1107,8 @@ const ApplicantScoring = () => {
             const actor = auditActor();
             fd.append("audit_actor_id", actor.audit_actor_id);
             fd.append("audit_actor_role", actor.audit_actor_role);
+            const macAddress = getLoginMacPayload().user_mac_address;
+            if (macAddress) fd.append("user_mac_address", macAddress);
 
             const res = await axios.post(
                 `${API_BASE_URL}/api/exam/import`,
@@ -1446,61 +1483,7 @@ const ApplicantScoring = () => {
             <br />
             <br />
 
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // ❌ prevent wrapping
-                    width: "100%",
-
-                    gap: 2,
-                }}
-            >
-                {tabs.map((tab, index) => (
-                    <Card
-                        key={index}
-                        onClick={() => handleStepClick(index, tab.to)}
-                        sx={{
-                            flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-                            height: 135,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            borderRadius: 2,
-                            border: `1px solid ${borderColor}`,
-                            backgroundColor:
-                                activeStep === index
-                                    ? settings?.header_color || "#1976d2"
-                                    : "#E8C999",
-                            color: activeStep === index ? "#fff" : "#000",
-                            boxShadow:
-                                activeStep === index
-                                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                            transition: "0.3s ease",
-                            "&:hover": {
-                                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                            },
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                            }}
-                        >
-                            <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-                            <Typography
-                                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                            >
-                                {tab.label}
-                            </Typography>
-                        </Box>
-                    </Card>
-                ))}
-            </Box>
+            <AdmissionProcessTabs />
 
             <br />
             <br />
@@ -2032,7 +2015,9 @@ const ApplicantScoring = () => {
                                     onChange={(e) => handleDepartmentChange(e.target.value)}
                                     displayEmpty
                                 >
-                                    <MenuItem value="">All Departments</MenuItem>
+                                    {department.length > 1 && (
+                                        <MenuItem value="">All Departments</MenuItem>
+                                    )}
                                     {filteredDepartments.map((dep) => (
                                         <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                                             {dep.dprtmnt_name} ({dep.dprtmnt_code})

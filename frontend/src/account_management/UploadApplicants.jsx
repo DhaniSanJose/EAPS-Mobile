@@ -27,11 +27,14 @@ import {
 } from "@mui/material";
 import { Delete, FileUpload, PersonAdd, Save, Search } from "@mui/icons-material";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { SettingsContext } from "../App";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 
 const UploadApplicants = () => {
+  useAccountAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -92,8 +95,8 @@ const UploadApplicants = () => {
 
   const [employeeID, setEmployeeID] = useState("");
 
-  const getAuditHeaders = () => ({
-    headers: {
+  const getAuditHeaders = () =>
+    getAuditConfig({
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-change-section": "personal_information",
@@ -103,11 +106,8 @@ const UploadApplicants = () => {
         localStorage.getItem("person_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    },
-  });
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    });
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");

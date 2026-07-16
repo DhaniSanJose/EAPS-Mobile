@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
-  Box, Button, Grid, MenuItem, TextField, Typography, Paper, Card, TableContainer,
+  Box, Button, Grid, MenuItem, TextField, Typography, Paper, TableContainer,
   Table,
   TableHead,
   TableRow,
@@ -18,19 +18,17 @@ import { Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 
 import { Link, useLocation } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import SchoolIcon from "@mui/icons-material/School";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import ScheduleIcon from "@mui/icons-material/Schedule";
-import PeopleIcon from "@mui/icons-material/People";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import KeyIcon from "@mui/icons-material/Key";
 import API_BASE_URL from "../apiConfig";
-import CampaignIcon from '@mui/icons-material/Campaign';
+import { getAuditConfig } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import AdmissionRoomAssignmentTabs from "../components/AdmissionRoomAssignmentTabs";
 import SearchIcon from "@mui/icons-material/Search";
 import InputAdornment from "@mui/material/InputAdornment";
 import EditIcon from "@mui/icons-material/Edit";
@@ -42,6 +40,7 @@ import SaveIcon from '@mui/icons-material/Save';
 
 
 const AssignEntranceExam = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -94,58 +93,19 @@ const AssignEntranceExam = () => {
 
   }, [settings]);
 
-  const tabs = [
-
-    {
-      label: "Verify Documents Room Assignment",
-      to: "/verify_document_room_assignment",
-      icon: <MeetingRoomIcon fontSize="large" />,
-    },
-
-    {
-      label: "Evaluator's Applicant List",
-      to: "/evaluator_schedule_room_list",
-      icon: <PeopleIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Exam Room Assignment",
-      to: "/entrance_exam_room_assignment",
-      icon: <MeetingRoomIcon fontSize="large" />,
-    },
-
-    {
-      label: "Proctor's Applicant List",
-      to: "/admission_schedule_room_list",
-      icon: <PeopleIcon fontSize="large" />,
-    },
-
-    {
-      label: "Subject Management",
-      to: "/applicant_exam_subjects",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-
-    {
-      label: "Announcement",
-      to: "/admission_announcement",
-      icon: <CampaignIcon fontSize="large" />,
-    },
-  ];
-
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
   const [employeeID, setEmployeeID] = useState("");
-  const auditConfig = {
-    headers: {
-      "x-audit-actor-id":
+  const getAuditConfigForPage = () =>
+    getAuditConfig({
+"x-audit-actor-id":
         employeeID ||
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-    },
-  };
+    });
   const [hasAccess, setHasAccess] = useState(null);
 
   const currentYear = new Date().getFullYear();
@@ -178,17 +138,7 @@ const AssignEntranceExam = () => {
   const [openUpdateDialog, setOpenUpdateDialog] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [activeStep, setActiveStep] = useState(2);
-  const [clickedSteps, setClickedSteps] = useState(Array(tabs.length).fill(false));
-
-  const navigate = useNavigate();
-
   const pageId = 9;
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    navigate(to);
-  };
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -345,7 +295,7 @@ const AssignEntranceExam = () => {
             room_quota: roomQuota,
             active_school_year_id: schoolYearId,
           },
-          auditConfig,
+          getAuditConfigForPage(),
         );
         setSnackbarMessage("Schedule updated");
       } else {
@@ -359,7 +309,7 @@ const AssignEntranceExam = () => {
           proctor,
           room_quota: roomQuota,
           active_school_year_id: schoolYearId,
-        }, auditConfig);
+        }, getAuditConfigForPage());
         setSnackbarMessage("Schedule saved");
       }
 
@@ -406,7 +356,7 @@ const AssignEntranceExam = () => {
     try {
       await axios.delete(
         `${API_BASE_URL}/api/delete_exam_schedule/${scheduleToDelete.schedule_id}`,
-        auditConfig,
+        getAuditConfigForPage(),
       );
       setSchedules(prev => prev.filter(s => s.schedule_id !== scheduleToDelete.schedule_id));
 
@@ -607,61 +557,7 @@ const AssignEntranceExam = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <AdmissionRoomAssignmentTabs />
 
       <br />
       <br />
@@ -1405,7 +1301,7 @@ const AssignEntranceExam = () => {
               try {
                 await axios.delete(
                   `${API_BASE_URL}/api/delete_exam_schedule/${scheduleToDelete.schedule_id}`,
-                  auditConfig,
+                  getAuditConfigForPage(),
                 );
                 setSchedules((prev) => prev.filter((s) => s.schedule_id !== scheduleToDelete.schedule_id));
                 setSnackbarMessage("Schedule deleted ✅");

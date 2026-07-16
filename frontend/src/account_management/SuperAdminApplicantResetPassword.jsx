@@ -32,9 +32,14 @@ import {
   AdminPanelSettings,
 } from "@mui/icons-material";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import DateField from "../components/DateField";
 
 const SuperAdminApplicantResetPassword = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -166,12 +171,14 @@ const SuperAdminApplicantResetPassword = () => {
   const [applicants, setApplicants] = useState([]);
 
   const auditFields = () => ({
+
     audit_actor_id:
       employeeID ||
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   useEffect(() => {
@@ -193,10 +200,14 @@ const SuperAdminApplicantResetPassword = () => {
     if (!userInfo) return;
     setResetLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/superadmin-reset-applicant`, {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/superadmin-reset-applicant`,
+        {
         email: userInfo.email,
         ...auditFields(),
-      });
+      },
+        getAuditRequestConfig(),
+      );
       // ✅ Store pending flag keyed to the target user's email
 
       setSnackbar({ open: true, message: res.data.message, severity: "success" });
@@ -215,11 +226,15 @@ const SuperAdminApplicantResetPassword = () => {
     const newStatus = parseInt(e.target.value, 10);
     setUserInfo((prev) => ({ ...prev, status: newStatus }));
     try {
-      await axios.post(`${API_BASE_URL}/api/superadmin-update-status-applicant`, {
+      await axios.post(
+        `${API_BASE_URL}/api/superadmin-update-status-applicant`,
+        {
         email: userInfo.email,
         status: newStatus,
         ...auditFields(),
-      });
+      },
+        getAuditRequestConfig(),
+      );
     } catch (err) {
       console.error("Failed to update status", err);
     }
@@ -288,11 +303,15 @@ const SuperAdminApplicantResetPassword = () => {
     if (!userInfo) return;
     setStatusLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/superadmin-update-status-applicant`, {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/superadmin-update-status-applicant`,
+        {
         email: userInfo.email,
         status: userInfo.status,
         ...auditFields(),
-      });
+      },
+        getAuditRequestConfig(),
+      );
       setApplicants((prev) =>
         prev.map((a) =>
           a.email === userInfo.email ? { ...a, status: userInfo.status } : a,

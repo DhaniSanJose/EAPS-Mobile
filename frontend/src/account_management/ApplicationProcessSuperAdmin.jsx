@@ -30,6 +30,8 @@ import {
 import { io } from "socket.io-client";
 import { Snackbar, Alert } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -43,6 +45,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
 
 const ApplicationProcessAdmin = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);

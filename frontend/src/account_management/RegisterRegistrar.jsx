@@ -38,6 +38,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import SaveIcon from "@mui/icons-material/Save";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import SearchIcon from "@mui/icons-material/Search";
@@ -56,6 +58,8 @@ import ImageIcon from "@mui/icons-material/Image";
 
 
 const RegisterRegistrar = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");

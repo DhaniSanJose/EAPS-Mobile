@@ -7,9 +7,12 @@ import EaristLogo from "../assets/EaristLogo.png";
 import { FcPrint } from "react-icons/fc";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import DownloadIcon from "@mui/icons-material/Download";
 
 const PersonalDataForm = forwardRef(({ personId }, ref) => {
+  useAuditMac();
 
     const settings = useContext(SettingsContext);
 

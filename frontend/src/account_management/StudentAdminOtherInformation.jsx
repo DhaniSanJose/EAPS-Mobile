@@ -18,12 +18,29 @@ import ExamPermit from "../applicant/ExamPermit";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 
 const SuperAdminStudentDashboard5 = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
+  const getAuditHeaders = () =>
+    getAuditConfig({
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-change-section": "other_information",
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("person_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    });
 
     const settings = useContext(SettingsContext);
 
@@ -261,7 +278,7 @@ const SuperAdminStudentDashboard5 = () => {
         };
 
         try {
-            await axios.put(`${API_BASE_URL}/api/person/${userID}`, updatedPerson);
+            await axios.put(`${API_BASE_URL}/api/person/${userID}`, updatedPerson, getAuditHeaders());
             console.log("Auto-saved with created_at:", updatedPerson.created_at);
         } catch (error) {
             console.error("Auto-save failed:", error);
@@ -289,7 +306,7 @@ const SuperAdminStudentDashboard5 = () => {
     // 🖱️ Triggered when input loses focus (safety net)
     const handleBlur = async () => {
         try {
-            await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, person);
+            await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, person, getAuditHeaders());
             console.log("✅ Auto-saved (on blur) to ENROLLMENT DB3");
         } catch (err) {
             console.error("❌ Auto-save failed (on blur):", err);

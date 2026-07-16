@@ -20,6 +20,8 @@ import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIELD DEFINITIONS FOR DASHBOARD 3 (Educational Attainment)
@@ -101,6 +103,7 @@ const buildDefaultState = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const StudentEditPermissions3 = () => {
   const settings = useContext(SettingsContext);
+  useAccountAuditMac();
 
   const [mainButtonColor, setMainButtonColor] = useState("#6D2323");
   const [borderColor, setBorderColor] = useState("#000");
@@ -121,8 +124,8 @@ const StudentEditPermissions3 = () => {
   // permission panels so all dashboard field locks live in one store.
   const pageId = 157; // same page_id as SuperAdminStudentDashboard3
 
-  const auditConfig = {
-    headers: {
+  const getAuditConfigForPage = () =>
+    getAuditConfig({
       "x-employee-id":
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
@@ -134,8 +137,7 @@ const StudentEditPermissions3 = () => {
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
       "x-audit-change-section": "Educational Attainment",
-    },
-  };
+    });
 
   // ── Load theme settings ───────────────────────────────────────────────────
   useEffect(() => {
@@ -214,7 +216,7 @@ const StudentEditPermissions3 = () => {
         ...buildSectionPayload(sourcePermissions),
         ...(options.isReset ? { reset_to_defaults: true } : {}),
       },
-      auditConfig,
+      getAuditConfigForPage(),
     );
   };
 

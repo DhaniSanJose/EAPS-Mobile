@@ -18,6 +18,7 @@ const {
   insertAuditLogAdmission,
   insertAuditLogEnrollment,
 } = require("./utils/auditLogger");
+const { resolveUserMacAddress } = require("./utils/macAddress");
 const {
   getCourseLabel,
   getStudentNameByNumber,
@@ -43,7 +44,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.42:5173",
+  "http://192.168.50.40:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -2965,11 +2966,21 @@ const buildAuditEventMessage = async (req) => {
     },
     PRINTING_APPLICANT_DOCS: {
       type: "Printing",
-      message: `${actorNameWithId} printed ${details.document_label || "applicant document"} for applicant ${applicantName} (${applicantNumber}).`,
+      message: details.failed
+        ? `${actorNameWithId} failed to print ${details.document_label || "applicant document"} for applicant ${applicantName} (${applicantNumber}).`
+        : `${actorNameWithId} printed ${details.document_label || "applicant document"} for applicant ${applicantName} (${applicantNumber}).`,
     },
     PRINTING_STUDENT_DOCS: {
       type: "Printing",
-      message: `${actorNameWithId} printed ${details.document_label || "student document"} for student ${searchedStudentName} (${searchedStudentNumber}).`,
+      message: details.failed
+        ? `${actorNameWithId} failed to print ${details.document_label || "student document"} for student ${searchedStudentName} (${searchedStudentNumber}).`
+        : `${actorNameWithId} printed ${details.document_label || "student document"} for student ${searchedStudentName} (${searchedStudentNumber}).`,
+    },
+    DOWNLOAD_EXAM_PDF: {
+      type: "Download",
+      message: details.failed
+        ? `${actorNameWithId} failed to download ${details.document_label || "exam document"} PDF for applicant ${applicantName} (${applicantNumber}).`
+        : `${actorNameWithId} downloaded ${details.document_label || "exam document"} PDF for applicant ${applicantName} (${applicantNumber}).`,
     },
   };
 
@@ -2992,16 +3003,26 @@ app.post("/api/audit/event", async (req, res) => {
     }
 
     const insertFn =
-      auditEvent.eventType === "PRINTING_APPLICANT_DOCS"
+      auditEvent.eventType === "PRINTING_APPLICANT_DOCS" ||
+      auditEvent.eventType === "DOWNLOAD_EXAM_PDF"
         ? insertAuditLogAdmission
         : insertAuditLogEnrollment;
+
+    const userMacAddress = await resolveUserMacAddress(req);
 
     await insertFn({
       actorId: auditEvent.actor.id,
       role: req.headers["x-audit-actor-role"] || req.body?.audit_actor_role || "faculty",
       action: auditEvent.eventType,
-      severity: "INFO",
+      severity:
+        (auditEvent.eventType === "PRINTING_APPLICANT_DOCS" ||
+          auditEvent.eventType === "PRINTING_STUDENT_DOCS" ||
+          auditEvent.eventType === "DOWNLOAD_EXAM_PDF") &&
+        req.body?.details?.failed
+          ? "WARNING"
+          : "INFO",
       message: auditEvent.message,
+      userMacAddress,
     });
 
     res.json({ success: true, message: "Log inserted" });

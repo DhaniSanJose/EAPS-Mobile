@@ -718,12 +718,18 @@ const ApplicantDashboard = (props) => {
       </Box>
     );
 
-    if (index === 3) return (
-      <Typography variant="body2" sx={{ color: "maroon", fontWeight: "bold" }}>
-        {collegeApproval === "Accepted" ? "✅ Approved by College" : collegeApproval === "Rejected" ? "❌ Rejected by College" : "⏳ Waiting for College Approval"}
-      </Typography>
-    );
+    if (index === 3)
+      return (
+        <Typography variant="body2" sx={{ color: "maroon", fontWeight: "bold" }}>
+          {collegeApproval === "Accepted"
+            ? "✅ Approved by College"
+            : collegeApproval === "Rejected"
+              ? `❌ After careful evaluation, we regret to inform you that your application could not be approved at this time as it did not satisfy one or more of the admission requirements or program qualifications. Thank you for your understanding, and we wish you success in your future academic endeavors.`
+              : "⏳ Waiting for College Approval"}
+        </Typography>
+      );
 
+      
     if (index === 4) return (
       <Typography variant="body2" sx={{ color: "maroon", fontWeight: "bold", lineHeight: 1.6 }}>
         {registrarApproved

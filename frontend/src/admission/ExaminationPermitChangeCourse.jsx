@@ -23,19 +23,19 @@ import {
 import EaristLogo from "../assets/EaristLogo.png";
 import "../styles/Print.css";
 import API_BASE_URL from "../apiConfig";
-import { postAuditEvent } from "../utils/auditEvents";
+import { getAuditConfig, getFlatAuditHeaders, postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import { FcPrint } from "react-icons/fc";
 import { useLocation, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import SchoolIcon from "@mui/icons-material/School";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import ScheduleIcon from "@mui/icons-material/Schedule";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
+import PrintingHistoryDialog, {
+  DOWNLOAD_EXAM_PDF_ACTION,
+} from "../components/PrintingHistoryDialog";
 import SearchIcon from "@mui/icons-material/Search";
-import ScoreIcon from "@mui/icons-material/Score";
-import PersonIcon from "@mui/icons-material/Person";
 import Autocomplete from "@mui/material/Autocomplete";
 import PrintIcon from "@mui/icons-material/Print";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -116,6 +116,7 @@ const FORM_ENDPOINTS = {
 };
 
 const ExaminationProfile = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
@@ -160,16 +161,6 @@ const ExaminationProfile = () => {
   const firstLine = words.slice(0, middle).join(" ");
   const secondLine = words.slice(middle).join(" ");
 
-  const tabs = [
-    { label: "Applicant List", to: "/admission_applicant_list", icon: <SchoolIcon fontSize="large" /> },
-    { label: "Applicant Profile", to: "/admission_personal_information", icon: <PersonIcon fontSize="large" /> },
-    { label: "Applicant Online Requirements", to: "/admission_online_requirements", icon: <AssignmentIcon fontSize="large" /> },
-    { label: "Verify Schedule Management", to: "/verify_document_schedule_management", icon: <ScheduleIcon fontSize="large" /> },
-    { label: "Entrance Exam Schedule Management", to: "/entrance_exam_schedule_management", icon: <ScheduleIcon fontSize="large" /> },
-    { label: "Examination Permit", to: "/examination_permit_change_course", icon: <PersonSearchIcon fontSize="large" /> },
-    { label: "Entrance Examination Score", to: "/applicant_entrance_exam_score", icon: <ScoreIcon fontSize="large" /> },
-  ];
-
   const location = useLocation();
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -192,14 +183,6 @@ const ExaminationProfile = () => {
   }, [location.search]);
 
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(5);
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-    if (pid) navigate(`${to}?person_id=${pid}`);
-    else navigate(to);
-  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [persons, setPersons] = useState([]);
@@ -211,6 +194,7 @@ const ExaminationProfile = () => {
 
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [employeeID, setEmployeeID] = useState("");
   const pageId = 48;
 
   useEffect(() => {
@@ -219,8 +203,10 @@ const ExaminationProfile = () => {
     const storedID = localStorage.getItem("person_id");
     const storedEmployeeID = localStorage.getItem("employee_id");
     if (storedUser && storedRole && storedID) {
-      if (storedRole === "registrar") checkAccess(storedEmployeeID);
-      else window.location.href = "/login";
+      if (storedRole === "registrar") {
+        setEmployeeID(storedEmployeeID || "");
+        checkAccess(storedEmployeeID);
+      } else window.location.href = "/login";
     } else {
       window.location.href = "/login";
     }
@@ -411,11 +397,40 @@ const ExaminationProfile = () => {
   // form options via FORM_ENDPOINTS + refMap.
   const [downloadingKey, setDownloadingKey] = useState(null);
 
+  const logDownloadExamPdf = async (documentLabel, { failed = false } = {}) => {
+    try {
+      const source = selectedPerson || person;
+      const middleInitial = source?.middle_name
+        ? ` ${String(source.middle_name).trim().charAt(0).toUpperCase()}.`
+        : "";
+      const applicantName = source?.last_name
+        ? `${source.last_name}, ${source.first_name || ""}${middleInitial}`.trim()
+        : [source?.first_name, source?.middle_name].filter(Boolean).join(" ") ||
+          "Unknown Applicant";
+
+      await postAuditEvent(DOWNLOAD_EXAM_PDF_ACTION, {
+        document_label: documentLabel,
+        applicant_name: applicantName,
+        applicant_number:
+          selectedPerson?.applicant_number || applicantNumber || "N/A",
+        person_id: selectedPerson?.person_id || person?.person_id || "",
+        failed,
+      });
+    } catch (err) {
+      console.error("Download exam PDF audit failed:", err);
+    }
+  };
+
   const handleDownloadPdf = async () => {
     if (!selectedPerson || !selectedForm) return;
 
     const config = FORM_ENDPOINTS[selectedForm];
     const ref = refMap[selectedForm];
+    const formLabel =
+      FORM_OPTIONS.find((opt) => opt.key === selectedForm)?.label ||
+      config?.prefix ||
+      "exam document";
+
     if (!config || !ref?.current) {
       console.error("No endpoint/ref configured for form:", selectedForm);
       return;
@@ -439,8 +454,16 @@ const ExaminationProfile = () => {
           last_name: selectedPerson?.last_name || "",
           first_name: selectedPerson?.first_name || "",
           control_number: controlNumber, // 👈 pass it to the PDF route so the file matches what's on screen
+          document_label: formLabel,
+          audit_print_action: DOWNLOAD_EXAM_PDF_ACTION,
+          audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
+          audit_actor_role: localStorage.getItem("role") || "registrar",
+          ...getLoginMacPayload(),
         },
-        { responseType: "blob" },
+        {
+          responseType: "blob",
+          headers: getAuditHeaders(),
+        },
       );
 
       const blob = new Blob([response.data], { type: "application/pdf" });
@@ -459,6 +482,8 @@ const ExaminationProfile = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to generate PDF:", error);
+      // Still audit when download fails (e.g. IDM intercept) so history is recorded.
+      await logDownloadExamPdf(formLabel, { failed: true });
       alert("Something went wrong while generating the PDF. Please try again.");
     } finally {
       setDownloadingKey(null);
@@ -756,7 +781,8 @@ const ExaminationProfile = () => {
 
   const ProgramRow = ({ filled }) => {
     const programText = filled && curriculumOptions.length > 0
-      ? `${curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.program_description || person?.program || ""} ${curriculumOptions.find((c) => c.curriculum_id?.toString() === (person?.program ?? "").toString())?.major || ""}`
+      ? `${curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.program_code || person?.program || ""} ${curriculumOptions.find((c) => c.curriculum_id?.toString() === (person?.program ?? "").toString())?.major || ""
+        }`.toUpperCase()
       : "";
     return (
       <tr>
@@ -979,16 +1005,50 @@ const ExaminationProfile = () => {
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%", gap: "10px" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Course Applied:</label>
-                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", minWidth: "265px", width: "100%", display: "flex", alignItems: "center", paddingRight: "5px", overflowWrap: "break-word" }}>
-                    {curriculumOptions.length > 0 ? curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.program_description || (person?.program ?? "") : "Loading..."}
+                  <div
+                    style={{
+                      borderBottom: "1px solid black",
+                      fontFamily: "Arial",
+                      fontWeight: "normal",
+                      fontSize: "15px",
+                      minWidth: "265px",
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      paddingRight: "5px",
+                      overflowWrap: "break-word",
+                
+                    }}
+                  >
+                    {curriculumOptions.length > 0
+                      ? curriculumOptions.find(
+                        (i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString()
+                      )?.program_description || (person?.program ?? "")
+                      : "Loading..."}
                   </div>
                 </div>
               </td>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%", gap: "10px" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Major:</label>
-                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", width: "100%", display: "flex", alignItems: "center", paddingRight: "5px" }}>
-                    {curriculumOptions.length > 0 ? curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.major || "" : "Loading..."}
+                  <div
+                    style={{
+                      borderBottom: "1px solid black",
+                      fontFamily: "Arial",
+                      fontWeight: "normal",
+                      fontSize: "15px",
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      paddingRight: "5px",
+                  
+                    }}
+                  >
+                    {curriculumOptions.length > 0
+                      ? curriculumOptions.find(
+                        (i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString()
+                      )?.major || ""
+                      : "Loading..."}
                   </div>
                 </div>
               </td>
@@ -1199,106 +1259,60 @@ const ExaminationProfile = () => {
         <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}>
           EXAMINATION PERMIT CHANGE COURSE
         </Typography>
-        <Autocomplete
-          options={persons}
-          value={selectedPerson}
-          inputValue={searchQuery}
-          isOptionEqualToValue={(option, value) => option?.person_id === value?.person_id || option?.applicant_number === value?.applicant_number}
-          getOptionLabel={(option) => option ? `${option.applicant_number || ""} - ${option.last_name || ""}, ${option.first_name || ""} ${option.middle_name || ""} (${option.emailAddress || ""})` : ""}
-          onInputChange={(event, newInputValue, reason) => { if (reason !== "reset") setSearchQuery(newInputValue); }}
-          filterOptions={(options, state) => {
-            const query = state.inputValue.toLowerCase();
-            return options.filter((p) => {
-              const fullString = `${p.first_name ?? ""} ${p.middle_name ?? ""} ${p.last_name ?? ""} ${p.emailAddress ?? ""}`.toLowerCase();
-              return (p.applicant_number || "").toLowerCase().includes(query) || fullString.includes(query);
-            });
-          }}
-          onChange={(event, newValue) => {
-            if (newValue) {
-              setSelectedPerson(newValue);
-              fetchPersonData(newValue.person_id);
-              setApplicantNumber(newValue.applicant_number);
-              setSearchQuery(newValue.applicant_number || "");
-              sessionStorage.setItem("admin_edit_person_id", newValue.person_id);
-              setSelectedForm(null);
-            } else {
-              setSelectedPerson(null);
-              setApplicantNumber("");
-              setSearchQuery("");
-              setSelectedForm(null);
-            }
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params} variant="outlined"
-              placeholder="Search Applicant Name / Email / Applicant ID"
-              size="small"
-              sx={{ width: 450, backgroundColor: "#fff", borderRadius: 1, "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
-              InputProps={{ ...params.InputProps, startAdornment: (<><SearchIcon sx={{ mr: 1, color: "gray" }} />{params.InputProps.startAdornment}</>) }}
-            />
-          )}
-        />
+        <Box display="flex" alignItems="center" gap={2}>
+          <Autocomplete
+            options={persons}
+            value={selectedPerson}
+            inputValue={searchQuery}
+            isOptionEqualToValue={(option, value) => option?.person_id === value?.person_id || option?.applicant_number === value?.applicant_number}
+            getOptionLabel={(option) => option ? `${option.applicant_number || ""} - ${option.last_name || ""}, ${option.first_name || ""} ${option.middle_name || ""} (${option.emailAddress || ""})` : ""}
+            onInputChange={(event, newInputValue, reason) => { if (reason !== "reset") setSearchQuery(newInputValue); }}
+            filterOptions={(options, state) => {
+              const query = state.inputValue.toLowerCase();
+              return options.filter((p) => {
+                const fullString = `${p.first_name ?? ""} ${p.middle_name ?? ""} ${p.last_name ?? ""} ${p.emailAddress ?? ""}`.toLowerCase();
+                return (p.applicant_number || "").toLowerCase().includes(query) || fullString.includes(query);
+              });
+            }}
+            onChange={(event, newValue) => {
+              if (newValue) {
+                setSelectedPerson(newValue);
+                fetchPersonData(newValue.person_id);
+                setApplicantNumber(newValue.applicant_number);
+                setSearchQuery(newValue.applicant_number || "");
+                sessionStorage.setItem("admin_edit_person_id", newValue.person_id);
+                setSelectedForm(null);
+              } else {
+                setSelectedPerson(null);
+                setApplicantNumber("");
+                setSearchQuery("");
+                setSelectedForm(null);
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params} variant="outlined"
+                placeholder="Search Applicant Name / Email / Applicant ID"
+                size="small"
+                sx={{ width: 450, backgroundColor: "#fff", borderRadius: 1, "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+                InputProps={{ ...params.InputProps, startAdornment: (<><SearchIcon sx={{ mr: 1, color: "gray" }} />{params.InputProps.startAdornment}</>) }}
+              />
+            )}
+          />
+          <PrintingHistoryDialog
+            employeeId={employeeID}
+            action={DOWNLOAD_EXAM_PDF_ACTION}
+            buttonLabel="View Download History"
+            title="My Exam PDF Download History"
+          />
+        </Box>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap",
-          width: "100%",
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`,
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
-
+      <AdmissionProcessTabs />
 
       <br /><br />
 

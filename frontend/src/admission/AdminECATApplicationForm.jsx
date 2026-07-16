@@ -7,10 +7,13 @@ import { FcPrint } from "react-icons/fc";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import DownloadIcon from "@mui/icons-material/Download";
 
 
 const ECATApplicationForm = forwardRef(({ personId }, ref) => {
+  useAuditMac();
 
   const settings = useContext(SettingsContext);
 

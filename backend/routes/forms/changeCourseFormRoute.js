@@ -183,13 +183,34 @@ const makeChangeCourseHandler = ({ routeLabel, filenamePrefix, auditAction, audi
       try {
         const { actorId, actorRole } = getEnrollmentAuditActor(req);
         const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-        await insertAuditLogAdmission({
-          actorId,
-          role: actorRole,
-          action: auditAction,
-          severity: "INFO",
-          message: `${roleLabel} (${actorId}) exported ${auditLabel} PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
-        });
+        const printAction = String(req.body?.audit_print_action || "").trim();
+        const label = String(
+          req.body?.document_label || auditLabel || "document",
+        ).trim();
+        const applicantName = [
+          String(req.body?.last_name || "").trim(),
+          String(req.body?.first_name || "").trim(),
+        ]
+          .filter(Boolean)
+          .join(", ") || "Unknown Applicant";
+
+        if (printAction === "DOWNLOAD_EXAM_PDF") {
+          await insertAuditLogAdmission({
+            actorId,
+            role: actorRole,
+            action: "DOWNLOAD_EXAM_PDF",
+            severity: "INFO",
+            message: `${roleLabel} (${actorId}) downloaded ${label} PDF for applicant ${applicantName} (${applicant_number || "N/A"}).`,
+          });
+        } else {
+          await insertAuditLogAdmission({
+            actorId,
+            role: actorRole,
+            action: auditAction,
+            severity: "INFO",
+            message: `${roleLabel} (${actorId}) exported ${auditLabel} PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
+          });
+        }
       } catch (auditErr) {
         console.error(`${auditLabel} PDF audit log failed:`, auditErr);
       }

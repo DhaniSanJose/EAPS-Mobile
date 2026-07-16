@@ -8,7 +8,6 @@ import {
   Paper,
   Table,
   TableBody,
-  Card,
   TableCell,
   TableContainer,
   TableHead,
@@ -24,75 +23,29 @@ import {
 } from '@mui/material';
 import Search from '@mui/icons-material/Search';
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import { Link, useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { Snackbar, Alert } from "@mui/material";
-import SchoolIcon from "@mui/icons-material/School";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import ScheduleIcon from "@mui/icons-material/Schedule";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PeopleIcon from "@mui/icons-material/People";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
 import SearchIcon from "@mui/icons-material/Search";
 import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from '@mui/icons-material/Campaign';
-import ScoreIcon from '@mui/icons-material/Score';
-import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
-const tabs = [
-  {
-    label: "Applicant List",
-    to: "/admission_applicant_list",
-    icon: <SchoolIcon fontSize="large" />,
-  },
-  {
-    label: "Applicant Profile",
-    to: "/admission_personal_information",
-    icon: <PersonIcon fontSize="large" />,
-  },
-  {
-    label: "Applicant Online Requirements",
-    to: "/admission_online_requirements",
-    icon: <AssignmentIcon fontSize="large" />,
-  },
-  {
-    label: "Verify Schedule Management",
-    to: "/verify_document_schedule_management",
-    icon: <ScheduleIcon fontSize="large" />,
-  },
-  {
-    label: "Entrance Exam Schedule Management",
-    to: "/entrance_exam_schedule_management",
-    icon: <ScheduleIcon fontSize="large" />,
-  },
-
-  {
-    label: "Examination Permit",
-    to: "/examination_permit_change_course",
-    icon: <PersonSearchIcon fontSize="large" />,
-  },
-
-  {
-    label: "Entrance Examination Score",
-    to: "/applicant_entrance_exam_score",
-    icon: <ScoreIcon fontSize="large" />,
-  },
-];
-
-
 const StudentRequirements = () => {
+  useAuditMac();
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(2);
-  const [clickedSteps, setClickedSteps] = useState(Array(tabs.length).fill(false));
-
-
   // ------------------------------------
   const [requirements, setRequirements] = useState([]);
 
@@ -128,23 +81,6 @@ const StudentRequirements = () => {
       console.error("❌ person_with_applicant failed:", err);
     }
   };
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid =
-      selectedPerson?.person_id ||
-      person?.person_id ||
-      sessionStorage.getItem("admin_edit_person_id");
-
-    if (pid && to !== "/admission_applicant_list") {
-      sessionStorage.setItem("admin_edit_person_id", pid);
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
-
-
 
   const location = useLocation();
   const [uploads, setUploads] = useState([]);
@@ -453,19 +389,21 @@ const StudentRequirements = () => {
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
-  const getAuditHeaders = (extraHeaders = {}) => ({
-    ...extraHeaders,
-    "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-    "x-page-id": pageId,
-    "x-audit-actor-id":
-      employeeID ||
-      localStorage.getItem("employee_id") ||
-      localStorage.getItem("email") ||
-      "unknown",
-    "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-  });
+  const getAuditHeaders = (extraHeaders = {}) =>
+    getFlatAuditHeaders({
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      ...extraHeaders,
+    });
 
   const getUploadStatusLabel = (status) => {
     if (String(status) === "1") return "Verified";
@@ -1215,61 +1153,7 @@ const StudentRequirements = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <AdmissionProcessTabs />
 
       <br />
       <br />

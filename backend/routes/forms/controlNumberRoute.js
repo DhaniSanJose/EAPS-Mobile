@@ -2,14 +2,9 @@
 const express = require("express");
 const router = express.Router();
 
-// year_table (active school year) lives in db3 per your setup —
-// switch to `db` here if that's not the case.
 const { db3 } = require("../database/database");
 const { generateFormControlNumber } = require("../../utils/formControlNumber");
 
-// POST /api/generate-control-number
-// body: { form_type, applicant_number, person_id, action_type }
-// returns: { control_number }
 router.post("/generate-control-number", async (req, res) => {
   try {
     const { form_type, applicant_number, person_id, action_type } = req.body;

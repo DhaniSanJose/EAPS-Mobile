@@ -12,7 +12,6 @@ import {
   TableRow,
   FormControl,
   Select,
-  Card,
   TableCell,
   TextField,
   MenuItem,
@@ -31,18 +30,17 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
 import { Link } from "react-router-dom";
-import SchoolIcon from "@mui/icons-material/School";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import ScheduleIcon from "@mui/icons-material/Schedule";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PeopleIcon from "@mui/icons-material/People";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   isRegistrarCurriculumMatch,
   isRegistrarProgramSelectionLocked,
@@ -52,11 +50,10 @@ import {
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
-import ScoreIcon from "@mui/icons-material/Score";
 import DateField from "../components/DateField";
-import PersonIcon from "@mui/icons-material/Person";
 
 const ApplicantList = () => {
+  useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
@@ -173,63 +170,13 @@ const ApplicantList = () => {
       sessionStorage.setItem("edit_applicant_number", String(searchValue));
     }
 
-    navigate(`/applicant_college_personal_information?person_id=${personId}`);
+    navigate(`/admission_personal_information?person_id=${personId}`);
   };
-
-  const tabs = [
-    {
-      label: "Applicant List",
-      to: "/applicant_list_college",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Profile",
-      to: "/applicant_college_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Online Requirements",
-      to: "/applicant_online_requirements_college",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Examination Score",
-      to: "/college_entrance_examination_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-    {
-      label: "Qualifying / Interview Schedule Management",
-      to: "/college_qualifying_interview_schedule_management",
-      icon: <ScheduleIcon fontSize="large" />,
-    },
-    {
-      label: "Qualifying / Interview Exam Score",
-      to: "/college_qualifying_interview_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-  
-  ];
 
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(0);
-  const [clickedSteps, setClickedSteps] = useState(
-    Array(tabs.length).fill(false),
-  );
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-
-    if (pid && to !== "/applicant_list_college") {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
-
   useEffect(() => {
     if (location.search.includes("person_id")) {
-      navigate("/applicant_list_college", { replace: true });
+      navigate("/admission_applicant_list", { replace: true });
     }
   }, [location, navigate]);
 
@@ -378,6 +325,18 @@ const ApplicantList = () => {
   const [loading, setLoading] = useState(false);
 
   const pageId = 7;
+
+  const getAuditHeaders = () =>
+    getAuditConfig({
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    });
 
   const [employeeID, setEmployeeID] = useState("");
 
@@ -1057,12 +1016,26 @@ const ApplicantList = () => {
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
   useEffect(() => {
-    if (department.length > 0 && !selectedDepartmentFilter) {
-      const firstDept = department[0].dprtmnt_name;
-      setSelectedDepartmentFilter(firstDept);
-      handleDepartmentChange(firstDept); // if you also want to trigger it
+    if (!department.length) return;
+
+    // One department access → select that department
+    // Multiple department access → keep "All Departments" (empty value)
+    if (department.length === 1) {
+      const onlyDept = department[0].dprtmnt_name;
+      if (selectedDepartmentFilter !== onlyDept) {
+        setSelectedDepartmentFilter(onlyDept);
+        handleDepartmentChange(onlyDept);
+      }
+    } else if (
+      selectedDepartmentFilter &&
+      !department.some(
+        (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter),
+      )
+    ) {
+      setSelectedDepartmentFilter("");
+      handleDepartmentChange("");
     }
-  }, [department, selectedDepartmentFilter]);
+  }, [department]);
 
   const handleDepartmentChange = (selectedDept) => {
     setSelectedDepartmentFilter(selectedDept);
@@ -1354,61 +1327,7 @@ const ApplicantList = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <AdmissionProcessTabs />
 
       <br />
       <br />
@@ -1903,6 +1822,9 @@ const ApplicantList = () => {
                   }}
                   displayEmpty
                 >
+                  {department.length > 1 && (
+                    <MenuItem value="">All Departments</MenuItem>
+                  )}
                   {department.map((dep) => (
                     <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})

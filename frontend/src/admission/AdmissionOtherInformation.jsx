@@ -28,11 +28,15 @@ import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from '@mui/icons-material/Campaign';
 import ScoreIcon from '@mui/icons-material/Score';
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import AdminECATApplicationForm from "./AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 const AdminDashboard5 = () => {
+  useAuditMac();
 
   const settings = useContext(SettingsContext);
 
@@ -193,11 +197,6 @@ const AdminDashboard5 = () => {
     } catch (error) {
       console.error('Error checking access:', error);
       setHasAccess(false);
-      if (error.response && error.response.data.message) {
-        console.log(error.response.data.message);
-      } else {
-        console.log("An unexpected error occurred.");
-      }
       setLoading(false);
     }
   };
@@ -311,7 +310,6 @@ const AdminDashboard5 = () => {
 
     try {
       await axios.put(`${API_BASE_URL}/api/person/${person.person_id}`, updatedData);
-      console.log("✅ Auto-saved successfully");
     } catch (error) {
       console.error("❌ Auto-save failed:", error);
     }
@@ -399,7 +397,6 @@ const AdminDashboard5 = () => {
 
       // ✅ Execute safe update
       await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
-      console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
     } catch (err) {
       console.error("❌ Auto-save (on blur) failed:", {
         message: err.message,
@@ -546,6 +543,7 @@ const AdminDashboard5 = () => {
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );

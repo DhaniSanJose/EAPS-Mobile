@@ -26,6 +26,8 @@ import {
     Alert,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { IoMdAddCircle } from "react-icons/io";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -41,6 +43,7 @@ const Transition = React.forwardRef(function Transition(props, ref) {
 });
 
 const PageCRUD = () => {
+    useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
 
@@ -179,8 +182,8 @@ const PageCRUD = () => {
 
     const [pageIdInput, setPageIdInput] = useState("");
 
-    const auditConfig = {
-        headers: {
+    const getAuditConfigForPage = () =>
+        getAuditConfig({
             "x-employee-id":
                 employeeID ||
                 localStorage.getItem("employee_id") ||
@@ -193,8 +196,7 @@ const PageCRUD = () => {
                 localStorage.getItem("email") ||
                 "unknown",
             "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-        },
-    };
+        });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -225,7 +227,7 @@ const PageCRUD = () => {
                         page_description: pageDescription,
                         page_group: pageGroup,
                     },
-                    auditConfig,
+                    getAuditConfigForPage(),
                 );
 
                 setSnackbar({
@@ -243,7 +245,7 @@ const PageCRUD = () => {
                         page_description: pageDescription,
                         page_group: pageGroup,
                     },
-                    auditConfig,
+                    getAuditConfigForPage(),
                 );
 
                 setSnackbar({

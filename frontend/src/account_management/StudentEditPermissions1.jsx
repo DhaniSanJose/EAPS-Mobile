@@ -38,6 +38,8 @@ import SecurityIcon from "@mui/icons-material/Security";
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIELD DEFINITIONS
@@ -152,6 +154,7 @@ const buildDefaultState = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const StudentEditPermissions = () => {
   const settings = useContext(SettingsContext);
+  useAccountAuditMac();
 
   const [mainButtonColor, setMainButtonColor] = useState("#6D2323");
   const [borderColor, setBorderColor] = useState("#000");
@@ -170,8 +173,8 @@ const StudentEditPermissions = () => {
 
   const pageId = 155; // assign a unique page_id for this module
 
-  const auditConfig = {
-    headers: {
+  const getAuditConfigForPage = () =>
+    getAuditConfig({
       "x-employee-id":
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
@@ -183,8 +186,7 @@ const StudentEditPermissions = () => {
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
       "x-audit-change-section": "Personal Information",
-    },
-  };
+    });
 
   // ── Load settings ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -266,7 +268,7 @@ const StudentEditPermissions = () => {
         ...buildSectionPayload(sourcePermissions),
         ...(options.isReset ? { reset_to_defaults: true } : {}),
       },
-      auditConfig,
+      getAuditConfigForPage(),
     );
   };
 

@@ -32,6 +32,10 @@ import LoadingOverlay from "./LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
 import MuiLink from "@mui/material/Link";
 import { useResponsive } from "../hooks/useResponsive";
+import {
+  fetchAndStoreUserMacAddress,
+  getLoginMacPayload,
+} from "../utils/userMacAddress";
 
 function accessToSet(list = []) {
   return new Set(list.map(Number));
@@ -176,6 +180,7 @@ const TotpLoginModal = ({
         isSetup: isSetupFlow,
         source: loginData.source || "user",
         audit_log_db: "db3",
+        ...getLoginMacPayload(),
       });
 
       if (!verifyRes.data.success) {
@@ -678,6 +683,12 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
   }, []);
 
   useEffect(() => {
+    fetchAndStoreUserMacAddress().catch((err) => {
+      console.error("Unable to preload MAC address for audit logs:", err);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!email) return;
     const remaining = getLockoutRemaining(email);
     if (remaining > 0 && !lockout) {
@@ -777,7 +788,12 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
           ? `${API_BASE_URL}/api/login_applicant`
           : `${API_BASE_URL}/api/login`;
 
-      const res = await axios.post(apiUrl, { email, password, audit_log_db: "db3" });
+      const res = await axios.post(apiUrl, {
+        email,
+        password,
+        audit_log_db: "db3",
+        ...getLoginMacPayload(),
+      });
 
       if (res.data.locked) {
         const secs = res.data.remainingSeconds ?? 180;

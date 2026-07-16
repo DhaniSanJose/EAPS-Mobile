@@ -23,6 +23,8 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIELD DEFINITIONS FOR DASHBOARD 4 (Health Medical Records)
@@ -139,6 +141,7 @@ const buildDefaultState = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const StudentEditPermissions4 = () => {
   const settings = useContext(SettingsContext);
+  useAccountAuditMac();
 
   const [mainButtonColor, setMainButtonColor] = useState("#6D2323");
   const [borderColor, setBorderColor] = useState("#000");
@@ -159,8 +162,8 @@ const StudentEditPermissions4 = () => {
   // permission panels — all dashboard field locks live in one store.
   const pageId = 158; // unique page_id for Health Medical Records permissions
 
-  const auditConfig = {
-    headers: {
+  const getAuditConfigForPage = () =>
+    getAuditConfig({
       "x-employee-id":
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
@@ -172,8 +175,7 @@ const StudentEditPermissions4 = () => {
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
       "x-audit-change-section": "Health & Medical Records",
-    },
-  };
+    });
 
   // ── Load theme settings ───────────────────────────────────────────────────
   useEffect(() => {
@@ -252,7 +254,7 @@ const StudentEditPermissions4 = () => {
         ...buildSectionPayload(sourcePermissions),
         ...(options.isReset ? { reset_to_defaults: true } : {}),
       },
-      auditConfig,
+      getAuditConfigForPage(),
     );
   };
 

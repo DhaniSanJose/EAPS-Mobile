@@ -8,10 +8,13 @@ import axios from "axios";
 import { useLocation } from "react-router-dom";
 import ForwardIcon from '@mui/icons-material/Forward';
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import { QRCodeSVG } from "qrcode.react";
 import DownloadIcon from "@mui/icons-material/Download";
 
 const AdminAdmissionFormProcess = forwardRef((props, ref) => {
+  useAuditMac();
   const { personId: personIdProp, controlNumber: controlNumberProp } = props;
   const settings = useContext(SettingsContext);
   const [ownControlNumber, setOwnControlNumber] = useState(null);
@@ -1557,7 +1560,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                     }}
                   >
                     <span>{settings?.short_term || shortTerm}-QSF-AS-001 Rev. 00 (7.3.25)</span>
-                    <span>Registrar's Copy</span>
+                    <span>College Dean's Copy</span>
                   </div>
                 </td>
               </tr>

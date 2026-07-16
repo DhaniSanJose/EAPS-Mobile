@@ -18,6 +18,8 @@ import ExamPermit from "../applicant/ExamPermit";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { Snackbar, Alert } from "@mui/material";
 import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
@@ -26,6 +28,7 @@ import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 
 const SuperAdminApplicantDashboard2 = () => {
+  useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
 
@@ -88,20 +91,18 @@ const SuperAdminApplicantDashboard2 = () => {
 
     const [employeeID, setEmployeeID] = useState("");
 
-    const getAuditHeaders = () => ({
-        headers: {
-            "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-            "x-page-id": pageId,
-            "x-audit-change-section": "family_information",
-            "x-audit-actor-id":
-                employeeID ||
-                localStorage.getItem("employee_id") ||
-                localStorage.getItem("person_id") ||
-                localStorage.getItem("email") ||
-                "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-        },
+    const getAuditHeaders = () =>
+    getAuditConfig({
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-change-section": "family_information",
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("person_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
     });
 
     useEffect(() => {

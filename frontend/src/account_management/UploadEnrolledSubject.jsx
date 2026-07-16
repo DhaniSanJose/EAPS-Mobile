@@ -34,6 +34,7 @@ import API_BASE_URL from '../apiConfig';
 import LoadingOverlay from '../components/LoadingOverlay';
 import Unauthorized from '../components/Unauthorized';
 import { postAuditEvent, getAuditHeaders } from '../utils/auditEvents';
+import useAccountAuditMac from './useAccountAuditMac';
 
 const PROGRESS_STEPS = [
     { key: 'sorting', label: 'Sorting XLSX data' },
@@ -52,6 +53,7 @@ const FILTER_MENU_PROPS = {
 };
 
 const UploadEnrolledSubject = () => {
+    useAccountAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");

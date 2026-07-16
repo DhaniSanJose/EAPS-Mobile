@@ -27,6 +27,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import RestoreIcon from "@mui/icons-material/Restore";
 import DeleteIcon from "@mui/icons-material/Delete";
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { SettingsContext } from "../App";
 import LoadingOverlay from "../components/LoadingOverlay";
 
@@ -61,6 +63,7 @@ const formatName = (account) => {
 };
 
 const ArchivedModule = () => {
+  useAccountAuditMac();
 
   const settings = useContext(SettingsContext);
 
@@ -165,16 +168,11 @@ const ArchivedModule = () => {
     });
   };
 
-  const getAuditHeaders = () => ({
-    "x-employee-id": employeeID,
-    "x-page-id": pageId,
-    "x-audit-actor-id":
-      employeeID ||
-      localStorage.getItem("employee_id") ||
-      localStorage.getItem("email") ||
-      "unknown",
-    "x-audit-actor-role": localStorage.getItem("role") || "registrar",
-  });
+  const getAuditHeaders = () =>
+    getFlatAuditHeaders({
+      "x-employee-id": employeeID,
+      "x-page-id": pageId,
+    });
 
   const fetchArchivedAccounts = async () => {
     try {

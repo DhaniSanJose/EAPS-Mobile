@@ -10,7 +10,6 @@ import {
     TableHead,
     TableRow,
     TableCell,
-    Card,
     Paper,
     Grid,
     Snackbar,
@@ -22,14 +21,14 @@ import {
     Select,
     InputLabel
 } from "@mui/material";
-import CampaignIcon from "@mui/icons-material/Campaign";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
-import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import PeopleIcon from "@mui/icons-material/People";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import KeyIcon from "@mui/icons-material/Key";
+import AdmissionRoomAssignmentTabs from "../components/AdmissionRoomAssignmentTabs";
 import {
     Dialog,
     DialogTitle,
@@ -39,12 +38,11 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import Cropper from "react-easy-crop";
-import { useNavigate, useLocation } from "react-router-dom";
 import SaveIcon from '@mui/icons-material/Save';
-import SchoolIcon from "@mui/icons-material/School";
 import SearchIcon from "@mui/icons-material/Search";
 
 const AnnouncementPanel = () => {
+  useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000");
@@ -71,8 +69,8 @@ const AnnouncementPanel = () => {
     const [loading, setLoading] = useState(false);
 
     const pageId = 98;
-    const permissionHeaders = {
-        headers: {
+    const getPermissionHeaders = () =>
+        getAuditConfig({
             "x-employee-id": employeeID,
             "x-page-id": pageId,
             "x-audit-actor-id":
@@ -81,8 +79,7 @@ const AnnouncementPanel = () => {
                 localStorage.getItem("email") ||
                 "unknown",
             "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-        },
-    };
+        });
 
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
     const branches = Array.isArray(settings?.branches)
@@ -116,58 +113,11 @@ const AnnouncementPanel = () => {
         }
     }, []);
 
-    const tabs = [
-
-        {
-            label: "Verify Documents Room Assignment",
-            to: "/verify_document_room_assignment",
-            icon: <MeetingRoomIcon fontSize="large" />,
-        },
-
-        {
-            label: "Evaluator's Applicant List",
-            to: "/evaluator_schedule_room_list",
-            icon: <PeopleIcon fontSize="large" />,
-        },
-        {
-            label: "Entrance Exam Room Assignment",
-            to: "/entrance_exam_room_assignment",
-            icon: <MeetingRoomIcon fontSize="large" />,
-        },
-
-        {
-            label: "Proctor's Applicant List",
-            to: "/admission_schedule_room_list",
-            icon: <PeopleIcon fontSize="large" />,
-        },
-
-        {
-            label: "Subject Management",
-            to: "/applicant_exam_subjects",
-            icon: <SchoolIcon fontSize="large" />,
-        },
-
-        {
-            label: "Announcement",
-            to: "/admission_announcement",
-            icon: <CampaignIcon fontSize="large" />,
-        },
-    ];
-    const navigate = useNavigate();
-    const [activeStep, setActiveStep] = useState(5);
-    const [clickedSteps, setClickedSteps] = useState(Array(tabs.length).fill(false));
-
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
     const [openCrop, setOpenCrop] = useState(false);
     const [imageSrc, setImageSrc] = useState(null);
-
-    const handleStepClick = (index, to) => {
-        setActiveStep(index);
-        navigate(to); // this will actually change the page
-    };
-
 
     const checkAccess = async (employeeID) => {
         try {
@@ -235,14 +185,7 @@ const AnnouncementPanel = () => {
                 await axios.put(`${API_BASE_URL}/api/announcements/${editingId}`, formData, {
                     headers: {
                         "Content-Type": "multipart/form-data",
-                        "x-employee-id": employeeID,
-                        "x-page-id": pageId,
-                        "x-audit-actor-id":
-                            employeeID ||
-                            localStorage.getItem("employee_id") ||
-                            localStorage.getItem("email") ||
-                            "unknown",
-                        "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+                        ...getPermissionHeaders().headers,
                     },
                 });
                 setSnackbar({ open: true, message: "Announcement updated!", severity: "success" });
@@ -250,14 +193,7 @@ const AnnouncementPanel = () => {
                 await axios.post(`${API_BASE_URL}/api/announcements`, formData, {
                     headers: {
                         "Content-Type": "multipart/form-data",
-                        "x-employee-id": employeeID,
-                        "x-page-id": pageId,
-                        "x-audit-actor-id":
-                            employeeID ||
-                            localStorage.getItem("employee_id") ||
-                            localStorage.getItem("email") ||
-                            "unknown",
-                        "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+                        ...getPermissionHeaders().headers,
                     },
                 });
                 setSnackbar({ open: true, message: "Announcement created!", severity: "success" });
@@ -434,7 +370,7 @@ const AnnouncementPanel = () => {
         });
 
         try {
-            await axios.delete(`${API_BASE_URL}/api/announcements/${id}`, permissionHeaders);
+            await axios.delete(`${API_BASE_URL}/api/announcements/${id}`, getPermissionHeaders());
 
             setSnackbar({
                 open: true,
@@ -543,61 +479,7 @@ const AnnouncementPanel = () => {
             <br />
             <br />
 
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // ❌ prevent wrapping
-                    width: "100%",
-
-                    gap: 2,
-                }}
-            >
-                {tabs.map((tab, index) => (
-                    <Card
-                        key={index}
-                        onClick={() => handleStepClick(index, tab.to)}
-                        sx={{
-                            flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-                            height: 135,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            borderRadius: 2,
-                            border: `1px solid ${borderColor}`,
-                            backgroundColor:
-                                activeStep === index
-                                    ? settings?.header_color || "#1976d2"
-                                    : "#E8C999",
-                            color: activeStep === index ? "#fff" : "#000",
-                            boxShadow:
-                                activeStep === index
-                                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                            transition: "0.3s ease",
-                            "&:hover": {
-                                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                            },
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                            }}
-                        >
-                            <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-                            <Typography
-                                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                            >
-                                {tab.label}
-                            </Typography>
-                        </Box>
-                    </Card>
-                ))}
-            </Box>
+            <AdmissionRoomAssignmentTabs />
 
             <br />
             <br />

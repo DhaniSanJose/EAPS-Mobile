@@ -32,6 +32,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import * as XLSX from "xlsx";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
@@ -48,6 +50,8 @@ import SendIcon from "@mui/icons-material/Send";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 
 const RegisterProf = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");

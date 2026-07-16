@@ -24,7 +24,24 @@ import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 const SuperAdminApplicantDashboard5 = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
+  const getAuditHeaders = () =>
+    getAuditConfig({
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-change-section": "other_information",
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("person_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    });
 
     const settings = useContext(SettingsContext);
 
@@ -285,7 +302,7 @@ const SuperAdminApplicantDashboard5 = () => {
             if (!cleanedData.created_at) cleanedData.created_at = formattedDate;
 
             // ✅ Execute update to backend
-            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, getAuditHeaders());
             console.log(`✅ Auto-saved for applicant person_id: ${targetId}`);
         } catch (error) {
             console.error("❌ Auto-save failed:", {
@@ -363,7 +380,7 @@ const SuperAdminApplicantDashboard5 = () => {
             }
 
             // ✅ Send update to backend
-            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, getAuditHeaders());
             console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
         } catch (err) {
             console.error("❌ Auto-save (on blur) failed:", {

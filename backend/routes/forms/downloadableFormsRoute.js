@@ -1,7 +1,7 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
 
-const { insertAuditLogAdmission } = require("../../utils/auditLogger");
+const { insertAuditLogAdmission, insertAuditLogEnrollment } = require("../../utils/auditLogger");
 
 const router = express.Router();
 
@@ -27,6 +27,87 @@ const getEnrollmentAuditActor = (req) => ({
     req.headers["x-audit-actor-role"] ||
     "registrar",
 });
+
+const buildPersonPrintName = (
+  { last_name, first_name },
+  fallback = "Unknown Applicant",
+) => {
+  const lastName = String(last_name || "").trim();
+  const firstName = String(first_name || "").trim();
+  if (lastName) return `${lastName}, ${firstName}`.trim();
+  return firstName || fallback;
+};
+
+const insertPdfExportAudit = async (
+  req,
+  { documentLabel, legacyAction, legacyMessage },
+) => {
+  try {
+    const { actorId, actorRole } = getEnrollmentAuditActor(req);
+    const roleLabel = formatEnrollmentAuditActorRole(actorRole);
+    const printAction = String(req.body?.audit_print_action || "").trim();
+    const applicantNumber = String(req.body?.applicant_number || "").trim();
+    const studentNumber = String(
+      req.body?.student_number || req.body?.applicant_number || "",
+    ).trim();
+    const label = String(
+      req.body?.document_label || documentLabel || "document",
+    ).trim();
+
+    if (printAction === "PRINTING_APPLICANT_DOCS") {
+      const applicantName = buildPersonPrintName(req.body || {}, "Unknown Applicant");
+
+      await insertAuditLogAdmission({
+        actorId,
+        role: actorRole,
+        action: "PRINTING_APPLICANT_DOCS",
+        severity: "INFO",
+        message: `${roleLabel} (${actorId}) printed ${label} for applicant ${applicantName} (${applicantNumber || "N/A"}).`,
+      });
+      return;
+    }
+
+    if (printAction === "PRINTING_STUDENT_DOCS") {
+      const studentName = buildPersonPrintName(req.body || {}, "Unknown Student");
+
+      await insertAuditLogEnrollment({
+        actorId,
+        role: actorRole,
+        action: "PRINTING_STUDENT_DOCS",
+        severity: "INFO",
+        message: `${roleLabel} (${actorId}) printed ${label} for student ${studentName} (${studentNumber || "N/A"}).`,
+      });
+      return;
+    }
+
+    if (printAction === "DOWNLOAD_EXAM_PDF") {
+      const applicantName = buildPersonPrintName(req.body || {}, "Unknown Applicant");
+
+      await insertAuditLogAdmission({
+        actorId,
+        role: actorRole,
+        action: "DOWNLOAD_EXAM_PDF",
+        severity: "INFO",
+        message: `${roleLabel} (${actorId}) downloaded ${label} PDF for applicant ${applicantName} (${applicantNumber || "N/A"}).`,
+      });
+      return;
+    }
+
+    await insertAuditLogAdmission({
+      actorId,
+      role: actorRole,
+      action: legacyAction,
+      severity: "INFO",
+      message: legacyMessage({
+        roleLabel,
+        actorId,
+        applicant_number: applicantNumber,
+      }),
+    });
+  } catch (auditErr) {
+    console.error(`${legacyAction || documentLabel} PDF audit log failed:`, auditErr);
+  }
+};
 
 // ─── Shared Puppeteer launch config ─────────────────────────────────────────
 const launchBrowser = () =>
@@ -208,19 +289,12 @@ router.post("/generate-admission-form-pdf", async (req, res) => {
 
     const fileName = buildOutputFilename("Admission_Form_Process", req.body);
 
-    try {
-      const { actorId, actorRole } = getEnrollmentAuditActor(req);
-      const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-      await insertAuditLogAdmission({
-        actorId,
-        role: actorRole,
-        action: "ADMISSION_FORM_PROCESS_PDF_EXPORT",
-        severity: "INFO",
-        message: `${roleLabel} (${actorId}) exported Admission Form (Process) PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
-      });
-    } catch (auditErr) {
-      console.error("Admission Form PDF audit log failed:", auditErr);
-    }
+    await insertPdfExportAudit(req, {
+      documentLabel: "Admission Form (Process)",
+      legacyAction: "ADMISSION_FORM_PROCESS_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId, applicant_number }) =>
+        `${roleLabel} (${actorId}) exported Admission Form (Process) PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
@@ -367,19 +441,12 @@ router.post("/generate-registrar-form-pdf", async (req, res) => {
 
     const fileName = buildOutputFilename("Office_Of_The_Registrar", req.body);
 
-    try {
-      const { actorId, actorRole } = getEnrollmentAuditActor(req);
-      const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-      await insertAuditLogAdmission({
-        actorId,
-        role: actorRole,
-        action: "REGISTRAR_FORM_PDF_EXPORT",
-        severity: "INFO",
-        message: `${roleLabel} (${actorId}) exported Office of the Registrar PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
-      });
-    } catch (auditErr) {
-      console.error("Registrar Form PDF audit log failed:", auditErr);
-    }
+    await insertPdfExportAudit(req, {
+      documentLabel: "Office of the Registrar Form",
+      legacyAction: "REGISTRAR_FORM_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId, applicant_number }) =>
+        `${roleLabel} (${actorId}) exported Office of the Registrar PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
@@ -459,10 +526,10 @@ router.post("/generate-personal-data-form-pdf", async (req, res) => {
     }
 
     .print-container {
-    width: 100%;
-+    height: 100%;
-    box-sizing: border-box;
-   zoom: 0.90;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      zoom: 0.90;
     }
 
     .student-table {
@@ -546,19 +613,12 @@ router.post("/generate-personal-data-form-pdf", async (req, res) => {
 
     const fileName = buildOutputFilename("Personal_Data_Form", req.body);
 
-    try {
-      const { actorId, actorRole } = getEnrollmentAuditActor(req);
-      const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-      await insertAuditLogAdmission({
-        actorId,
-        role: actorRole,
-        action: "PERSONAL_DATA_FORM_PDF_EXPORT",
-        severity: "INFO",
-        message: `${roleLabel} (${actorId}) exported Personal Data Form PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
-      });
-    } catch (auditErr) {
-      console.error("Personal Data Form PDF audit log failed:", auditErr);
-    }
+    await insertPdfExportAudit(req, {
+      documentLabel: "Personal Data Form",
+      legacyAction: "PERSONAL_DATA_FORM_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId, applicant_number }) =>
+        `${roleLabel} (${actorId}) exported Personal Data Form PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
@@ -695,19 +755,12 @@ router.post("/generate-ecat-form-pdf", async (req, res) => {
 
     const fileName = buildOutputFilename("ECAT_Application_Form", req.body);
 
-    try {
-      const { actorId, actorRole } = getEnrollmentAuditActor(req);
-      const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-      await insertAuditLogAdmission({
-        actorId,
-        role: actorRole,
-        action: "ECAT_FORM_PDF_EXPORT",
-        severity: "INFO",
-        message: `${roleLabel} (${actorId}) exported ECAT Application Form PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
-      });
-    } catch (auditErr) {
-      console.error("ECAT Form PDF audit log failed:", auditErr);
-    }
+    await insertPdfExportAudit(req, {
+      documentLabel: "ECAT Application Form",
+      legacyAction: "ECAT_FORM_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId, applicant_number }) =>
+        `${roleLabel} (${actorId}) exported ECAT Application Form PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
@@ -862,19 +915,12 @@ router.post("/generate-admission-services-pdf", async (req, res) => {
     const timestamp = new Date().toISOString().slice(0, 10);
     const fileName = `Admission_Services_CSM_Form_${timestamp}.pdf`;
 
-    try {
-      const { actorId, actorRole } = getEnrollmentAuditActor(req);
-      const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-      await insertAuditLogAdmission({
-        actorId,
-        role: actorRole,
-        action: "ADMISSION_SERVICES_CSM_PDF_EXPORT",
-        severity: "INFO",
-        message: `${roleLabel} (${actorId}) exported the Admission Services CSM form PDF.`,
-      });
-    } catch (auditErr) {
-      console.error("Admission Services PDF audit log failed:", auditErr);
-    }
+    await insertPdfExportAudit(req, {
+      documentLabel: "Application/Student Satisfactory Survey",
+      legacyAction: "ADMISSION_SERVICES_CSM_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Admission Services CSM form PDF.`,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
@@ -995,19 +1041,12 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
 
     const fileName = buildOutputFilename("Exam_Permit", req.body);
 
-    try {
-      const { actorId, actorRole } = getEnrollmentAuditActor(req);
-      const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-      await insertAuditLogAdmission({
-        actorId,
-        role: actorRole,
-        action: "EXAM_PERMIT_PDF_EXPORT",
-        severity: "INFO",
-        message: `${roleLabel} (${actorId}) exported Exam Permit PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
-      });
-    } catch (auditErr) {
-      console.error("Exam Permit PDF audit log failed:", auditErr);
-    }
+    await insertPdfExportAudit(req, {
+      documentLabel: "Examination Permit",
+      legacyAction: "EXAM_PERMIT_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId, applicant_number }) =>
+        `${roleLabel} (${actorId}) exported Exam Permit PDF${applicant_number ? ` for Applicant (${applicant_number})` : ""}.`,
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);

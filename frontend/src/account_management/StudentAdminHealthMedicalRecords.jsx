@@ -18,12 +18,15 @@ import ExamPermit from "../applicant/ExamPermit";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { Snackbar, Alert } from "@mui/material";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 const SuperAdminStudentDashboard4 = () => {
+  useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
 
@@ -87,20 +90,18 @@ const SuperAdminStudentDashboard4 = () => {
 
     const [employeeID, setEmployeeID] = useState("");
 
-    const getAuditHeaders = () => ({
-        headers: {
-            "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-            "x-page-id": pageId,
-            "x-audit-change-section": "health_information",
-            "x-audit-actor-id":
-                employeeID ||
-                localStorage.getItem("employee_id") ||
-                localStorage.getItem("person_id") ||
-                localStorage.getItem("email") ||
-                "unknown",
-            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-        },
+    const getAuditHeaders = () =>
+    getAuditConfig({
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-change-section": "health_information",
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("person_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
     });
 
     useEffect(() => {

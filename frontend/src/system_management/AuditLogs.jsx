@@ -605,6 +605,19 @@ const AuditLogs = () => {
                     {log.email || "unknown"}
                   </Typography>
 
+                  {log.user_mac_address && (
+                    <Typography
+                      sx={{
+                        mt: 0.5,
+                        fontSize: 12,
+                        color: "#6b7280",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      MAC: {log.user_mac_address}
+                    </Typography>
+                  )}
+
                   <Typography
                     sx={{
                       mt: 0.5,

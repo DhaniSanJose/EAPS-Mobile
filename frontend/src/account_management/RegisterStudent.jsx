@@ -27,6 +27,8 @@ import {
     DialogActions,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import AddIcon from "@mui/icons-material/Add";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import { FileUpload } from "@mui/icons-material";
@@ -37,6 +39,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import { FaFileExcel } from "react-icons/fa";
 
 const RegisterStudents = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");

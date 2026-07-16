@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 const clearAuthStorage = () => {
@@ -29,44 +29,51 @@ export const isTokenValid = (token) => {
 
 const normalizeRole = (role) => String(role || "").trim().toLowerCase();
 
+const resolveAuthorization = (allowedRoles = []) => {
+  const token = localStorage.getItem("token");
+  const storedRole = normalizeRole(localStorage.getItem("role"));
+  const storedEmail = localStorage.getItem("email");
+  const normalizedAllowedRoles = Array.isArray(allowedRoles)
+    ? allowedRoles.map(normalizeRole)
+    : allowedRoles
+      ? [normalizeRole(allowedRoles)]
+      : [];
+
+  if (!storedEmail || !isTokenValid(token)) {
+    clearAuthStorage();
+    return false;
+  }
+
+  if (
+    normalizedAllowedRoles.length === 0 ||
+    normalizedAllowedRoles.includes(storedRole)
+  ) {
+    return true;
+  }
+
+  return "unauthorized";
+};
+
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const [isAuthorized, setIsAuthorized] = useState(null);
   const location = useLocation();
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const storedRole = normalizeRole(localStorage.getItem("role"));
-    const storedEmail = localStorage.getItem("email");
-    const normalizedAllowedRoles = Array.isArray(allowedRoles)
-      ? allowedRoles.map(normalizeRole)
-      : allowedRoles
-        ? [normalizeRole(allowedRoles)]
-        : [];
-
-    if (!storedEmail || !isTokenValid(token)) {
-      clearAuthStorage();
-      setIsAuthorized(false);
-      return;
-    }
-
-    if (normalizedAllowedRoles.length === 0 || normalizedAllowedRoles.includes(storedRole)) {
-      setIsAuthorized(true);
-      return;
-    }
-
-    setIsAuthorized("unauthorized");
-  }, [allowedRoles]);
+  const isAuthorized = resolveAuthorization(allowedRoles);
 
   useEffect(() => {
     if (isAuthorized !== true) return;
 
     const currentPath = `${location.pathname}${location.search}${location.hash}`;
-    if (!currentPath || currentPath === "/" || currentPath === "/login" || currentPath === "/login_applicant") return;
+    if (
+      !currentPath ||
+      currentPath === "/" ||
+      currentPath === "/login" ||
+      currentPath === "/login_applicant"
+    ) {
+      return;
+    }
 
     localStorage.setItem("lastVisitedPath", currentPath);
   }, [isAuthorized, location.pathname, location.search, location.hash]);
 
-  if (isAuthorized === null) return <div>Loading...</div>;
   if (isAuthorized === true) return children;
   if (isAuthorized === "unauthorized") return <Navigate to="/unauthorized" />;
 

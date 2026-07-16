@@ -26,10 +26,10 @@ router.get("/audit-logs", async (req, res) => {
 
     if (search) {
       clauses.push(
-        "(actor_id LIKE ? OR role LIKE ? OR action LIKE ? OR message LIKE ?)",
+        "(actor_id LIKE ? OR role LIKE ? OR action LIKE ? OR message LIKE ? OR user_mac_address LIKE ?)",
       );
       const searchValue = `%${search}%`;
-      params.push(searchValue, searchValue, searchValue, searchValue);
+      params.push(searchValue, searchValue, searchValue, searchValue, searchValue);
     }
 
     if (severity) {
@@ -72,6 +72,7 @@ router.get("/audit-logs", async (req, res) => {
             action,
             message,
             severity,
+            user_mac_address,
             timestamp,
             ? AS source_key
           FROM audit_logs
@@ -116,6 +117,7 @@ router.get("/audit-logs", async (req, res) => {
       action: row.action,
       message: row.message,
       severity: row.severity,
+      user_mac_address: row.user_mac_address,
       timestamp: row.timestamp,
     }));
 

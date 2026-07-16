@@ -575,76 +575,43 @@ const CourseTaggingForSummerCollege = () => {
     return status ? status.hasPrereq === true : false;
   };
 
-  const checkPrerequisite = async (student_number, course) => {
-    try {
-      const { data } = await axios.post(
-        `${API_BASE_URL}/api/check-prerequisite`,
-        {
-          student_number,
-          course_id: course.course_id,
-          semester_id: course.semester_id,
-          curriculum_id: currId,
-        },
-      );
-      if (typeof data.allowed !== "boolean") {
-        return {
-          allowed: false,
-          reason: "ERROR",
-          status: data.status,
-          message:
-            data.message ||
-            "Invalid response from prerequisite API. Please contact administrator.",
-        };
-      }
-      if (data.allowed) {
-        return {
-          allowed: true,
-          reason: "OK",
-          status: data.status,
-          message: data.message,
-        };
-      }
-      let reason = "ERROR";
-      if (data.status === "FAILED_PREREQ") reason = "FAILED_PREREQUISITE";
-      else if (data.status === "MISSING_PREREQ")
-        reason = "MISSING_OR_NOT_PASSED_PREREQUISITE";
-      return {
-        allowed: false,
-        reason,
-        status: data.status,
-        message: data.message,
-        failedPrereq: data.failedPrereq || [],
-        missingPrereq: data.missingPrereq || [],
-      };
-    } catch (err) {
-      console.error("Error calling /api/check-prerequisite:", err);
-      return {
-        allowed: false,
-        reason: "ERROR",
-        status: "REQUEST_ERROR",
-        message: "Error calling prerequisite API.",
-      };
-    }
-  };
-
   useEffect(() => {
     const computePrereqStatus = async () => {
-      if (!userId || courses.length === 0) {
+      if (!userId || courses.length === 0 || !currId) {
         setPrereqMap({});
         return;
       }
-      const map = {};
-      for (const course of courses) {
-        const res = await checkPrerequisite(userId, course);
-        let hasPrereq = true;
-        if (res.status === "NO_PREREQ" || res.status === "PREREQ_NOT_FOUND")
-          hasPrereq = false;
-        map[course.course_id] = { allowed: !!res.allowed, hasPrereq };
+
+      try {
+        const { data } = await axios.post(
+          `${API_BASE_URL}/api/check-prerequisites-batch`,
+          {
+            student_number: userId,
+            curriculum_id: currId,
+            courses: courses.map((course) => ({
+              course_id: course.course_id,
+              semester_id: course.semester_id,
+            })),
+          },
+        );
+
+        const map = {};
+        for (const course of courses) {
+          const result = data.results?.[String(course.course_id)];
+          if (!result) continue;
+          map[course.course_id] = {
+            allowed: !!result.allowed,
+            hasPrereq: !!result.hasPrereq,
+          };
+        }
+        setPrereqMap(map);
+      } catch (err) {
+        console.error("Failed to load prerequisite status:", err);
+        setPrereqMap({});
       }
-      setPrereqMap(map);
     };
     computePrereqStatus();
-  }, [userId, courses]);
+  }, [userId, courses, currId]);
 
   const addToCart = async (course) => {
     if (!canCreate) {

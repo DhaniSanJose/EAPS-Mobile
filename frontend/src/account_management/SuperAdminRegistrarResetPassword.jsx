@@ -26,6 +26,9 @@ import SearchIcon from "@mui/icons-material/Search";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   People,
@@ -35,6 +38,8 @@ import {
 } from "@mui/icons-material";
 
 const SuperAdminRegistrarResetPassword = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -172,12 +177,14 @@ const SuperAdminRegistrarResetPassword = () => {
   });
 
   const auditFields = () => ({
+
     audit_actor_id:
       employeeID ||
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   const [registrars, setRegistrars] = useState([]);
@@ -274,7 +281,8 @@ const SuperAdminRegistrarResetPassword = () => {
         {
           email: userInfo.email,
           ...auditFields(),
-        }
+        },
+        getAuditRequestConfig(),
       );
 
       setSnackbar({
@@ -321,7 +329,8 @@ const SuperAdminRegistrarResetPassword = () => {
           email: userInfo.email,
           status: userInfo.status,
           ...auditFields(),
-        }
+        },
+        getAuditRequestConfig(),
       );
 
       setRegistrars((prev) =>

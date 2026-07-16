@@ -16,7 +16,6 @@ import {
   DialogActions,
   Table,
   TableRow,
-  Card,
   FormControl,
   InputLabel,
   Select,
@@ -29,26 +28,33 @@ import {
   IconButton,
 } from "@mui/material";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import SchoolIcon from "@mui/icons-material/School";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import ScheduleIcon from "@mui/icons-material/Schedule";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PeopleIcon from "@mui/icons-material/People";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
 import SearchIcon from "@mui/icons-material/Search";
 import KeyIcon from "@mui/icons-material/Key";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import {
+  isRegistrarCurriculumMatch,
+  isRegistrarProgramSelectionLocked,
+  refreshRegistrarCurriculumId,
+  restrictToRegistrarCurriculum,
+  syncRegistrarScopeFromAdminData,
+} from "../utils/registrarCurriculumRestriction";
+import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import CampaignIcon from "@mui/icons-material/Campaign";
 import { Toc } from "@mui/icons-material";
-import ScoreIcon from "@mui/icons-material/Score";
-import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close"; // or use the custom SVG below
 
 const AssignScheduleToApplicants = () => {
+  useAuditMac();
   const socket = useRef(null);
   const settings = useContext(SettingsContext);
 
@@ -105,63 +111,8 @@ const AssignScheduleToApplicants = () => {
     }
   }, [settings]);
 
-  const tabs = [
-    {
-      label: "Applicant List",
-      to: "/admission_applicant_list",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Profile",
-      to: "/admission_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Online Requirements",
-      to: "/admission_online_requirements",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Verify Schedule Management",
-      to: "/verify_document_schedule_management",
-      icon: <ScheduleIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Exam Schedule Management",
-      to: "/entrance_exam_schedule_management",
-      icon: <ScheduleIcon fontSize="large" />,
-    },
-
-    {
-      label: "Examination Permit",
-      to: "/examination_permit_change_course",
-      icon: <PersonSearchIcon fontSize="large" />,
-    },
-
-    {
-      label: "Entrance Examination Score",
-      to: "/applicant_entrance_exam_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-  ];
-
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(4);
-  const [clickedSteps, setClickedSteps] = useState(
-    Array(tabs.length).fill(false),
-  );
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-
-    if (pid && to !== "/admission_applicant_list") {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
 
   const queryParams = new URLSearchParams(location.search);
   const queryPersonId = queryParams.get("person_id")?.trim() || "";
@@ -223,10 +174,21 @@ const AssignScheduleToApplicants = () => {
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
   const [hasAccess, setHasAccess] = useState(null);
+  const [adminData, setAdminData] = useState({
+    dprtmnt_id: "",
+    dprtmnt_ids: [],
+  });
 
   const pageId = 11;
 
   const [employeeID, setEmployeeID] = useState("");
+  const scopeRevision = useRegistrarScopeRevision();
+  const [allCurriculums, setAllCurriculums] = useState([]);
+  const [schoolYears, setSchoolYears] = useState([]);
+  const [semesters, setSchoolSemester] = useState([]);
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
+  const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
+  const [selectedActiveSchoolYear, setSelectedActiveSchoolYear] = useState("");
 
   const auditActor = () => ({
     audit_actor_id:
@@ -235,6 +197,7 @@ const AssignScheduleToApplicants = () => {
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   useEffect(() => {
@@ -281,32 +244,72 @@ const AssignScheduleToApplicants = () => {
     }
   };
 
+  const fetchPersonData = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+      setAdminData(res.data);
+      syncRegistrarScopeFromAdminData(res.data);
+    } catch (err) {
+      console.error("Error fetching admin data:", err);
+    }
+  };
+
   useEffect(() => {
+    if (user) fetchPersonData();
+  }, [user]);
+
+  useEffect(() => {
+    if (userRole !== "registrar" || !employeeID) return;
+    refreshRegistrarCurriculumId(employeeID).catch((err) => {
+      console.error("Error refreshing registrar scope:", err);
+    });
+  }, [userRole, employeeID]);
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
     const fetchCurriculums = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
-        setCurriculumOptions(response.data);
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+          ),
+        );
+        const merged = responses.flatMap((response) => response.data || []);
+        const restricted = restrictToRegistrarCurriculum(merged);
+        setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
       }
     };
 
     fetchCurriculums();
-  }, []);
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      setAllCurriculums(res.data);
-      setCurriculumOptions(res.data);
-    });
-  }, []);
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
 
-  const [allCurriculums, setAllCurriculums] = useState([]);
-  const [schoolYears, setSchoolYears] = useState([]);
-  const [semesters, setSchoolSemester] = useState([]);
-  const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
-  const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
-  const [selectedActiveSchoolYear, setSelectedActiveSchoolYear] = useState("");
+    if (departmentIds.length) return;
+
+    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
+      const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
+      setAllCurriculums(restrictedCurriculums);
+      setCurriculumOptions(restrictedCurriculums);
+    });
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
   useEffect(() => {
     axios
@@ -985,6 +988,10 @@ This printed permit must be presented to your proctor on the exam day to verify 
     const programInfo = allCurriculums.find(
       (opt) => opt.curriculum_id?.toString() === personData.program?.toString(),
     );
+    const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(
+      personData.program,
+      allCurriculums,
+    );
     const matchesProgramQuery = programInfo?.program_code
       ?.toLowerCase()
       .includes(query);
@@ -1020,6 +1027,7 @@ This printed permit must be presented to your proctor on the exam day to verify 
         matchesProgramQuery) &&
       matchesDepartment &&
       matchesProgramFilter &&
+      matchesRegistrarCurriculum &&
       matchesSchoolYear &&
       matchesSemester &&
       matchesCampus
@@ -1063,17 +1071,56 @@ This printed permit must be presented to your proctor on the exam day to verify 
   const currentPersons = sortedPersons.slice(indexOfFirstItem, indexOfLastItem);
 
   useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
     const fetchDepartments = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/departments`); // ✅ Update if needed
-        setDepartment(response.data);
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
       } catch (error) {
         console.error("Error fetching departments:", error);
       }
     };
 
     fetchDepartments();
-  }, []);
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  useEffect(() => {
+    if (!department.length) return;
+
+    if (department.length === 1) {
+      const onlyDeptId = String(department[0].dprtmnt_id);
+      if (String(selectedDepartmentFilter) !== onlyDeptId) {
+        handleDepartmentChange(onlyDeptId);
+      }
+    } else if (
+      selectedDepartmentFilter &&
+      !department.some(
+        (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+      )
+    ) {
+      handleDepartmentChange("");
+    }
+  }, [department]);
 
   const maxButtonsToShow = 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
@@ -1186,61 +1233,7 @@ This printed permit must be presented to your proctor on the exam day to verify 
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <AdmissionProcessTabs />
 
       <br />
       <br />
@@ -1588,7 +1581,9 @@ This printed permit must be presented to your proctor on the exam day to verify 
                 onChange={(e) => handleDepartmentChange(e.target.value)}
                 displayEmpty
               >
-                <MenuItem value="">All Departments</MenuItem>
+                {department.length > 1 && (
+                  <MenuItem value="">All Departments</MenuItem>
+                )}
                 {filteredDepartments.map((dep) => (
                   <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                     {dep.dprtmnt_name} ({dep.dprtmnt_code})

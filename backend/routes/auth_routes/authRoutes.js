@@ -10,8 +10,9 @@ const { db, db3 } = require("../database/database");
 const { CanDelete, CanEdit } = require("../../middleware/pagePermissions");
 const {
   insertAuditLogAdmission,
-  insertAuditLogEnrollment,
+  insertAuditLogBoth,
 } = require("../../utils/auditLogger");
+const { resolveUserMacAddress } = require("../../utils/macAddress");
 const {
   resolveRegistrarLoginFields,
 } = require("../../utils/registrarScopeService");
@@ -25,6 +26,22 @@ async function getShortTerm() {
   );
   return rows?.[0]?.short_term || "Institution";
 }
+
+router.get("/user-mac-address", async (req, res) => {
+  try {
+    const macAddress = await resolveUserMacAddress(req);
+    return res.json({
+      success: true,
+      mac_address: macAddress,
+    });
+  } catch (error) {
+    console.error("MAC address lookup failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to resolve MAC address.",
+    });
+  }
+});
 
 
 const generateTempPassword = () => {
@@ -174,10 +191,24 @@ async function getApplicantNumberByPersonId(personId) {
   }
 }
 
-const getLoginAuditLogger = (req) =>
-  req.body?.audit_log_db === "db3"
-    ? insertAuditLogEnrollment
-    : insertAuditLogAdmission;
+const createLoginAuditLogger = (req) => {
+  let resolvedMac = null;
+
+  const ensureMac = async () => {
+    if (!resolvedMac) {
+      resolvedMac = await resolveUserMacAddress(req);
+    }
+    return resolvedMac;
+  };
+
+  return async (payload) => {
+    const userMacAddress = await ensureMac();
+    await insertAuditLogBoth({
+      ...payload,
+      userMacAddress,
+    });
+  };
+};
 
 const buildRegistrationAuditMessage = ({ actorId, event, reason }) => {
   const safeActor = actorId || "unknown";
@@ -838,7 +869,7 @@ router.post("/register", async (req, res) => {
 
 router.post("/login", async (req, res) => {
   const { email: loginCredentials, password } = req.body;
-  const insertLoginAuditLog = getLoginAuditLogger(req);
+  const insertLoginAuditLog = createLoginAuditLogger(req);
 
   if (!loginCredentials || !password) {
     return res
@@ -1166,7 +1197,7 @@ router.post("/verify-login-totp", async (req, res) => {
   try {
     const { email, token: totpToken, isSetup, source } = req.body;
     const normalizedEmail = email?.trim().toLowerCase();
-    const insertLoginAuditLog = getLoginAuditLogger(req);
+    const insertLoginAuditLog = createLoginAuditLogger(req);
 
     if (!normalizedEmail || !totpToken) {
       return res
@@ -1308,7 +1339,7 @@ router.post("/verify-login-totp", async (req, res) => {
 
 router.post("/login_applicant", async (req, res) => {
   const { email, password } = req.body;
-  const insertLoginAuditLog = getLoginAuditLogger(req);
+  const insertLoginAuditLog = createLoginAuditLogger(req);
 
   if (!email || !password) {
     return res

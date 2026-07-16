@@ -24,6 +24,8 @@ import {
 } from "@mui/material";
 import Search from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import { Link, useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
@@ -47,6 +49,8 @@ import FormalExample from "../assets/formalexample.png";
 
 
 const SuperAdminRequirementsUploader = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(2);
 

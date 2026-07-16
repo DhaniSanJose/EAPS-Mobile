@@ -23,22 +23,22 @@ import PersonIcon from "@mui/icons-material/Person";
 import SchoolIcon from "@mui/icons-material/School";
 import ExamPermit from "../applicant/ExamPermit";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import ScheduleIcon from "@mui/icons-material/Schedule";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PeopleIcon from "@mui/icons-material/People";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
 import SearchIcon from "@mui/icons-material/Search";
 import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from '@mui/icons-material/Campaign';
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import { postAuditEvent } from "../utils/auditEvents";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import ScoreIcon from '@mui/icons-material/Score';
 import DateField from "../components/DateField";
 import FormalExample from "../assets/formalexample.png";
 import AdminECATApplicationForm from "./AdminECATApplicationForm";
@@ -46,6 +46,7 @@ import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 const AdminDashboard1 = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -104,50 +105,6 @@ const AdminDashboard1 = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
 
-  const stepsData = [
-    {
-      label: "Applicant List",
-      to: "/admission_applicant_list",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Profile",
-      to: "/admission_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Online Requirements",
-      to: "/admission_online_requirements",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Verify Schedule Management",
-      to: "/verify_document_schedule_management",
-      icon: <ScheduleIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Exam Schedule Management",
-      to: "/entrance_exam_schedule_management",
-      icon: <ScheduleIcon fontSize="large" />,
-    },
-
-    {
-      label: "Examination Permit",
-      to: "/examination_permit_change_course",
-      icon: <PersonSearchIcon fontSize="large" />,
-    },
-
-    {
-      label: "Entrance Examination Score",
-      to: "/applicant_entrance_exam_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-  ];
-
-  const [currentStep, setCurrentStep] = useState(1);
-  const [visitedSteps, setVisitedSteps] = useState(Array(stepsData.length).fill(false));
-
-
   const navigate = useNavigate();
   const [explicitSelection, setExplicitSelection] = useState(false);
 
@@ -162,20 +119,6 @@ const AdminDashboard1 = () => {
       console.error("❌ person_with_applicant failed:", err);
     }
   };
-
-
-  const handleNavigateStep = (index, to) => {
-    setCurrentStep(index);
-
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-    if (pid) {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
-
-
 
 
   const [userID, setUserID] = useState("");
@@ -291,7 +234,6 @@ const AdminDashboard1 = () => {
     const fetchActiveYearAndAvailability = async () => {
       const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
       const activeYear = yearRes.data[0];
-      console.log(activeYear);
 
       if (activeYear) {
         setActiveYearId(activeYear.year_id);
@@ -308,7 +250,6 @@ const AdminDashboard1 = () => {
         );
 
         setProgramAvailability(availRes.data);
-        console.log("Program Availability:", availRes.data);
       }
     };
 
@@ -348,6 +289,7 @@ const AdminDashboard1 = () => {
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   useEffect(() => {
@@ -384,11 +326,6 @@ const AdminDashboard1 = () => {
     } catch (error) {
       console.error('Error checking access:', error);
       setHasAccess(false);
-      if (error.response && error.response.data.message) {
-        console.log(error.response.data.message);
-      } else {
-        console.log("An unexpected error occurred.");
-      }
       setLoading(false);
     }
   };
@@ -619,8 +556,6 @@ const AdminDashboard1 = () => {
 
       // ✅ Send update request
       await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
-
-      console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
     } catch (error) {
       console.error("❌ SuperAdmin update failed:", {
         message: error.message,
@@ -790,7 +725,6 @@ const AdminDashboard1 = () => {
 
       // ✅ Execute safe update
       await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
-      console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
     } catch (err) {
       console.error("❌ Auto-save (on blur) failed:", {
         message: err.message,
@@ -868,7 +802,6 @@ const AdminDashboard1 = () => {
       }
 
       await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
-      console.log(`💾 Auto-saved (manual) for person_id: ${targetId}`);
     } catch (err) {
       console.error("❌ Auto-save (manual) failed:", {
         message: err.message,
@@ -1276,7 +1209,7 @@ const AdminDashboard1 = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
-  const logPrintingApplicantDocs = async (documentLabel) => {
+  const logPrintingApplicantDocs = async (documentLabel, { failed = false } = {}) => {
     try {
       const middleInitial = person?.middle_name
         ? ` ${String(person.middle_name).trim().charAt(0).toUpperCase()}.`
@@ -1291,6 +1224,7 @@ const AdminDashboard1 = () => {
         applicant_name: applicantName,
         applicant_number: person?.applicant_number || "N/A",
         person_id: person?.person_id || userID || "",
+        failed,
       });
     } catch (err) {
       console.error("Printing applicant docs audit failed:", err);
@@ -1328,8 +1262,11 @@ const AdminDashboard1 = () => {
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: config.label,
+          audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );
@@ -1352,9 +1289,10 @@ const AdminDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      await logPrintingApplicantDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingApplicantDocs(config.label, { failed: true });
       setSnackbar({
         open: true,
         message: `⚠️ Unable to generate ${config.label} PDF right now.`,
@@ -1400,6 +1338,11 @@ const AdminDashboard1 = () => {
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: "Examination Permit",
+          audit_print_action: "PRINTING_APPLICANT_DOCS",
+          audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
+          audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );
@@ -1419,9 +1362,10 @@ const AdminDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      await logPrintingApplicantDocs("Examination Permit");
     } catch (err) {
       console.error("Error downloading exam permit PDF:", err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingApplicantDocs("Examination Permit", { failed: true });
       setExamPermitError("⚠️ Unable to generate the Exam Permit PDF right now.");
       setExamPermitModalOpen(true);
     } finally {
@@ -1562,70 +1506,7 @@ const AdminDashboard1 = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          width: "100%",
-
-        }}
-      >
-        {stepsData.map((step, index) => (
-          <React.Fragment key={index}>
-            {/* Step Card */}
-            <Card
-              onClick={() => handleNavigateStep(index, step.to)}
-              sx={{
-                flex: 1,
-                maxWidth: `${100 / stepsData.length}%`, // evenly fit 100%
-                height: 140,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                borderRadius: 2,
-                border: `1px solid ${borderColor}`,
-                backgroundColor: currentStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
-                color: currentStep === index ? "#fff" : "#000",
-                boxShadow:
-                  currentStep === index
-                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                transition: "0.3s ease",
-                "&:hover": {
-                  backgroundColor: currentStep === index ? "#000" : "#f5d98f",
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <Box sx={{ fontSize: 32, mb: 0.5 }}>{step.icon}</Box>
-                <Typography
-                  sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                >
-                  {step.label}
-                </Typography>
-              </Box>
-            </Card>
-
-            {/* Spacer instead of line */}
-            {index < stepsData.length - 1 && (
-              <Box
-                sx={{
-
-                  mx: 1, // margin to keep spacing
-                }}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </Box>
+      <AdmissionProcessTabs />
 
       <br />
       <br />

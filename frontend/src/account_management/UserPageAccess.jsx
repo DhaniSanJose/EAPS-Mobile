@@ -32,6 +32,8 @@ import {
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
@@ -44,6 +46,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 const PROTECTED_PAGE_ID = 69;
 
 const UserPageAccess = () => {
+  useAccountAuditMac();
   const settings = useContext(SettingsContext);
 
   // UI Colors
@@ -92,8 +95,8 @@ const UserPageAccess = () => {
     severity: "success", // success | error | warning | info
   });
 
-  const auditConfig = {
-    headers: {
+  const getAuditConfigForPage = () =>
+    getAuditConfig({
       "x-employee-id":
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
@@ -104,8 +107,7 @@ const UserPageAccess = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-    },
-  };
+    });
 
   const handleCloseSnack = (event, reason) => {
     if (reason === "clickaway") return;
@@ -472,12 +474,12 @@ const UserPageAccess = () => {
         await axios.post(
           `${API_BASE_URL}/api/page_access/${selectedUser.employee_id}/${targetPageId}`,
           {},
-          auditConfig,
+          getAuditConfigForPage(),
         );
       } else {
         await axios.delete(
           `${API_BASE_URL}/api/page_access/${selectedUser.employee_id}/${targetPageId}`,
-          auditConfig,
+          getAuditConfigForPage(),
         );
       }
 
@@ -567,7 +569,7 @@ const UserPageAccess = () => {
           can_edit: nextState.can_edit ? 1 : 0,
           can_delete: nextState.can_delete ? 1 : 0,
         },
-        auditConfig,
+        getAuditConfigForPage(),
       );
 
       setSnack({
@@ -735,7 +737,7 @@ const UserPageAccess = () => {
           access_description: accessDescription,
           affected_count: affectedCount,
         },
-        auditConfig,
+        getAuditConfigForPage(),
       );
     } catch (err) {
       console.error("Failed to insert create access bulk permission audit:", err);
@@ -833,7 +835,7 @@ const UserPageAccess = () => {
           access_description: editAccessDescription,
           affected_count: affectedCount,
         },
-        auditConfig,
+        getAuditConfigForPage(),
       );
     } catch (err) {
       console.error("Failed to insert edit access bulk permission audit:", err);
@@ -874,7 +876,7 @@ const UserPageAccess = () => {
       await axios.put(`${API_BASE_URL}/api/access/${editAccessId}`, {
         access_description: editAccessDescription,
         access_page: selectedPages,
-      }, auditConfig);
+      }, getAuditConfigForPage());
 
       setAccessLevels((prev) =>
         prev.map((level) =>
@@ -930,7 +932,7 @@ const UserPageAccess = () => {
       await axios.post(`${API_BASE_URL}/api/access`, {
         access_description: accessDescription,
         access_page: selectedPages,
-      }, auditConfig);
+      }, getAuditConfigForPage());
 
       setSnack({
         open: true,
@@ -963,7 +965,7 @@ const UserPageAccess = () => {
     try {
       await axios.post(`${API_BASE_URL}/api/page_access/grant-all`, {
         userId: selectedUser.employee_id,
-      }, auditConfig);
+      }, getAuditConfigForPage());
 
       const newAccess = {};
       pages.forEach((p) => {
@@ -1006,7 +1008,7 @@ const UserPageAccess = () => {
     try {
       await axios.post(`${API_BASE_URL}/api/page_access/revoke-all`, {
         userId: selectedUser.employee_id,
-      }, auditConfig);
+      }, getAuditConfigForPage());
 
       const newAccess = {};
       pages.forEach((p) => {
@@ -1064,7 +1066,7 @@ const UserPageAccess = () => {
           permission: permissionKey,
           enabled: enabled ? 1 : 0,
         },
-        auditConfig,
+        getAuditConfigForPage(),
       );
 
       const protectedLabel = getProtectedPageLabel();
@@ -1097,7 +1099,7 @@ const UserPageAccess = () => {
     try {
       await axios.put(`${API_BASE_URL}/api/update_student_status/${userId}`, {
         status: nextStatus,
-      }, auditConfig);
+      }, getAuditConfigForPage());
 
       setSnack({
         open: true,

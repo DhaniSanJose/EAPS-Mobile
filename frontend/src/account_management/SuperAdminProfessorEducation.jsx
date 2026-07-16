@@ -32,6 +32,8 @@ import { SettingsContext } from "../App";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 
 // ── Fast filter: plain string match, no fuzzy scoring ──────────────────────
@@ -45,6 +47,8 @@ const filterOptions = createFilterOptions({
 });
 
 const SuperAdminProfessorEducation = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
     const settings = useContext(SettingsContext);
     const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
     const [borderColor, setBorderColor] = useState("#000000");

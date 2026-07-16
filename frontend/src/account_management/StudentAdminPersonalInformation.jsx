@@ -54,7 +54,8 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
-import { postAuditEvent } from "../utils/auditEvents";
+import { postAuditEvent, getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import PrintingHistoryDialog, {
   PRINTING_STUDENT_ACTION,
 } from "../components/PrintingHistoryDialog";
@@ -66,6 +67,7 @@ import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar"
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 
 const SuperAdminStudentDashboard1 = () => {
+  useAccountAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -237,8 +239,8 @@ const SuperAdminStudentDashboard1 = () => {
 
   const [employeeID, setEmployeeID] = useState("");
 
-  const getAuditHeaders = () => ({
-    headers: {
+  const getAuditHeaders = () =>
+    getAuditConfig({
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-change-section": "personal_information",
@@ -248,11 +250,8 @@ const SuperAdminStudentDashboard1 = () => {
         localStorage.getItem("person_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    },
-  });
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    });
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -1103,7 +1102,7 @@ const SuperAdminStudentDashboard1 = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
-  const logPrintingStudentDocs = async (documentLabel) => {
+  const logPrintingStudentDocs = async (documentLabel, { failed = false } = {}) => {
     try {
       const middleInitial = person?.middle_name
         ? ` ${String(person.middle_name).trim().charAt(0).toUpperCase()}.`
@@ -1119,6 +1118,7 @@ const SuperAdminStudentDashboard1 = () => {
         student_number:
           person?.student_number || person?.applicant_number || "N/A",
         person_id: person?.person_id || userID || "",
+        failed,
       });
     } catch (err) {
       console.error("Printing student docs audit failed:", err);
@@ -1159,8 +1159,11 @@ const SuperAdminStudentDashboard1 = () => {
         {
           html: node.innerHTML,
           applicant_number: person?.applicant_number || "",
+          student_number: person?.student_number || person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: config.label,
+          audit_print_action: "PRINTING_STUDENT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
         },
@@ -1185,9 +1188,10 @@ const SuperAdminStudentDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      await logPrintingStudentDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingStudentDocs(config.label, { failed: true });
       setSnack({
         open: true,
         message: `⚠️ Unable to generate ${config.label} PDF right now.`,

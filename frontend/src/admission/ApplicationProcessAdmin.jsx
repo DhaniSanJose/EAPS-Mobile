@@ -29,6 +29,8 @@ import {
 import { io } from "socket.io-client";
 import { Snackbar, Alert } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -39,8 +41,16 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import DateField from "../components/DateField";
 import DeleteIcon from "@mui/icons-material/Delete";
+import {
+  isRegistrarCurriculumMatch,
+  refreshRegistrarCurriculumId,
+  restrictToRegistrarCurriculum,
+  syncRegistrarScopeFromAdminData,
+} from "../utils/registrarCurriculumRestriction";
+import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
 const ApplicationProcessAdmin = () => {
+  useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
@@ -188,7 +198,11 @@ const ApplicationProcessAdmin = () => {
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
-  const [adminData, setAdminData] = useState({ dprtmnt_id: "" });
+  const [adminData, setAdminData] = useState({
+    dprtmnt_id: "",
+    dprtmnt_ids: [],
+  });
+  const scopeRevision = useRegistrarScopeRevision();
 
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -269,7 +283,8 @@ const ApplicationProcessAdmin = () => {
   const fetchPersonData = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
-      setAdminData(res.data); // { dprtmnt_id: "..." }
+      setAdminData(res.data);
+      syncRegistrarScopeFromAdminData(res.data);
     } catch (err) {
       console.error("Error fetching admin data:", err);
     }
@@ -280,6 +295,13 @@ const ApplicationProcessAdmin = () => {
       fetchPersonData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (userRole !== "registrar" || !employeeID) return;
+    refreshRegistrarCurriculumId(employeeID).catch((err) => {
+      console.error("Error refreshing registrar scope:", err);
+    });
+  }, [userRole, employeeID]);
 
   const cleanName = (v) => (v ?? "").trim().toLowerCase();
 
@@ -568,6 +590,53 @@ const ApplicationProcessAdmin = () => {
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
   const [department, setDepartment] = useState([]);
   const [allCurriculums, setAllCurriculums] = useState([]);
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
+    const fetchCurriculums = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+          ),
+        );
+        const merged = responses.flatMap((response) => response.data || []);
+        const restricted = restrictToRegistrarCurriculum(merged);
+        setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
+      } catch (error) {
+        console.error("Error fetching curriculum options:", error);
+      }
+    };
+
+    fetchCurriculums();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (departmentIds.length) return;
+
+    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
+      const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
+      setAllCurriculums(restrictedCurriculums);
+      setCurriculumOptions(restrictedCurriculums);
+    });
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
   const filteredDepartments = department.filter((dep) =>
     allCurriculums.some(
       (curriculum) =>
@@ -693,6 +762,10 @@ const ApplicationProcessAdmin = () => {
         (opt) =>
           opt.curriculum_id?.toString() === personData.program?.toString(),
       );
+      const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(
+        personData.program,
+        allCurriculums,
+      );
 
       const matchesProgram =
         selectedProgramFilter === "" ||
@@ -758,6 +831,7 @@ const ApplicationProcessAdmin = () => {
         matchesSubmittedDocs &&
         matchesDepartment &&
         matchesProgram &&
+        matchesRegistrarCurriculum &&
         matchesSchoolYear &&
         matchesSemester &&
         matchesDateRange
@@ -829,17 +903,56 @@ const ApplicationProcessAdmin = () => {
   }, []);
 
   useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
     const fetchDepartments = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/departments`); // ✅ Update if needed
-        setDepartment(response.data);
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
       } catch (error) {
         console.error("Error fetching departments:", error);
       }
     };
 
     fetchDepartments();
-  }, []);
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  useEffect(() => {
+    if (!department.length) return;
+
+    if (department.length === 1) {
+      const onlyDeptId = String(department[0].dprtmnt_id);
+      if (String(selectedDepartmentFilter) !== onlyDeptId) {
+        handleDepartmentChange(onlyDeptId);
+      }
+    } else if (
+      selectedDepartmentFilter &&
+      !department.some(
+        (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+      )
+    ) {
+      handleDepartmentChange("");
+    }
+  }, [department]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -920,13 +1033,6 @@ const ApplicationProcessAdmin = () => {
   };
 
   const activeDocumentOptions = getDocumentOptionsForPerson(activePerson);
-
-  useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      setAllCurriculums(res.data);
-      setCurriculumOptions(res.data);
-    });
-  }, []);
 
   const handleCampusChange = (branchId) => {
     setPerson((prev) => ({ ...prev, campus: branchId }));
@@ -1151,17 +1257,10 @@ const ApplicationProcessAdmin = () => {
   const handleDeleteAccount = async (person_id) => {
     try {
       await axios.delete(`${API_BASE_URL}/api/delete-account/${person_id}`, {
-        headers: {
+        headers: getFlatAuditHeaders({
           "x-employee-id": employeeID,
           "x-page-id": pageId,
-          "x-audit-actor-id":
-            employeeID ||
-            localStorage.getItem("employee_id") ||
-            localStorage.getItem("email") ||
-            "unknown",
-          "x-audit-actor-role":
-            userRole || localStorage.getItem("role") || "registrar",
-        },
+        }),
       });
 
       setSnack({
@@ -1752,9 +1851,11 @@ const ApplicationProcessAdmin = () => {
                   }}
                   displayEmpty
                 >
-                  <MenuItem value="">Select College</MenuItem>
-                  {department.map((dep) => (
-                    <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
+                  {department.length > 1 && (
+                    <MenuItem value="">All Departments</MenuItem>
+                  )}
+                  {filteredDepartments.map((dep) => (
+                    <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})
                     </MenuItem>
                   ))}

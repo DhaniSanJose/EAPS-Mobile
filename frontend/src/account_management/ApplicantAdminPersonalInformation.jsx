@@ -54,7 +54,8 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import SearchIcon from "@mui/icons-material/Search";
 import { Snackbar, Alert } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
-import { postAuditEvent } from "../utils/auditEvents";
+import { postAuditEvent, getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DateField from "../components/DateField";
@@ -65,6 +66,7 @@ import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 const SuperAdminApplicantDashboard1 = () => {
+  useAccountAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -239,8 +241,8 @@ const SuperAdminApplicantDashboard1 = () => {
 
   const [employeeID, setEmployeeID] = useState("");
 
-  const getAuditHeaders = () => ({
-    headers: {
+  const getAuditHeaders = () =>
+    getAuditConfig({
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-change-section": "personal_information",
@@ -250,11 +252,8 @@ const SuperAdminApplicantDashboard1 = () => {
         localStorage.getItem("person_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    },
-  });
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    });
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -1573,7 +1572,7 @@ const SuperAdminApplicantDashboard1 = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
-  const logPrintingApplicantDocs = async (documentLabel) => {
+  const logPrintingApplicantDocs = async (documentLabel, { failed = false } = {}) => {
     try {
       const middleInitial = person?.middle_name
         ? ` ${String(person.middle_name).trim().charAt(0).toUpperCase()}.`
@@ -1588,6 +1587,7 @@ const SuperAdminApplicantDashboard1 = () => {
         applicant_name: applicantName,
         applicant_number: person?.applicant_number || "N/A",
         person_id: person?.person_id || userID || "",
+        failed,
       });
     } catch (err) {
       console.error("Printing applicant docs audit failed:", err);
@@ -1625,6 +1625,8 @@ const SuperAdminApplicantDashboard1 = () => {
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: config.label,
+          audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
         },
@@ -1649,9 +1651,10 @@ const SuperAdminApplicantDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      await logPrintingApplicantDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingApplicantDocs(config.label, { failed: true });
       setSnackbar({
         open: true,
         message: `⚠️ Unable to generate ${config.label} PDF right now.`,
@@ -1697,6 +1700,10 @@ const SuperAdminApplicantDashboard1 = () => {
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: "Examination Permit",
+          audit_print_action: "PRINTING_APPLICANT_DOCS",
+          audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
+          audit_actor_role: userRole || "registrar",
         },
         { responseType: "blob" },
       );
@@ -1716,9 +1723,10 @@ const SuperAdminApplicantDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      await logPrintingApplicantDocs("Examination Permit");
     } catch (err) {
       console.error("Error downloading exam permit PDF:", err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingApplicantDocs("Examination Permit", { failed: true });
       setExamPermitError("⚠️ Unable to generate the Exam Permit PDF right now.");
       setExamPermitModalOpen(true);
     } finally {

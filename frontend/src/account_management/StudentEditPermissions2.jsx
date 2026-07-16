@@ -23,6 +23,8 @@ import SecurityIcon from "@mui/icons-material/Security";
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIELD DEFINITIONS FOR DASHBOARD 2 (Family Background)
@@ -151,6 +153,7 @@ const buildDefaultState = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const StudentEditPermissions2 = () => {
   const settings = useContext(SettingsContext);
+  useAccountAuditMac();
 
   const [mainButtonColor, setMainButtonColor] = useState("#6D2323");
   const [borderColor, setBorderColor] = useState("#000");
@@ -172,8 +175,8 @@ const StudentEditPermissions2 = () => {
   // POST/GET to /api/student_edit_permissions covers all dashboards.
   const pageId = 156;
 
-  const auditConfig = {
-    headers: {
+  const getAuditConfigForPage = () =>
+    getAuditConfig({
       "x-employee-id":
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
@@ -185,8 +188,7 @@ const StudentEditPermissions2 = () => {
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
       "x-audit-change-section": "Family Background",
-    },
-  };
+    });
 
   // ── Load settings ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -265,7 +267,7 @@ const StudentEditPermissions2 = () => {
         ...buildSectionPayload(sourcePermissions),
         ...(options.isReset ? { reset_to_defaults: true } : {}),
       },
-      auditConfig,
+      getAuditConfigForPage(),
     );
   };
 

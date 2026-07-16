@@ -29,6 +29,9 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import { useNavigate, useLocation } from "react-router-dom";
 import DateField from "../components/DateField";
 import {
@@ -39,6 +42,8 @@ import {
 } from "@mui/icons-material";
 
 const SuperAdminStudentResetPassword = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -157,12 +162,14 @@ const SuperAdminStudentResetPassword = () => {
   });
 
   const auditFields = () => ({
+
     audit_actor_id:
       employeeID ||
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   /* =====================================
@@ -243,7 +250,8 @@ const SuperAdminStudentResetPassword = () => {
         {
           search: userInfo.email,
           ...auditFields(),
-        }
+        },
+        getAuditRequestConfig(),
       );
 
 
@@ -287,7 +295,8 @@ const SuperAdminStudentResetPassword = () => {
           email: userInfo.email,
           status: userInfo.status,
           ...auditFields(),
-        }
+        },
+        getAuditRequestConfig(),
       );
 
       setStudents((prev) =>

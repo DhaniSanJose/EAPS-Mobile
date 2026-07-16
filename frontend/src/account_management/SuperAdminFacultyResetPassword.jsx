@@ -25,6 +25,9 @@ import SearchIcon from "@mui/icons-material/Search";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
+import { getLoginMacPayload } from "../utils/userMacAddress";
 import { useNavigate } from "react-router-dom";
 import {
   People,
@@ -34,6 +37,8 @@ import {
 } from "@mui/icons-material";
 
 const SuperAdminFacultyResetPassword = () => {
+  useAccountAuditMac();
+  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -72,11 +77,13 @@ const SuperAdminFacultyResetPassword = () => {
   });
 
   const auditFields = () => ({
+
     audit_actor_id:
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   const tabs = [
@@ -167,10 +174,14 @@ const SuperAdminFacultyResetPassword = () => {
   const handleReset = async () => {
     if (!userInfo) return;
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/superadmin-reset-employee`, {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/superadmin-reset-employee`,
+        {
         email: userInfo.email,
         ...auditFields(),
-      });
+      },
+        getAuditRequestConfig(),
+      );
 
       setSnackbar({ open: true, message: res.data.message, severity: "success" });
     } catch (err) {
@@ -199,7 +210,8 @@ const SuperAdminFacultyResetPassword = () => {
           email: userInfo.email,
           status: userInfo.status,
           ...auditFields(),
-        }
+        },
+        getAuditRequestConfig(),
       );
 
       setFaculty((prev) =>
