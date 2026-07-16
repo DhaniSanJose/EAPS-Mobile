@@ -36,11 +36,14 @@ import AddIcon from "@mui/icons-material/Add";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import EditIcon from "@mui/icons-material/Edit";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 
 
 
 export default function DepartmentCurriculumPanel() {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -129,6 +132,7 @@ export default function DepartmentCurriculumPanel() {
   const [employeeID, setEmployeeID] = useState("");
   const permissionHeaders = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID,

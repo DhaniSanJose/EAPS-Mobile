@@ -29,6 +29,10 @@ import {
 import { SettingsContext } from "../App";
 import API_BASE_URL from "../apiConfig";
 import { useResponsive } from "../hooks/useResponsive";
+import {
+  getLoginMacPayload,
+} from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 /* ═══════════════════════════════════════════════════════════
    APPLICANT FORGOT PASSWORD — TOTP MODAL
@@ -107,6 +111,7 @@ const ApplicantForgotPasswordTotpModal = ({
         identifier: identifier.trim(),
         type: "applicant",
         token: code,
+        ...getLoginMacPayload(),
       });
 
       if (res.data?.success) {
@@ -579,6 +584,7 @@ const ApplicantForgotPasswordTotpModal = ({
 };
 
 const ApplicantForgotPassword = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const { device, isMobile, isTablet, isDesktop } = useResponsive();
   const navigate = useNavigate();
@@ -652,6 +658,7 @@ const ApplicantForgotPassword = () => {
         identifier: applicantNumber.trim(),
         email: email.trim(),
         birthdate,
+        ...getLoginMacPayload(),
       });
 
       if (res.data?.success) {

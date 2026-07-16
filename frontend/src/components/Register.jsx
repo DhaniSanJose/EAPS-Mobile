@@ -46,6 +46,10 @@ import { SettingsContext } from "../App";
 import API_BASE_URL from "../apiConfig";
 import AnnouncementSlider from "../components/AnnouncementSlider";
 import RedirectLoading from "../components/RedirectLoading";
+import {
+  fetchAndStoreUserMacAddress,
+  getLoginMacPayload,
+} from "../utils/userMacAddress";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Autocomplete from "@mui/material/Autocomplete";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1381,6 +1385,12 @@ const Register = () => {
   }, [isCompact]);
 
   useEffect(() => {
+    fetchAndStoreUserMacAddress().catch((err) => {
+      console.error("Unable to preload MAC address for audit logs:", err);
+    });
+  }, []);
+
+  useEffect(() => {
     axios.get(`${API_BASE_URL}/api/branches`)
       .then((res) => setBranches(res.data))
       .catch((err) => console.error(err));
@@ -1533,6 +1543,7 @@ const Register = () => {
         program: selectedCurriculum,
         active_school_year_id: activeSchoolYearId,
         audit_log_db: "db",
+        ...getLoginMacPayload(),
       });
 
       // Step 3: Open the TOTP modal (it calls /register-totp-setup internally)

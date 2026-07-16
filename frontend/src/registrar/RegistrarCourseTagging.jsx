@@ -39,7 +39,8 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import GradeIcon from "@mui/icons-material/Grade";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import { useNavigate } from "react-router-dom";
-import { postAuditEvent } from "../utils/auditEvents";
+import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   formatCourseHistoryLabel,
   formatStudentDisplayName,
@@ -208,6 +209,7 @@ const getStudentSearchErrorMessage = (error) =>
   "Unable to search student right now. Please try again.";
 
 const CourseTagging = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -265,6 +267,7 @@ const CourseTagging = () => {
 
   const auditConfig = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id":
         employeeID ||
         localStorage.getItem("employee_id") ||

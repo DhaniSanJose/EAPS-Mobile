@@ -30,8 +30,11 @@ import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const SectionPanel = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -51,6 +54,7 @@ const SectionPanel = () => {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

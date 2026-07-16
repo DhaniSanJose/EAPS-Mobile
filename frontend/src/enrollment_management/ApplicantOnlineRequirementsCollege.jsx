@@ -46,6 +46,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import PersonIcon from "@mui/icons-material/Person";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const tabs = [
   {
@@ -82,6 +84,7 @@ const tabs = [
 ];
 
 const RegistrarRequirements = () => {
+  useAuditMac();
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(2);
   const [clickedSteps, setClickedSteps] = useState(
@@ -293,6 +296,7 @@ const RegistrarRequirements = () => {
 
   const getAuditConfig = (extraHeaders = {}) => ({
     headers: {
+      ...getFlatAuditHeaders(),
       ...extraHeaders,
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,

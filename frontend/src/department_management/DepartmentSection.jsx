@@ -36,6 +36,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import TextField from "@mui/material/TextField";
 import SearchIcon from "@mui/icons-material/Search";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const formatSchoolYear = (yearDesc) => {
   if (!yearDesc) return "";
@@ -479,6 +481,7 @@ const DepartmentSectionGrid = memo(
 DepartmentSectionGrid.displayName = "DepartmentSectionGrid";
 
 const DepartmentSection = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -523,6 +526,7 @@ const DepartmentSection = () => {
   const pageId = 20;
 
   const getPermissionHeaders = () => ({
+    ...getFlatAuditHeaders(),
     "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
     "x-page-id": pageId,
     "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

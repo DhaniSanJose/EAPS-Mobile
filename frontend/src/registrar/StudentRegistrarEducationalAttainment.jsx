@@ -33,7 +33,10 @@ import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 const ReadmissionDashboard3 = () => {
+  useAuditMac();
 
   const settings = useContext(SettingsContext);
 
@@ -521,6 +524,7 @@ const ReadmissionDashboard3 = () => {
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );

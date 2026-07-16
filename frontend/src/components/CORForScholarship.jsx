@@ -34,10 +34,12 @@ import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const CertificateOfRegistration = forwardRef(
 
   ({ student_number, onSaved }, divToPrintRef) => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");

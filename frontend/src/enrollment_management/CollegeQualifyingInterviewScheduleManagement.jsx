@@ -58,7 +58,11 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import ScoreIcon from "@mui/icons-material/Score";
 import PersonIcon from "@mui/icons-material/Person";
 import EaristLogo from "../assets/EaristLogo.png";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
+
 const AssignScheduleToApplicantsInterviewer = () => {
+  useAuditMac();
   const socket = useRef(null);
   const settings = useContext(SettingsContext);
 
@@ -157,6 +161,7 @@ const AssignScheduleToApplicantsInterviewer = () => {
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   useEffect(() => {

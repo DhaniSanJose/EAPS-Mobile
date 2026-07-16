@@ -9,8 +9,11 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 const ProgramEvaluationForRegistrar = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -346,6 +349,7 @@ const ProgramEvaluationForRegistrar = () => {
           localStorage.getItem("email") ||
           "unknown",
         audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+        ...getLoginMacPayload(),
       });
 
       try {

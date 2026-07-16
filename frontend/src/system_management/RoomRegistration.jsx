@@ -46,8 +46,11 @@ import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const RoomRegistration = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const branches = Array.isArray(settings?.branches)
@@ -108,6 +111,7 @@ const RoomRegistration = () => {
   const [employeeID, setEmployeeID] = useState("");
   const permissionHeaders = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id":

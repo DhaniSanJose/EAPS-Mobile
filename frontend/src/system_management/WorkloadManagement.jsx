@@ -21,6 +21,8 @@ import {
     DialogActions,
 } from "@mui/material";
 import API_BASE_URL from '../apiConfig';
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const DEFAULT_WORKLOAD_COLOR = "#fde047";
 
@@ -69,6 +71,7 @@ const normalizeColorForSave = (input) => {
 };
 
 const WorkloadManagement = () => {
+    useAuditMac();
     const [workloads, setWorkloads] = useState([]);
     const [workloadDescription, setWorkloadDescription] = useState("");
     const [workloadCode, setWorkloadCode] = useState("");
@@ -81,6 +84,18 @@ const WorkloadManagement = () => {
         open: false,
         message: "",
         severity: "success",
+    });
+
+    const getAuditConfig = () => ({
+        headers: {
+            ...getFlatAuditHeaders(),
+            "x-audit-actor-id":
+                localStorage.getItem("employee_id") ||
+                localStorage.getItem("person_id") ||
+                localStorage.getItem("email") ||
+                "unknown",
+            "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+        },
     });
 
     const showSnackbar = (message, severity = "success") => {
@@ -129,7 +144,8 @@ const WorkloadManagement = () => {
                         workloadDescription,
                         workloadCode,
                         workloadColor: normalizedColor,
-                    }
+                    },
+                    getAuditConfig()
                 );
 
                 showSnackbar(
@@ -143,7 +159,8 @@ const WorkloadManagement = () => {
                         workloadDescription,
                         workloadCode,
                         workloadColor: normalizedColor,
-                    }
+                    },
+                    getAuditConfig()
                 );
 
                 showSnackbar(
@@ -182,7 +199,8 @@ const WorkloadManagement = () => {
     const confirmDelete = async () => {
         try {
             await axios.delete(
-                `${API_BASE_URL}/api/workload/${selectedId}`
+                `${API_BASE_URL}/api/workload/${selectedId}`,
+                getAuditConfig()
             );
 
             showSnackbar(

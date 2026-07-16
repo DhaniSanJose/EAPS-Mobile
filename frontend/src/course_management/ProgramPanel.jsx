@@ -27,8 +27,11 @@ import {
   MenuItem,
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const ProgramPanel = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -99,6 +102,7 @@ const ProgramPanel = () => {
   const [employeeID, setEmployeeID] = useState("");
 
   const getPermissionHeaders = () => ({
+    ...getFlatAuditHeaders(),
     "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
     "x-audit-actor-id":
       employeeID ||

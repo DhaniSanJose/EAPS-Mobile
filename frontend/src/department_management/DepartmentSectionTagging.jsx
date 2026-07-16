@@ -37,8 +37,11 @@ import {
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const DepartmentSectionTagging = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   // ── Theme ─────────────────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ const DepartmentSectionTagging = () => {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

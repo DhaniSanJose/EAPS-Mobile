@@ -45,7 +45,8 @@ import {
 import PersonIcon from "@mui/icons-material/Person";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
-import { postAuditEvent } from "../utils/auditEvents";
+import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   formatCourseHistoryLabel,
   formatStudentDisplayName,
@@ -221,6 +222,7 @@ const getStudentSearchErrorMessage = (error) =>
   "Unable to search student right now. Please try again.";
 
 const CourseTaggingForCollege = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   // ── settings state (unchanged) ──
@@ -275,6 +277,7 @@ const CourseTaggingForCollege = () => {
 
   const auditConfig = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id":
         employeeID ||
         localStorage.getItem("employee_id") ||

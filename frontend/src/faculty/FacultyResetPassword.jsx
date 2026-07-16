@@ -26,6 +26,9 @@ import {
 } from "@mui/icons-material";
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
+import { getAuditConfig } from "../utils/auditEvents";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 import { useNavigate } from "react-router-dom";
 
 
@@ -79,6 +82,7 @@ const passwordRules = [
 
 
 const FacultyResetPassword = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const theme = useTheme();
@@ -180,9 +184,16 @@ const FacultyResetPassword = () => {
     e.preventDefault();
     try {
       const employee_id = localStorage.getItem("employee_id");
-      const response = await axios.post(`${API_BASE_URL}/api/faculty-change-password`, {
-        employee_id, currentPassword, newPassword,
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/api/faculty-change-password`,
+        {
+          employee_id,
+          currentPassword,
+          newPassword,
+          ...getLoginMacPayload(),
+        },
+        getAuditConfig(),
+      );
       setSnack({ open: true, message: response.data.message, severity: "success" });
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
       localStorage.removeItem("force_password_change");

@@ -25,6 +25,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
 import GradeIcon from "@mui/icons-material/Grade";
 import API_BASE_URL from "../apiConfig";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 import DescriptionIcon from "@mui/icons-material/Description";
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -36,7 +38,7 @@ import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 const MedicalDashboard4 = () => {
-
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -562,6 +564,7 @@ const MedicalDashboard4 = () => {
                     first_name: person?.first_name || "",
                     audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
                     audit_actor_role: userRole || "registrar",
+                    ...getLoginMacPayload(),
                 },
                 { responseType: "blob" },
             );

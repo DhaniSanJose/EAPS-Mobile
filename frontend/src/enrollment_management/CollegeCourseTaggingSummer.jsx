@@ -33,7 +33,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import API_BASE_URL from "../apiConfig";
 import ScoreIcon from "@mui/icons-material/Score";
-import { postAuditEvent } from "../utils/auditEvents";
+import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   formatCourseHistoryLabel,
   formatStudentDisplayName,
@@ -203,6 +204,7 @@ const logStudentBasicInfoSearch = async ({
 };
 
 const CourseTaggingForSummerCollege = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -264,6 +266,7 @@ const CourseTaggingForSummerCollege = () => {
   const [employeeID, setEmployeeID] = useState("");
   const auditConfig = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id":
         employeeID ||
         localStorage.getItem("employee_id") ||

@@ -36,8 +36,11 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import Cropper from "react-easy-crop";
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from "@mui/icons-material/Search";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const AnnouncementPanel = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000");
@@ -66,6 +69,7 @@ const AnnouncementPanel = () => {
     const pageId = 66;
     const permissionHeaders = {
         headers: {
+            ...getFlatAuditHeaders(),
             "x-employee-id": employeeID,
             "x-page-id": pageId,
             "x-audit-actor-id":
@@ -175,6 +179,7 @@ const AnnouncementPanel = () => {
             if (editingId) {
                 await axios.put(`${API_BASE_URL}/api/announcements/${editingId}`, formData, {
                     headers: {
+                        ...getFlatAuditHeaders(),
                         "Content-Type": "multipart/form-data",
                         "x-employee-id": employeeID,
                         "x-page-id": pageId,
@@ -190,6 +195,7 @@ const AnnouncementPanel = () => {
             } else {
                 await axios.post(`${API_BASE_URL}/api/announcements`, formData, {
                     headers: {
+                        ...getFlatAuditHeaders(),
                         "Content-Type": "multipart/form-data",
                         "x-employee-id": employeeID,
                         "x-page-id": pageId,

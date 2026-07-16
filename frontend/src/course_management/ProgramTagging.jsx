@@ -34,8 +34,11 @@ import {
 } from "@mui/material";
 import { FaFileExcel } from "react-icons/fa";
 import SaveIcon from "@mui/icons-material/Save";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const ProgramTagging = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -198,6 +201,7 @@ const ProgramTagging = () => {
 
   const getPermissionHeaders = (extraHeaders = {}) => ({
     headers: {
+      ...getFlatAuditHeaders(),
       ...extraHeaders,
       "x-employee-id": employeeID,
       "x-audit-actor-id":

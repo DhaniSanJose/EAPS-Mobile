@@ -36,6 +36,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import LoadingOverlay from "../components/LoadingOverlay";
 import Unauthorized from "../components/Unauthorized";
 import EaristLogo from "../assets/EaristLogo.png";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const generateSlotOptions = (start = 10, end = 500, step = 10) => {
   const options = [];
@@ -49,6 +51,7 @@ const SLOT_OPTIONS = generateSlotOptions(10, 500, 10);
 const ADD_SLOT_OPTIONS = [1, 5, 10, 20, 50, 100];
 
 const ProgramSlotLimit = () => {
+  useAuditMac();
   const [yearId, setYearId] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const [programs, setPrograms] = useState([]);
@@ -81,6 +84,7 @@ const ProgramSlotLimit = () => {
   const [employeeID, setEmployeeID] = useState("");
   const auditConfig = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-audit-actor-id":
         employeeID ||
         localStorage.getItem("employee_id") ||

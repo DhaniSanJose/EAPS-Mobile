@@ -29,10 +29,13 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
 import SaveIcon from "@mui/icons-material/Save";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const ROWS_PER_PAGE = 10;
 
 const SemesterPanel = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   // ── Colors ──────────────────────────────────────────────────────────────────
@@ -81,6 +84,7 @@ const SemesterPanel = () => {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

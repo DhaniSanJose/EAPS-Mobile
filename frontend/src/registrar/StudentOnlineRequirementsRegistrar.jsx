@@ -44,6 +44,8 @@ import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import AddIcon from '@mui/icons-material/Add';
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const tabs1 = [
   { label: "Student List", to: "/registrar_student_list", icon: <SchoolIcon fontSize="large" /> },
@@ -56,6 +58,7 @@ const tabs1 = [
 ];
 
 const MedicalRequirements = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -295,6 +298,7 @@ const MedicalRequirements = () => {
 
   const getAuditConfig = (extraHeaders = {}) => ({
     headers: {
+      ...getFlatAuditHeaders(),
       ...extraHeaders,
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,

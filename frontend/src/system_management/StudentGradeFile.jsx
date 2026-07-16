@@ -41,6 +41,8 @@ import {
   convertRawToRatingDynamic,
   setRemarksFromRatingDynamic,
 } from "../utils/gradeConversion";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const bodyStyle = {
   fontSize: "15px",
@@ -50,6 +52,7 @@ const bodyStyle = {
 };
 
 const StudentGradeFile = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   // Colors State
@@ -103,6 +106,7 @@ const StudentGradeFile = () => {
 
   const auditConfig = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id":

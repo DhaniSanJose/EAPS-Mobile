@@ -5,8 +5,10 @@ import { SettingsContext } from "../App";
 import API_BASE_URL from "../apiConfig";
 import { FaFileExcel } from "react-icons/fa";
 import { getAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const UploadEnrolledSubject = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");

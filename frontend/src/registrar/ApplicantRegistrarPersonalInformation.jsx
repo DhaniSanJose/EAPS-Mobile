@@ -36,6 +36,8 @@ import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from '@mui/icons-material/Campaign';
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ScoreIcon from '@mui/icons-material/Score';
@@ -48,6 +50,7 @@ import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 const AdminDashboard1 = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -344,6 +347,7 @@ const AdminDashboard1 = () => {
       localStorage.getItem("email") ||
       "unknown",
     audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+    ...getLoginMacPayload(),
   });
 
   useEffect(() => {
@@ -1360,6 +1364,7 @@ const AdminDashboard1 = () => {
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );

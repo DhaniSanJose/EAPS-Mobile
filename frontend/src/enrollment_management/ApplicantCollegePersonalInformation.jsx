@@ -58,6 +58,8 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
@@ -77,6 +79,7 @@ import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 const RegistrarDashboard1 = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -1606,6 +1609,7 @@ const RegistrarDashboard1 = () => {
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );

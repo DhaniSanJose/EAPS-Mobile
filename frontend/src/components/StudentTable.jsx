@@ -23,8 +23,10 @@ import {
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const StudentTable = ({ data, paymentType, onRemove }) => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [borderColor, setBorderColor] = useState("#000000");

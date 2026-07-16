@@ -31,8 +31,11 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import * as XLSX from "xlsx";
 import ApplicantTable from "../components/ApplicantTable";
 import StudentTable from "../components/StudentTable";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const PaymentExportingModule = () => {
+    useAuditMac();
     const [yearId, setYearId] = useState("");
     const [semesterId, setSemesterId] = useState("");
     const [programs, setPrograms] = useState([]);
@@ -76,6 +79,7 @@ const PaymentExportingModule = () => {
 
     const getAuditHeaders = () => ({
         headers: {
+            ...getFlatAuditHeaders(),
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

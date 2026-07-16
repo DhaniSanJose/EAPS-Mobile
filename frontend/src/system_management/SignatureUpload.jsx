@@ -38,8 +38,11 @@ import LoadingOverlay from "../components/LoadingOverlay";
 
 import { SettingsContext } from "../App";
 import axios from "axios";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const SignatureUpload = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -190,6 +193,7 @@ const SignatureUpload = () => {
   };
 
   const getAuditHeaders = () => ({
+    ...getFlatAuditHeaders(),
     "x-employee-id": employeeID,
     "x-page-id": pageId,
     "x-audit-actor-id": employeeID,

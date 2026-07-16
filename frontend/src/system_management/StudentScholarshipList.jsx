@@ -40,8 +40,11 @@ import API_BASE_URL from "../apiConfig";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const StudentScholarshipList = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -111,6 +114,7 @@ const StudentScholarshipList = () => {
   const [accessDescription, setAccessDescription] = useState("");
 
   const getAuditHeaders = () => ({
+    ...getFlatAuditHeaders(),
     "Content-Type": "application/json",
     "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
     "x-page-id": pageId,

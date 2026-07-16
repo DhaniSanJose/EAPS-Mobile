@@ -27,7 +27,8 @@ import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import EaristLogo from "../assets/EaristLogo.png";
-import { postAuditEvent } from "../utils/auditEvents";
+import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -47,6 +48,7 @@ const C = {
 
 // ─── Main Component ────────────────────────────────────────────────────────
 const GradeConversionAdmin = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     // ── Settings state ──
@@ -105,6 +107,7 @@ const GradeConversionAdmin = () => {
     const [employeeID, setEmployeeID] = useState("");
     const getAuditHeaders = () => ({
         headers: {
+            ...getFlatAuditHeaders(),
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id":

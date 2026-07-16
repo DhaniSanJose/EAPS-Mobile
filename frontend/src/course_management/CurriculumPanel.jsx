@@ -38,9 +38,12 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { FaFileExcel } from "react-icons/fa";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import SaveIcon from "@mui/icons-material/Save";
 
 const CurriculumPanel = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -120,6 +123,7 @@ const CurriculumPanel = () => {
   const [employeeID, setEmployeeID] = useState("");
 
   const getPermissionHeaders = () => ({
+    ...getFlatAuditHeaders(),
     "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
     "x-page-id": pageId,
     "x-audit-actor-id":

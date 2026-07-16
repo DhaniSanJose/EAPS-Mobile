@@ -53,6 +53,8 @@ import BusinessIcon from "@mui/icons-material/Business";
 import { DeleteOutline } from "@mui/icons-material";
 import axios from "axios";
 import Unauthorized from "../components/Unauthorized";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const REASONS = [
@@ -290,6 +292,7 @@ const EnrollmentStatusChip = ({ status, hasSubjects }) => {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 const StudentEnrollment = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [tab, setTab] = useState(0);
@@ -351,6 +354,7 @@ const StudentEnrollment = () => {
 
   const auditConfig = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id":

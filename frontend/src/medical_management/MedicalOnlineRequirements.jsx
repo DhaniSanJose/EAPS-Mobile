@@ -39,6 +39,8 @@ import PsychologyIcon from "@mui/icons-material/Psychology";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 
 const tabs = [
@@ -51,6 +53,7 @@ const tabs = [
 ];
 
 const MedicalRequirements = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -231,6 +234,7 @@ const MedicalRequirements = () => {
 
   const getAuditHeaders = (extraHeaders = {}) => ({
     headers: {
+      ...getFlatAuditHeaders(),
       ...extraHeaders,
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,

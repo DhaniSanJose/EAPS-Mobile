@@ -36,6 +36,7 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import StudentHistoryDialog from "../components/StudentHistoryDialog";
 import { postAuditEvent } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import AddIcon from '@mui/icons-material/Add';
 
 const cleanAuditValue = (value) => {
@@ -63,6 +64,7 @@ const logCorSearchAudit = async (student, fallbackStudentNumber) => {
 };
 
 const SearchCertificateOfRegistration = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");

@@ -37,8 +37,11 @@ import API_BASE_URL from "../apiConfig";
 import { Snackbar, Alert } from "@mui/material";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const DentalAssessment = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -267,6 +270,7 @@ const DentalAssessment = () => {
 
     const getAuditHeaders = () => ({
         headers: {
+            ...getFlatAuditHeaders(),
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id":

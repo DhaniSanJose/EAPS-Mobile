@@ -47,8 +47,11 @@ import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import PersonIcon from "@mui/icons-material/Person";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const RegistrarRequirements = () => {
+  useAuditMac();
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(2);
 
@@ -295,6 +298,7 @@ const RegistrarRequirements = () => {
 
   const getAuditConfig = (extraHeaders = {}) => ({
     headers: {
+      ...getFlatAuditHeaders(),
       ...extraHeaders,
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,

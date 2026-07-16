@@ -32,8 +32,11 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import EaristLogo from "../assets/EaristLogo.png";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const SectionSlotManagement = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
     const pageId = 167;
 
@@ -114,6 +117,7 @@ const SectionSlotManagement = () => {
 
     const getPermissionHeaders = () => ({
         headers: {
+            ...getFlatAuditHeaders(),
             "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

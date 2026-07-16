@@ -53,6 +53,8 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { FaFileExcel } from "react-icons/fa";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 import PrintingHistoryDialog, {
   PRINTING_STUDENT_ACTION,
 } from "../components/PrintingHistoryDialog";
@@ -79,6 +81,7 @@ import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar"
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 
 const OfficialStudentDashboard1 = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -1676,6 +1679,7 @@ const OfficialStudentDashboard1 = () => {
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );

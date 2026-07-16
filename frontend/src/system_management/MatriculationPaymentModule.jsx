@@ -39,6 +39,8 @@ import {
     Tooltip,
     Cell,
 } from "recharts";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const PRIORITY_FEE_CONFIG = [
     { priority: 0, key: "tuition_fees", label: "Tuition Fees" },
@@ -208,6 +210,7 @@ const formatTransactionDateTime = (value) => {
 };
 
 const MatriculationPaymentModule = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [borderColor, setBorderColor] = useState("#000000");
@@ -256,6 +259,7 @@ const MatriculationPaymentModule = () => {
     };
     const auditConfig = {
         headers: {
+            ...getFlatAuditHeaders(),
             "x-audit-actor-id":
                 personData?.employee_id ||
                 localStorage.getItem("employee_id") ||

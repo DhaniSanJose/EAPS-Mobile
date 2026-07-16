@@ -1,8 +1,48 @@
 const express = require('express');
 const { db3 } = require('../database/database');
+const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
+const { resolveUserMacAddress } = require("../../utils/macAddress");
 const router = express.Router();
 
 const WORKLOAD_HOUR_LIMIT = 40;
+
+const formatAuditActorRole = (role) => {
+    const safeRole = String(role || "registrar").trim();
+    if (!safeRole) return "Registrar";
+
+    return safeRole
+        .split(/[\s_-]+/)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(" ");
+};
+
+const insertWorkloadAuditLog = async ({ req, action, message }) => {
+    const { actorId, actorRole } = resolveAuditActor(req);
+    const userMacAddress = await resolveUserMacAddress(req);
+
+    await insertAuditLogEnrollment({
+        actorId,
+        role: actorRole,
+        action,
+        message,
+        severity: "INFO",
+        userMacAddress,
+    });
+};
+
+const getActorLabel = (req) => {
+    const { actorId, actorRole } = resolveAuditActor(req);
+    return {
+        actorId,
+        roleLabel: formatAuditActorRole(actorRole),
+    };
+};
+
+const formatWorkloadLabel = ({ workloadDescription, workloadCode } = {}) => {
+    const description = String(workloadDescription || "").trim() || "Untitled workload";
+    const code = String(workloadCode || "").trim();
+    return code ? `${description} (${code})` : description;
+};
 
 function timeToMinutes(timeStr) {
     if (!timeStr) return 0;
@@ -284,6 +324,17 @@ router.post('/workload', async (req, res) => {
         const insertQuery = `INSERT INTO workload_type(workload_description, workload_code, workload_color) VALUES (?, ?, ?)`;
 
         await db3.query(insertQuery, [workloadDescription, workloadCode, workloadColor || null]);
+
+        const { actorId, roleLabel } = getActorLabel(req);
+        await insertWorkloadAuditLog({
+            req,
+            action: "WORKLOAD_TYPE_CREATE",
+            message: `${roleLabel} (${actorId}) created workload type ${formatWorkloadLabel({
+                workloadDescription,
+                workloadCode,
+            })}.`,
+        });
+
         res.json({ message: "Successfully created new workload type" });
     } catch (err) {
         console.log("Debug Error", err);
@@ -303,6 +354,16 @@ router.put('/workload/:id', async (req, res) => {
         const updateQuery = 'UPDATE workload_type SET workload_description = ?, workload_code = ?, workload_color = ? WHERE id = ?';
         await db3.query(updateQuery, [workloadDescription, workloadCode, workloadColor || null, id]);
 
+        const { actorId, roleLabel } = getActorLabel(req);
+        await insertWorkloadAuditLog({
+            req,
+            action: "WORKLOAD_TYPE_UPDATE",
+            message: `${roleLabel} (${actorId}) updated workload type ${formatWorkloadLabel({
+                workloadDescription,
+                workloadCode,
+            })}.`,
+        });
+
         res.status(200).send({ message: "Successfully update the workload" });
     } catch (err) {
         console.log("Debug Error", err);
@@ -318,8 +379,23 @@ router.delete('/workload/:id', async (req, res) => {
             return res.status(401).send({ message: "Missing Requirements or Credentials" });
         }
 
+        const [[existing]] = await db3.query(
+            "SELECT workload_description, workload_code FROM workload_type WHERE id = ? LIMIT 1",
+            [id],
+        );
+
         const updateQuery = 'DELETE FROM workload_type WHERE id = ?';
         await db3.query(updateQuery, [id]);
+
+        const { actorId, roleLabel } = getActorLabel(req);
+        await insertWorkloadAuditLog({
+            req,
+            action: "WORKLOAD_TYPE_DELETE",
+            message: `${roleLabel} (${actorId}) deleted workload type ${formatWorkloadLabel({
+                workloadDescription: existing?.workload_description,
+                workloadCode: existing?.workload_code,
+            })}.`,
+        });
 
         res.status(200).send({ message: "Successfully deleted the workload" });
     } catch (err) {

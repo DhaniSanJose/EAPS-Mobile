@@ -56,8 +56,11 @@ import {
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import PersonIcon from "@mui/icons-material/Person";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 const StudentNumbering = () => {
+    useAuditMac();
     const socket = useRef(null);
     const settings = useContext(SettingsContext);
 
@@ -647,6 +650,7 @@ const StudentNumbering = () => {
                     localStorage.getItem("email") ||
                     "unknown",
                 audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+                ...getLoginMacPayload(),
             });
 
             socket.current.once("assign-student-number-result", (data) => {

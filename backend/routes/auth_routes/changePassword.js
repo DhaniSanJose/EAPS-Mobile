@@ -5,13 +5,29 @@ const {
   insertAuditLogAdmission,
   insertAuditLogEnrollment,
 } = require("../../utils/auditLogger");
+const { resolveUserMacAddress } = require("../../utils/macAddress");
 const router = express.Router();
+
+const buildPersonDisplayName = (row = {}) => {
+  const fullName = [
+    row.first_name || row.fname,
+    row.middle_name || row.mname,
+    row.last_name || row.lname,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return fullName || row.email || "Unknown User";
+};
 
 const insertOwnPasswordAuditLog = async ({
   auditDb,
   actorId,
   role,
   action,
+  message,
+  userMacAddress,
 }) => {
   const auditLogger =
     auditDb === "db" ? insertAuditLogAdmission : insertAuditLogEnrollment;
@@ -21,7 +37,10 @@ const insertOwnPasswordAuditLog = async ({
     role,
     action,
     severity: "INFO",
-    message: `${role || "User"} (${actorId || "unknown"}) reset own account password.`,
+    message:
+      message ||
+      `${role || "User"} (${actorId || "unknown"}) reset own account password.`,
+    userMacAddress,
   });
 };
 
@@ -130,7 +149,17 @@ router.post("/faculty-change-password", async (req, res) => {
       "UPDATE prof_table SET password = ?, force_password_change = 0 WHERE employee_id = ?",
       [hashed, employee_id]
     );
-    await insertOwnPasswordAuditLog({ auditDb: "db3", actorId: user.employee_id || user.email || employee_id, role: user.role || "faculty", action: "FACULTY_OWN_PASSWORD_RESET" });
+    const displayName = buildPersonDisplayName(user);
+    const accountEmail = user.email || "unknown";
+    const userMacAddress = await resolveUserMacAddress(req);
+    await insertOwnPasswordAuditLog({
+      auditDb: "db3",
+      actorId: user.employee_id || user.email || employee_id,
+      role: user.role || "faculty",
+      action: "FACULTY_OWN_PASSWORD_RESET",
+      message: `The user ${displayName} ${accountEmail} reset the password.`,
+      userMacAddress,
+    });
     res.json({ message: "Password updated successfully" });
   } catch (error) {
     console.error("Password update error:", error);

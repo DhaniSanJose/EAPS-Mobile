@@ -32,6 +32,7 @@ import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   filterCollegeScheduleSections,
   getDepartmentIdsFromAdminData,
@@ -47,6 +48,7 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 const CertificateOfRegistrationForCollege = forwardRef(
 
   ({ student_number, dprtmnt_id, onNotify, preload }, divToPrintRef) => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");

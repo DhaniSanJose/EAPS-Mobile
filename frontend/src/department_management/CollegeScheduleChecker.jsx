@@ -40,6 +40,7 @@ import {
 } from "../utils/scheduleTimeValidation";
 import SearchIcon from "@mui/icons-material/Search";
 import { postAuditEvent } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   checkProfessorWorkloadWarning,
   combineScheduleMessage,
@@ -64,6 +65,7 @@ const isDesignationEntry = (entry) =>
   Number(entry?.department_section_id) === 0;
 
 const CollegeScheduleChecker = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");

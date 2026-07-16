@@ -46,8 +46,11 @@ import DateField from "../components/DateField";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const MedicalStudentList = () => {
+  useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
@@ -447,6 +450,7 @@ const MedicalStudentList = () => {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-audit-actor-id":
         employeeID || localStorage.getItem("employee_id") || "",
       "x-audit-actor-role":

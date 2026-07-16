@@ -22,6 +22,8 @@ import {
   CircularProgress,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 export const DEPARTMENT_PLOTTING_ACCESS_EVENT = "department-plotting-access-changed";
 
@@ -62,6 +64,7 @@ const PAGE_ID = 53;
 const PANEL_HEIGHT = 600;
 
 const ScheduleFilterer = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -89,6 +92,7 @@ const ScheduleFilterer = () => {
   const location = useLocation();
 
   const permissionHeaders = {
+    ...getFlatAuditHeaders(),
     "x-employee-id": employeeID,
     "x-page-id": String(PAGE_ID),
     "x-audit-actor-id":

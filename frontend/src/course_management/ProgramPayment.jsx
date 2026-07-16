@@ -6,9 +6,12 @@ import { Box, Typography, Button, Snackbar, Alert, FormControl, InputLabel, Sele
 import LoadingOverlay from "../components/LoadingOverlay";
 import { Autocomplete } from "@mui/material";
 import { useMemo } from "react";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 
 const CurriculumCourseMap = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -84,6 +87,7 @@ const CurriculumCourseMap = () => {
   const [employeeID, setEmployeeID] = useState("");
   const getAuditConfig = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id":

@@ -39,7 +39,8 @@ import {
   convertRawToRatingDynamic,
   setRemarksFromRatingDynamic,
 } from "../utils/gradeConversion";
-import { postAuditEvent } from "../utils/auditEvents";
+import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 // ── Defined OUTSIDE the component so the reference never changes ──────────────
 const gradeOptions = [
@@ -210,6 +211,7 @@ const GradeSelect = React.memo(({ value, onChange, placeholder = "", disabled = 
 GradeSelect.displayName = "GradeSelect";
 
 const GradingSheet = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const location = useLocation();
   const { course_id, section_id, school_year_id } = location.state || {};
@@ -1286,7 +1288,10 @@ const GradingSheet = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/post_student_grades`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuditHeaders(),
+        },
         body: JSON.stringify({
           professor_id: profData.prof_id,
           course_id: selectedCourse,

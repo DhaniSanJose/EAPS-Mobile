@@ -34,6 +34,8 @@ import {
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 // ── NSTP type config ──────────────────────────────────────────────────────────
 const NSTP_TYPES = [
@@ -80,6 +82,7 @@ const NSTP_COMPONENT_REVERSE_MAP = {
 };
 
 const NSTPTagging = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   // ── Theme ─────────────────────────────────────────────────────────────────
@@ -104,6 +107,7 @@ const NSTPTagging = () => {
   const pageId = 148;
   const auditConfig = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-audit-actor-id":
         employeeID ||
         localStorage.getItem("employee_id") ||

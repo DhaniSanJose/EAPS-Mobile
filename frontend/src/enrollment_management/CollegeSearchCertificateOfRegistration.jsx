@@ -46,6 +46,7 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PersonIcon from "@mui/icons-material/Person";
 import { postAuditEvent } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const cleanAuditValue = (value) => {
     if (value === null || value === undefined) return "";
@@ -72,6 +73,7 @@ const logCorSearchAudit = async (student, fallbackStudentNumber) => {
 };
 
 const SearchCorForCollege = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");

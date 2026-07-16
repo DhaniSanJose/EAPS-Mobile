@@ -36,6 +36,8 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const getBmiInterpretation = (bmiValue) => {
   const bmi = Number(bmiValue);
@@ -61,7 +63,7 @@ const calculateBmi = (heightValue, weightValue) => {
 };
 
 const MedicalRequirements = () => {
-
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -121,6 +123,7 @@ const MedicalRequirements = () => {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id":

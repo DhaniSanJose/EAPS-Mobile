@@ -57,8 +57,11 @@ import ScoreIcon from "@mui/icons-material/Score";
 import DateField from "../components/DateField";
 import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close"; // or use the custom SVG below
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 const QualifyingExamScore = () => {
+  useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
@@ -256,6 +259,7 @@ const QualifyingExamScore = () => {
         localStorage.getItem("role") ||
         "registrar",
       audit_actor_email: localStorage.getItem("email") || "",
+      ...getLoginMacPayload(),
     };
   };
 
@@ -272,6 +276,7 @@ const QualifyingExamScore = () => {
       localStorage.getItem("role") ||
       "registrar",
     audit_actor_email: localStorage.getItem("email") || "",
+    ...getLoginMacPayload(),
   });
 
   const saveSingleRow = async (person) => {

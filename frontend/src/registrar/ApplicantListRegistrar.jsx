@@ -43,8 +43,11 @@ import PersonIcon from "@mui/icons-material/Person";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import ScoreIcon from '@mui/icons-material/Score';
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const SuperAdminApplicantList = () => {
+  useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
@@ -217,6 +220,7 @@ const SuperAdminApplicantList = () => {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id":

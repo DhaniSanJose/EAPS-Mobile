@@ -32,6 +32,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
 import SaveIcon from '@mui/icons-material/Save';
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const applicantTypeMap = {
   "0": "All Applicants",
@@ -46,6 +48,7 @@ const applicantTypeMap = {
 };
 
 const RequirementsForm = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -103,6 +106,7 @@ const RequirementsForm = () => {
   const [employeeID, setEmployeeID] = useState("");
   const permissionHeaders = {
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID,

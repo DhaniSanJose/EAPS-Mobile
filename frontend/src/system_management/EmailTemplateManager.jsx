@@ -45,8 +45,11 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import PeopleIcon from "@mui/icons-material/People";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import SearchIcon from "@mui/icons-material/Search";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 export default function EmailTemplateManager() {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [borderColor, setBorderColor] = useState("#000000");
@@ -70,6 +73,7 @@ export default function EmailTemplateManager() {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

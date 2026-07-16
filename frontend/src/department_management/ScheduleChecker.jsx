@@ -38,12 +38,14 @@ import {
 } from "../utils/scheduleTimeValidation";
 import SearchIcon from "@mui/icons-material/Search";
 import { postAuditEvent } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   checkProfessorWorkloadWarning,
   combineScheduleMessage,
 } from "../utils/professorWorkloadWarning";
 
 const ScheduleChecker = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");

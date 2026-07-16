@@ -16,8 +16,11 @@ import {
 import LoadingOverlay from "../components/LoadingOverlay";
 import Unauthorized from "../components/Unauthorized";
 import { Autocomplete } from "@mui/material";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const CoursePanelMap = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000");
@@ -42,6 +45,7 @@ const CoursePanelMap = () => {
     const [loading, setLoading] = useState(false);
     const getAuditConfig = () => ({
         headers: {
+            ...getFlatAuditHeaders(),
             "x-employee-id": localStorage.getItem("employee_id") || "",
             "x-page-id": pageId,
             "x-audit-actor-id":

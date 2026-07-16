@@ -51,9 +51,11 @@ import ScoreIcon from '@mui/icons-material/Score';
 import DateField from "../components/DateField";
 import PersonIcon from "@mui/icons-material/Person";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
-
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 const ApplicantScoringReadOnly = () => {
+    useAuditMac();
 
 
     const settings = useContext(SettingsContext);
@@ -187,6 +189,7 @@ const ApplicantScoringReadOnly = () => {
             localStorage.getItem("email") ||
             "unknown",
         audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+        ...getLoginMacPayload(),
     });
 
     useEffect(() => {

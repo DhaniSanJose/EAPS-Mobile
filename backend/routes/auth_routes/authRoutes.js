@@ -10,6 +10,7 @@ const { db, db3 } = require("../database/database");
 const { CanDelete, CanEdit } = require("../../middleware/pagePermissions");
 const {
   insertAuditLogAdmission,
+  insertAuditLogEnrollment,
   insertAuditLogBoth,
 } = require("../../utils/auditLogger");
 const { resolveUserMacAddress } = require("../../utils/macAddress");
@@ -54,41 +55,77 @@ const generateTempPassword = () => {
 // Looks up an account by ID (student number, or employee ID for
 // registrar/faculty) and returns its type + email + current totp state.
 // Does NOT verify email here — caller compares it.
+const buildForgotPasswordDisplayName = (row = {}) => {
+  const fullName = [
+    row.first_name || row.fname,
+    row.middle_name || row.mname,
+    row.last_name || row.lname,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return fullName || row.email || "Unknown User";
+};
+
 async function resolveForgotPasswordAccount(identifier) {
   const normalizedIdentifier = String(identifier || "").trim();
   if (!normalizedIdentifier) return null;
 
   const [studentRows] = await db3.query(
-    `SELECT ua.id, ua.email, ua.totp_secret, ua.totp_verified
+    `SELECT ua.id, ua.email, ua.totp_secret, ua.totp_verified,
+            pt.first_name, pt.middle_name, pt.last_name
      FROM student_numbering_table snt
      JOIN user_accounts ua ON ua.person_id = snt.person_id AND ua.role = 'student'
+     LEFT JOIN person_table pt ON pt.person_id = ua.person_id
      WHERE snt.student_number = ?
      LIMIT 1`,
     [normalizedIdentifier]
   );
-  if (studentRows.length > 0) return { ...studentRows[0], type: "student" };
+  if (studentRows.length > 0) {
+    return {
+      ...studentRows[0],
+      type: "student",
+      displayName: buildForgotPasswordDisplayName(studentRows[0]),
+    };
+  }
 
   const [registrarRows] = await db3.query(
-    `SELECT id, email, totp_secret, totp_verified
-     FROM user_accounts
-     WHERE employee_id = ? AND role = 'registrar'
+    `SELECT ua.id, ua.email, ua.totp_secret, ua.totp_verified,
+            pt.first_name, pt.middle_name, pt.last_name
+     FROM user_accounts ua
+     LEFT JOIN person_table pt ON pt.person_id = ua.person_id
+     WHERE ua.employee_id = ? AND ua.role = 'registrar'
      LIMIT 1`,
     [normalizedIdentifier]
   );
-  if (registrarRows.length > 0) return { ...registrarRows[0], type: "registrar" };
+  if (registrarRows.length > 0) {
+    return {
+      ...registrarRows[0],
+      type: "registrar",
+      displayName: buildForgotPasswordDisplayName(registrarRows[0]),
+    };
+  }
 
   const [facultyRows] = await db3.query(
-    `SELECT prof_id AS id, email, totp_secret, totp_verified
+    `SELECT prof_id AS id, email, totp_secret, totp_verified, fname, mname, lname
      FROM prof_table
      WHERE employee_id = ? AND role = 'faculty'
      LIMIT 1`,
     [normalizedIdentifier]
   );
-  if (facultyRows.length > 0) return { ...facultyRows[0], type: "faculty" };
+  if (facultyRows.length > 0) {
+    return {
+      ...facultyRows[0],
+      type: "faculty",
+      displayName: buildForgotPasswordDisplayName(facultyRows[0]),
+    };
+  }
 
   // ── NEW: applicant lookup (lives in the ADMISSION db, keyed by applicant_number) ──
   const [applicantRows] = await db.query(
-    `SELECT ua.person_id AS id, ua.email, ua.totp_secret, ua.totp_verified, pt.birthOfDate
+    `SELECT ua.person_id AS id, ua.email, ua.totp_secret, ua.totp_verified, pt.birthOfDate,
+            pt.first_name, pt.middle_name, pt.last_name
      FROM applicant_numbering_table ant
      JOIN person_table pt ON pt.person_id = ant.person_id
      JOIN user_accounts ua ON ua.person_id = ant.person_id AND ua.role = 'applicant'
@@ -96,7 +133,13 @@ async function resolveForgotPasswordAccount(identifier) {
      LIMIT 1`,
     [normalizedIdentifier]
   );
-  if (applicantRows.length > 0) return { ...applicantRows[0], type: "applicant" };
+  if (applicantRows.length > 0) {
+    return {
+      ...applicantRows[0],
+      type: "applicant",
+      displayName: buildForgotPasswordDisplayName(applicantRows[0]),
+    };
+  }
 
   return null;
 }
@@ -2013,26 +2056,31 @@ router.post("/forgot-password-confirm", async (req, res) => {
   const { identifier, type, token } = req.body;
   const normalizedIdentifier = String(identifier || "").trim();
   const normalizedType = String(type || "").trim();
- 
+  const userMacAddress = await resolveUserMacAddress(req);
+  const forgotPasswordAuditLogger =
+    normalizedType === "applicant"
+      ? insertAuditLogAdmission
+      : insertAuditLogEnrollment;
+
   if (!normalizedIdentifier || !normalizedType || !token) {
     return res.status(400).json({
       success: false,
       message: "Missing identifier, type, or code.",
     });
   }
- 
+
   if (!/^\d{6}$/.test(String(token).trim())) {
     return res.status(400).json({
       success: false,
       message: "Please enter a valid 6-digit code.",
     });
   }
- 
+
   const tableInfo = TYPE_TABLE_MAP[normalizedType];
   if (!tableInfo) {
     return res.status(400).json({ success: false, message: "Invalid account type." });
   }
- 
+
   // Basic brute-force guard on the confirm step, separate from login lockouts.
   const attemptKey = `fp_confirm::${normalizedType}::${normalizedIdentifier}`;
   const now = Date.now();
@@ -2040,7 +2088,7 @@ router.post("/forgot-password-confirm", async (req, res) => {
     loginAttempts[attemptKey] = { count: 0, lockUntil: null };
   }
   const record = loginAttempts[attemptKey];
- 
+
   if (record.lockUntil && record.lockUntil > now) {
     const remainingSeconds = Math.ceil((record.lockUntil - now) / 1000);
     return res.status(429).json({
@@ -2053,17 +2101,17 @@ router.post("/forgot-password-confirm", async (req, res) => {
   if (record.lockUntil && record.lockUntil <= now) {
     loginAttempts[attemptKey] = { count: 0, lockUntil: null };
   }
- 
+
   const storeKey = `forgot_password_setup::${normalizedType}::${normalizedIdentifier}`;
   const stored = otpStore[storeKey];
- 
+
   if (!stored) {
     return res.status(400).json({
       success: false,
       message: "No pending recovery request found. Please start over.",
     });
   }
- 
+
   if (stored.expiresAt < now) {
     delete otpStore[storeKey];
     return res.status(400).json({
@@ -2071,24 +2119,25 @@ router.post("/forgot-password-confirm", async (req, res) => {
       message: "This recovery QR code has expired. Please start over.",
     });
   }
- 
+
   const isValid = speakeasy.totp.verify({
     secret: stored.totpSecret,
     encoding: "base32",
     token: String(token).trim(),
     window: 1,
   });
- 
+
   if (!isValid) {
     loginAttempts[attemptKey].count++;
     if (loginAttempts[attemptKey].count >= 3) {
       loginAttempts[attemptKey].lockUntil = now + 3 * 60 * 1000;
-      await insertAuditLogAdmission({
+      await forgotPasswordAuditLogger({
         actorId: normalizedIdentifier,
         role: normalizedType,
         action: "FORGOT_PASSWORD_QR_CONFIRM",
         outcome: "LOCKED",
         reason: "Too many invalid recovery codes",
+        userMacAddress,
       });
       return res.status(429).json({
         success: false,
@@ -2097,42 +2146,47 @@ router.post("/forgot-password-confirm", async (req, res) => {
         message: "Too many failed attempts. Locked for 3 minutes.",
       });
     }
-    await insertAuditLogAdmission({
+    await forgotPasswordAuditLogger({
       actorId: normalizedIdentifier,
       role: normalizedType,
       action: "FORGOT_PASSWORD_QR_CONFIRM",
       outcome: "FAILED",
       reason: "Invalid recovery code",
+      userMacAddress,
     });
     return res.status(400).json({
       success: false,
       message: "Incorrect code. Wait for it to refresh and try again.",
     });
   }
- 
+
   try {
     const newPassword = generateTempPassword();
     const hashedPassword = await bcrypt.hash(newPassword, 10);
- 
-  await tableInfo.db.query(   // ← use the connection that matches the account type
-  `UPDATE ${tableInfo.table}
-   SET totp_secret = ?, totp_verified = 1, password = ?, force_password_change = 1
-   WHERE ${tableInfo.idColumn} = ?`,
-  [stored.totpSecret, hashedPassword, stored.accountId]
-);
- 
+
+    await tableInfo.db.query(
+      `UPDATE ${tableInfo.table}
+       SET totp_secret = ?, totp_verified = 1, password = ?, force_password_change = 1
+       WHERE ${tableInfo.idColumn} = ?`,
+      [stored.totpSecret, hashedPassword, stored.accountId]
+    );
+
+    const displayName = stored.displayName || "Unknown User";
+    const accountEmail = stored.email || "unknown";
+
     delete otpStore[storeKey];
     delete loginAttempts[attemptKey];
- 
-    await insertAuditLogAdmission({
+
+    await forgotPasswordAuditLogger({
       actorId: normalizedIdentifier,
       role: normalizedType,
       action: "FORGOT_PASSWORD_QR_CONFIRM",
-      severity: "WARNING", // secret + password both changed — worth flagging for review
+      severity: "WARNING",
       outcome: "SUCCESS",
-      message: `Authenticator re-linked and password reset for (${normalizedIdentifier}). Old authenticator secret is now invalid.`,
+      message: `The user ${displayName} ${accountEmail} reset the password.`,
+      userMacAddress,
     });
- 
+
     return res.json({
       success: true,
       temp_password: newPassword,
@@ -2199,6 +2253,8 @@ router.post("/forgot-password-init", async (req, res) => {
     otpStore[`forgot_password_setup::${account.type}::${normalizedIdentifier}`] = {
       totpSecret: secret.base32,
       accountId: account.id,
+      email: account.email || normalizedEmail,
+      displayName: account.displayName || buildForgotPasswordDisplayName(account),
       expiresAt: Date.now() + 10 * 60 * 1000,
     };
 

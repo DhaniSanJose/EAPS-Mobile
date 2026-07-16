@@ -27,6 +27,8 @@ import axios from 'axios';
 import API_BASE_URL from '../apiConfig';
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const capitalize = (word) => {
     if (!word) return "";
@@ -36,6 +38,7 @@ const toDigitsOnly = (value) => String(value ?? "").replace(/\D/g, "");
 const getFirstFour = (value) => String(value ?? "").slice(0, 4);
 
 const ReceiptCounterAssignment = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -132,6 +135,7 @@ const ReceiptCounterAssignment = () => {
     });
     const auditConfig = {
         headers: {
+            ...getFlatAuditHeaders(),
             "x-audit-actor-id":
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||

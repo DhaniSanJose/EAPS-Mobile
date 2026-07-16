@@ -43,6 +43,8 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import {
   isRegistrarCurriculumMatch,
   isRegistrarProgramSelectionLocked,
@@ -57,6 +59,7 @@ import DateField from "../components/DateField";
 import PersonIcon from "@mui/icons-material/Person";
 
 const ApplicantList = () => {
+  useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
@@ -380,6 +383,20 @@ const ApplicantList = () => {
   const pageId = 6;
 
   const [employeeID, setEmployeeID] = useState("");
+
+  const getAuditHeaders = () => ({
+    headers: {
+      ...getFlatAuditHeaders(),
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    },
+  });
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");

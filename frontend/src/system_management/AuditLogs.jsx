@@ -23,6 +23,8 @@ import API_BASE_URL from "../apiConfig";
 import { SettingsContext } from "../App";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const PAGE_SIZE = 100;
 
@@ -50,6 +52,7 @@ const formatDate = (value) => {
 };
 
 const AuditLogs = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const titleColor = settings?.title_color || "#000000";
   const borderColor = settings?.border_color || "#d1d5db";
@@ -96,6 +99,7 @@ const AuditLogs = () => {
 
   const getAuditHeaders = () => ({
     headers: {
+      ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",

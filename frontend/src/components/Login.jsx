@@ -26,6 +26,10 @@ import AnnouncementSlider from "../components/AnnouncementSlider";
 import { Link as RouterLink } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useResponsive } from "../hooks/useResponsive";
+import {
+  fetchAndStoreUserMacAddress,
+  getLoginMacPayload,
+} from "../utils/userMacAddress";
 
 /* ─── Per-email localStorage lockout helpers ─── */
 function lockoutKey(email) {
@@ -820,6 +824,12 @@ const Login = ({ setIsAuthenticated }) => {
     setCurrentYear(new Date(now).getFullYear());
   }, []);
 
+  useEffect(() => {
+    fetchAndStoreUserMacAddress().catch((err) => {
+      console.error("Unable to preload MAC address for audit logs:", err);
+    });
+  }, []);
+
   // Fetch the compact banner data for BOTH mobile and tablet, since neither
   // has room for the full side-by-side desktop AnnouncementSlider.
   useEffect(() => {
@@ -904,7 +914,12 @@ const Login = ({ setIsAuthenticated }) => {
           ? `${API_BASE_URL}/api/login_applicant`
           : `${API_BASE_URL}/api/login`;
 
-      const res = await axios.post(apiUrl, { email, password, audit_log_db: "db3" });
+      const res = await axios.post(apiUrl, {
+        email,
+        password,
+        audit_log_db: "db3",
+        ...getLoginMacPayload(),
+      });
 
       if (res.data.locked) {
         const secs = res.data.remainingSeconds ?? 180;

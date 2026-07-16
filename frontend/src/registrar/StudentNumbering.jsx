@@ -47,8 +47,11 @@ import PersonIcon from "@mui/icons-material/Person";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import ScoreIcon from '@mui/icons-material/Score';
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 const StudentNumbering = () => {
+  useAuditMac();
   const socket = useRef(null);
   const settings = useContext(SettingsContext);
 
@@ -888,6 +891,7 @@ const StudentNumbering = () => {
           "unknown",
         audit_actor_role:
           userRole || localStorage.getItem("role") || "registrar",
+        ...getLoginMacPayload(),
       });
 
       socket.current.once("assign-student-number-result", (data) => {

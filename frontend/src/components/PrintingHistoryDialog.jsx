@@ -18,6 +18,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import { Virtuoso } from "react-virtuoso";
 import API_BASE_URL from "../apiConfig";
 import { getAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const PRINTING_APPLICANT_ACTION = "PRINTING_APPLICANT_DOCS";
 const PRINTING_STUDENT_ACTION = "PRINTING_STUDENT_DOCS";
@@ -147,6 +148,7 @@ const PrintingHistoryDialog = ({
   title = "My Printing History",
   disabled = false,
 }) => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const headerColor = settings?.header_color || "#1976d2";
 

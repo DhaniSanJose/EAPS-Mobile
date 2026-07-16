@@ -38,10 +38,13 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DateField from "../components/DateField";
 import ScoreIcon from "@mui/icons-material/Score"
 import SaveIcon from '@mui/icons-material/Save';
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 
 
 const AssignQualifyingInterviewExam = () => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -196,6 +199,7 @@ const AssignQualifyingInterviewExam = () => {
     const [employeeID, setEmployeeID] = useState("");
     const auditConfig = {
         headers: {
+            ...getFlatAuditHeaders(),
             "x-audit-actor-id":
                 employeeID ||
                 localStorage.getItem("employee_id") ||

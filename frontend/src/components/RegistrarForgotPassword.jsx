@@ -28,6 +28,10 @@ import {
 import { SettingsContext } from "../App";
 import API_BASE_URL from "../apiConfig";
 import { useResponsive } from "../hooks/useResponsive";
+import {
+  getLoginMacPayload,
+} from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 /* ═══════════════════════════════════════════════════════════
    FORGOT PASSWORD TOTP MODAL
@@ -109,6 +113,7 @@ const ForgotPasswordTotpModal = ({
         identifier: identifier.trim(),
         type: accountType,
         token: code,
+        ...getLoginMacPayload(),
       });
 
       if (res.data?.success) {
@@ -591,6 +596,7 @@ const ForgotPasswordTotpModal = ({
 
 // page step machine is now just "identify" — the rest lives in the modal
 const RegistrarForgotPasswordQR = () => {
+  useAuditMac();
   const settings = useContext(SettingsContext);
   const { device, isMobile, isTablet, isDesktop } = useResponsive();
   const navigate = useNavigate();
@@ -666,6 +672,7 @@ const RegistrarForgotPasswordQR = () => {
       const res = await axios.post(`${API_BASE_URL}/api/forgot-password-init`, {
         identifier: identifier.trim(),
         email: email.trim(),
+        ...getLoginMacPayload(),
       });
 
       if (res.data?.success) {

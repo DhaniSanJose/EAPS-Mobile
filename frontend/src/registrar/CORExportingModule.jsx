@@ -32,8 +32,11 @@ import { jsPDF } from "jspdf";
 import API_BASE_URL from "../apiConfig";
 import LoadingOverlay from "../components/LoadingOverlay";
 import CertificateOfRegistration from "../components/CertificateOfRegistration";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 
 const CORExportingModule = () => {
+  useAuditMac();
   const [yearId, setYearId] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const [programs, setPrograms] = useState([]);
@@ -90,6 +93,7 @@ const CORExportingModule = () => {
   const pageId = 117;
 
   const getAuditHeaders = () => ({
+    ...getFlatAuditHeaders(),
     "x-audit-actor-id":
       employeeID ||
       localStorage.getItem("employee_id") ||

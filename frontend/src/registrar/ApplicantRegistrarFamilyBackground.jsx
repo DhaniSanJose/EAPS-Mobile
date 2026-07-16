@@ -33,8 +33,11 @@ import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
+import { getLoginMacPayload } from "../utils/userMacAddress";
+import useAuditMac from "../utils/useAuditMac";
 
 const AdminDashboard2 = () => {
+  useAuditMac();
 
   const settings = useContext(SettingsContext);
 
@@ -739,6 +742,7 @@ const AdminDashboard2 = () => {
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
+          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );

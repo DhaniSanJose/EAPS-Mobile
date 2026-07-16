@@ -30,6 +30,9 @@ import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+import { getStoredUserMacAddress } from "../utils/userMacAddress";
 
 // ─── Static design tokens (non-dynamic values only) ───────────────────────────
 const C = {
@@ -141,6 +144,7 @@ function UploadButton({ label, icon, onChange, accept, headerColor, borderColor 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function Settings({ onUpdate }) {
+  useAuditMac();
   const settings = useContext(SettingsContext);
 
   // School info
@@ -237,10 +241,13 @@ function Settings({ onUpdate }) {
     formData.append("subtitle_color", subtitleColor);
     formData.append("audit_actor_id", localStorage.getItem("employee_id") || "");
     formData.append("audit_actor_role", localStorage.getItem("role") || "registrar");
+    const mac = getStoredUserMacAddress();
+    if (mac) formData.append("user_mac_address", mac);
 
     try {
       await axios.post(`${API_BASE_URL}/api/settings`, formData, {
         headers: {
+          ...getFlatAuditHeaders(),
           "Content-Type": "multipart/form-data",
           "x-employee-id": localStorage.getItem("employee_id") || "",
           "x-page-id": pageId,
