@@ -97,6 +97,7 @@ const formatYearLabel = (year) => yearLabelMap[year] || year;
 
 const isMigratedGrade = (subject) => Number(subject?.is_migrated) === 1 || subject?.is_migrated === true;
 const isEvaluatedGrade = (subject) => Number(subject?.fe_status) === 1;
+const isPostedGrade = (subject) => Number(subject?.is_posted) === 1;
 
 const getAcademicTermKey = (subject) =>
   `${subject?.active_school_year_id || subject?.year_description || "N/A"}-${subject?.semester_id || subject?.semester_description || "N/A"}`;
@@ -116,11 +117,40 @@ const getLatestMigratedTermKey = (subjects) => {
   return latestMigratedSubject ? getAcademicTermKey(latestMigratedSubject) : null;
 };
 
-const canShowGrade = (subject, latestMigratedTermKey) => {
-  if (isEvaluatedGrade(subject)) return true;
-  if (!isMigratedGrade(subject)) return false;
+// Returns: 'show' | 'not_posted' | 'hidden'
+const getGradeVisibility = (subject, latestMigratedTermKey) => {
+  if (isMigratedGrade(subject)) {
+    if (isEvaluatedGrade(subject)) return "show";
+    if (getAcademicTermKey(subject) !== latestMigratedTermKey) return "show";
+    return "hidden";
+  }
 
-  return getAcademicTermKey(subject) !== latestMigratedTermKey;
+  if (!isEvaluatedGrade(subject)) return "hidden";
+  if (isPostedGrade(subject)) return "show";
+  return "not_posted";
+};
+
+const applyGradeVisibility = (subject, visibility) => {
+  if (visibility === "show") return subject;
+
+  if (visibility === "not_posted") {
+    return {
+      ...subject,
+      final_grade: null,
+      numeric_grade: null,
+      descriptive_grade: null,
+      grade_display: "Not Posted",
+    };
+  }
+
+  return {
+    ...subject,
+    final_grade: null,
+    numeric_grade: null,
+    descriptive_grade: null,
+    en_remarks: null,
+    gwa: null,
+  };
 };
 
 // ─── Mobile / Tablet Grade Card ────────────────────────────────────
@@ -151,9 +181,11 @@ const MobileGradeCard = ({
         </Typography>
       </Box>
       <Box sx={{ ml: 1, flexShrink: 0 }}>
-        {row.numeric_grade
-          ? <Typography sx={{ fontWeight: 700, fontSize: { xs: 15, sm: 16 }, color: titleColor }}>{row.numeric_grade}</Typography>
-          : <Typography sx={{ color: "#9CA3AF", fontSize: 14 }}>—</Typography>
+        {row.grade_display
+          ? <Typography sx={{ fontWeight: 700, fontSize: { xs: 12, sm: 13 }, color: "#E65100" }}>{row.grade_display}</Typography>
+          : row.numeric_grade
+            ? <Typography sx={{ fontWeight: 700, fontSize: { xs: 15, sm: 16 }, color: titleColor }}>{row.numeric_grade}</Typography>
+            : <Typography sx={{ color: "#9CA3AF", fontSize: 14 }}>—</Typography>
         }
       </Box>
     </Box>
@@ -264,8 +296,25 @@ const StudentGradingPage = () => {
 
   const hideGradeFields = (subject) => ({
     ...subject, final_grade: null, numeric_grade: null,
-    descriptive_grade: null, en_remarks: null, gwa: null,
+    descriptive_grade: null, en_remarks: null, gwa: null, grade_display: null,
   });
+
+  const recalculateTermGwa = (subjects) => {
+    let total = 0;
+    let units = 0;
+
+    subjects.forEach((row) => {
+      if (row.grade_display) return;
+      const grade = Number(row.numeric_grade);
+      const rowUnits = Number(row.gwa_units ?? row.course_unit) || 0;
+      if (!Number.isFinite(grade) || grade <= 0 || rowUnits <= 0) return;
+      total += grade * rowUnits;
+      units += rowUnits;
+    });
+
+    const gwa = units > 0 ? total / units : null;
+    return subjects.map((row) => ({ ...row, gwa }));
+  };
 
   const fetchStudentGrade = async (id) => {
     setLoading(true);
@@ -286,18 +335,10 @@ const StudentGradingPage = () => {
       });
 
       const processedGrades = Object.values(groupedByTerm).flatMap((termSubjects) => {
-        const allReleased = termSubjects.every((s) => canShowGrade(s, latestMigratedTermKey));
-        if (!allReleased) {
-          return termSubjects.map((s) => ({
-            ...s,
-            final_grade: canShowGrade(s, latestMigratedTermKey) ? s.final_grade : null,
-            numeric_grade: canShowGrade(s, latestMigratedTermKey) ? s.numeric_grade : null,
-            descriptive_grade: canShowGrade(s, latestMigratedTermKey) ? s.descriptive_grade : null,
-            en_remarks: canShowGrade(s, latestMigratedTermKey) ? s.en_remarks : null,
-            gwa: canShowGrade(s, latestMigratedTermKey) ? s.gwa : null,
-          }));
-        }
-        return termSubjects;
+        const visibleSubjects = termSubjects.map((subj) =>
+          applyGradeVisibility(subj, getGradeVisibility(subj, latestMigratedTermKey)),
+        );
+        return recalculateTermGwa(visibleSubjects);
       });
 
       setStudentGrade(processedGrades);
@@ -324,7 +365,9 @@ const StudentGradingPage = () => {
     if (matriculationBalanceInfo.hasBalance) { setMessage(""); return; }
     if (!gradingActive || studentGrade.length === 0) return;
     const latestMigratedTermKey = getLatestMigratedTermKey(studentGrade);
-    const pending = studentGrade.filter((s) => !canShowGrade(s, latestMigratedTermKey)).length;
+    const pending = studentGrade.filter(
+      (s) => getGradeVisibility(s, latestMigratedTermKey) === "hidden",
+    ).length;
     if (pending > 0) setMessage(`Grades are available. Please evaluate all your professors. Remaining: ${pending}`);
     else setMessage("");
   }, [gradingActive, matriculationBalanceInfo.hasBalance, studentGrade]);
@@ -622,9 +665,11 @@ const StudentGradingPage = () => {
                             {row.section_description}
                           </TableCell>
                           <TableCell sx={{ ...bodyCell, border: `1px solid ${borderColor}`, textAlign: "center" }}>
-                            {row.numeric_grade
-                              ? <span style={{ fontWeight: 700, fontSize: 14, color: titleColor }}>{row.numeric_grade}</span>
-                              : <span style={{ color: "#9CA3AF" }}>—</span>}
+                            {row.grade_display
+                              ? <span style={{ fontWeight: 700, fontSize: 12, color: "#E65100" }}>{row.grade_display}</span>
+                              : row.numeric_grade
+                                ? <span style={{ fontWeight: 700, fontSize: 14, color: titleColor }}>{row.numeric_grade}</span>
+                                : <span style={{ color: "#9CA3AF" }}>—</span>}
                           </TableCell>
                           <TableCell sx={{ ...bodyCell, border: `1px solid ${borderColor}`, textAlign: "center" }}>
                             <RemarkBadge value={row.en_remarks} />

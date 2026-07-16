@@ -337,6 +337,7 @@ router.get("/student_grade/:id", async (req, res) => {
         gc_main.descriptive_rating AS descriptive_grade,
 
         es.fe_status,
+        es.is_posted,
         es.active_school_year_id,
 
         ? AS last_name,
@@ -447,6 +448,7 @@ router.get("/student_grade/:id", async (req, res) => {
         gc_main.equivalent_grade,
         gc_main.descriptive_rating,
         es.fe_status,
+        es.is_posted,
         es.active_school_year_id
 
       ORDER BY

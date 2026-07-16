@@ -25,6 +25,11 @@ import {
   Alert,
   ClickAwayListener,
   Popper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
 import { useLocation } from "react-router-dom";
@@ -77,7 +82,7 @@ const displayGradeValue = (rawValue) => {
 };
 
 // ── GradeSelect outside + React.memo = no unmount/remount on parent re-render ─
-const GradeSelect = React.memo(({ value, onChange, placeholder = "" }) => {
+const GradeSelect = React.memo(({ value, onChange, placeholder = "", disabled = false }) => {
   const [inputValue, setInputValue] = useState(displayGradeValue(value));
   const [open, setOpen] = useState(false);
   const anchorRef = useRef(null);
@@ -115,17 +120,26 @@ const GradeSelect = React.memo(({ value, onChange, placeholder = "" }) => {
           size="small"
           variant="outlined"
           value={inputValue}
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
+          disabled={disabled}
+          onFocus={() => {
+            if (!disabled) setOpen(true);
+          }}
+          onClick={() => {
+            if (!disabled) setOpen(true);
+          }}
           onChange={(event) => {
+            if (disabled) return;
             const nextValue = event.target.value.toUpperCase();
             setInputValue(nextValue);
           }}
           onBlur={() => {
-            setOpen(false);
-            commitValue(inputValue);
+            if (!disabled) {
+              setOpen(false);
+              commitValue(inputValue);
+            }
           }}
           onKeyDown={(e) => {
+            if (disabled) return;
             if (e.key === "Enter") {
               e.preventDefault();
               setOpen(false);
@@ -165,8 +179,9 @@ const GradeSelect = React.memo(({ value, onChange, placeholder = "" }) => {
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  setOpen(false);
-                  commitValue(option);
+                if (disabled) return;
+                setOpen(false);
+                commitValue(option);
                 }}
                 sx={{
                   width: "100%",
@@ -258,15 +273,22 @@ const GradingSheet = () => {
   const skipNextStudentFetchRef = useRef(false);
   const skipNextSectionFetchRef = useRef(false);
   const autoSaveTimersRef = useRef({});
+  const pendingDraftsRef = useRef({});
   const [selectedFile, setSelectedFile] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortOrder, setSortOrder] = useState("asc");
   const [gradeConversions, setGradeConversions] = useState([]);
+  const [gradeEditScope, setGradeEditScope] = useState({
+    midtermOpen: false,
+    finalsOpen: false,
+  });
   const [snack, setSnack] = useState({
     open: false,
     message: "",
     severity: "info",
   });
+  const [postDialogOpen, setPostDialogOpen] = useState(false);
+  const [isPostingGrades, setIsPostingGrades] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -359,6 +381,11 @@ const GradingSheet = () => {
       })
       .then((res) => {
         const data = res.data || {};
+        const scope = data?.grade_edit_scope || {};
+        setGradeEditScope({
+          midtermOpen: Boolean(scope.midtermOpen),
+          finalsOpen: Boolean(scope.finalsOpen),
+        });
         const active = data.activeSchoolYear || {};
         const courses = Array.isArray(data.courses) ? data.courses : [];
         const sections = Array.isArray(data.sections) ? data.sections : [];
@@ -486,12 +513,6 @@ const GradingSheet = () => {
         .catch((err) => console.error(err));
     }
   }, [selectedSchoolYear, selectedSchoolSemester]);
-
-  // Cleanup auto-save timers on unmount
-  useEffect(() => {
-    const timers = autoSaveTimersRef.current;
-    return () => Object.values(timers).forEach(clearTimeout);
-  }, []);
 
   const handleFetchStudents = async (department_section_id) => {
     if (!profData.prof_id) return;
@@ -880,6 +901,7 @@ const GradingSheet = () => {
             : row,
         ),
       );
+      delete pendingDraftsRef.current[getStudentKey(student)];
 
       if (!silent) {
         setSnack({
@@ -924,11 +946,26 @@ const GradingSheet = () => {
 
   const scheduleAutoSave = useCallback((student) => {
     const key = getStudentKey(student);
+    pendingDraftsRef.current[key] = student;
     clearTimeout(autoSaveTimersRef.current[key]);
     autoSaveTimersRef.current[key] = setTimeout(() => {
-      saveStudentGrade(student);
+      const latestDraft = pendingDraftsRef.current[key] || student;
+      saveStudentGrade(latestDraft);
       delete autoSaveTimersRef.current[key];
     }, 600);
+  }, [saveStudentGrade]);
+
+  // Cleanup auto-save timers on unmount and flush pending drafts.
+  useEffect(() => {
+    return () => {
+      const timers = autoSaveTimersRef.current;
+      Object.values(timers).forEach(clearTimeout);
+
+      const pendingDrafts = Object.values(pendingDraftsRef.current);
+      pendingDrafts.forEach((draft) => {
+        saveStudentGrade(draft, { silent: true });
+      });
+    };
   }, [saveStudentGrade]);
 
   // useCallback + functional setState so the reference stays stable across renders.
@@ -1225,107 +1262,81 @@ const GradingSheet = () => {
     setStudents(sorted);
   };
 
-  const handleSaveAll = async () => {
+  const handlePostStudentGrades = async () => {
     if (students.length === 0) {
       setSnack({
         open: true,
-        message: "No students to save!",
+        message: "No students to post grades for!",
         severity: "warning",
       });
       return;
     }
 
-    setLoading(true);
-    setStudents((prev) =>
-      prev.map((student) => ({ ...student, _saveStatus: "saving" })),
-    );
-    let successCount = 0;
-    let failCount = 0;
-    const successfulStudents = [];
-    const successfulKeys = new Set();
-    const failedKeys = new Set();
+    if (!profData.prof_id || !selectedCourse || !selectedSectionID || !selectedActiveSchoolYear) {
+      setSnack({
+        open: true,
+        message: "Please select a subject, section, and school year first.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setIsPostingGrades(true);
 
     try {
-      const promises = students.map(async (student) => {
-        try {
-          const response = await fetch(`${API_BASE_URL}/api/add_grades`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              midterm: student.midterm,
-              finals: student.finals,
-              final_grade: student.final_grade,
-              en_remarks: student.en_remarks,
-              student_number: student.student_number,
-              subject_id: selectedCourse,
-            }),
-          });
-
-          if (response.ok) {
-            successCount++;
-            successfulStudents.push(student);
-            successfulKeys.add(getStudentKey(student));
-          } else {
-            failCount++;
-            failedKeys.add(getStudentKey(student));
-          }
-        } catch (error) {
-          failCount++;
-          failedKeys.add(getStudentKey(student));
-        }
+      const response = await fetch(`${API_BASE_URL}/api/post_student_grades`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          professor_id: profData.prof_id,
+          course_id: selectedCourse,
+          department_section_id: selectedSectionID,
+          active_school_year_id: selectedActiveSchoolYear,
+        }),
       });
 
-      await Promise.all(promises);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setSnack({
+          open: true,
+          message: data.message || "Failed to post student grades.",
+          severity: "error",
+        });
+        return;
+      }
+
       setStudents((prev) =>
-        prev.map((student) => {
-          const key = getStudentKey(student);
-          if (successfulKeys.has(key)) return { ...student, _saveStatus: "saved" };
-          if (failedKeys.has(key)) return { ...student, _saveStatus: "failed" };
-          return student;
-        }),
+        prev.map((student) => ({ ...student, is_posted: 1 })),
       );
 
       try {
-        await Promise.all(
-          successfulStudents.map((student) =>
-            postAuditEvent(
-              "faculty_grading_sheet_grade_submitted",
-              buildGradeAuditDetails(student),
-            ),
-          ),
+        await postAuditEvent(
+          "faculty_grading_sheet_grades_posted",
+          buildClassAuditDetails(students[0] || {}, {
+            posted_count: data.posted_count ?? students.length,
+            student_count: students.length,
+          }),
         );
       } catch (err) {
         console.error("Error inserting audit log");
       }
 
-      if (failCount === 0) {
-        setSnack({
-          open: true,
-          message: "All grades saved successfully!",
-          severity: "success",
-        });
-      } else if (successCount === 0) {
-        setSnack({
-          open: true,
-          message: "Failed to save grades.",
-          severity: "error",
-        });
-      } else {
-        setSnack({
-          open: true,
-          message: `Saved ${successCount} students. Failed ${failCount}.`,
-          severity: "warning",
-        });
-      }
-    } catch (error) {
-      console.error("Error saving all grades:", error);
       setSnack({
         open: true,
-        message: "An error occurred while saving grades.",
+        message: data.message || "Student grades posted successfully!",
+        severity: "success",
+      });
+      setPostDialogOpen(false);
+    } catch (error) {
+      console.error("Error posting student grades:", error);
+      setSnack({
+        open: true,
+        message: "An error occurred while posting student grades.",
         severity: "error",
       });
     } finally {
-      setLoading(false);
+      setIsPostingGrades(false);
     }
   };
 
@@ -1957,14 +1968,15 @@ const GradingSheet = () => {
             {/* Divider */}
             <Box sx={{ width: "100%", borderTop: "1px solid #e0e0e0", my: 0.5 }} />
 
-            {/* Save All */}
+            {/* Post Student Grades */}
             <Button
-              onClick={handleSaveAll}
+              onClick={() => setPostDialogOpen(true)}
               variant="contained"
               color="primary"
+              disabled={students.length === 0 || isPostingGrades}
               sx={{ width: "100%", height: "50px", fontSize: "15px", fontWeight: "bold", borderRadius: "5px" }}
             >
-              Save All
+              Post Student Grades
             </Button>
 
             {/* Download Template */}
@@ -2180,6 +2192,7 @@ const GradingSheet = () => {
                       value={student.midterm}
                       onChange={(val) => handleChanges(student, "midterm", val)}
                       placeholder="Enter grade"
+                      disabled={!gradeEditScope.midtermOpen}
                     />
                   </TableCell>
                   <TableCell
@@ -2195,6 +2208,7 @@ const GradingSheet = () => {
                       value={student.finals}
                       onChange={(val) => handleChanges(student, "finals", val)}
                       placeholder="Enter grade"
+                      disabled={!gradeEditScope.finalsOpen}
                     />
                   </TableCell>
                   <TableCell
@@ -2969,6 +2983,38 @@ const GradingSheet = () => {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={postDialogOpen}
+        onClose={() => !isPostingGrades && setPostDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Post Student Grades</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to post grades for{" "}
+            <strong>{students.length}</strong> student{students.length === 1 ? "" : "s"} in this class?
+            Once posted, students who have completed faculty evaluation will be able to view their grades.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setPostDialogOpen(false)}
+            disabled={isPostingGrades}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handlePostStudentGrades}
+            variant="contained"
+            color="primary"
+            disabled={isPostingGrades}
+          >
+            {isPostingGrades ? "Posting..." : "Confirm Post"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snack.open}

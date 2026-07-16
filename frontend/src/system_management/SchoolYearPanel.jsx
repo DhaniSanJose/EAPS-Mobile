@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
   Box, Typography, Snackbar, Alert, Button, TextField, Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   TableContainer,
   Table,
@@ -15,9 +16,13 @@ import {
   MenuItem,
   Select,
   FormControl,
-  Switch
+  Switch,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
@@ -203,6 +208,66 @@ const SchoolYearPanel = () => {
 
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [schoolYearToDelete, setSchoolYearToDelete] = useState(null);
+  const [openActivateDialog, setOpenActivateDialog] = useState(false);
+  const [schoolYearToActivate, setSchoolYearToActivate] = useState(null);
+  const [isActivating, setIsActivating] = useState(false);
+  const [activatePassword, setActivatePassword] = useState("");
+  const [activatePasswordError, setActivatePasswordError] = useState("");
+  const [showActivatePassword, setShowActivatePassword] = useState(false);
+  const [activateLocked, setActivateLocked] = useState(false);
+  const [activateLockTimer, setActivateLockTimer] = useState(0);
+  const activateLockIntervalRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (activateLockIntervalRef.current) clearInterval(activateLockIntervalRef.current);
+    };
+  }, []);
+
+  const startActivateLockCountdown = (remainingSeconds, message) => {
+    setActivateLocked(true);
+    setActivateLockTimer(remainingSeconds);
+    setActivatePasswordError(message);
+
+    if (activateLockIntervalRef.current) clearInterval(activateLockIntervalRef.current);
+
+    activateLockIntervalRef.current = setInterval(() => {
+      setActivateLockTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(activateLockIntervalRef.current);
+          setActivateLocked(false);
+          setActivatePasswordError("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const resetActivateDialogState = () => {
+    setOpenActivateDialog(false);
+    setSchoolYearToActivate(null);
+    setActivatePassword("");
+    setActivatePasswordError("");
+    setShowActivatePassword(false);
+  };
+
+  const checkActivateLockStatus = async () => {
+    const personId = localStorage.getItem("person_id");
+    if (!personId) return;
+
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/check-lock-status/${personId}`);
+      if (res.data.locked) {
+        startActivateLockCountdown(
+          res.data.remainingSeconds,
+          `Account locked. Try again in ${Math.ceil(res.data.remainingSeconds / 60)} minute(s).`,
+        );
+      }
+    } catch (err) {
+      console.error("Lock check failed:", err);
+    }
+  };
 
   const handleConfirmDelete = async () => {
     if (!schoolYearToDelete) return;
@@ -235,16 +300,9 @@ const SchoolYearPanel = () => {
   };
 
 
-  // 🔍 Filtered list for search
-  const handleToggleActivator = async (sy) => {
-    if (!canEdit) {
-      setSnackbar({ open: true, message: "You do not have permission to edit school years", severity: "error" });
-      return;
-    }
-
+  // Toggle school year active status
+  const applyToggleActivator = async (sy, updatedStatus) => {
     const schoolYearId = sy.school_year_id || sy.id;
-    const currentStatus = Number(sy.astatus) === 1 ? 1 : 0;
-    const updatedStatus = currentStatus === 1 ? 0 : 1;
     const previousSchoolYears = schoolYears;
 
     setSchoolYears((prev) =>
@@ -270,13 +328,12 @@ const SchoolYearPanel = () => {
         getAuditHeaders()
       );
 
-      const generatedRows =
-        response.data?.studentStatusGeneration?.generatedRows ?? 0;
+      const generationSummary = response.data?.studentStatusGeneration;
       setSnackbar({
         open: true,
         message:
           updatedStatus === 1
-            ? `School year activated! Generated ${generatedRows} student status row${generatedRows === 1 ? "" : "s"}.`
+            ? getActivationSuccessMessage(generationSummary)
             : "School year deactivated!",
         severity: "success",
       });
@@ -285,6 +342,115 @@ const SchoolYearPanel = () => {
       setSchoolYears(previousSchoolYears);
       setSnackbar({ open: true, message: "Failed to update school year", severity: "error" });
     }
+  };
+
+  const handleToggleActivator = (sy) => {
+    if (!canEdit) {
+      setSnackbar({ open: true, message: "You do not have permission to edit school years", severity: "error" });
+      return;
+    }
+
+    const currentStatus = Number(sy.astatus) === 1 ? 1 : 0;
+    const updatedStatus = currentStatus === 1 ? 0 : 1;
+
+    if (updatedStatus === 1) {
+      setSchoolYearToActivate(sy);
+      setActivatePassword("");
+      setActivatePasswordError("");
+      setShowActivatePassword(false);
+      setActivateLocked(false);
+      setActivateLockTimer(0);
+      setOpenActivateDialog(true);
+      checkActivateLockStatus();
+      return;
+    }
+
+    applyToggleActivator(sy, updatedStatus);
+  };
+
+  const handleConfirmActivate = async () => {
+    if (!schoolYearToActivate) return;
+    if (!canEdit) {
+      setSnackbar({ open: true, message: "You do not have permission to edit school years", severity: "error" });
+      return;
+    }
+    if (activateLocked) return;
+
+    if (!activatePassword) {
+      setActivatePasswordError("Password is required.");
+      return;
+    }
+
+    setIsActivating(true);
+    try {
+      const personId = localStorage.getItem("person_id");
+      const verifyRes = await axios.post(`${API_BASE_URL}/api/verify-password`, {
+        person_id: personId,
+        password: activatePassword,
+      });
+
+      if (!verifyRes.data.success) {
+        setActivatePassword("");
+        setActivatePasswordError("Invalid password.");
+        return;
+      }
+
+      await applyToggleActivator(schoolYearToActivate, 1);
+      resetActivateDialogState();
+    } catch (err) {
+      const data = err.response?.data;
+
+      if (data?.locked) {
+        setActivatePassword("");
+        startActivateLockCountdown(data.remainingSeconds, data.message);
+        return;
+      }
+
+      setActivatePassword("");
+      setActivatePasswordError(
+        data?.attemptsLeft !== undefined
+          ? `Invalid password. ${data.attemptsLeft} attempt(s) remaining.`
+          : data?.message || "Invalid password.",
+      );
+    } finally {
+      setIsActivating(false);
+    }
+  };
+
+  const getSchoolYearLabel = (sy) => {
+    if (!sy) return "";
+    return `${sy.year_description}-${parseInt(sy.year_description, 10) + 1}`;
+  };
+
+  const getActivationSuccessMessage = (generationSummary) => {
+    const generatedRows = generationSummary?.generatedRows ?? 0;
+
+    if (generationSummary?.generationAllowed === false) {
+      const previousYear = generationSummary.previousYearDescription;
+      const expectedYear = generationSummary.expectedNextYearDescription;
+
+      if (generationSummary.skippedReason === "TARGET_YEAR_BEFORE_PREVIOUS_ACTIVE") {
+        return previousYear
+          ? `School year activated. No student status rows were generated because the selected school year is below ${previousYear}.`
+          : "School year activated. No student status rows were generated because the selected school year is before the previously active term.";
+      }
+      if (generationSummary.skippedReason === "TARGET_YEAR_SKIPPED_AHEAD") {
+        return previousYear
+          ? `School year activated. No student status rows were generated. You cannot skip ahead from school year ${previousYear} to ${generationSummary.targetYearDescription}.`
+          : "School year activated. No student status rows were generated because the selected school year skips one or more years ahead.";
+      }
+      if (generationSummary.skippedReason === "TARGET_NOT_IMMEDIATE_NEXT_TERM") {
+        return expectedYear
+          ? `School year activated. No student status rows were generated. Only the immediate next term after school year ${previousYear} can generate records (expected: ${expectedYear}).`
+          : "School year activated. No student status rows were generated because the selected term is not the immediate next school year.";
+      }
+      if (generationSummary.skippedReason === "NO_NEXT_SCHOOL_YEAR_DEFINED") {
+        return "School year activated. No student status rows were generated because no next school year is defined after the previously active term.";
+      }
+      return "School year activated. Student status generation was skipped.";
+    }
+
+    return `School year activated! Generated ${generatedRows} student status row${generatedRows === 1 ? "" : "s"}.`;
   };
 
   const filteredSchoolYears = schoolYears
@@ -839,6 +1005,189 @@ const SchoolYearPanel = () => {
 
 
 
+
+      <Dialog
+        open={openActivateDialog}
+        onClose={(_, reason) => {
+          if (isActivating || activateLocked) return;
+          if (reason === "backdropClick") return;
+          resetActivateDialogState();
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "16px",
+            overflow: "hidden",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: activateLocked ? "#7a0000" : settings?.header_color || "#1976d2",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            px: 3,
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              {activateLocked ? "🔒" : "🔐"}
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                {activateLocked ? "Access Locked" : "Activate School Year"}
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                {activateLocked
+                  ? "Too many failed attempts"
+                  : "Confirm your credentials to continue"}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, mt: 1 }}>
+          {activateLocked ? (
+            <Box textAlign="center" py={2}>
+              <Typography fontWeight="bold" fontSize={18} color="#c62828" mb={1}>
+                Account Temporarily Locked
+              </Typography>
+              <Typography fontSize={13} color="#555" mb={2}>
+                {activatePasswordError}
+              </Typography>
+              <Typography
+                fontSize={32}
+                fontWeight="bold"
+                color="#bf360c"
+                fontFamily="monospace"
+                letterSpacing={3}
+              >
+                {String(Math.floor(activateLockTimer / 60)).padStart(2, "0")}:
+                {String(activateLockTimer % 60).padStart(2, "0")}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <DialogContentText sx={{ color: "#1a1a1a", mb: 2 }}>
+                Are you sure you want to activate the school year{" "}
+                <strong>{getSchoolYearLabel(schoolYearToActivate)}</strong>{" "}
+                (<strong>{schoolYearToActivate?.semester_description}</strong>)?
+              </DialogContentText>
+
+              <DialogContentText sx={{ color: "#E65100", fontSize: "0.95rem", mb: 2.5 }}>
+                Activating this school year will deactivate all other school years.
+                Student status records are generated only for the immediate next term after
+                the currently active school year. If the active year is 2025, turning on
+                years below 2025 or years 2027 and above will not generate new student
+                status rows.
+              </DialogContentText>
+
+              <Typography fontSize={13} fontWeight="bold" color="#333" mb={0.75}>
+                Enter your password
+              </Typography>
+              <TextField
+                type={showActivatePassword ? "text" : "password"}
+                fullWidth
+                size="small"
+                placeholder="••••••••"
+                value={activatePassword}
+                onChange={(e) => setActivatePassword(e.target.value)}
+                autoComplete="current-password"
+                disabled={isActivating}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmActivate();
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    fontSize: 14,
+                    "&.Mui-focused fieldset": {
+                      borderColor: settings?.header_color || "#1976d2",
+                      borderWidth: 2,
+                    },
+                  },
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowActivatePassword(!showActivatePassword)}
+                        size="small"
+                        edge="end"
+                      >
+                        {showActivatePassword ? (
+                          <VisibilityOff fontSize="small" />
+                        ) : (
+                          <Visibility fontSize="small" />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              {activatePasswordError && (
+                <Box
+                  sx={{
+                    mt: 1.5,
+                    p: 1.25,
+                    backgroundColor: "#ffebee",
+                    borderRadius: "8px",
+                    border: "1px solid #ef9a9a",
+                  }}
+                >
+                  <Typography fontSize={12.5} color="#c62828">
+                    {activatePasswordError}
+                  </Typography>
+                </Box>
+              )}
+            </>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 0 }}>
+          {!activateLocked && (
+            <>
+              <Button
+                variant="outlined"
+                onClick={resetActivateDialogState}
+                disabled={isActivating}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleConfirmActivate}
+                disabled={isActivating}
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  px: 3,
+                  fontWeight: "bold",
+                }}
+              >
+                {isActivating ? "Activating..." : "Yes, Activate"}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={openDeleteDialog}

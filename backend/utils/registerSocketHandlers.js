@@ -4116,6 +4116,7 @@ Click the link below to log in:
         es.finals,
         es.final_grade,
         es.en_remarks,
+        es.is_posted,
         st.description AS section_description,
         pgt.program_code,
         dst.id,
@@ -4176,11 +4177,40 @@ Click the link below to log in:
       req.query;
 
     try {
-      const [[periodStatus]] = await db3.query(
-        "SELECT status FROM period_status WHERE description = 'Final Grading Period'",
+      // Determine which grading period is currently active.
+      // We only allow encoding/editing grades when an active period exists.
+      const [[activePeriod]] = await db3.query(
+        "SELECT id, description, status FROM period_status WHERE status = 1 LIMIT 1",
       );
 
-      if (!periodStatus || periodStatus.status !== 1) {
+      if (!activePeriod || activePeriod.status !== 1) {
+        return res.status(403).json({ message: "Grades not available yet" });
+      }
+
+      const activeDesc = String(activePeriod.description || "").toLowerCase();
+
+      let gradeEditMode = "BOTH";
+      let midtermOpen = true;
+      let finalsOpen = true;
+
+      if (activeDesc.includes("midterm")) {
+        gradeEditMode = "MIDTERM_ONLY";
+        midtermOpen = true;
+        finalsOpen = false;
+      } else if (activeDesc.includes("final grading period")) {
+        gradeEditMode = "BOTH";
+        midtermOpen = true;
+        finalsOpen = true;
+      } else if (activeDesc.includes("finals")) {
+        gradeEditMode = "FINALS_ONLY";
+        midtermOpen = false;
+        finalsOpen = true;
+      } else if (activeDesc.includes("final")) {
+        // Fallback if your DB uses a different description wording.
+        gradeEditMode = "FINALS_ONLY";
+        midtermOpen = false;
+        finalsOpen = true;
+      } else {
         return res.status(403).json({ message: "Grades not available yet" });
       }
 
@@ -4280,50 +4310,51 @@ Click the link below to log in:
               smt.semester_description,
               es.midterm,
               es.finals,
-              es.final_grade,
-              es.en_remarks,
-              st.description AS section_description,
-              pgt.program_code,
-              dst.id,
-              smt.semester_id,
-              es.active_school_year_id,
-              ylt.year_id,
-              ylt.year_description AS current_year,
-              ylt.year_description + 1 AS next_year,
-              cst.course_id,
-              cst.course_description,
-              cst.course_code,
-              cst.course_unit,
-              cst.lab_unit,
-              dt.dprtmnt_name,
-              yrlt.year_level_description
-            FROM enrolled_subject AS es
-              INNER JOIN student_numbering_table AS snt ON es.student_number = snt.student_number
-              INNER JOIN person_table AS ptbl ON snt.person_id = ptbl.person_id
-              INNER JOIN time_table AS tt
-                ON es.department_section_id = tt.department_section_id
-                AND es.course_id = tt.course_id
-                AND es.active_school_year_id = tt.school_year_id
-              INNER JOIN prof_table AS pt ON tt.professor_id = pt.prof_id
-              INNER JOIN dprtmnt_section_table AS dst ON es.department_section_id = dst.id
-              INNER JOIN section_table AS st ON dst.section_id = st.id
-              INNER JOIN curriculum_table AS ct ON es.curriculum_id = ct.curriculum_id
-              INNER JOIN program_table AS pgt ON ct.program_id = pgt.program_id
-              INNER JOIN active_school_year_table AS sy ON es.active_school_year_id = sy.id
-              INNER JOIN year_table AS ylt ON sy.year_id = ylt.year_id
-              INNER JOIN semester_table AS smt ON sy.semester_id = smt.semester_id
-              INNER JOIN course_table AS cst ON es.course_id = cst.course_id
-              LEFT JOIN program_tagging_table AS ptt
-                ON es.curriculum_id = ptt.curriculum_id
-                AND es.course_id = ptt.course_id
-              LEFT JOIN year_level_table AS yrlt ON ptt.year_level_id = yrlt.year_level_id
-              INNER JOIN dprtmnt_curriculum_table AS dct ON ct.curriculum_id = dct.curriculum_id
-              INNER JOIN dprtmnt_table AS dt ON dct.dprtmnt_id = dt.dprtmnt_id
-            WHERE tt.professor_id = ?
-              AND es.course_id = ?
-              AND es.department_section_id = ?
-              AND es.active_school_year_id = ?
-            ORDER BY ptbl.last_name ASC, ptbl.first_name ASC
+        es.final_grade,
+        es.en_remarks,
+        es.is_posted,
+        st.description AS section_description,
+        pgt.program_code,
+        dst.id,
+        smt.semester_id,
+        es.active_school_year_id,
+        ylt.year_id,
+        ylt.year_description AS current_year,
+        ylt.year_description + 1 AS next_year,
+        cst.course_id,
+        cst.course_description,
+        cst.course_code,
+        cst.course_unit,
+        cst.lab_unit,
+        dt.dprtmnt_name,
+        yrlt.year_level_description
+      FROM enrolled_subject AS es
+        INNER JOIN student_numbering_table AS snt ON es.student_number = snt.student_number
+        INNER JOIN person_table AS ptbl ON snt.person_id = ptbl.person_id
+        INNER JOIN time_table AS tt
+          ON es.department_section_id = tt.department_section_id
+          AND es.course_id = tt.course_id
+          AND es.active_school_year_id = tt.school_year_id
+        INNER JOIN prof_table AS pt ON tt.professor_id = pt.prof_id
+        INNER JOIN dprtmnt_section_table AS dst ON es.department_section_id = dst.id
+        INNER JOIN section_table AS st ON dst.section_id = st.id
+        INNER JOIN curriculum_table AS ct ON es.curriculum_id = ct.curriculum_id
+        INNER JOIN program_table AS pgt ON ct.program_id = pgt.program_id
+        INNER JOIN active_school_year_table AS sy ON es.active_school_year_id = sy.id
+        INNER JOIN year_table AS ylt ON sy.year_id = ylt.year_id
+        INNER JOIN semester_table AS smt ON sy.semester_id = smt.semester_id
+        INNER JOIN course_table AS cst ON es.course_id = cst.course_id
+        LEFT JOIN program_tagging_table AS ptt
+          ON es.curriculum_id = ptt.curriculum_id
+          AND es.course_id = ptt.course_id
+        LEFT JOIN year_level_table AS yrlt ON ptt.year_level_id = yrlt.year_level_id
+        INNER JOIN dprtmnt_curriculum_table AS dct ON ct.curriculum_id = dct.curriculum_id
+        INNER JOIN dprtmnt_table AS dt ON dct.dprtmnt_id = dt.dprtmnt_id
+      WHERE tt.professor_id = ?
+        AND es.course_id = ?
+        AND es.department_section_id = ?
+        AND es.active_school_year_id = ?
+      ORDER BY ptbl.last_name ASC, ptbl.first_name ASC
             `,
             [
               userID,
@@ -4341,6 +4372,8 @@ Click the link below to log in:
         selectedCourse: selectedCourseId || "",
         selectedSection: selectedSectionId || "",
         students,
+        gradeEditMode,
+        grade_edit_scope: { midtermOpen, finalsOpen },
       });
     } catch (err) {
       console.error("Grading sheet bootstrap error:", err);
@@ -4373,6 +4406,102 @@ Click the link below to log in:
     return `${mm}/${dd}/${year} ${hh}:${min}:${ss} ${ampm}`;
   }
 
+  const ensureEnrolledSubjectIsPostedColumn = async () => {
+    try {
+      await db3.query(`
+        ALTER TABLE enrolled_subject
+          ADD COLUMN IF NOT EXISTS is_posted tinyint(1) NOT NULL DEFAULT 0 AFTER fe_status
+      `);
+    } catch (err) {
+      console.error("Failed to ensure enrolled_subject.is_posted column:", err);
+    }
+  };
+
+  ensureEnrolledSubjectIsPostedColumn();
+
+  app.put("/api/post_student_grades", async (req, res) => {
+    const {
+      professor_id,
+      course_id,
+      department_section_id,
+      active_school_year_id,
+    } = req.body;
+
+    if (
+      !professor_id ||
+      !course_id ||
+      !department_section_id ||
+      !active_school_year_id
+    ) {
+      return res.status(400).json({ message: "Missing required parameters." });
+    }
+
+    try {
+      const [[activePeriod]] = await db3.execute(
+        "SELECT id, description, status FROM period_status WHERE status = 1 LIMIT 1",
+      );
+
+      if (!activePeriod || activePeriod.status !== 1) {
+        return res
+          .status(403)
+          .json({ message: "The posting of grades is still not open." });
+      }
+
+      const [assignmentRows] = await db3.execute(
+        `
+        SELECT tt.id
+        FROM time_table AS tt
+        WHERE tt.professor_id = ?
+          AND tt.course_id = ?
+          AND tt.department_section_id = ?
+          AND tt.school_year_id = ?
+        LIMIT 1
+        `,
+        [
+          professor_id,
+          course_id,
+          department_section_id,
+          active_school_year_id,
+        ],
+      );
+
+      if (!assignmentRows.length) {
+        return res.status(403).json({
+          message: "You are not assigned to this subject and section.",
+        });
+      }
+
+      const [result] = await db3.execute(
+        `
+        UPDATE enrolled_subject AS es
+          INNER JOIN time_table AS tt
+            ON es.course_id = tt.course_id
+            AND es.department_section_id = tt.department_section_id
+            AND es.active_school_year_id = tt.school_year_id
+        SET es.is_posted = 1
+        WHERE tt.professor_id = ?
+          AND es.course_id = ?
+          AND es.department_section_id = ?
+          AND es.active_school_year_id = ?
+        `,
+        [
+          professor_id,
+          course_id,
+          department_section_id,
+          active_school_year_id,
+        ],
+      );
+
+      return res.status(200).json({
+        message: "Student grades posted successfully.",
+        posted_count: result.affectedRows || 0,
+      });
+    } catch (err) {
+      console.error("Failed to post student grades:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.put("/api/add_grades", async (req, res) => {
     const {
       midterm,
@@ -4384,13 +4513,40 @@ Click the link below to log in:
     } = req.body;
 
     try {
-      const [rows] = await db3.execute(
-        `SELECT id, description, status FROM period_status WHERE id = 3`,
+      const [[activePeriod]] = await db3.execute(
+        "SELECT id, description, status FROM period_status WHERE status = 1 LIMIT 1",
       );
-      if (!rows.length || rows[0].status !== 1) {
+
+      if (!activePeriod || activePeriod.status !== 1) {
         return res
-          .status(400)
+          .status(403)
           .json({ message: "The uploading of grades is still not open." });
+      }
+
+      const activeDesc = String(activePeriod.description || "").toLowerCase();
+
+      let gradeEditMode = "BOTH";
+      let midtermOpen = true;
+      let finalsOpen = true;
+
+      if (activeDesc.includes("midterm")) {
+        gradeEditMode = "MIDTERM_ONLY";
+        midtermOpen = true;
+        finalsOpen = false;
+      } else if (activeDesc.includes("final grading period")) {
+        gradeEditMode = "BOTH";
+        midtermOpen = true;
+        finalsOpen = true;
+      } else if (activeDesc.includes("finals")) {
+        gradeEditMode = "FINALS_ONLY";
+        midtermOpen = false;
+        finalsOpen = true;
+      } else if (activeDesc.includes("final")) {
+        gradeEditMode = "FINALS_ONLY";
+        midtermOpen = false;
+        finalsOpen = true;
+      } else {
+        return res.status(403).json({ message: "Grades not available yet" });
       }
 
       const isIncomplete =
@@ -4399,37 +4555,66 @@ Click the link below to log in:
         String(finals).toLowerCase() === "inc" ||
         String(finals).toLowerCase() === "incomplete";
 
-      if (isIncomplete) {
-        const [result] = await db3.execute(
+      // Enforce column editability based on active grading period.
+      // - MIDTERM_ONLY: allow only midterm updates; preserve finals/final_grade/remarks
+      // - FINALS_ONLY: allow only finals + final_grade/remarks updates; preserve midterm
+      // - BOTH: allow all updates (existing behavior)
+      let result;
+
+      if (gradeEditMode === "MIDTERM_ONLY") {
+        const [r] = await db3.execute(
           `UPDATE enrolled_subject
-        SET midterm = ?, finals = ? , final_grade= "0.00", grades_status = 'INC', en_remarks = 3
-        WHERE student_number = ? AND course_id = ?`,
-          [midterm, finals, student_number, subject_id],
+           SET midterm = ?
+           WHERE student_number = ? AND course_id = ?`,
+          [midterm, student_number, subject_id],
         );
-
-        return result.affectedRows > 0
-          ? res
-            .status(200)
-            .json({ message: "Grades marked as INC successfully!" })
-          : res
-            .status(404)
-            .json({ message: "No matching record found to update." });
+        result = r;
+      } else if (gradeEditMode === "FINALS_ONLY") {
+        if (isIncomplete) {
+          const [r] = await db3.execute(
+            `UPDATE enrolled_subject
+             SET finals = ?, final_grade = "0.00", grades_status = 'INC', en_remarks = 3
+             WHERE student_number = ? AND course_id = ?`,
+            [finals, student_number, subject_id],
+          );
+          result = r;
+        } else {
+          const [r] = await db3.execute(
+            `UPDATE enrolled_subject
+             SET finals = ?, final_grade = ?, grades_status = ?, en_remarks = ?
+             WHERE student_number = ? AND course_id = ?`,
+            [finals, final_grade, final_grade, en_remarks, student_number, subject_id],
+          );
+          result = r;
+        }
+      } else {
+        // BOTH (final grading period) — keep existing behavior.
+        if (isIncomplete) {
+          const [r] = await db3.execute(
+            `UPDATE enrolled_subject
+             SET midterm = ?, finals = ? , final_grade = "0.00", grades_status = 'INC', en_remarks = 3
+             WHERE student_number = ? AND course_id = ?`,
+            [midterm, finals, student_number, subject_id],
+          );
+          result = r;
+        } else {
+          const [r] = await db3.execute(
+            `UPDATE enrolled_subject
+             SET midterm = ?, finals = ?, final_grade = ?, grades_status = ?, en_remarks = ?
+             WHERE student_number = ? AND course_id = ?`,
+            [
+              midterm,
+              finals,
+              final_grade,
+              final_grade,
+              en_remarks,
+              student_number,
+              subject_id,
+            ],
+          );
+          result = r;
+        }
       }
-
-      const [result] = await db3.execute(
-        `UPDATE enrolled_subject
-      SET midterm = ?, finals = ?, final_grade = ?, grades_status = ?, en_remarks = ?
-      WHERE student_number = ? AND course_id = ?`,
-        [
-          midterm,
-          finals,
-          final_grade,
-          final_grade,
-          en_remarks,
-          student_number,
-          subject_id,
-        ],
-      );
 
       return result.affectedRows > 0
         ? res.status(200).json({ message: "Grades updated successfully!" })

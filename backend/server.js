@@ -831,9 +831,9 @@ app.put("/api/uploads/status/:upload_id", async (req, res) => {
     // 1. Update single row status
     await db.query(
       `UPDATE requirement_uploads
-       SET status = ?, last_updated_by = ?
+       SET status = ?, last_updated_by = ?, verified_at = CASE WHEN ? = 1 OR ? = '1' THEN NOW() ELSE NULL END
        WHERE upload_id = ?`,
-      [status, user_id, upload_id]
+      [status, user_id, status, status, upload_id]
     );
 
     const person_id = uploadBefore.person_id;
@@ -855,7 +855,8 @@ app.put("/api/uploads/status/:upload_id", async (req, res) => {
       // 🔥 5. AUTO UPDATE document_status
       await db.query(
         `UPDATE requirement_uploads
-         SET document_status = 'Documents Verified & ECAT'
+         SET document_status = 'Documents Verified & ECAT',
+             verified_at = COALESCE(verified_at, NOW())
          WHERE person_id = ?`,
         [person_id]
       );
@@ -1998,7 +1999,7 @@ app.get("/api/document-verification/:applicant_number", async (req, res) => {
     // 3) Pull this applicant's uploads for exactly those requirement ids
     const [uploadRows] = await db.query(
       `
-      SELECT requirements_id, document_status, created_at, last_updated_by
+      SELECT requirements_id, document_status, verified_at, created_at, last_updated_by
       FROM requirement_uploads
       WHERE person_id = ?
         AND requirements_id IN (${placeholders})
@@ -2027,10 +2028,12 @@ app.get("/api/document-verification/:applicant_number", async (req, res) => {
     }
 
     // 4) All required docs verified — "Date Verified" is when the LAST one
-    //    was completed, i.e. the max(created_at) among the verified rows.
+    //    was verified, i.e. the max(verified_at) among the verified rows.
     const latestRow = uploadRows.reduce((latest, row) => {
+      const rowVerifiedAt = row.verified_at || row.created_at;
       if (!latest) return row;
-      return new Date(row.created_at) > new Date(latest.created_at) ? row : latest;
+      const latestVerifiedAt = latest.verified_at || latest.created_at;
+      return new Date(rowVerifiedAt) > new Date(latestVerifiedAt) ? row : latest;
     }, null);
 
     let verifiedBy = null;
@@ -2068,7 +2071,7 @@ app.get("/api/document-verification/:applicant_number", async (req, res) => {
 
    res.json({
     verified: true,
-    verified_at: toManilaIsoLike(latestRow.created_at),
+    verified_at: toManilaIsoLike(latestRow.verified_at || latestRow.created_at),
     verified_by: verifiedBy,
     required_count: requiredIds.length,
     verified_count: uploadRows.length,
@@ -2947,6 +2950,10 @@ const buildAuditEventMessage = async (req) => {
     faculty_grading_sheet_save_all: {
       type: "submit",
       message: `${userPrefix} executed Save All in Grading Sheet. Success: ${Number(details.success_count || 0)}, Failed: ${Number(details.fail_count || 0)}`,
+    },
+    faculty_grading_sheet_grades_posted: {
+      type: "submit",
+      message: `${gradingSheetProfessor} (${gradingSheetEmployeeId}) posted student grades in Grading Sheet for ${gradingSheetSubject}${gradingSheetSubjectCode}${gradingSheetSection}. Posted: ${Number(details.posted_count || 0)} student/s.`,
     },
     faculty_evaluation_printed: {
       type: "Printing",

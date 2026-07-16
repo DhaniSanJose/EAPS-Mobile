@@ -104,6 +104,69 @@ const buildCurriculumStepMap = (programRows) => {
   return map;
 };
 
+const getSchoolYearTermById = async (connection, schoolYearId) => {
+  const [[schoolYear]] = await connection.query(
+    `
+    SELECT
+      sy.id,
+      sy.semester_id,
+      yt.year_description
+    FROM active_school_year_table AS sy
+    INNER JOIN year_table AS yt ON sy.year_id = yt.year_id
+    WHERE sy.id = ?
+    LIMIT 1
+    `,
+    [schoolYearId],
+  );
+
+  if (!schoolYear) return null;
+
+  return {
+    id: Number(schoolYear.id),
+    semesterId: Number(schoolYear.semester_id),
+    yearDescription: Number(schoolYear.year_description),
+  };
+};
+
+const getNextSchoolYearTermAfter = async (connection, previousActiveSchoolYearId) => {
+  const previousSchoolYear = await getSchoolYearTermById(
+    connection,
+    previousActiveSchoolYearId,
+  );
+
+  if (!previousSchoolYear) return null;
+
+  const [[nextSchoolYear]] = await connection.query(
+    `
+    SELECT
+      sy.id,
+      sy.semester_id,
+      yt.year_description
+    FROM active_school_year_table AS sy
+    INNER JOIN year_table AS yt ON sy.year_id = yt.year_id
+    WHERE (
+      yt.year_description > ?
+      OR (yt.year_description = ? AND sy.semester_id > ?)
+    )
+    ORDER BY yt.year_description ASC, sy.semester_id ASC
+    LIMIT 1
+    `,
+    [
+      previousSchoolYear.yearDescription,
+      previousSchoolYear.yearDescription,
+      previousSchoolYear.semesterId,
+    ],
+  );
+
+  if (!nextSchoolYear) return null;
+
+  return {
+    id: Number(nextSchoolYear.id),
+    semesterId: Number(nextSchoolYear.semester_id),
+    yearDescription: Number(nextSchoolYear.year_description),
+  };
+};
+
 const generateStudentStatusesForActivatedSchoolYear = async ({
   connection,
   targetSchoolYearId,
@@ -116,7 +179,70 @@ const generateStudentStatusesForActivatedSchoolYear = async ({
     skippedNoCurriculumSequence: 0,
     skippedNoNextStep: 0,
     skippedTargetSemesterMismatch: 0,
+    generationAllowed: true,
+    skippedReason: null,
+    previousActiveSchoolYearId: previousActiveSchoolYearId
+      ? Number(previousActiveSchoolYearId)
+      : null,
+    previousYearDescription: null,
+    targetYearDescription: null,
+    expectedNextSchoolYearId: null,
+    expectedNextYearDescription: null,
   };
+
+  const targetId = Number(targetSchoolYearId);
+  const targetTerm = await getSchoolYearTermById(connection, targetId);
+
+  if (!targetTerm) {
+    summary.generationAllowed = false;
+    summary.skippedReason = "TARGET_SCHOOL_YEAR_NOT_FOUND";
+    return summary;
+  }
+
+  summary.targetYearDescription = targetTerm.yearDescription;
+
+  if (previousActiveSchoolYearId) {
+    const previousTerm = await getSchoolYearTermById(
+      connection,
+      previousActiveSchoolYearId,
+    );
+
+    if (!previousTerm) {
+      summary.generationAllowed = false;
+      summary.skippedReason = "PREVIOUS_ACTIVE_SCHOOL_YEAR_NOT_FOUND";
+      return summary;
+    }
+
+    summary.previousYearDescription = previousTerm.yearDescription;
+
+    if (targetTerm.yearDescription < previousTerm.yearDescription) {
+      summary.generationAllowed = false;
+      summary.skippedReason = "TARGET_YEAR_BEFORE_PREVIOUS_ACTIVE";
+      return summary;
+    }
+
+    if (targetTerm.yearDescription > previousTerm.yearDescription + 1) {
+      summary.generationAllowed = false;
+      summary.skippedReason = "TARGET_YEAR_SKIPPED_AHEAD";
+      return summary;
+    }
+
+    const nextTerm = await getNextSchoolYearTermAfter(
+      connection,
+      previousTerm.id,
+    );
+
+    summary.expectedNextSchoolYearId = nextTerm?.id || null;
+    summary.expectedNextYearDescription = nextTerm?.yearDescription || null;
+
+    if (!nextTerm || nextTerm.id !== targetId) {
+      summary.generationAllowed = false;
+      summary.skippedReason = nextTerm
+        ? "TARGET_NOT_IMMEDIATE_NEXT_TERM"
+        : "NO_NEXT_SCHOOL_YEAR_DEFINED";
+      return summary;
+    }
+  }
 
   const [lockedCurricula] = await connection.query(
     "SELECT curriculum_id FROM curriculum_table WHERE lock_status = 1",

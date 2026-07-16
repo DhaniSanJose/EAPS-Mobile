@@ -361,11 +361,13 @@ router.put("/document_status/:applicant_number", async (req, res) => {
     const updateParams = [document_status, user_id];
 
     if (document_status === "Documents Verified & ECAT") {
-      statusSyncSql = ", ru.status = ?";
+      statusSyncSql = ", ru.status = ?, ru.verified_at = NOW()";
       updateParams.push(1);
     } else if (document_status === "Disapproved / Program Closed") {
-      statusSyncSql = ", ru.status = ?";
+      statusSyncSql = ", ru.status = ?, ru.verified_at = NULL";
       updateParams.push(2);
+    } else {
+      statusSyncSql = ", ru.verified_at = NULL";
     }
 
     updateParams.push(applicant_number);
@@ -452,9 +454,9 @@ router.put("/uploads/status/:upload_id", async (req, res) => {
     // 1. Update single row status
     await db.query(
       `UPDATE requirement_uploads
-       SET status = ?, last_updated_by = ?
+       SET status = ?, last_updated_by = ?, verified_at = CASE WHEN ? = 1 OR ? = '1' THEN NOW() ELSE NULL END
        WHERE upload_id = ?`,
-      [status, user_id, upload_id]
+      [status, user_id, status, status, upload_id]
     );
 
     const person_id = uploadBefore.person_id;
@@ -476,7 +478,8 @@ router.put("/uploads/status/:upload_id", async (req, res) => {
       // 🔥 5. AUTO UPDATE document_status
       await db.query(
         `UPDATE requirement_uploads
-         SET document_status = 'Documents Verified & ECAT'
+         SET document_status = 'Documents Verified & ECAT',
+             verified_at = COALESCE(verified_at, NOW())
          WHERE person_id = ?`,
         [person_id]
       );
