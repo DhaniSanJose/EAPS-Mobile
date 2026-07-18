@@ -6,7 +6,6 @@ import {
   Snackbar,
   Alert,
   Avatar,
-  Card,
   TableContainer,
   Table,
   TableHead,
@@ -27,22 +26,10 @@ import { useLocation } from "react-router-dom";
 import axios from "axios";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import ClassIcon from "@mui/icons-material/Class";
+import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import SearchIcon from "@mui/icons-material/Search";
-import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
-import GradeIcon from "@mui/icons-material/Grade";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import SchoolIcon from "@mui/icons-material/School";
-import { useNavigate } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import API_BASE_URL from "../apiConfig";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import PersonIcon from "@mui/icons-material/Person";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
-import AddIcon from '@mui/icons-material/Add';
 const TOR = () => {
   const settings = useContext(SettingsContext);
 
@@ -223,9 +210,6 @@ const TOR = () => {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
 
-  const [activeStep, setActiveStep] = useState(5);
-  const [clickedSteps, setClickedSteps] = useState([]);
-
   useEffect(() => {
     if (!settings) return;
 
@@ -267,18 +251,6 @@ const TOR = () => {
     person?.branch_id,
   ]);
 
-  const navigate = useNavigate();
-
-  const tabs = [
-    { label: "Student List", to: "/registrar_student_list", icon: <SchoolIcon fontSize="large" /> },
-    { label: "Student Profile", to: "/student_registrar_personal_information", icon: <PersonIcon fontSize="large" /> },
-    { label: "Student Online Requirements Registrar", to: "/student_online_requirements_registrar", icon: <AssignmentIcon fontSize="large" /> },
-    { label: "Course Tagging", to: "/registrar_class_list", icon: <AddIcon fontSize="large" /> },
-    { label: "Search Certificate of Registration", to: "/registrar_course_tagging_summer", icon: <ListAltIcon fontSize="large" /> },
-    { label: "Report of Grades", to: "/report_of_grades", icon: <GradeIcon fontSize="large" /> },
-    { label: "Transcript of Records", to: "/transcript_of_records", icon: <ReceiptLongIcon fontSize="large" /> },
-  ];
-
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const personIdFromUrl = queryParams.get("person_id");
@@ -305,18 +277,6 @@ const TOR = () => {
       })
       .catch((err) => console.error("Auto search failed:", err));
   }, [location.search]);
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-
-    const pid = localStorage.getItem("admin_edit_person_id");
-    console.log(pid);
-    if (pid && pid !== "undefined" && pid !== "null" && pid.length >= 9) {
-      navigate(`${to}?student_number=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
 
   useEffect(() => {
     const storedId = localStorage.getItem("admin_edit_person_id");
@@ -807,73 +767,7 @@ const TOR = () => {
       <br />
 
       <br />
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          width: "100%",
-          mt: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <React.Fragment key={index}>
-            {/* Step Card */}
-            <Card
-              onClick={() => handleStepClick(index, tab.to)}
-              sx={{
-                flex: 1,
-                maxWidth: `${100 / tabs.length}%`, // evenly fit 100%
-                height: 140,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                borderRadius: 2,
-                border: `1px solid ${borderColor}`,
-                backgroundColor:
-                  activeStep === index
-                    ? settings?.header_color || "#1976d2"
-                    : "#E8C999",
-                color: activeStep === index ? "#fff" : "#000",
-                boxShadow:
-                  activeStep === index
-                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                transition: "0.3s ease",
-                "&:hover": {
-                  backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <Box sx={{ fontSize: 32, mb: 0.5 }}>{tab.icon}</Box>
-                <Typography
-                  sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                >
-                  {tab.label}
-                </Typography>
-              </Box>
-            </Card>
-
-            {/* Spacer instead of line */}
-            {index < tabs.length - 1 && (
-              <Box
-                sx={{
-                  flex: 0.1,
-                  mx: 1, // margin to keep spacing
-                }}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </Box>
+      <RegistrarEnrollmentTabs />
       <br />
       <br />
       <style>

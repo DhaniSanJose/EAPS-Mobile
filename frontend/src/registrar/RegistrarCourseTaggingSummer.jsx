@@ -30,6 +30,7 @@ import { Snackbar, Alert } from "@mui/material";
 import { FaFileExcel } from "react-icons/fa";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import SchoolIcon from "@mui/icons-material/School";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
@@ -43,7 +44,6 @@ import SearchIcon from "@mui/icons-material/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import API_BASE_URL from "../apiConfig";
-import { useNavigate } from "react-router-dom";
 import ScoreIcon from "@mui/icons-material/Score";
 import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
@@ -338,11 +338,6 @@ const CourseTaggingForSummer = () => {
       }
       setLoading(false);
     }
-  };
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    navigate(to);
   };
 
   useEffect(() => {
@@ -1424,6 +1419,11 @@ const CourseTaggingForSummer = () => {
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+      <br />
+      <br />
+
+      <RegistrarEnrollmentTabs />
+
       <br />
       <br />
 

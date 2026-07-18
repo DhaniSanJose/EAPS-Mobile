@@ -27,16 +27,12 @@ import GradeIcon from "@mui/icons-material/Grade";
 import API_BASE_URL from "../apiConfig";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
-import DescriptionIcon from "@mui/icons-material/Description";
-import HowToRegIcon from '@mui/icons-material/HowToReg';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DateField from "../components/DateField";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
+import MedicalProcessTabs from "../components/MedicalProcessTabs";
 const MedicalDashboard4 = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
@@ -81,19 +77,6 @@ const MedicalDashboard4 = () => {
 
 
 
-    const stepsData = [
-        { label: "Student List", to: "/medical_student_list", icon: <SchoolIcon fontSize="large" /> },
-        { label: "Student Profile", to: "/medical_personal_information", icon: <PersonIcon fontSize="large" /> },
-        { label: "Student Online Requirements", to: "/medical_online_requirements", icon: <AssignmentIcon fontSize="large" /> }, // updated icon
-        { label: "Medical History", to: "/medical_requirements_form", icon: <HealthAndSafetyIcon fontSize="large" /> },
-        { label: "Dental Assessment", to: "/dental_assessment", icon: <DescriptionIcon fontSize="large" /> },
-        { label: "Physical and Neurological Examination", to: "/physical_neuro_exam", icon: <PsychologyIcon fontSize="large" /> },
-    ];
-
-    const [currentStep, setCurrentStep] = useState(1);
-    const [visitedSteps, setVisitedSteps] = useState(Array(stepsData.length).fill(false));
-
-
     const navigate = useNavigate();
     const [userID, setUserID] = useState("");
     const [user, setUser] = useState("");
@@ -107,17 +90,6 @@ const MedicalDashboard4 = () => {
         booster1Brand: "", booster1Date: "", booster2Brand: "", booster2Date: "",
         chestXray: "", cbc: "", urinalysis: "", otherworkups: "", symptomsToday: "", remarks: ""
     });
-
-    const handleNavigateStep = (index, to) => {
-        setCurrentStep(index);
-
-        const pid = sessionStorage.getItem("admin_edit_person_id");
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else {
-            navigate(to);
-        }
-    };
 
     const [hasAccess, setHasAccess] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -736,81 +708,10 @@ const MedicalDashboard4 = () => {
             </Box>
 
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+
             <br />
-
-
-
-
-
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // prevent wrapping
-                    width: "100%",
-                    mt: 3,
-
-                }}
-            >
-                {stepsData.map((step, index) => (
-                    <React.Fragment key={index}>
-                        {/* Step Card */}
-                        <Card
-                            onClick={() => handleNavigateStep(index, step.to)}
-                            sx={{
-                                flex: `1 1 ${100 / stepsData.length}%`, // evenly divide width
-                                height: 140,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                borderRadius: 2,
-                                border: `1px solid ${borderColor}`,
-                                backgroundColor: currentStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
-                                color: currentStep === index ? "#fff" : "#000",
-                                boxShadow:
-                                    currentStep === index
-                                        ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                        : "0px 2px 6px rgba(0,0,0,0.15)",
-                                transition: "0.3s ease",
-                                "&:hover": {
-                                    backgroundColor: currentStep === index ? "#000" : "#f5d98f",
-                                },
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                }}
-                            >
-                                <Box sx={{ fontSize: 40, mb: 1 }}>{step.icon}</Box>
-                                <Typography
-                                    sx={{
-                                        fontSize: 14,
-                                        fontWeight: "bold",
-                                        textAlign: "center",
-                                    }}
-                                >
-                                    {step.label}
-                                </Typography>
-                            </Box>
-                        </Card>
-
-                        {/* Spacer (line gap between steps) */}
-                        {index < stepsData.length - 1 && (
-                            <Box
-                                sx={{
-
-                                    mx: 1, // spacing between cards
-                                }}
-                            />
-                        )}
-                    </React.Fragment>
-                ))}
-            </Box>
-
+            <br />
+            <MedicalProcessTabs />
             <br />
             <br />
 

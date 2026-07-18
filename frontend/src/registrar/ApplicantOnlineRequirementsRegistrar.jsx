@@ -8,7 +8,6 @@ import {
   Paper,
   Table,
   TableBody,
-  Card,
   TableCell,
   TableContainer,
   TableHead,
@@ -25,12 +24,9 @@ import API_BASE_URL from "../apiConfig";
 import { restrictToRegistrarCurriculum } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import { Link, useLocation } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Snackbar, Alert } from "@mui/material";
-import SchoolIcon from "@mui/icons-material/School";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
@@ -40,20 +36,16 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from "@mui/icons-material/Campaign";
-import ScoreIcon from "@mui/icons-material/Score";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import SearchIcon from "@mui/icons-material/Search";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
-import PersonIcon from "@mui/icons-material/Person";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
 const RegistrarRequirements = () => {
   useAuditMac();
-  const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(2);
 
   // ------------------------------------
   const [requirements, setRequirements] = useState([]);
@@ -115,55 +107,6 @@ const RegistrarRequirements = () => {
       console.error("❌ person_with_applicant failed:", err);
     }
   };
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-
-    if (pid && to !== "/applicant_list_registrar") {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
-
-
-
-   const tabs = [
-    {
-      label: "Applicant List",
-      to: "/applicant_list_registrar",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Profile",
-      to: "/applicant_registrar_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Online Requirements",
-      to: "/applicant_online_requirements_registrar",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Examination Score",
-      to: "/registrar_entrance_examination_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-
-    {
-      label: "Qualifying / Interview Exam Score",
-      to: "/registrar_qualifying_interview_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-
-    {
-      label: "Student Numbering Panel",
-      to: "/student_numbering",
-      icon: <FormatListNumberedIcon fontSize="large" />,
-    },
-
-  ];
 
   const location = useLocation();
   const [uploads, setUploads] = useState([]);
@@ -1115,61 +1058,7 @@ const RegistrarRequirements = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <RegistrarApplicantProcessTabs />
 
       <br />
       <br />

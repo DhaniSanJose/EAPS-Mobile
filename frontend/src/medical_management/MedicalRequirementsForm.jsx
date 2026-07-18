@@ -24,18 +24,9 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate, useLocation } from "react-router-dom";
-import SchoolIcon from '@mui/icons-material/School';
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonIcon from "@mui/icons-material/Person";
-import DescriptionIcon from "@mui/icons-material/Description";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import HowToRegIcon from '@mui/icons-material/HowToReg';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import Search from '@mui/icons-material/Search';
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
-import AssignmentIcon from "@mui/icons-material/Assignment";
+import MedicalProcessTabs from "../components/MedicalProcessTabs";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
@@ -326,18 +317,6 @@ const MedicalRequirements = () => {
   });
 
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(3);
-
-  const tabs = [
-    { label: "Student List", to: "/medical_student_list", icon: <SchoolIcon fontSize="large" /> },
-    { label: "Student Profile", to: "/medical_personal_information", icon: <PersonIcon fontSize="large" /> },
-    { label: "Student Online Requirements", to: "/medical_online_requirements", icon: <AssignmentIcon fontSize="large" /> }, // updated icon
-    { label: "Medical History", to: "/medical_requirements_form", icon: <HealthAndSafetyIcon fontSize="large" /> },
-    { label: "Dental Assessment", to: "/dental_assessment", icon: <DescriptionIcon fontSize="large" /> },
-    { label: "Physical and Neurological Examination", to: "/physical_neuro_exam", icon: <PsychologyIcon fontSize="large" /> },
-  ];
-
-
 
   const [person, setPerson] = useState(null);
   const fetchByStudentNumber = async (number) => {
@@ -579,20 +558,6 @@ const MedicalRequirements = () => {
       .catch((err) => console.error("Auto search failed:", err));
   }, [location.search]);
 
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid = sessionStorage.getItem("edit_person_id");
-    const sn = sessionStorage.getItem("edit_student_number");
-
-    if (pid) {
-      navigate(`${to}?person_id=${pid}`);
-    } else if (sn) {
-      navigate(`${to}?student_number=${sn}`);
-    } else {
-      navigate(to); // no id → open without query
-    }
-  };
-
   useEffect(() => {
     const storedId = sessionStorage.getItem("edit_student_number");
 
@@ -721,61 +686,7 @@ const MedicalRequirements = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <MedicalProcessTabs />
 
       <br />
       <br />

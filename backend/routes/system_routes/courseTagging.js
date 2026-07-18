@@ -935,10 +935,10 @@ router.post("/student-tagging", async (req, res) => {
 
   try {
     const whereClause = active_school_year_id
-      ? "WHERE sn.student_number = ?"
+      ? "WHERE sn.student_number = ? AND ss.active_school_year_id = ?"
       : "WHERE sn.student_number = ? AND (ss.active_school_year_id = 0 OR sy.astatus = 1)";
     const queryParams = active_school_year_id
-      ? [studentNumber]
+      ? [studentNumber, active_school_year_id]
       : [studentNumber];
 
     const sql = `
@@ -978,7 +978,9 @@ router.post("/student-tagging", async (req, res) => {
     LEFT JOIN curriculum_table AS c ON ss.active_curriculum = c.curriculum_id
     LEFT JOIN program_table AS pt ON c.program_id = pt.program_id
     LEFT JOIN year_table AS yt ON c.year_id = yt.year_id
-    LEFT JOIN enrolled_subject AS es ON ss.student_number = es.student_number
+    LEFT JOIN enrolled_subject AS es
+      ON ss.student_number = es.student_number
+      AND es.active_school_year_id = ss.active_school_year_id
     LEFT JOIN dprtmnt_section_table AS dst ON es.department_section_id = dst.id
     LEFT JOIN section_table AS st ON dst.section_id = st.id
     LEFT JOIN dprtmnt_curriculum_table AS dct ON c.curriculum_id = dct.curriculum_id
@@ -1083,26 +1085,38 @@ router.post("/student-tagging", async (req, res) => {
       totalLaboratory,
       totalNstpCount,
       studentNumber: student.student_number,
+      student_number: student.student_number,
       person_id2: student.person_id,
+      person_id: student.person_id,
       section: student.section_description,
       department_section_id: student.department_section_id,
       dprtmnt_id: student.dprtmnt_id,
       activeCurriculum: effectiveProgram,
+      active_curriculum: effectiveProgram,
+      active_school_year_id: student.active_school_year_id,
       program_id: student.program_id,
       major: student.major,
       yearLevel: student.year_level_id,
+      year_level_id: student.year_level_id,
       yearLevelDescription: student.year_level_description,
+      year_level_description: student.year_level_description,
       courseCode: student.program_code,
       courseDescription: student.program_description,
       departmentName: student.dprtmnt_name,
+      dprtmnt_name: student.dprtmnt_name,
       yearDesc: student.year_description,
+      year_description: student.year_description,
       firstName: student.first_name,
+      first_name: student.first_name,
       middleName: student.middle_name,
+      middle_name: student.middle_name,
       lastName: student.last_name,
+      last_name: student.last_name,
       age: student.age,
       gender: student.gender,
       applyingAs: student.applyingAs,
       email: student.emailAddress,
+      emailAddress: student.emailAddress,
       program: student.program,
       profile_img: student.profile_img,
       extension: student.extension,

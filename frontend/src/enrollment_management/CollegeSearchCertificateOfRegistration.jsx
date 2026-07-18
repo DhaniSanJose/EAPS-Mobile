@@ -3,7 +3,6 @@ import { SettingsContext } from "../App";
 import axios from "axios";
 import {
     Box,
-    Card,
     TextField,
     Typography,
     Table,
@@ -20,21 +19,13 @@ import '../styles/Print.css'
 import CertificateOfRegistrationForCollege from "./CollegeCertificateOfRegistration";
 import EaristLogo from "../assets/EaristLogo.png";
 import SearchIcon from "@mui/icons-material/Search";
-import SchoolIcon from '@mui/icons-material/School';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ScoreIcon from '@mui/icons-material/Score';
 import { FcPrint } from "react-icons/fc";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay"
 import StudentHistoryDialog from "../components/StudentHistoryDialog";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
+import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 import {
     getDepartmentIdsFromAdminData,
     refreshRegistrarCurriculumId,
@@ -43,8 +34,6 @@ import {
     syncRegistrarScopeFromAdminData,
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import PersonIcon from "@mui/icons-material/Person";
 import { postAuditEvent } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
@@ -233,47 +222,8 @@ const SearchCorForCollege = () => {
         }
     };
 
-    const navigate = useNavigate();
     const location = useLocation();
-    const isTabNavigationRef = useRef(false);
     const COLLEGE_COR_SEARCH_KEY = "college_cor_search_student_number";
-
-    const tabs = [
-        { label: "Student List", to: "/college_student_list", icon: <SchoolIcon fontSize="large" /> },
-        { label: "Student Profile", to: "/student_college_personal_information", icon: <PersonIcon fontSize="large" /> },
-        { label: "Student Online Requirements", to: "/student_online_requirements_college", icon: <AssignmentIcon fontSize="large" /> },
-        { label: "Course Tagging", to: "/college_course_tagging", icon: <UploadFileIcon fontSize="large" /> },
-        { label: "Search COR", to: "/college_search_certification_of_registration", icon: <MenuBookIcon fontSize="large" /> },
-        { label: "Class List", to: "/college_class_list", icon: <PersonSearchIcon fontSize="large" /> },
-
-    ];
-    
-    const [activeStep, setActiveStep] = useState(4);
-
-    const handleStepClick = (index, to) => {
-        setActiveStep(index);
-        isTabNavigationRef.current = true;
-        const params = new URLSearchParams(location.search);
-        const pid =
-            params.get("person_id") ||
-            sessionStorage.getItem("edit_person_id") ||
-            sessionStorage.getItem("admin_edit_person_id");
-        const trimmed = studentNumber.trim();
-        if (trimmed) {
-            sessionStorage.setItem(COLLEGE_COR_SEARCH_KEY, trimmed);
-            sessionStorage.setItem("edit_student_number", trimmed);
-        } else {
-            sessionStorage.removeItem(COLLEGE_COR_SEARCH_KEY);
-        }
-
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else if (trimmed) {
-            navigate(`${to}?student_number=${trimmed}`);
-        } else {
-            navigate(to);
-        }
-    };
 
     const [studentNumber, setStudentNumber] = useState(() => {
         return sessionStorage.getItem(COLLEGE_COR_SEARCH_KEY) || localStorage.getItem("studentNumberForCOR") || "";
@@ -528,6 +478,14 @@ const SearchCorForCollege = () => {
     }, [studentNumber]);
 
     useEffect(() => {
+        const trimmed = studentNumber.trim();
+        if (trimmed) {
+            sessionStorage.setItem(COLLEGE_COR_SEARCH_KEY, trimmed);
+            sessionStorage.setItem("edit_student_number", trimmed);
+        }
+    }, [studentNumber]);
+
+    useEffect(() => {
         if (studentNumber) {
             localStorage.removeItem("studentNumberForCOR");
         }
@@ -542,10 +500,8 @@ const SearchCorForCollege = () => {
         window.addEventListener("beforeunload", handleBeforeUnload);
         return () => {
             window.removeEventListener("beforeunload", handleBeforeUnload);
-            if (!isTabNavigationRef.current) {
-                sessionStorage.removeItem(COLLEGE_COR_SEARCH_KEY);
-                localStorage.removeItem("studentNumberForCOR");
-            }
+            sessionStorage.removeItem(COLLEGE_COR_SEARCH_KEY);
+            localStorage.removeItem("studentNumberForCOR");
         };
     }, []);
 
@@ -645,63 +601,7 @@ const SearchCorForCollege = () => {
 
             <br />
             <br />
-
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // ❌ prevent wrapping
-                    width: "100%",
-
-                    gap: 2,
-                }}
-            >
-                {tabs.map((tab, index) => (
-                    <Card
-                        key={index}
-                        onClick={() => handleStepClick(index, tab.to)}
-                        sx={{
-                            flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-                            height: 135,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            borderRadius: 2,
-                            border: `1px solid ${borderColor}`,
-                            backgroundColor:
-                                activeStep === index
-                                    ? settings?.header_color || "#1976d2"
-                                    : "#E8C999",
-                            color: activeStep === index ? "#fff" : "#000",
-                            boxShadow:
-                                activeStep === index
-                                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                            transition: "0.3s ease",
-                            "&:hover": {
-                                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                            },
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                            }}
-                        >
-                            <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-                            <Typography
-                                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                            >
-                                {tab.label}
-                            </Typography>
-                        </Box>
-                    </Card>
-                ))}
-            </Box>
-
+            <CollegeEnrollmentTabs />
             <br />
             <br />
 

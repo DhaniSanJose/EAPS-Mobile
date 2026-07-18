@@ -5,7 +5,6 @@ import {
   Box,
   TextField,
   Typography,
-  Card,
   Table,
   TableHead,
   TableCell,
@@ -14,30 +13,24 @@ import {
   Paper,
   Snackbar,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import '../styles/Print.css'
 import CertificateOfRegistration from '../registrar/CertificateOfRegistrationForRegistrar';
 import SearchIcon from "@mui/icons-material/Search";
 import { FcPrint } from "react-icons/fc";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import ClassIcon from "@mui/icons-material/Class";
-import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
-import GradeIcon from "@mui/icons-material/Grade";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import SchoolIcon from "@mui/icons-material/School";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import PersonIcon from "@mui/icons-material/Person";
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import StudentHistoryDialog from "../components/StudentHistoryDialog";
+import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import { postAuditEvent } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
-import AddIcon from '@mui/icons-material/Add';
+import EaristLogo from "../assets/EaristLogo.png";
 
 const cleanAuditValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -158,23 +151,8 @@ const SearchCertificateOfRegistration = () => {
 
 
 
-  const navigate = useNavigate();
   const location = useLocation();
-  const isTabNavigationRef = useRef(false);
   const REGISTRAR_COR_SEARCH_KEY = "registrar_cor_search_student_number";
-
-  const [activeStep, setActiveStep] = useState(3);
-  const [clickedSteps, setClickedSteps] = useState([]);
-
-  const tabs = [
-    { label: "Student List", to: "/registrar_student_list", icon: <SchoolIcon fontSize="large" /> },
-    { label: "Student Profile", to: "/student_registrar_personal_information", icon: <PersonIcon fontSize="large" /> },
-    { label: "Student Online Requirements Registrar", to: "/student_online_requirements_registrar", icon: <AssignmentIcon fontSize="large" /> },
-    { label: "Course Tagging", to: "/registrar_class_list", icon: <AddIcon fontSize="large" /> },
-    { label: "Search Certificate of Registration", to: "/registrar_course_tagging_summer", icon: <ListAltIcon fontSize="large" /> },
-    { label: "Report of Grades", to: "/report_of_grades", icon: <GradeIcon fontSize="large" /> },
-    { label: "Transcript of Records", to: "/transcript_of_records", icon: <ReceiptLongIcon fontSize="large" /> },
-  ];
 
   const [studentNumber, setStudentNumber] = useState(() => {
     return sessionStorage.getItem(REGISTRAR_COR_SEARCH_KEY) || localStorage.getItem("studentNumberForCOR") || "";
@@ -185,6 +163,11 @@ const SearchCertificateOfRegistration = () => {
   const [studentDetails, setStudentDetails] = useState([]);
   const [corPreload, setCorPreload] = useState(null);
   const [corPreloadLoading, setCorPreloadLoading] = useState(false);
+  const [schoolYears, setSchoolYears] = useState([]);
+  const [schoolSemesters, setSchoolSemesters] = useState([]);
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
+  const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
+  const [selectedActiveSchoolYear, setSelectedActiveSchoolYear] = useState("");
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("info");
@@ -197,6 +180,60 @@ const SearchCertificateOfRegistration = () => {
     if (reason === "clickaway") return;
     setOpenSnackbar(false);
   };
+
+  useEffect(() => {
+    axios
+      .get(`${API_BASE_URL}/api/get_school_year/`)
+      .then((res) => setSchoolYears(res.data || []))
+      .catch((err) => console.error(err));
+
+    axios
+      .get(`${API_BASE_URL}/api/get_school_semester/`)
+      .then((res) => setSchoolSemesters(res.data || []))
+      .catch((err) => console.error(err));
+
+    axios
+      .get(`${API_BASE_URL}/api/active_school_year`)
+      .then((res) => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setSelectedSchoolYear(res.data[0].year_id);
+          setSelectedSchoolSemester(res.data[0].semester_id);
+        }
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSchoolYear || !selectedSchoolSemester) {
+      setSelectedActiveSchoolYear("");
+      return;
+    }
+
+    axios
+      .get(
+        `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`,
+      )
+      .then((res) => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setSelectedActiveSchoolYear(res.data[0].school_year_id);
+        } else {
+          setSelectedActiveSchoolYear("");
+          showSnackbar("No academic term found for the selected year/semester.", "warning");
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setSelectedActiveSchoolYear("");
+      });
+  }, [selectedSchoolYear, selectedSchoolSemester]);
+
+  useEffect(() => {
+    const trimmed = studentNumber.trim();
+    if (trimmed) {
+      sessionStorage.setItem(REGISTRAR_COR_SEARCH_KEY, trimmed);
+      sessionStorage.setItem("edit_student_number", trimmed);
+    }
+  }, [studentNumber]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -247,6 +284,11 @@ const SearchCertificateOfRegistration = () => {
       return;
     }
 
+    if (!selectedActiveSchoolYear) {
+      setCorPreload(null);
+      return;
+    }
+
     const fetchStudent = async () => {
       try {
         setCorPreload(null);
@@ -256,11 +298,18 @@ const SearchCertificateOfRegistration = () => {
           axios
             .post(
               `${API_BASE_URL}/api/student-tagging`,
-              { studentNumber: debouncedStudentNumber },
+              {
+                studentNumber: debouncedStudentNumber,
+                active_school_year_id: selectedActiveSchoolYear,
+              },
               { headers: { "Content-Type": "application/json" } },
             )
             .catch((err) => {
               console.error("COR preload failed:", err);
+              showSnackbar(
+                err.response?.data?.message || "No COR found for the selected academic term.",
+                "warning",
+              );
               return null;
             }),
         ]);
@@ -299,34 +348,7 @@ const SearchCertificateOfRegistration = () => {
     };
 
     fetchStudent();
-  }, [debouncedStudentNumber]);
-
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-
-    isTabNavigationRef.current = true;
-    const params = new URLSearchParams(location.search);
-    const pid =
-      params.get("person_id") ||
-      sessionStorage.getItem("edit_person_id") ||
-      sessionStorage.getItem("admin_edit_person_id");
-    const trimmed = studentNumber.trim();
-    if (trimmed) {
-      sessionStorage.setItem(REGISTRAR_COR_SEARCH_KEY, trimmed);
-      sessionStorage.setItem("edit_student_number", trimmed);
-    } else {
-      sessionStorage.removeItem(REGISTRAR_COR_SEARCH_KEY);
-    }
-
-    if (pid) {
-      navigate(`${to}?person_id=${pid}`);
-    } else if (trimmed) {
-      navigate(`${to}?student_number=${trimmed}`);
-    } else {
-      navigate(to);
-    }
-  };
+  }, [debouncedStudentNumber, selectedActiveSchoolYear]);
 
   const divToPrintRef = useRef();
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -434,10 +456,6 @@ const SearchCertificateOfRegistration = () => {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      if (!isTabNavigationRef.current) {
-        sessionStorage.removeItem(REGISTRAR_COR_SEARCH_KEY);
-        localStorage.removeItem("studentNumberForCOR");
-      }
     };
   }, []);
 
@@ -525,77 +543,63 @@ const SearchCertificateOfRegistration = () => {
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
+      <br />
+
+      <RegistrarEnrollmentTabs />
 
       <br />
 
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          width: "100%",
-
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <React.Fragment key={index}>
-            {/* Step Card */}
-            <Card
-              onClick={() => handleStepClick(index, tab.to)}
-              sx={{
-                flex: 1,
-                maxWidth: `${100 / tabs.length}%`, // evenly fit 100%
-                height: 140,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                borderRadius: 2,
-                border: `1px solid ${borderColor}`,
-                backgroundColor: activeStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
-                color: activeStep === index ? "#fff" : "#000",
-                boxShadow:
-                  activeStep === index
-                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                transition: "0.3s ease",
-                "&:hover": {
-                  backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
+      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 4, p: 2, flexWrap: "wrap" }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography fontSize={13} sx={{ minWidth: "90px" }}>
+              School Year:
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>School Year</InputLabel>
+              <Select
+                value={selectedSchoolYear}
+                label="School Year"
+                onChange={(e) => setSelectedSchoolYear(e.target.value)}
               >
-                <Box sx={{ fontSize: 32, mb: 0.5 }}>{tab.icon}</Box>
-                <Typography
-                  sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                >
-                  {tab.label}
-                </Typography>
-              </Box>
-            </Card>
+                {schoolYears.length > 0 ? (
+                  schoolYears.map((sy) => (
+                    <MenuItem value={sy.year_id} key={sy.year_id}>
+                      {sy.current_year} - {sy.next_year}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No school years found</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          </Box>
 
-            {/* Spacer instead of line */}
-            {index < tabs.length - 1 && (
-              <Box
-                sx={{
-                  flex: 0.1,
-                  mx: 1, // margin to keep spacing
-                }}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </Box>
-
-
-      <br />
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography fontSize={13} sx={{ minWidth: "80px" }}>
+              Semester:
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Semester</InputLabel>
+              <Select
+                value={selectedSchoolSemester}
+                label="Semester"
+                onChange={(e) => setSelectedSchoolSemester(e.target.value)}
+              >
+                {schoolSemesters.length > 0 ? (
+                  schoolSemesters.map((sem) => (
+                    <MenuItem value={sem.semester_id} key={sem.semester_id}>
+                      {sem.semester_description}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No semesters found</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+      </TableContainer>
 
       <br />
       <TableContainer component={Paper} sx={{ width: '100%' }}>
@@ -662,9 +666,13 @@ const SearchCertificateOfRegistration = () => {
         }}
       >
         <CertificateOfRegistration
+          key={`${debouncedStudentNumber}-${selectedActiveSchoolYear || "none"}`}
           student_number={
-            corPreload || !corPreloadLoading ? debouncedStudentNumber : ""
+            selectedActiveSchoolYear && (corPreload || !corPreloadLoading)
+              ? debouncedStudentNumber
+              : ""
           }
+          activeSchoolYearId={selectedActiveSchoolYear || undefined}
           preload={corPreload}
           onNotify={({ message, severity }) => showSnackbar(message, severity)}
         />

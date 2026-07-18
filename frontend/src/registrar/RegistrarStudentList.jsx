@@ -12,7 +12,6 @@ import {
     TableRow,
     FormControl,
     Select,
-    Card,
     TableCell,
     TextField,
     MenuItem,
@@ -26,26 +25,14 @@ import {
     Grid,
 } from '@mui/material';
 import API_BASE_URL from "../apiConfig";
-// Search icon imported as SearchIcon below; remove duplicate Search import
 import { io } from "socket.io-client";
 import { Snackbar, Alert } from '@mui/material';
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
-import { Link } from "react-router-dom";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Unauthorized from "../components/Unauthorized";
-import LoadingOverlay from "../components/LoadingOverlay";
+import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import SearchIcon from "@mui/icons-material/Search";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import GradeIcon from "@mui/icons-material/Grade";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import SchoolIcon from "@mui/icons-material/School";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import PersonIcon from "@mui/icons-material/Person";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import AddIcon from '@mui/icons-material/Add';
 const StudentList = () => {
     const socket = useRef(null);
 
@@ -126,6 +113,7 @@ const StudentList = () => {
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = (queryParams.get("person_id") || "").trim();
+    const navigate = useNavigate();
 
     const handleRowClick = (person) => {
         if (!person) return;
@@ -140,44 +128,9 @@ const StudentList = () => {
         );
     };
 
-
-
-
-    const tabs1 = [
-        { label: "Student List", to: "/registrar_student_list", icon: <SchoolIcon fontSize="large" /> },
-        { label: "Student Profile", to: "/student_registrar_personal_information", icon: <PersonIcon fontSize="large" /> },
-        { label: "Student Online Requirements Registrar", to: "/student_online_requirements_registrar", icon: <AssignmentIcon fontSize="large" /> },
-        { label: "Course Tagging", to: "/registrar_class_list", icon: <AddIcon fontSize="large" /> },
-        { label: "Search Certificate of Registration", to: "/registrar_course_tagging_summer", icon: <ListAltIcon fontSize="large" /> },
-        { label: "Report of Grades", to: "/report_of_grades", icon: <GradeIcon fontSize="large" /> },
-        { label: "Transcript of Records", to: "/transcript_of_records", icon: <ReceiptLongIcon fontSize="large" /> },
-    ];
-
-    const navigate = useNavigate();
-    const [activeStep, setActiveStep] = useState(0);
-    const [clickedSteps, setClickedSteps] = useState(Array(tabs1.length).fill(false));
-
-
-    const handleStepClick = (index, to) => {
-        setActiveStep(index);
-        const pid = sessionStorage.getItem("edit_person_id");
-        const sn = sessionStorage.getItem("edit_student_number");
-
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else if (sn) {
-            navigate(`${to}?student_number=${sn}`);
-        } else {
-            navigate(to); // no id → open without query
-        }
-    };
-
-
-
     const [hasAccess, setHasAccess] = useState(null);
     const [accessLoading, setAccessLoading] = useState(true);
     const [studentsLoading, setStudentsLoading] = useState(false);
-    const [documentsLoading, setDocumentsLoading] = useState(false);
     const pageId = 104;
 
     const [employeeID, setEmployeeID] = useState("");
@@ -317,49 +270,6 @@ const StudentList = () => {
         setCampusAddress(settings.address || "");
     }, [settings, branches, person?.campus]);
 
-    const fetchStudents = async () => {
-        if (!selectedDepartmentFilter) {
-            setPersons([]);
-            return;
-        }
-
-        try {
-            setStudentsLoading(true);
-            const listRes = await fetch(
-                `${API_BASE_URL}/api/list_of_students/details?departmentId=${encodeURIComponent(selectedDepartmentFilter)}`
-            );
-
-            if (!listRes.ok) {
-                throw new Error("Failed to fetch student list");
-            }
-
-            const mergedData = (await listRes.json()).map((student) => ({
-                ...student,
-                documents: [],
-            }));
-
-            mergedData.sort((a, b) => {
-                const yearA = Number(a.year_id ?? Number.MAX_SAFE_INTEGER);
-                const yearB = Number(b.year_id ?? Number.MAX_SAFE_INTEGER);
-                if (yearA !== yearB) return yearA - yearB;
-
-                const semA = Number(a.semester_id ?? Number.MAX_SAFE_INTEGER);
-                const semB = Number(b.semester_id ?? Number.MAX_SAFE_INTEGER);
-                if (semA !== semB) return semA - semB;
-
-                return String(a.student_number ?? "").localeCompare(String(b.student_number ?? ""));
-            });
-
-            setPersons(mergedData);
-        } catch (err) {
-            console.error("Error fetching students:", err);
-        } finally {
-            setStudentsLoading(false);
-        }
-    };
-
-    // confirm states for actions removed (medical-specific toggle was removed)
-
     const [curriculumOptions, setCurriculumOptions] = useState([]);
     const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
     const [sortBy, setSortBy] = useState("name");
@@ -373,16 +283,56 @@ const StudentList = () => {
     const [semesters, setSchoolSemester] = useState([]);
     const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
     const [selectedSchoolSemester, setSelectedSchoolSemester] = useState('');
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(100);
+    const [activeTermReady, setActiveTermReady] = useState(false);
 
-    useEffect(() => {
-        fetchStudents();
-    }, [selectedDepartmentFilter]);
-
-    useEffect(() => {
-        if (adminData?.dprtmnt_id) {
-            handleDepartmentChange(adminData.dprtmnt_id);
+    const fetchStudents = async () => {
+        if (!selectedDepartmentFilter || !selectedSchoolYear || !selectedSchoolSemester) {
+            setPersons([]);
+            setTotalRecords(0);
+            setTotalPages(1);
+            return;
         }
-    }, [adminData, allCurriculums]);
+
+        try {
+            setStudentsLoading(true);
+            const params = new URLSearchParams({
+                departmentId: String(selectedDepartmentFilter),
+                yearId: String(selectedSchoolYear),
+                semesterId: String(selectedSchoolSemester),
+                page: String(currentPage),
+                limit: String(itemsPerPage),
+            });
+            const listRes = await fetch(
+                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`
+            );
+
+            if (!listRes.ok) {
+                throw new Error("Failed to fetch student list");
+            }
+
+            const payload = await listRes.json();
+            const rows = Array.isArray(payload) ? payload : (payload.data || []);
+            setPersons(rows.map((student) => ({ ...student, documents: [] })));
+            setTotalRecords(Number(payload.total ?? rows.length));
+            setTotalPages(Math.max(1, Number(payload.totalPages ?? 1)));
+        } catch (err) {
+            console.error("Error fetching students:", err);
+            setPersons([]);
+            setTotalRecords(0);
+            setTotalPages(1);
+        } finally {
+            setStudentsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (department.length === 0 || selectedDepartmentFilter) return;
+
+        handleDepartmentChange(String(department[0].dprtmnt_id));
+    }, [department, selectedDepartmentFilter]);
 
     useEffect(() => {
         axios
@@ -404,20 +354,33 @@ const StudentList = () => {
             .then((res) => {
                 if (res.data.length > 0) {
                     setSelectedSchoolYear(res.data[0].year_id);
-                    console.log("Active School Year:", res.data[0].year_id);
                     setSelectedSchoolSemester(res.data[0].semester_id);
                 }
             })
-            .catch((err) => console.error(err));
+            .catch((err) => console.error(err))
+            .finally(() => setActiveTermReady(true));
     }, []);
 
+    useEffect(() => {
+        if (!activeTermReady) return;
+        fetchStudents();
+    }, [
+        activeTermReady,
+        selectedDepartmentFilter,
+        selectedSchoolYear,
+        selectedSchoolSemester,
+        currentPage,
+        itemsPerPage,
+    ]);
 
     const handleSchoolYearChange = (event) => {
         setSelectedSchoolYear(event.target.value);
+        setCurrentPage(1);
     };
 
     const handleSchoolSemesterChange = (event) => {
         setSelectedSchoolSemester(event.target.value);
+        setCurrentPage(1);
     };
 
     const handleOpenPreview = (person) => {
@@ -433,7 +396,6 @@ const StudentList = () => {
         }
 
         try {
-            setDocumentsLoading(true);
             const res = await fetch(
                 `${API_BASE_URL}/api/list_of_students/documents/${encodeURIComponent(selectedPerson.person_id)}`
             );
@@ -459,8 +421,6 @@ const StudentList = () => {
                 message: "Failed to fetch student documents",
                 severity: "error",
             });
-        } finally {
-            setDocumentsLoading(false);
         }
     };
 
@@ -496,25 +456,10 @@ const StudentList = () => {
                 String(programInfo?.program_id ?? "") === String(selectedProgramFilter) ||
                 String(personData.program_id ?? "") === String(selectedProgramFilter);
 
-            const matchesDepartment =
-                selectedDepartmentFilter === "" ||
-                String(programInfo?.dprtmnt_id ?? personData.dprtmnt_id) === String(selectedDepartmentFilter);
-
-            const matchesSchoolYear =
-                selectedSchoolYear === "" ||
-                String(personData.year_id) === String(selectedSchoolYear);
-
-            const matchesSemester =
-                selectedSchoolSemester === "" ||
-                String(personData.semester_id) === String(selectedSchoolSemester);
-
             return (
                 matchesSearch &&
                 matchesCampus &&
-                matchesProgram &&
-                matchesDepartment &&
-                matchesSchoolYear &&
-                matchesSemester
+                matchesProgram
             );
         })
         .sort((a, b) => {
@@ -550,12 +495,7 @@ const StudentList = () => {
         }
     };
 
-    const [itemsPerPage, setItemsPerPage] = useState(100);
-
-    const totalPages = Math.ceil(filteredPersons.length / itemsPerPage);
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentPersons = filteredPersons.slice(indexOfFirstItem, indexOfLastItem);
+    const currentPersons = filteredPersons;
 
     const maxButtonsToShow = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
@@ -590,7 +530,7 @@ const StudentList = () => {
         if (currentPage > totalPages) {
             setCurrentPage(totalPages || 1);
         }
-    }, [filteredPersons.length, totalPages]);
+    }, [totalPages, currentPage]);
 
 
     const [openDialog, setOpenDialog] = useState(false);
@@ -614,19 +554,29 @@ const StudentList = () => {
         axios.get(`${API_BASE_URL}/api/applied_program`)
             .then(res => {
                 setAllCurriculums(res.data);
-                setCurriculumOptions(res.data);
             });
     }, []);
 
-    const handleDepartmentChange = (selectedDept) => {
-        setSelectedDepartmentFilter(selectedDept);
-        if (!selectedDept) {
+    useEffect(() => {
+        if (!selectedDepartmentFilter) {
             setCurriculumOptions(allCurriculums);
-        } else {
-            setCurriculumOptions(
-                allCurriculums.filter(opt => opt.dprtmnt_id === selectedDept)
-            );
+            return;
         }
+
+        setCurriculumOptions(
+            allCurriculums.filter(
+                (opt) => String(opt.dprtmnt_id) === String(selectedDepartmentFilter),
+            ),
+        );
+    }, [selectedDepartmentFilter, allCurriculums]);
+
+    const handleDepartmentChange = (selectedDept) => {
+        const nextDept = selectedDept === "" || selectedDept == null ? "" : String(selectedDept);
+        setSelectedDepartmentFilter(nextDept);
+        setCurrentPage(1);
+        setPersons([]);
+        setTotalRecords(0);
+        setTotalPages(1);
         setSelectedProgramFilter("");
     };
 
@@ -842,7 +792,7 @@ const StudentList = () => {
 
     // Put this at the very bottom before the return 
     if (accessLoading || hasAccess === null) {
-        return <LoadingOverlay open message="Loading..." />;
+        return null;
     }
 
     if (!hasAccess) {
@@ -863,7 +813,6 @@ const StudentList = () => {
                 padding: 2,
             }}
         >
-            <LoadingOverlay open={documentsLoading} message="Loading..." />
             <Box
                 display="flex"
                 justifyContent="space-between"
@@ -912,61 +861,7 @@ const StudentList = () => {
             <br />
             <br />
 
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // ❌ prevent wrapping
-                    width: "100%",
-
-                    gap: 2,
-                }}
-            >
-                {tabs1.map((tab, index) => (
-                    <Card
-                        key={index}
-                        onClick={() => handleStepClick(index, tab.to)}
-                        sx={{
-                            flex: `1 1 ${100 / tabs1.length}%`, // evenly divide row
-                            height: 135,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            borderRadius: 2,
-                            border: `1px solid ${borderColor}`,
-                            backgroundColor:
-                                activeStep === index
-                                    ? settings?.header_color || "#1976d2"
-                                    : "#E8C999",
-                            color: activeStep === index ? "#fff" : "#000",
-                            boxShadow:
-                                activeStep === index
-                                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                            transition: "0.3s ease",
-                            "&:hover": {
-                                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                            },
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                            }}
-                        >
-                            <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-                            <Typography
-                                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                            >
-                                {tab.label}
-                            </Typography>
-                        </Box>
-                    </Card>
-                ))}
-            </Box>
+            <RegistrarEnrollmentTabs />
 
             <br />
             <br />
@@ -1057,7 +952,7 @@ const StudentList = () => {
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     {/* Left: Total Count */}
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Student's Records: {filteredPersons.length}
+                                        Total Student's Records: {totalRecords}
                                     </Typography>
 
                                     {/* Right: Pagination Controls */}
@@ -1303,15 +1198,11 @@ const StudentList = () => {
                             <FormControl size="small" sx={{ width: "400px" }}>
                                 <Select
                                     value={selectedDepartmentFilter}
-                                    onChange={(e) => {
-                                        const selectedDept = e.target.value;
-                                        setSelectedDepartmentFilter(selectedDept);
-                                        handleDepartmentChange(selectedDept);
-                                    }}
+                                    onChange={(e) => handleDepartmentChange(e.target.value)}
                                     displayEmpty
                                 >
                                     {department.map((dep) => (
-                                        <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_id}>
+                                        <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                                             {dep.dprtmnt_name} ({dep.dprtmnt_code})
                                         </MenuItem>
                                     ))}
@@ -1516,7 +1407,7 @@ const StudentList = () => {
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     {/* Left: Total Count */}
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Student's Records: {filteredPersons.length}
+                                        Total Student's Records: {totalRecords}
                                     </Typography>
 
                                     {/* Right: Pagination Controls */}

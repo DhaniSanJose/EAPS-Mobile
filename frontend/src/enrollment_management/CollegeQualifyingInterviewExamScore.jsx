@@ -12,7 +12,6 @@ import {
   TableRow,
   FormControl,
   Select,
-  Card,
   TableCell,
   TextField,
   MenuItem,
@@ -33,10 +32,7 @@ import EaristLogo from "../assets/EaristLogo.png";
 import { FaFileExcel } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { io } from "socket.io-client";
-import SchoolIcon from "@mui/icons-material/School";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import ScheduleIcon from "@mui/icons-material/Schedule";
 import PeopleIcon from "@mui/icons-material/People";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -53,13 +49,12 @@ import {
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import SearchIcon from "@mui/icons-material/Search";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
-import ScoreIcon from "@mui/icons-material/Score";
 import DateField from "../components/DateField";
-import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close"; // or use the custom SVG below
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import SaveIcon from "@mui/icons-material/Save";
+import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
 const QualifyingExamScore = () => {
   useAuditMac();
@@ -163,57 +158,7 @@ const QualifyingExamScore = () => {
     navigate(`/applicant_college_personal_information?person_id=${personId}`);
   };
 
-  const tabs = [
-    {
-      label: "Applicant List",
-      to: "/applicant_list_college",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Profile",
-      to: "/applicant_college_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Online Requirements",
-      to: "/applicant_online_requirements_college",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Examination Score",
-      to: "/college_entrance_examination_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-    {
-      label: "Qualifying / Interview Schedule Management",
-      to: "/college_qualifying_interview_schedule_management",
-      icon: <ScheduleIcon fontSize="large" />,
-    },
-    {
-      label: "Qualifying / Interview Exam Score",
-      to: "/college_qualifying_interview_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-
-  ];
-
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(5);
-  const [clickedSteps, setClickedSteps] = useState(
-    Array(tabs.length).fill(false),
-  );
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-
-    if (pid) {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
 
   const COLLEGE_APPROVAL_STATUS = {
     WAITING_LIST: 0,
@@ -2693,61 +2638,7 @@ Thank you, best regards
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <CollegeApplicantProcessTabs />
 
       <br />
       <br />

@@ -6,12 +6,17 @@ const router = express.Router();
 
 router.get("/payment-status/:studentNumber", async (req, res) => {
   const { studentNumber } = req.params;
+  const requestedSchoolYearId = req.query.active_school_year_id;
 
   try {
-    const [activeRows] = await db3.query(
-      "SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1",
-    );
-    const activeSchoolYearId = activeRows[0]?.id;
+    let activeSchoolYearId = requestedSchoolYearId;
+
+    if (!activeSchoolYearId) {
+      const [activeRows] = await db3.query(
+        "SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1",
+      );
+      activeSchoolYearId = activeRows[0]?.id;
+    }
 
     if (!activeSchoolYearId) {
       return res.json({
@@ -34,6 +39,7 @@ router.get("/payment-status/:studentNumber", async (req, res) => {
       success: true,
       saved_unifast: unifastRows.length > 0,
       saved_matriculation: matricRows.length > 0,
+      active_school_year_id: activeSchoolYearId,
     });
   } catch (error) {
     console.error("Error fetching payment status:", error);

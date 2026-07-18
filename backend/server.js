@@ -44,7 +44,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.10:5173",
+  "http://192.168.1.42:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -1545,14 +1545,82 @@ app.get("/api/list_of_students", async (req, res) => {
 });
 
 app.get("/api/list_of_students/details", async (req, res) => {
-  const { departmentId, dprtmnt_id } = req.query;
+  const { departmentId, dprtmnt_id, yearId, semesterId, page: pageRaw, limit: limitRaw } =
+    req.query;
   const selectedDepartmentId = departmentId || dprtmnt_id;
 
   if (!selectedDepartmentId) {
     return res.status(400).json({ message: "Department ID is required" });
   }
 
+  if (!yearId || !semesterId) {
+    return res.status(400).json({
+      message: "School year and semester are required",
+    });
+  }
+
+  const page = Math.max(1, parseInt(pageRaw, 10) || 1);
+  const DEFAULT_LIMIT = 100;
+  const MAX_LIMIT = 500;
+  const limit = Math.min(
+    MAX_LIMIT,
+    Math.max(1, parseInt(limitRaw, 10) || DEFAULT_LIMIT),
+  );
+  const offset = (page - 1) * limit;
+
+  const baseFromSql = `
+      FROM (
+        SELECT
+          es.student_number,
+          es.active_school_year_id,
+          MIN(es.curriculum_id) AS curriculum_id,
+          MAX(es.en_remarks) AS en_remarks
+        FROM enrolled_subject es
+        INNER JOIN dprtmnt_curriculum_table dct
+          ON es.curriculum_id = dct.curriculum_id
+        INNER JOIN active_school_year_table asyt_filter
+          ON es.active_school_year_id = asyt_filter.id
+        WHERE dct.dprtmnt_id = ?
+          AND asyt_filter.year_id = ?
+          AND asyt_filter.semester_id = ?
+        GROUP BY es.student_number, es.active_school_year_id
+      ) es
+      INNER JOIN student_numbering_table snt
+        ON es.student_number = snt.student_number
+      INNER JOIN person_table pt
+        ON snt.person_id = pt.person_id
+      INNER JOIN curriculum_table ct
+        ON es.curriculum_id = ct.curriculum_id
+      INNER JOIN program_table pgt
+        ON ct.program_id = pgt.program_id
+      INNER JOIN dprtmnt_curriculum_table dct
+        ON es.curriculum_id = dct.curriculum_id
+       AND dct.dprtmnt_id = ?
+      INNER JOIN dprtmnt_table dpt
+        ON dct.dprtmnt_id = dpt.dprtmnt_id
+      INNER JOIN student_status_table sst
+        ON es.student_number = sst.student_number
+       AND es.active_school_year_id = sst.active_school_year_id
+      INNER JOIN year_level_table ylt
+        ON sst.year_level_id = ylt.year_level_id
+      LEFT JOIN active_school_year_table asyt
+        ON es.active_school_year_id = asyt.id
+      LEFT JOIN year_table yt
+        ON asyt.year_id = yt.year_id
+      LEFT JOIN semester_table smt
+        ON asyt.semester_id = smt.semester_id
+  `;
+
+  const filterParams = [selectedDepartmentId, yearId, semesterId, selectedDepartmentId];
+
   try {
+    const [countRows] = await db3.query(
+      `SELECT COUNT(*) AS total ${baseFromSql}`,
+      filterParams,
+    );
+    const total = Number(countRows[0]?.total || 0);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
     const [rows] = await db3.query(
       `
       SELECT
@@ -1583,47 +1651,20 @@ app.get("/api/list_of_students/details", async (req, res) => {
         es.en_remarks AS en_remarks,
         es.en_remarks AS remark_summary,
         ylt.year_level_description
-      FROM (
-        SELECT
-          es.student_number,
-          es.active_school_year_id,
-          MIN(es.curriculum_id) AS curriculum_id,
-          MAX(es.en_remarks) AS en_remarks
-        FROM enrolled_subject es
-        INNER JOIN dprtmnt_curriculum_table dct
-          ON es.curriculum_id = dct.curriculum_id
-        WHERE dct.dprtmnt_id = ?
-        GROUP BY es.student_number, es.active_school_year_id
-      ) es
-      INNER JOIN student_numbering_table snt
-        ON es.student_number = snt.student_number
-      INNER JOIN person_table pt
-        ON snt.person_id = pt.person_id
-      INNER JOIN curriculum_table ct
-        ON es.curriculum_id = ct.curriculum_id
-      INNER JOIN program_table pgt
-        ON ct.program_id = pgt.program_id
-      INNER JOIN dprtmnt_curriculum_table dct
-        ON es.curriculum_id = dct.curriculum_id
-      INNER JOIN dprtmnt_table dpt
-        ON dct.dprtmnt_id = dpt.dprtmnt_id
-      INNER JOIN student_status_table sst
-        ON es.student_number = sst.student_number
-       AND es.active_school_year_id = sst.active_school_year_id
-      INNER JOIN year_level_table ylt
-        ON sst.year_level_id = ylt.year_level_id
-      LEFT JOIN active_school_year_table asyt
-        ON es.active_school_year_id = asyt.id
-      LEFT JOIN year_table yt
-        ON asyt.year_id = yt.year_id
-      LEFT JOIN semester_table smt
-        ON asyt.semester_id = smt.semester_id
+      ${baseFromSql}
       ORDER BY asyt.year_id ASC, asyt.semester_id ASC, snt.student_number ASC
+      LIMIT ? OFFSET ?
       `,
-      [selectedDepartmentId],
+      [...filterParams, limit, offset],
     );
 
-    res.status(200).json(rows);
+    res.status(200).json({
+      data: rows,
+      total,
+      page,
+      limit,
+      totalPages,
+    });
   } catch (error) {
     console.error("Error fetching student list details by department:", error);
     res.status(500).json({ message: "Internal Server Error" });

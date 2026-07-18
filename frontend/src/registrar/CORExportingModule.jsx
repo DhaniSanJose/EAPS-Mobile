@@ -410,7 +410,7 @@ const CORExportingModule = () => {
           resolve(false);
           return;
         }
-        setTimeout(check, 400);
+        setTimeout(check, 150);
       };
       check();
     });
@@ -524,7 +524,7 @@ const CORExportingModule = () => {
 
     let job = null;
     while (true) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       const statusRes = await axios.get(
         `${API_BASE_URL}/api/cor-export/jobs/${jobId}`,
       );
@@ -876,21 +876,16 @@ const CORExportingModule = () => {
         const pageWidth = pdfDoc.internal.pageSize.getWidth();
         const pageHeight = pdfDoc.internal.pageSize.getHeight();
 
-        // Calculate dimensions to fit the entire content
+        // Fit A4 with uniform scale (preserve aspect ratio — no stretch).
         const imgWidth = canvas.width;
         const imgHeight = canvas.height;
-
-        // Scale to fit page width
         let pdfWidth = pageWidth;
         let pdfHeight = (imgHeight / imgWidth) * pdfWidth;
-
-        // If height exceeds page, scale by height instead
         if (pdfHeight > pageHeight) {
           pdfHeight = pageHeight;
           pdfWidth = (imgWidth / imgHeight) * pdfHeight;
         }
-
-        const imgX = (pageWidth - pdfWidth) / 2; // Center horizontally
+        const imgX = (pageWidth - pdfWidth) / 2;
         const imgY = 0;
 
         pdfDoc.addImage(imgData, "JPEG", imgX, imgY, pdfWidth, pdfHeight, undefined, "FAST");

@@ -18,25 +18,17 @@ import {
   TableRow,
   FormControl,
   Select,
-  Card,
 } from "@mui/material";
 import { Snackbar, Alert } from "@mui/material";
 
 import SearchIcon from "@mui/icons-material/Search";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import SuperAdminResetPasswordTabs from "../components/SuperAdminResetPasswordTabs";
 import API_BASE_URL from "../apiConfig";
 import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import { getLoginMacPayload } from "../utils/userMacAddress";
-import { useNavigate, useLocation } from "react-router-dom";
-import {
-  People,
-  School,
-  SupervisorAccount,
-  AdminPanelSettings,
-} from "@mui/icons-material";
-
 const SuperAdminRegistrarResetPassword = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
@@ -134,40 +126,6 @@ const SuperAdminRegistrarResetPassword = () => {
       }
       setLoading(false);
     }
-  };
-
-  const tabs = [
-    {
-      label: "Applicant Reset Password",
-      to: "/superadmin_applicant_reset_password",
-      icon: <People fontSize="large" />,
-    },
-    {
-      label: "Student Reset Password",
-      to: "/superadmin_student_reset_password",
-      icon: <School fontSize="large" />,
-    },
-    {
-      label: "Faculty Reset Password",
-      to: "/superadmin_faculty_reset_password",
-      icon: <SupervisorAccount fontSize="large" />,
-    },
-    {
-      label: "Registrar Reset Password",
-      to: "/superadmin_registrar_reset_password",
-      icon: <AdminPanelSettings fontSize="large" />,
-    },
-  ];
-
-  const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(3);
-  const [clickedSteps, setClickedSteps] = useState(
-    Array(tabs.length).fill(false),
-  );
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    navigate(to); // this will actually change the page
   };
 
   const [snackbar, setSnackbar] = useState({
@@ -504,61 +462,7 @@ const SuperAdminRegistrarResetPassword = () => {
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
       <br />
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-          mt: 1,
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <SuperAdminResetPasswordTabs />
       <br />
       <br />
 

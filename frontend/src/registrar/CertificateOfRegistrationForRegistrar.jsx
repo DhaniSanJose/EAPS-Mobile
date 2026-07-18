@@ -36,7 +36,7 @@ import useAuditMac from "../utils/useAuditMac";
 
 const CertificateOfRegistration = forwardRef(
 
-  ({ student_number, onNotify, preload }, divToPrintRef) => {
+  ({ student_number, onNotify, preload, activeSchoolYearId }, divToPrintRef) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
     const [fetchedLogo, setFetchedLogo] = useState(null);
@@ -424,20 +424,35 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       if (userId && currId) {
         axios
-          .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`)
+          .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, {
+            params: activeSchoolYearId
+              ? { activeSchoolYearId }
+              : undefined,
+          })
           .then((res) => setEnrolled(res.data))
           .catch((err) => console.error(err));
       }
-    }, [userId, currId]);
+    }, [userId, currId, activeSchoolYearId]);
 
     const [activeSchoolYear, setActiveSchoolYear] = useState([]);
 
     useEffect(() => {
+      if (activeSchoolYearId) {
+        axios
+          .get(`${API_BASE_URL}/api/active_school_year_by_id/${activeSchoolYearId}`)
+          .then((res) => setActiveSchoolYear(Array.isArray(res.data) ? res.data : []))
+          .catch((err) => {
+            console.error(err);
+            setActiveSchoolYear([]);
+          });
+        return;
+      }
+
       axios
         .get(`${API_BASE_URL}/api/get_active_school_years`)
         .then((res) => setActiveSchoolYear(res.data))
         .catch((err) => console.error(err));
-    }, []);
+    }, [activeSchoolYearId]);
 
     // Fetch department sections when component mounts
     useEffect(() => {
@@ -496,7 +511,12 @@ const CertificateOfRegistration = forwardRef(
           if (!tagged) {
             const response = await axios.post(
               `${API_BASE_URL}/api/student-tagging`,
-              { studentNumber: student_number },
+              {
+                studentNumber: student_number,
+                ...(activeSchoolYearId
+                  ? { active_school_year_id: activeSchoolYearId }
+                  : {}),
+              },
               { headers: { "Content-Type": "application/json" } },
             );
             tagged = response.data;
@@ -607,15 +627,26 @@ const CertificateOfRegistration = forwardRef(
       };
 
       fetchStudent();
-    }, [student_number, preload]); // ?? runs automatically when prop changes
+    }, [student_number, preload, activeSchoolYearId]); // ?? runs automatically when prop changes
 
     useEffect(() => {
-      if (!student_number || !student_number.trim()) return;
+      if (!student_number || !student_number.trim()) {
+        setSavedUnifast(false);
+        setSavedMatriculation(false);
+        return;
+      }
 
       const fetchPaymentStatus = async () => {
         try {
+          setSavedUnifast(false);
+          setSavedMatriculation(false);
           const res = await axios.get(
             `${API_BASE_URL}/api/payment-status/${student_number}`,
+            {
+              params: activeSchoolYearId
+                ? { active_school_year_id: activeSchoolYearId }
+                : undefined,
+            },
           );
           if (res.data?.success) {
             setSavedUnifast(!!res.data.saved_unifast);
@@ -623,11 +654,13 @@ const CertificateOfRegistration = forwardRef(
           }
         } catch (error) {
           console.error("Failed to fetch payment status:", error);
+          setSavedUnifast(false);
+          setSavedMatriculation(false);
         }
       };
 
       fetchPaymentStatus();
-    }, [student_number]);
+    }, [student_number, activeSchoolYearId]);
 
     // Fetch all departments when component mounts
     useEffect(() => {
@@ -832,9 +865,24 @@ const CertificateOfRegistration = forwardRef(
         school_id_fees: schoolIdFee,
         total_tosf: totalTotalTOSF,
         remark: "",
-        active_school_year_id: activeSchoolYear[0]?.id || null,
+        active_school_year_id:
+          activeSchoolYearId || activeSchoolYear[0]?.id || null,
       });
-    }, [data, tosf, enrolled, totalLabFees, totalLecFees, branches, person?.campus]);
+    }, [
+      data,
+      tosf,
+      enrolled,
+      totalLabFees,
+      totalLecFees,
+      branches,
+      person?.campus,
+      activeSchoolYear,
+      activeSchoolYearId,
+      isHaveNSTP,
+      isHaveComputerFees,
+      isHaveLaboratory,
+      year_Level_Description,
+    ]);
 
     const toNumber = (value) => {
       if (typeof value === "string") {
@@ -1233,6 +1281,10 @@ const CertificateOfRegistration = forwardRef(
                 {`
                 .certificate-wrapper {
                   position: relative;
+                  width: 210mm;
+                  max-width: 100%;
+                  margin: 0 auto;
+                  box-sizing: border-box;
                 }
 
                 .certificate-watermark {
@@ -1258,7 +1310,7 @@ const CertificateOfRegistration = forwardRef(
                     display: none;
                   }
                   .fee-table-con{
-                    width: calc(8in - 2px) !important;
+                    width: calc(100% - 2px) !important;
                   }
                 }
               `}</style>
@@ -1269,7 +1321,7 @@ const CertificateOfRegistration = forwardRef(
                   style={{
                     borderCollapse: "collapse",
                     fontFamily: "Arial",
-                    width: "8in",
+                    width: "100%",
                     margin: "0 auto", // Center the table inside the form
                     textAlign: "center",
                     tableLayout: "fixed",
@@ -1534,7 +1586,7 @@ const CertificateOfRegistration = forwardRef(
                     borderRight: "1px solid black",
                     borderCollapse: "collapse",
                     fontFamily: "Arial",
-                    width: "8in",
+                    width: "100%",
                     paddingTop: "-15px",
                     margin: "0 auto", // Center the table inside the form
                     textAlign: "center",
@@ -2537,7 +2589,7 @@ const CertificateOfRegistration = forwardRef(
                   className="fee-table-con"
                   style={{
                     display: "flex",
-                    width: "8in",
+                    width: "100%",
                     margin: "0 auto",
                     alignItems: "flex-start",
                     borderLeft: "1px solid black",
@@ -4266,7 +4318,7 @@ const CertificateOfRegistration = forwardRef(
                   style={{
                     borderCollapse: "collapse",
                     fontFamily: "Arial",
-                    width: "8in",
+                    width: "100%",
                     margin: "0 auto",
                     textAlign: "center",
                     tableLayout: "fixed",

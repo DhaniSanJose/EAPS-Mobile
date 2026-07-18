@@ -12,7 +12,6 @@ import {
     TableRow,
     FormControl,
     Select,
-    Card,
     TableCell,
     TextField,
     MenuItem,
@@ -32,17 +31,9 @@ import { Snackbar, Alert } from '@mui/material';
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
-import { Link } from "react-router-dom";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Unauthorized from "../components/Unauthorized";
-import LoadingOverlay from "../components/LoadingOverlay";
+import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 import SearchIcon from "@mui/icons-material/Search";
-import PersonIcon from "@mui/icons-material/Person";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import SchoolIcon from "@mui/icons-material/School";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import {
     getDepartmentIdsFromAdminData,
     isRegistrarCurriculumMatch,
@@ -119,6 +110,7 @@ const StudentListForEnrollment = () => {
     const firstLine = words.slice(0, middle).join(" ");
     const secondLine = words.slice(middle).join(" ");
 
+    const navigate = useNavigate();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = (queryParams.get("person_id") || "").trim();
@@ -134,37 +126,9 @@ const StudentListForEnrollment = () => {
         );
     };
 
-    const tabs = [
-        { label: "Student List", to: "/college_student_list", icon: <SchoolIcon fontSize="large" /> },
-        { label: "Student Profile", to: "/student_college_personal_information", icon: <PersonIcon fontSize="large" /> },
-        { label: "Student Online Requirements", to: "/student_online_requirements_college", icon: <AssignmentIcon fontSize="large" /> },
-        { label: "Course Tagging", to: "/college_course_tagging", icon: <UploadFileIcon fontSize="large" /> },
-        { label: "Search COR", to: "/college_search_certification_of_registration", icon: <MenuBookIcon fontSize="large" /> },
-        { label: "Class List", to: "/college_class_list", icon: <PersonSearchIcon fontSize="large" /> },
-
-    ];
-
-    const navigate = useNavigate();
-    const [activeStep, setActiveStep] = useState(0);
-    const [clickedSteps, setClickedSteps] = useState(Array(tabs.length).fill(false));
-
-    const handleStepClick = (index, to) => {
-        setActiveStep(index);
-        const pid = sessionStorage.getItem("edit_person_id");
-        const sn = sessionStorage.getItem("edit_student_number");
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else if (sn) {
-            navigate(`${to}?student_number=${sn}`);
-        } else {
-            navigate(to);
-        }
-    };
-
     const [hasAccess, setHasAccess] = useState(null);
     const [accessLoading, setAccessLoading] = useState(true);
     const [studentsLoading, setStudentsLoading] = useState(false);
-    const [documentsLoading, setDocumentsLoading] = useState(false);
     const pageId = 137;
     const [employeeID, setEmployeeID] = useState("");
 
@@ -291,82 +255,6 @@ const StudentListForEnrollment = () => {
         setCampusAddress(settings.address || "");
     }, [settings, branches, person?.campus]);
 
-    const resolveFetchDepartmentIds = () => {
-        const scopedIds = getDepartmentIdsFromAdminData(adminData);
-        if (selectedDepartmentFilter) {
-            return [selectedDepartmentFilter];
-        }
-        if (scopedIds.length > 1) {
-            return scopedIds;
-        }
-        if (scopedIds.length === 1) {
-            return [scopedIds[0]];
-        }
-        if (department.length > 0) {
-            return department.map((dep) => dep.dprtmnt_id);
-        }
-        return [];
-    };
-
-    const fetchStudents = async () => {
-        const departmentIdsToFetch = resolveFetchDepartmentIds();
-        if (!departmentIdsToFetch.length) {
-            setPersons([]);
-            return;
-        }
-
-        try {
-            setStudentsLoading(true);
-            const responses = await Promise.all(
-                departmentIdsToFetch.map((departmentId) =>
-                    fetch(
-                        `${API_BASE_URL}/api/list_of_students/details?departmentId=${encodeURIComponent(departmentId)}`
-                    ),
-                ),
-            );
-
-            for (const listRes of responses) {
-                if (!listRes.ok) {
-                    throw new Error("Failed to fetch student list");
-                }
-            }
-
-            const mergedData = (
-                await Promise.all(responses.map((listRes) => listRes.json()))
-            )
-                .flat()
-                .map((student) => ({
-                    ...student,
-                    documents: [],
-                }));
-
-            const uniqueStudents = [
-                ...new Map(
-                    mergedData.map((student) => [
-                        `${student.student_number}-${student.active_school_year_id}`,
-                        student,
-                    ]),
-                ).values(),
-            ];
-
-            uniqueStudents.sort((a, b) => {
-                const yearA = Number(a.year_id ?? Number.MAX_SAFE_INTEGER);
-                const yearB = Number(b.year_id ?? Number.MAX_SAFE_INTEGER);
-                if (yearA !== yearB) return yearA - yearB;
-                const semA = Number(a.semester_id ?? Number.MAX_SAFE_INTEGER);
-                const semB = Number(b.semester_id ?? Number.MAX_SAFE_INTEGER);
-                if (semA !== semB) return semA - semB;
-                return String(a.student_number ?? "").localeCompare(String(b.student_number ?? ""));
-            });
-
-            setPersons(uniqueStudents);
-        } catch (err) {
-            console.error("Error fetching students:", err);
-        } finally {
-            setStudentsLoading(false);
-        }
-    };
-
     const [curriculumOptions, setCurriculumOptions] = useState([]);
     const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
     const [sortBy, setSortBy] = useState("name");
@@ -382,10 +270,72 @@ const StudentListForEnrollment = () => {
     const [semesters, setSchoolSemester] = useState([]);
     const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
     const [selectedSchoolSemester, setSelectedSchoolSemester] = useState('');
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(100);
+    const [activeTermReady, setActiveTermReady] = useState(false);
+    const studentsFetchIdRef = useRef(0);
+    const studentsAbortRef = useRef(null);
 
-    useEffect(() => {
-        fetchStudents();
-    }, [selectedDepartmentFilter, adminData.dprtmnt_id, adminData.dprtmnt_ids, department.length]);
+    const fetchStudents = async ({
+        departmentId = selectedDepartmentFilter,
+        yearId = selectedSchoolYear,
+        semesterId = selectedSchoolSemester,
+        page = currentPage,
+        limit = itemsPerPage,
+    } = {}) => {
+        if (!departmentId || !yearId || !semesterId) {
+            setPersons([]);
+            setTotalRecords(0);
+            setTotalPages(1);
+            return;
+        }
+
+        if (studentsAbortRef.current) {
+            studentsAbortRef.current.abort();
+        }
+        const controller = new AbortController();
+        studentsAbortRef.current = controller;
+        const fetchId = ++studentsFetchIdRef.current;
+
+        try {
+            setStudentsLoading(true);
+            const params = new URLSearchParams({
+                departmentId: String(departmentId),
+                yearId: String(yearId),
+                semesterId: String(semesterId),
+                page: String(page),
+                limit: String(limit),
+            });
+            const listRes = await fetch(
+                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
+                { signal: controller.signal },
+            );
+
+            if (!listRes.ok) {
+                throw new Error("Failed to fetch student list");
+            }
+
+            const payload = await listRes.json();
+            if (fetchId !== studentsFetchIdRef.current) return;
+
+            const rows = Array.isArray(payload) ? payload : (payload.data || []);
+            setPersons(rows.map((student) => ({ ...student, documents: [] })));
+            setTotalRecords(Number(payload.total ?? rows.length));
+            setTotalPages(Math.max(1, Number(payload.totalPages ?? 1)));
+        } catch (err) {
+            if (err?.name === "AbortError") return;
+            console.error("Error fetching students:", err);
+            if (fetchId !== studentsFetchIdRef.current) return;
+            setPersons([]);
+            setTotalRecords(0);
+            setTotalPages(1);
+        } finally {
+            if (fetchId === studentsFetchIdRef.current) {
+                setStudentsLoading(false);
+            }
+        }
+    };
 
     useEffect(() => {
         axios
@@ -410,15 +360,36 @@ const StudentListForEnrollment = () => {
                     setSelectedSchoolSemester(res.data[0].semester_id);
                 }
             })
-            .catch((err) => console.error(err));
+            .catch((err) => console.error(err))
+            .finally(() => setActiveTermReady(true));
     }, []);
+
+    useEffect(() => {
+        if (!activeTermReady) return;
+        fetchStudents();
+
+        return () => {
+            if (studentsAbortRef.current) {
+                studentsAbortRef.current.abort();
+            }
+        };
+    }, [
+        activeTermReady,
+        selectedDepartmentFilter,
+        selectedSchoolYear,
+        selectedSchoolSemester,
+        currentPage,
+        itemsPerPage,
+    ]);
 
     const handleSchoolYearChange = (event) => {
         setSelectedSchoolYear(event.target.value);
+        setCurrentPage(1);
     };
 
     const handleSchoolSemesterChange = (event) => {
         setSelectedSchoolSemester(event.target.value);
+        setCurrentPage(1);
     };
 
     const handleOpenPreview = (person) => {
@@ -434,7 +405,6 @@ const StudentListForEnrollment = () => {
         }
 
         try {
-            setDocumentsLoading(true);
             const res = await fetch(
                 `${API_BASE_URL}/api/list_of_students/documents/${encodeURIComponent(selectedPerson.person_id)}`
             );
@@ -460,8 +430,6 @@ const StudentListForEnrollment = () => {
                 message: "Failed to fetch student documents",
                 severity: "error",
             });
-        } finally {
-            setDocumentsLoading(false);
         }
     };
 
@@ -501,25 +469,15 @@ const StudentListForEnrollment = () => {
                 String(programInfo?.curriculum_id ?? "") === String(selectedProgramFilter);
 
             const matchesDepartment =
-                selectedDepartmentFilter === "" ||
-                String(programInfo?.dprtmnt_id ?? personData.dprtmnt_id) === String(selectedDepartmentFilter);
-
-            const matchesSchoolYear =
-                selectedSchoolYear === "" ||
-                String(personData.year_id) === String(selectedSchoolYear);
-
-            const matchesSemester =
-                selectedSchoolSemester === "" ||
-                String(personData.semester_id) === String(selectedSchoolSemester);
+                !selectedDepartmentFilter ||
+                String(personData.dprtmnt_id ?? "") === String(selectedDepartmentFilter);
 
             return (
                 matchesSearch &&
                 matchesCampus &&
                 matchesRegistrarScope &&
                 matchesProgram &&
-                matchesDepartment &&
-                matchesSchoolYear &&
-                matchesSemester
+                matchesDepartment
             );
         })
         .sort((a, b) => {
@@ -549,11 +507,7 @@ const StudentListForEnrollment = () => {
         }
     };
 
-    const [itemsPerPage, setItemsPerPage] = useState(100);
-    const totalPages = Math.ceil(filteredPersons.length / itemsPerPage);
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentPersons = filteredPersons.slice(indexOfFirstItem, indexOfLastItem);
+    const currentPersons = filteredPersons;
 
     const maxButtonsToShow = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
@@ -608,7 +562,6 @@ const StudentListForEnrollment = () => {
                 const merged = responses.flatMap((response) => response.data || []);
                 const restrictedCurriculums = restrictToRegistrarCurriculum(merged);
                 setAllCurriculums(restrictedCurriculums);
-                setCurriculumOptions(restrictedCurriculums);
             } catch (error) {
                 console.error("Error fetching curriculum options:", error);
             }
@@ -636,27 +589,34 @@ const StudentListForEnrollment = () => {
             .then(res => {
                 const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
                 setAllCurriculums(restrictedCurriculums);
-                setCurriculumOptions(restrictedCurriculums);
             })
             .catch(console.error);
     }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
     useEffect(() => {
         if (department.length === 0 || selectedDepartmentFilter) return;
-        const departmentIds = getDepartmentIdsFromAdminData(adminData);
-        if (departmentIds.length !== 1) return;
-        if (allCurriculums.length === 0) return;
 
-        const firstDeptId = department[0].dprtmnt_id;
-        setSelectedDepartmentFilter(firstDeptId);
-        handleDepartmentChange(firstDeptId);
-    }, [department, allCurriculums, selectedDepartmentFilter, adminData]);
+        handleDepartmentChange(String(department[0].dprtmnt_id));
+    }, [department, selectedDepartmentFilter]);
+
+    useEffect(() => {
+        if (!selectedDepartmentFilter) {
+            setCurriculumOptions([]);
+            return;
+        }
+
+        setCurriculumOptions(
+            allCurriculums.filter(
+                (opt) => String(opt.dprtmnt_id) === String(selectedDepartmentFilter),
+            ),
+        );
+    }, [selectedDepartmentFilter, allCurriculums]);
 
     useEffect(() => {
         if (currentPage > totalPages) {
             setCurrentPage(totalPages || 1);
         }
-    }, [filteredPersons.length, totalPages]);
+    }, [totalPages, currentPage]);
 
     const [openDialog, setOpenDialog] = useState(false);
     const [activePerson, setActivePerson] = useState(null);
@@ -685,14 +645,12 @@ const StudentListForEnrollment = () => {
     }, [curriculumOptions, isProgramLocked]);
 
     const handleDepartmentChange = (selectedDept) => {
-        setSelectedDepartmentFilter(selectedDept);
-        if (!selectedDept) {
-            setCurriculumOptions(allCurriculums);
-        } else {
-            setCurriculumOptions(
-                allCurriculums.filter(opt => opt.dprtmnt_id === selectedDept)
-            );
-        }
+        const nextDept = selectedDept === "" || selectedDept == null ? "" : String(selectedDept);
+        setSelectedDepartmentFilter(nextDept);
+        setCurrentPage(1);
+        setPersons([]);
+        setTotalRecords(0);
+        setTotalPages(1);
         if (!isProgramLocked) setSelectedProgramFilter("");
     };
 
@@ -887,7 +845,7 @@ const StudentListForEnrollment = () => {
 
 
     if (accessLoading || hasAccess === null) {
-        return <LoadingOverlay open message="Loading..." />;
+        return null;
     }
 
     if (!hasAccess) {
@@ -916,13 +874,12 @@ const StudentListForEnrollment = () => {
 
     const scopedDepartmentIds = getDepartmentIdsFromAdminData(adminData);
     const isDeptLocked = scopedDepartmentIds.length === 1 && department.length === 1;
-    const showAllDepartmentsOption = scopedDepartmentIds.length !== 1;
     const selectedDepartmentFilterValue =
         selectedDepartmentFilter === "" ||
         department.some(
             (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
         )
-            ? selectedDepartmentFilter
+            ? String(selectedDepartmentFilter || "")
             : "";
 
     return (
@@ -936,8 +893,6 @@ const StudentListForEnrollment = () => {
                 padding: 2,
             }}
         >
-            <LoadingOverlay open={documentsLoading} message="Loading..." />
-
             <Box
                 display="flex"
                 justifyContent="space-between"
@@ -983,61 +938,7 @@ const StudentListForEnrollment = () => {
             <br />
             <br />
 
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // ❌ prevent wrapping
-                    width: "100%",
-
-                    gap: 2,
-                }}
-            >
-                {tabs.map((tab, index) => (
-                    <Card
-                        key={index}
-                        onClick={() => handleStepClick(index, tab.to)}
-                        sx={{
-                            flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-                            height: 135,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            borderRadius: 2,
-                            border: `1px solid ${borderColor}`,
-                            backgroundColor:
-                                activeStep === index
-                                    ? settings?.header_color || "#1976d2"
-                                    : "#E8C999",
-                            color: activeStep === index ? "#fff" : "#000",
-                            boxShadow:
-                                activeStep === index
-                                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                            transition: "0.3s ease",
-                            "&:hover": {
-                                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                            },
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                            }}
-                        >
-                            <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-                            <Typography
-                                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                            >
-                                {tab.label}
-                            </Typography>
-                        </Box>
-                    </Card>
-                ))}
-            </Box>
+            <CollegeEnrollmentTabs />
 
             <br />
             <br />
@@ -1120,7 +1021,7 @@ const StudentListForEnrollment = () => {
                             <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Student's Records: {filteredPersons.length}
+                                        Total Student's Records: {totalRecords}
                                     </Typography>
                                     <Box display="flex" alignItems="center" gap={1}>
                                         <Button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} variant="outlined" size="small"
@@ -1234,18 +1135,16 @@ const StudentListForEnrollment = () => {
                                             value={selectedDepartmentFilterValue}
                                             onChange={(e) => {
                                                 if (isDeptLocked) return;
-                                                const selectedDept = e.target.value;
-                                                setSelectedDepartmentFilter(selectedDept);
-                                                handleDepartmentChange(selectedDept);
+                                                handleDepartmentChange(e.target.value);
                                             }}
                                             displayEmpty
                                             sx={isDeptLocked ? { backgroundColor: "#f5f5f5", cursor: "not-allowed" } : {}}
                                         >
-                                            {!isDeptLocked && showAllDepartmentsOption && (
-                                                <MenuItem value="">All Departments</MenuItem>
+                                            {!isDeptLocked && (
+                                                <MenuItem value="">Select Department</MenuItem>
                                             )}
                                             {department.map((dep) => (
-                                                <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_id}>
+                                                <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                                                     {dep.dprtmnt_name} ({dep.dprtmnt_code})
                                                 </MenuItem>
                                             ))}
@@ -1378,7 +1277,7 @@ const StudentListForEnrollment = () => {
                             <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Student's Records: {filteredPersons.length}
+                                        Total Student's Records: {totalRecords}
                                     </Typography>
                                     <Box display="flex" alignItems="center" gap={1}>
                                         <Button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} variant="outlined" size="small"

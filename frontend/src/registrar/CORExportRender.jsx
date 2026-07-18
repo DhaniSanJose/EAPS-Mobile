@@ -5,140 +5,124 @@ import API_BASE_URL from "../apiConfig";
 
 const CORExportRender = () => {
   const [searchParams] = useSearchParams();
-  const studentNumber = searchParams.get("student_number") || "";
-  const personId = searchParams.get("person_id") || "";
   const jobId = searchParams.get("job_id") || "";
+  const initialStudentNumber = searchParams.get("student_number") || "";
+  const initialPersonId = searchParams.get("person_id") || "";
+  const fastMode = searchParams.get("fast") !== "0";
+
+  const [studentNumber, setStudentNumber] = React.useState(initialStudentNumber);
+  const [personId, setPersonId] = React.useState(initialPersonId);
   const [preload, setPreload] = React.useState(null);
   const [isPreloadReady, setIsPreloadReady] = React.useState(!jobId);
+  const [renderKey, setRenderKey] = React.useState(0);
   const pageRef = React.useRef(null);
   const contentRef = React.useRef(null);
+  const loadSeqRef = React.useRef(0);
 
-  const fitToA4 = React.useCallback(() => {
-    window.__COR_READY = false;
-    window.__COR_FIT_COMPLETE = false;
-
-    const nextFrame = () =>
-      new Promise((resolve) => requestAnimationFrame(resolve));
-    const waitForImages = (content) =>
-      Promise.all(
-        Array.from(content.querySelectorAll("img")).map((image) => {
-          if (image.complete) return Promise.resolve();
-          return new Promise((resolve) => {
-            image.addEventListener("load", resolve, { once: true });
-            image.addEventListener("error", resolve, { once: true });
-          });
-        }),
-      );
-
-    const applyFit = async () => {
-      const page = pageRef.current;
-      const content = contentRef.current;
-      if (!page || !content) {
-        window.__COR_READY = true;
-        window.__COR_FIT_COMPLETE = true;
-        return;
-      }
-
-      content.style.transform = "none";
-      content.style.width = "210mm";
-
-      await nextFrame();
-      await waitForImages(content);
-      await nextFrame();
-
-      const pageRect = page.getBoundingClientRect();
-      const contentRect = content.getBoundingClientRect();
-      const descendantRects = Array.from(content.querySelectorAll("*")).map(
-        (child) => child.getBoundingClientRect(),
-      );
-      const maxRight = Math.max(
-        contentRect.right,
-        ...descendantRects.map((rect) => rect.right),
-      );
-      const maxBottom = Math.max(
-        contentRect.bottom,
-        ...descendantRects.map((rect) => rect.bottom),
-      );
-      const naturalWidth = Math.max(
-        content.scrollWidth,
-        content.offsetWidth,
-        maxRight - contentRect.left,
-        1,
-      );
-      const naturalHeight = Math.max(
-        content.scrollHeight,
-        content.offsetHeight,
-        maxBottom - contentRect.top,
-        1,
-      );
-      let scale = Math.min(
-        0.94,
-        (pageRect.width - 2) / naturalWidth,
-        (pageRect.height - 2) / naturalHeight,
-      );
-
-      content.style.transform = `scale(${scale})`;
-      content.style.transformOrigin = "top left";
-      content.style.width = `${naturalWidth}px`;
-      content.style.height = `${naturalHeight}px`;
-      await nextFrame();
-
-      const pageRectAfterFit = page.getBoundingClientRect();
-      const fittedRects = Array.from(content.querySelectorAll("*")).map(
-        (child) => child.getBoundingClientRect(),
-      );
-      const fittedMinLeft = Math.min(...fittedRects.map((rect) => rect.left));
-      const fittedMaxRight = Math.max(...fittedRects.map((rect) => rect.right));
-      const fittedMinTop = Math.min(...fittedRects.map((rect) => rect.top));
-      const fittedMaxBottom = Math.max(...fittedRects.map((rect) => rect.bottom));
-      const fittedVisualWidth = fittedMaxRight - fittedMinLeft;
-      const fittedVisualHeight = fittedMaxBottom - fittedMinTop;
-      const overflowAdjustment = Math.min(
-        1,
-        (pageRectAfterFit.width - 4) / Math.max(fittedVisualWidth, 1),
-        (pageRectAfterFit.height - 4) / Math.max(fittedVisualHeight, 1),
-      );
-
-      if (overflowAdjustment < 1) {
-        scale *= overflowAdjustment;
-        content.style.transform = `scale(${scale})`;
-        await nextFrame();
-      }
-
-      const finalRects = Array.from(content.querySelectorAll("*")).map((child) =>
-        child.getBoundingClientRect(),
-      );
-      const finalMinLeft = Math.min(...finalRects.map((rect) => rect.left));
-      const finalMaxRight = Math.max(...finalRects.map((rect) => rect.right));
-      const finalMinTop = Math.min(...finalRects.map((rect) => rect.top));
-      const finalMaxBottom = Math.max(...finalRects.map((rect) => rect.bottom));
-      const finalVisualWidth = finalMaxRight - finalMinLeft;
-      const finalVisualHeight = finalMaxBottom - finalMinTop;
-
-      content.style.left = `${pageRect.left + (pageRect.width - finalVisualWidth) / 2 - finalMinLeft}px`;
-      content.style.top = `${pageRect.top + (pageRect.height - finalVisualHeight) / 2 - finalMinTop}px`;
-
-      window.__COR_SCALE = scale;
-      window.__COR_FITS_A4 = true;
-      window.__COR_READY = true;
-      window.__COR_FIT_COMPLETE = true;
-    };
-
-    applyFit();
+  const markReady = React.useCallback(() => {
+    window.__COR_READY = true;
+    window.__COR_FIT_COMPLETE = true;
+    window.__COR_FITS_A4 = true;
   }, []);
 
-  const handleReady = () => {
-    fitToA4();
-  };
+  const fitToA4Fast = React.useCallback(async () => {
+    window.__COR_READY = false;
+    window.__COR_FIT_COMPLETE = false;
+    window.__COR_FITS_A4 = false;
+
+    const page = pageRef.current;
+    const content = contentRef.current;
+    if (!page || !content) {
+      markReady();
+      return;
+    }
+
+    // Fast export fit: one uniform scale (no X/Y stretch).
+    content.style.transform = "none";
+    content.style.left = "0px";
+    content.style.top = "0px";
+    content.style.width = "210mm";
+    content.style.height = "auto";
+    content.style.transformOrigin = "top left";
+
+    content.querySelectorAll("table, .fee-table-con").forEach((el) => {
+      el.style.width = "100%";
+      el.style.maxWidth = "100%";
+      el.style.marginLeft = "0";
+      el.style.marginRight = "0";
+    });
+
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const pageRect = page.getBoundingClientRect();
+    const naturalWidth = Math.max(content.scrollWidth, content.offsetWidth, 1);
+    const naturalHeight = Math.max(content.scrollHeight, content.offsetHeight, 1);
+    const scale = Math.min(
+      0.98,
+      (pageRect.width - 4) / naturalWidth,
+      (pageRect.height - 4) / naturalHeight,
+    );
+
+    content.style.transform = `scale(${scale})`;
+    content.style.width = `${naturalWidth}px`;
+    // Center any leftover horizontal space instead of stretching.
+    content.style.left = `${Math.max(0, (pageRect.width - naturalWidth * scale) / 2)}px`;
+    window.__COR_SCALE = scale;
+
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    markReady();
+  }, [markReady]);
+
+  const handleReady = React.useCallback(() => {
+    if (fastMode) {
+      fitToA4Fast();
+      return;
+    }
+    fitToA4Fast();
+  }, [fastMode, fitToA4Fast]);
+
+  const applyStudentPayload = React.useCallback(async (payload = {}) => {
+    const nextStudentNumber = String(payload.student_number || "").trim();
+    const nextPersonId = payload.person_id ? String(payload.person_id) : "";
+    const nextPreload = payload.preload || null;
+    const seq = ++loadSeqRef.current;
+
+    window.__COR_READY = false;
+    window.__COR_FIT_COMPLETE = false;
+    window.__COR_FITS_A4 = false;
+    window.__COR_ENROLLED_READY = false;
+    window.__COR_SCALE = 1;
+
+    setIsPreloadReady(false);
+    setStudentNumber(nextStudentNumber);
+    setPersonId(nextPersonId);
+    setPreload(nextPreload);
+    setRenderKey((value) => value + 1);
+
+    // Allow React to commit before marking preload ready.
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    if (seq !== loadSeqRef.current) return false;
+    setIsPreloadReady(true);
+    return true;
+  }, []);
+
+  React.useEffect(() => {
+    window.__loadCorForExport = async (payload) => applyStudentPayload(payload);
+    window.__COR_EXPORT_BOOTSTRAPPED = true;
+    return () => {
+      delete window.__loadCorForExport;
+      delete window.__COR_EXPORT_BOOTSTRAPPED;
+    };
+  }, [applyStudentPayload]);
 
   React.useEffect(() => {
     window.__COR_READY = false;
     window.__COR_SCALE = 1;
     window.__COR_FITS_A4 = false;
     window.__COR_FIT_COMPLETE = false;
-    setPreload(null);
 
-    if (!jobId || !studentNumber) {
+    // When Puppeteer drives loads via __loadCorForExport, skip URL preload fetch.
+    if (!jobId || !initialStudentNumber) {
       setIsPreloadReady(true);
       return;
     }
@@ -148,7 +132,7 @@ const CORExportRender = () => {
 
     fetch(
       `${API_BASE_URL}/api/cor-export/jobs/${jobId}/preload/${encodeURIComponent(
-        studentNumber,
+        initialStudentNumber,
       )}`,
     )
       .then((response) => (response.ok ? response.json() : null))
@@ -165,27 +149,7 @@ const CORExportRender = () => {
     return () => {
       isMounted = false;
     };
-  }, [jobId, studentNumber]);
-
-  // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
-
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  }, [jobId, initialStudentNumber]);
 
   return (
     <div
@@ -228,15 +192,16 @@ const CORExportRender = () => {
           left: 0,
         }}
       >
-        {isPreloadReady && (
+        {isPreloadReady && studentNumber ? (
           <CertificateOfRegistration
+            key={`${studentNumber}-${renderKey}`}
             student_number={studentNumber}
             person_id={personId}
             preload={preload}
             containerId="server-cor-export"
             onReady={handleReady}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );

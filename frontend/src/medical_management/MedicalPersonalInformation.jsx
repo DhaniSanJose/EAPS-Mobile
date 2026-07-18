@@ -56,20 +56,10 @@ import ExamPermit from "../applicant/ExamPermit";
 import { Snackbar, Alert } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import ClassIcon from "@mui/icons-material/Class";
+import MedicalProcessTabs from "../components/MedicalProcessTabs";
 import SearchIcon from "@mui/icons-material/Search";
-import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
-import GradeIcon from "@mui/icons-material/Grade";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import DescriptionIcon from "@mui/icons-material/Description";
-import HowToRegIcon from "@mui/icons-material/HowToReg";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DateField from "../components/DateField";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import FormalExample from "../assets/formalexample.png";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
@@ -133,44 +123,6 @@ const MedicalDashboard1 = () => {
     );
     return branch?.branch || "—";
   };
-
-  const stepsData = [
-    {
-      label: "Student List",
-      to: "/medical_student_list",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Student Profile",
-      to: "/medical_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Student Online Requirements",
-      to: "/medical_online_requirements",
-      icon: <AssignmentIcon fontSize="large" />,
-    }, // updated icon
-    {
-      label: "Medical History",
-      to: "/medical_requirements_form",
-      icon: <HealthAndSafetyIcon fontSize="large" />,
-    },
-    {
-      label: "Dental Assessment",
-      to: "/dental_assessment",
-      icon: <DescriptionIcon fontSize="large" />,
-    },
-    {
-      label: "Physical and Neurological Examination",
-      to: "/physical_neuro_exam",
-      icon: <PsychologyIcon fontSize="large" />,
-    },
-  ];
-
-  const [currentStep, setCurrentStep] = useState(1);
-  const [visitedSteps, setVisitedSteps] = useState(
-    Array(stepsData.length).fill(false),
-  );
 
   const [snack, setSnack] = useState({
     open: false,
@@ -276,17 +228,6 @@ const MedicalDashboard1 = () => {
     // If College/Bachelor → show only year levels
     return yl.level_type === "year";
   });
-
-  const handleNavigateStep = (index, to) => {
-    setCurrentStep(index);
-
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-    if (pid) {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
 
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1884,71 +1825,7 @@ const MedicalDashboard1 = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          width: "100%",
-        }}
-      >
-        {stepsData.map((step, index) => (
-          <React.Fragment key={index}>
-            {/* Step Card */}
-            <Card
-              onClick={() => handleNavigateStep(index, step.to)}
-              sx={{
-                flex: 1,
-                maxWidth: `${100 / stepsData.length}%`, // evenly fit 100%
-                height: 140,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                borderRadius: 2,
-                border: `1px solid ${borderColor}`,
-                backgroundColor:
-                  currentStep === index
-                    ? settings?.header_color || "#1976d2"
-                    : "#E8C999",
-                color: currentStep === index ? "#fff" : "#000",
-                boxShadow:
-                  currentStep === index
-                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                transition: "0.3s ease",
-                "&:hover": {
-                  backgroundColor: currentStep === index ? "#000" : "#f5d98f",
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <Box sx={{ fontSize: 32, mb: 0.5 }}>{step.icon}</Box>
-                <Typography
-                  sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                >
-                  {step.label}
-                </Typography>
-              </Box>
-            </Card>
-
-            {/* Spacer instead of line */}
-            {index < stepsData.length - 1 && (
-              <Box
-                sx={{
-                  mx: 1, // margin to keep spacing
-                }}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </Box>
+      <MedicalProcessTabs />
 
       <br />
       <br />

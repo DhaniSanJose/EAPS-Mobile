@@ -24,16 +24,13 @@ import SearchIcon from "@mui/icons-material/Search";
 import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
 import GradeIcon from "@mui/icons-material/Grade";
 import API_BASE_URL from "../apiConfig";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
+import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 
 const OfficialStudentDashboard3 = () => {
     useAuditMac();
@@ -77,20 +74,6 @@ const OfficialStudentDashboard3 = () => {
 
     }, [settings]);
 
-    const stepsData = [
-        { label: "Student List", to: "/college_student_list", icon: <SchoolIcon fontSize="large" /> },
-        { label: "Student Profile", to: "/student_college_personal_information", icon: <PersonIcon fontSize="large" /> },
-        { label: "Student Online Requirements", to: "/student_online_requirements_college", icon: <AssignmentIcon fontSize="large" /> },
-        { label: "Course Tagging", to: "/college_course_tagging", icon: <UploadFileIcon fontSize="large" /> },
-        { label: "Search COR", to: "/college_search_certification_of_registration", icon: <MenuBookIcon fontSize="large" /> },
-        { label: "Class List", to: "/college_class_list", icon: <PersonSearchIcon fontSize="large" /> },
-
-    ];
-
-    const [currentStep, setCurrentStep] = useState(1);
-    const [visitedSteps, setVisitedSteps] = useState(Array(stepsData.length).fill(false));
-
-
     const navigate = useNavigate();
     const [userID, setUserID] = useState("");
     const [user, setUser] = useState("");
@@ -112,17 +95,6 @@ const OfficialStudentDashboard3 = () => {
         yearGraduated1: "",
         strand: "",
     });
-
-    const handleNavigateStep = (index, to) => {
-        setCurrentStep(index);
-
-        const pid = sessionStorage.getItem("admin_edit_person_id");
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else {
-            navigate(to);
-        }
-    };
 
 
     const [hasAccess, setHasAccess] = useState(null);
@@ -681,75 +653,8 @@ const OfficialStudentDashboard3 = () => {
 
 
 
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // prevent wrapping
-                    width: "100%",
-                    mt: 3,
-
-                }}
-            >
-                {stepsData.map((step, index) => (
-                    <React.Fragment key={index}>
-                        {/* Step Card */}
-                        <Card
-                            onClick={() => handleNavigateStep(index, step.to)}
-                            sx={{
-                                flex: `1 1 ${100 / stepsData.length}%`, // evenly divide width
-                                height: 140,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                borderRadius: 2,
-                                border: `1px solid ${borderColor}`,
-                                backgroundColor: currentStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
-                                color: currentStep === index ? "#fff" : "#000",
-                                boxShadow:
-                                    currentStep === index
-                                        ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                        : "0px 2px 6px rgba(0,0,0,0.15)",
-                                transition: "0.3s ease",
-                                "&:hover": {
-                                    backgroundColor: currentStep === index ? "#000" : "#f5d98f",
-                                },
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                }}
-                            >
-                                <Box sx={{ fontSize: 40, mb: 1 }}>{step.icon}</Box>
-                                <Typography
-                                    sx={{
-                                        fontSize: 14,
-                                        fontWeight: "bold",
-                                        textAlign: "center",
-                                    }}
-                                >
-                                    {step.label}
-                                </Typography>
-                            </Box>
-                        </Card>
-
-                        {/* Spacer (line gap between steps) */}
-                        {index < stepsData.length - 1 && (
-                            <Box
-                                sx={{
-
-                                    mx: 1, // spacing between cards
-                                }}
-                            />
-                        )}
-                    </React.Fragment>
-                ))}
-            </Box>
-
+            <br />
+            <CollegeEnrollmentTabs />
             <br />
             <br />
 

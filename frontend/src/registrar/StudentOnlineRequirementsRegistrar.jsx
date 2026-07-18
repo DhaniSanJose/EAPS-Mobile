@@ -8,7 +8,6 @@ import {
   Paper,
   Table,
   TableBody,
-  Card,
   TableCell,
   TableContainer,
   TableHead,
@@ -21,41 +20,17 @@ import {
   MenuItem,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
-import Search from "@mui/icons-material/Search";
-import { Link, useLocation } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { io } from "socket.io-client";
 import { Snackbar, Alert } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import SchoolIcon from "@mui/icons-material/School";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonIcon from "@mui/icons-material/Person";
-import DescriptionIcon from "@mui/icons-material/Description";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import HowToRegIcon from "@mui/icons-material/HowToReg";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import GradeIcon from "@mui/icons-material/Grade";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import AssignmentIcon from "@mui/icons-material/Assignment";
+import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import VisibilityIcon from "@mui/icons-material/Visibility";
-import AddIcon from '@mui/icons-material/Add';
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
-
-const tabs1 = [
-  { label: "Student List", to: "/registrar_student_list", icon: <SchoolIcon fontSize="large" /> },
-  { label: "Student Profile", to: "/student_registrar_personal_information", icon: <PersonIcon fontSize="large" /> },
-  { label: "Student Online Requirements Registrar", to: "/student_online_requirements_registrar", icon: <AssignmentIcon fontSize="large" /> },
-  { label: "Course Tagging", to: "/registrar_class_list", icon: <AddIcon fontSize="large" /> },
-  { label: "Search Certificate of Registration", to: "/registrar_course_tagging_summer", icon: <ListAltIcon fontSize="large" /> },
-  { label: "Report of Grades", to: "/report_of_grades", icon: <GradeIcon fontSize="large" /> },
-  { label: "Transcript of Records", to: "/transcript_of_records", icon: <ReceiptLongIcon fontSize="large" /> },
-];
 
 const MedicalRequirements = () => {
   useAuditMac();
@@ -92,12 +67,6 @@ const MedicalRequirements = () => {
     if (settings.short_term) setShortTerm(settings.short_term);
     if (settings.campus_address) setCampusAddress(settings.campus_address);
   }, [settings]);
-
-  const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(2);
-  const [clickedSteps, setClickedSteps] = useState(
-    Array(tabs1.length).fill(false),
-  );
 
   // ------------------------------------
   const [requirements, setRequirements] = useState([]);
@@ -247,31 +216,6 @@ const MedicalRequirements = () => {
       })
       .catch((err) => console.error("Auto search failed:", err));
   }, [location.search]);
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-
-    const pid =
-      selectedPerson?.person_id ||
-      person?.person_id ||
-      sessionStorage.getItem("edit_person_id") ||
-      sessionStorage.getItem("admin_edit_person_id");
-    const sn =
-      selectedPerson?.student_number ||
-      person?.student_number ||
-      sessionStorage.getItem("edit_student_number");
-
-    if (pid) {
-      sessionStorage.setItem("edit_person_id", String(pid));
-      if (sn) sessionStorage.setItem("edit_student_number", String(sn));
-      navigate(`${to}?person_id=${pid}`);
-    } else if (sn) {
-      sessionStorage.setItem("edit_student_number", String(sn));
-      navigate(`${to}?student_number=${sn}`);
-    } else {
-      navigate(to);
-    }
-  };
 
   useEffect(() => {
     const storedId = sessionStorage.getItem("edit_student_number");
@@ -1012,61 +956,7 @@ const MedicalRequirements = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs1.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs1.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+      <RegistrarEnrollmentTabs />
 
       <br />
       <br />

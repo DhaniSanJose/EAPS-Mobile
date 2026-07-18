@@ -337,7 +337,22 @@ const CertificateOfRegistration = forwardRef(
     };
 
     useEffect(() => {
+      // Reset load flags whenever the student changes so export doesn't
+      // snapshot an empty subjects table from a previous render cycle.
+      window.__COR_ENROLLED_READY = false;
+      setDataLoaded({
+        student: false,
+        courses: false,
+        enrolled: false,
+        tosf: false,
+      });
+      setEnrolled([]);
+      setCourses([]);
+    }, [student_number]);
+
+    useEffect(() => {
       if (currId) {
+        setDataLoaded((prev) => ({ ...prev, courses: false }));
         axios
           .get(`${API_BASE_URL}/api/courses/${currId}`)
           .then((res) => {
@@ -348,30 +363,47 @@ const CertificateOfRegistration = forwardRef(
             console.error(err);
             setDataLoaded((prev) => ({ ...prev, courses: true })); // Mark as loaded even on error
           });
-      } else {
-        setDataLoaded((prev) => ({ ...prev, courses: true }));
       }
     }, [currId]);
 
     useEffect(() => {
-      if (userId && currId) {
-        axios
-          .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, {
-            params: corActiveSchoolYearId
-              ? { activeSchoolYearId: corActiveSchoolYearId }
-              : {},
-          })
-          .then((res) => {
-            setEnrolled(res.data);
-            setDataLoaded((prev) => ({ ...prev, enrolled: true }));
-          })
-          .catch((err) => {
-            console.error(err);
-            setDataLoaded((prev) => ({ ...prev, enrolled: true })); // Mark as loaded even on error
-          });
-      } else {
-        setDataLoaded((prev) => ({ ...prev, enrolled: true }));
+      if (!userId || !currId) {
+        // Keep enrolled=false until student tagging has produced ids.
+        // Marking true here caused PDF export before subjects finished loading.
+        return;
       }
+
+      let cancelled = false;
+      setDataLoaded((prev) => ({ ...prev, enrolled: false }));
+      setEnrolled([]);
+
+      axios
+        .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, {
+          params: corActiveSchoolYearId
+            ? { activeSchoolYearId: corActiveSchoolYearId }
+            : {},
+        })
+        .then((res) => {
+          if (cancelled) return;
+          setEnrolled(Array.isArray(res.data) ? res.data : []);
+          setDataLoaded((prev) => ({ ...prev, enrolled: true }));
+          window.__COR_ENROLLED_READY = true;
+          window.__COR_ENROLLED_COUNT = Array.isArray(res.data)
+            ? res.data.length
+            : 0;
+        })
+        .catch((err) => {
+          console.error(err);
+          if (cancelled) return;
+          setEnrolled([]);
+          setDataLoaded((prev) => ({ ...prev, enrolled: true }));
+          window.__COR_ENROLLED_READY = true;
+          window.__COR_ENROLLED_COUNT = 0;
+        });
+
+      return () => {
+        cancelled = true;
+      };
     }, [userId, currId, corActiveSchoolYearId]);
 
     // Fetch department sections when component mounts
@@ -481,9 +513,20 @@ const CertificateOfRegistration = forwardRef(
           let tagged = preload;
 
           if (!tagged) {
+            const activeSchoolYearIdFromQuery =
+              typeof window !== "undefined"
+                ? new URLSearchParams(window.location.search).get(
+                    "active_school_year_id",
+                  )
+                : null;
             const response = await axios.post(
               `${API_BASE_URL}/api/student-tagging`,
-              { studentNumber: student_number },
+              {
+                studentNumber: student_number,
+                ...(activeSchoolYearIdFromQuery
+                  ? { active_school_year_id: activeSchoolYearIdFromQuery }
+                  : {}),
+              },
               { headers: { "Content-Type": "application/json" } },
             );
             tagged = response.data;
@@ -564,13 +607,9 @@ const CertificateOfRegistration = forwardRef(
         dataLoaded.tosf;
 
       if (allDataLoaded && onReady && student_number) {
-        // Wait for data arrays to have content
-        if (data.length === 0 && enrolled.length === 0) {
-          // Data not yet populated, wait longer
-          const retryTimer = setTimeout(() => {
-            if (onReady) onReady(student_number);
-          }, 2000);
-          return () => clearTimeout(retryTimer);
+        // Student profile must be present before export snapshot.
+        if (data.length === 0) {
+          return;
         }
 
         // Add extra delay to ensure DOM is fully rendered with actual values
@@ -580,14 +619,28 @@ const CertificateOfRegistration = forwardRef(
             if (containerId) {
               const container = document.getElementById(containerId);
               if (container) {
-                const inputs = container.querySelectorAll('input[value]');
-                const filledInputs = Array.from(inputs).filter(inp => inp.value && inp.value.trim() !== '');
+                const inputs = container.querySelectorAll("input");
+                const filledInputs = Array.from(inputs).filter(
+                  (inp) => inp.value && inp.value.trim() !== "",
+                );
+                const subjectRows = container.querySelectorAll(
+                  "tbody tr, table tr",
+                );
 
-                // Only signal ready if we have some filled inputs OR force after timeout
-                if (filledInputs.length > 5 || Date.now() > checkContent.startTime + 3000) {
+                // Prefer waiting until subject rows exist when enrolled data is present.
+                const hasSubjectRows =
+                  enrolled.length === 0 || subjectRows.length > 1;
+
+                if (
+                  (filledInputs.length > 5 && hasSubjectRows) ||
+                  Date.now() > checkContent.startTime + 4000
+                ) {
                   onReady(student_number);
                   return;
                 }
+
+                setTimeout(checkContent, 150);
+                return;
               }
             }
             // Fallback - just signal ready
@@ -595,7 +648,7 @@ const CertificateOfRegistration = forwardRef(
           };
           checkContent.startTime = Date.now();
           checkContent();
-        }, 1200); // Increased from 800ms to 1200ms
+        }, 400);
 
         return () => clearTimeout(timer);
       }
@@ -695,44 +748,60 @@ const CertificateOfRegistration = forwardRef(
     });
 
     return (
-      <Container className="mb-[4rem]">
+      <Container
+        maxWidth={false}
+        disableGutters
+        className="mb-[4rem]"
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          px: 1,
+          py: 2,
+        }}
+      >
         <div className="flex-container">
           <div className="section">
             <Box></Box>
 
             <div ref={divToPrintRef} className="certificate-wrapper">
-              {/* Watermark across the page */}
-
               <style>
                 {`
                 .certificate-wrapper {
                   position: relative;
+                  width: 210mm;
+                  min-height: 297mm;
+                  max-width: 100%;
+                  margin: 0 auto;
+                  box-sizing: border-box;
+                  background: #fff;
+                  overflow: visible;
                 }
 
-                .certificate-watermark {
-                  position: absolute;
-                  top: 50%;
-                  left: 50%;
-                  transform: translate(-50%, -50%) rotate(-45deg); /* diagonal */
-                  font-size: 7rem; /* adjust to fit your page */
-                  font-weight: 900;
-                  color: rgba(0, 0, 0, 0.08); /* light grey, adjust opacity */
-                  text-transform: uppercase;
-                  white-space: nowrap;
-                  pointer-events: none;
-                  user-select: none;
-                  z-index: 9999;
+                .certificate-wrapper > .section,
+                .certificate-wrapper table,
+                .certificate-wrapper .fee-table-con,
+                .certificate-wrapper .student-table {
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  margin-left: 0 !important;
+                  margin-right: 0 !important;
+                  box-sizing: border-box;
                 }
 
                 @media print {
-                  .certificate-watermark {
-                    color: rgba(0, 0, 0, 0.15); /* a bit darker so it prints */
+                  @page {
+                    size: A4;
+                    margin: 0;
                   }
                   button {
                     display: none;
                   }
-                  .fee-table-con{
-                    width: calc(8in - 2px) !important;
+                  .certificate-wrapper {
+                    width: 210mm;
+                    min-height: 297mm;
+                  }
+                  .fee-table-con {
+                    width: 100% !important;
                   }
                 }
               `}</style>
@@ -743,7 +812,7 @@ const CertificateOfRegistration = forwardRef(
                   style={{
                     borderCollapse: "collapse",
                     fontFamily: "Arial",
-                    width: "8in",
+                    width: "100%",
                     margin: "0 auto", // Center the table inside the form
                     textAlign: "center",
                     tableLayout: "fixed",
@@ -1004,7 +1073,7 @@ const CertificateOfRegistration = forwardRef(
                     borderRight: "1px solid black",
                     borderCollapse: "collapse",
                     fontFamily: "Arial",
-                    width: "8in",
+                    width: "100%",
                     margin: "0 auto", // Center the table inside the form
                     textAlign: "center",
                     tableLayout: "fixed",
@@ -1457,7 +1526,7 @@ const CertificateOfRegistration = forwardRef(
 
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         rowSpan={2}
                         style={{
                           color: "black",
@@ -1482,7 +1551,7 @@ const CertificateOfRegistration = forwardRef(
                         </div>
                       </td>
                       <td
-                        colSpan={10}
+                        colSpan={14}
                         rowSpan={2}
                         style={{
                           color: "black",
@@ -1556,7 +1625,7 @@ const CertificateOfRegistration = forwardRef(
                         </div>
                       </td>
                       <td
-                        colSpan={8}
+                        colSpan={7}
                         rowSpan={2}
                         style={{
                           color: "black",
@@ -1579,7 +1648,7 @@ const CertificateOfRegistration = forwardRef(
                         </div>
                       </td>
                       <td
-                        colSpan={8}
+                        colSpan={6}
                         rowSpan={2}
                         style={{
                           color: "black",
@@ -1687,7 +1756,7 @@ const CertificateOfRegistration = forwardRef(
                     </tr>
                     {enrolled.map((item, index) => (
                       <tr key={index}>
-                        <td colSpan={6} style={{ border: "1px solid black" }}>
+                        <td colSpan={5} style={{ border: "1px solid black" }}>
                           <input
                             type="text"
                             value={item.course_code || ""}
@@ -1701,7 +1770,7 @@ const CertificateOfRegistration = forwardRef(
                             }}
                           />
                         </td>
-                        <td colSpan={10} style={{ border: "1px solid black" }}>
+                        <td colSpan={14} style={{ border: "1px solid black" }}>
                           <input
                             type="text"
                             value={item.course_description || ""}
@@ -1710,8 +1779,9 @@ const CertificateOfRegistration = forwardRef(
                               width: "98%",
                               border: "none",
                               background: "none",
-                              textAlign: "center",
-                              fontSize: "8px",
+                              textAlign: "left",
+                              fontSize: "11px",
+                              paddingLeft: "4px",
                             }}
                           />
                         </td>
@@ -1834,7 +1904,7 @@ const CertificateOfRegistration = forwardRef(
                             }}
                           />
                         </td>
-                        <td colSpan={8} style={{ border: "1px solid black" }}>
+                        <td colSpan={7} style={{ border: "1px solid black" }}>
                           <input
                             type="text"
                             value={`${item.day_description} ${item.school_time_start}-${item.school_time_end}`}
@@ -1844,11 +1914,11 @@ const CertificateOfRegistration = forwardRef(
                               border: "none",
                               background: "none",
                               textAlign: "center",
-                              fontSize: "8px",
+                              fontSize: "10px",
                             }}
                           />
                         </td>
-                        <td colSpan={8} style={{ border: "1px solid black" }}>
+                        <td colSpan={6} style={{ border: "1px solid black" }}>
                           <input
                             type="text"
                             value={`Prof. ${item.lname}`}
@@ -1858,7 +1928,7 @@ const CertificateOfRegistration = forwardRef(
                               border: "none",
                               background: "none",
                               textAlign: "center",
-                              fontSize: "8px",
+                              fontSize: "10px",
                             }}
                           />
                         </td>
@@ -1869,7 +1939,7 @@ const CertificateOfRegistration = forwardRef(
 
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={12}
                         style={{
                           height: "0.1in",
                           fontSize: "45%",
@@ -1880,7 +1950,7 @@ const CertificateOfRegistration = forwardRef(
                         <b>Note: Subject marked with "*" is Special Subject</b>
                       </td>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         style={{
                           fontSize: "50%",
                           color: "black",
@@ -1959,7 +2029,7 @@ const CertificateOfRegistration = forwardRef(
                       </td>
 
                       <td
-                        colSpan={2}
+                        colSpan={4}
                         style={{
                           height: "0.1in",
                           fontSize: "55%",
@@ -1968,7 +2038,16 @@ const CertificateOfRegistration = forwardRef(
                         }}
                       ></td>
                       <td
-                        colSpan={3}
+                        colSpan={7}
+                        style={{
+                          height: "0.1in",
+                          fontSize: "55%",
+                          color: "black",
+                          textAlign: "center",
+                        }}
+                      ></td>
+                      <td
+                        colSpan={6}
                         style={{
                           height: "0.1in",
                           fontSize: "55%",
@@ -1996,14 +2075,14 @@ const CertificateOfRegistration = forwardRef(
                   className="fee-table-con"
                   style={{
                     display: "flex",
-                    width: "8in",
+                    width: "100%",
                     margin: "0 auto",
                     alignItems: "flex-start",
                     borderLeft: "1px solid black",
                     borderRight: "1px solid black",
                   }}
                 >
-                  <div style={{ width: "50%", marginLeft: "9px" }}>
+                  <div style={{ width: "50%", paddingLeft: "4px", boxSizing: "border-box" }}>
                     <table
                       className="fee-table"
                       style={{
@@ -3717,7 +3796,7 @@ const CertificateOfRegistration = forwardRef(
                   style={{
                     borderCollapse: "collapse",
                     fontFamily: "Arial",
-                    width: "8in",
+                    width: "100%",
                     margin: "0 auto",
                     textAlign: "center",
                     tableLayout: "fixed",

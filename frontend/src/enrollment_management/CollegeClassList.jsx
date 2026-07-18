@@ -16,23 +16,14 @@ import {
   InputLabel,
   TableBody,
   Button,
-  Card,
   Tooltip,
 } from '@mui/material';
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import GradeIcon from "@mui/icons-material/Grade";
-import SchoolIcon from "@mui/icons-material/School";
-import { useNavigate } from "react-router-dom";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import PersonIcon from "@mui/icons-material/Person";
+import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 import {
   getDepartmentIdsFromAdminData,
   isRegistrarCurriculumMatch,
@@ -91,24 +82,11 @@ const ClassRoster = () => {
   const [loading, setLoading] = useState(false);
   const pageId = 152;
 
-  const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(5);
-
   const remarksMap = { 0: "Ongoing", 1: "Passed", 2: "Failed", 3: "Incomplete", 4: "Drop" };
   const getStudentRegularStatus = (student) =>
     Number(student.official_is_regular ?? student.is_regular ?? student.status);
   const getStudentRegularLabel = (student) =>
     getStudentRegularStatus(student) === 1 ? "Regular" : "Irregular";
-
-  const tabs = [
-    { label: "Student List", to: "/college_student_list", icon: <SchoolIcon fontSize="large" /> },
-    { label: "Student Profile", to: "/student_college_personal_information", icon: <PersonIcon fontSize="large" /> },
-    { label: "Student Online Requirements", to: "/student_online_requirements_college", icon: <AssignmentIcon fontSize="large" /> },
-    { label: "Course Tagging", to: "/college_course_tagging", icon: <UploadFileIcon fontSize="large" /> },
-    { label: "Search COR", to: "/college_search_certification_of_registration", icon: <MenuBookIcon fontSize="large" /> },
-    { label: "Class List", to: "/college_class_list", icon: <PersonSearchIcon fontSize="large" /> },
-
-  ];
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 1 & 2 — Auth + access check
@@ -353,11 +331,6 @@ const ClassRoster = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   // Handlers
   // ─────────────────────────────────────────────────────────────────────────────
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    navigate(to);
-  };
-
   const handleSchoolYearChange = e => { setSelectedSchoolYear(e.target.value); setCurrentPage(1); };
   const handleSchoolSemesterChange = e => { setSelectedSchoolSemester(e.target.value); setCurrentPage(1); };
 
@@ -547,63 +520,7 @@ const ClassRoster = () => {
 
       <br />
       <br />
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
-
+      <CollegeEnrollmentTabs />
       <br />
       <br />
 

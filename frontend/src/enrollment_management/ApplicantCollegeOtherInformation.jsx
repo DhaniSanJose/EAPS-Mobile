@@ -16,9 +16,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from "framer-motion";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import ScheduleIcon from "@mui/icons-material/Schedule";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import PeopleIcon from "@mui/icons-material/People";
 import ExamPermit from "../applicant/ExamPermit";
@@ -27,7 +25,6 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ScoreIcon from '@mui/icons-material/Score';
 import SearchIcon from '@mui/icons-material/Search';
 
 import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
@@ -36,6 +33,7 @@ import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
+import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
 const RegistrarDashboard5 = () => {
     useAuditMac();
@@ -80,43 +78,6 @@ const RegistrarDashboard5 = () => {
     }, [settings]);
 
 
-    const stepsData = [
-        {
-            label: "Applicant List",
-            to: "/applicant_list_college",
-            icon: <SchoolIcon fontSize="large" />,
-        },
-        {
-            label: "Applicant Profile",
-            to: "/applicant_college_personal_information",
-            icon: <PersonIcon fontSize="large" />,
-        },
-        {
-            label: "Applicant Online Requirements",
-            to: "/applicant_online_requirements_college",
-            icon: <AssignmentIcon fontSize="large" />,
-        },
-        {
-            label: "Entrance Examination Score",
-            to: "/college_entrance_examination_score",
-            icon: <ScoreIcon fontSize="large" />,
-        },
-        {
-            label: "Qualifying / Interview Schedule Management",
-            to: "/college_qualifying_interview_schedule_management",
-            icon: <ScheduleIcon fontSize="large" />,
-        },
-        {
-            label: "Qualifying / Interview Exam Score",
-            to: "/college_qualifying_interview_score",
-            icon: <ScoreIcon fontSize="large" />,
-        },
-
-    ];
-
-    const [currentStep, setCurrentStep] = useState(1);
-    const [visitedSteps, setVisitedSteps] = useState(Array(stepsData.length).fill(false));
-
     const fetchByPersonId = async (personID) => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
@@ -128,18 +89,6 @@ const RegistrarDashboard5 = () => {
             console.error("❌ person_with_applicant failed:", err);
         }
     };
-
-    const handleNavigateStep = (index, to) => {
-        setCurrentStep(index);
-
-        const pid = sessionStorage.getItem("admin_edit_person_id");
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else {
-            navigate(to);
-        }
-    };
-
 
     const navigate = useNavigate();
     const [explicitSelection, setExplicitSelection] = useState(false);
@@ -789,79 +738,10 @@ const RegistrarDashboard5 = () => {
                 </Typography>
             </Box>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+
             <br />
-
-
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // prevent wrapping
-                    width: "100%",
-                    mt: 3,
-
-                }}
-            >
-                {stepsData.map((step, index) => (
-                    <React.Fragment key={index}>
-                        {/* Step Card */}
-                        <Card
-                            onClick={() => handleNavigateStep(index, step.to)}
-                            sx={{
-                                flex: `1 1 ${100 / stepsData.length}%`, // evenly divide width
-                                height: 140,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                borderRadius: 2,
-                                border: `1px solid ${borderColor}`,
-                                backgroundColor: currentStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
-                                color: currentStep === index ? "#fff" : "#000",
-                                boxShadow:
-                                    currentStep === index
-                                        ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                        : "0px 2px 6px rgba(0,0,0,0.15)",
-                                transition: "0.3s ease",
-                                "&:hover": {
-                                    backgroundColor: currentStep === index ? "#000" : "#f5d98f",
-                                },
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                }}
-                            >
-                                <Box sx={{ fontSize: 40, mb: 1 }}>{step.icon}</Box>
-                                <Typography
-                                    sx={{
-                                        fontSize: 14,
-                                        fontWeight: "bold",
-                                        textAlign: "center",
-                                    }}
-                                >
-                                    {step.label}
-                                </Typography>
-                            </Box>
-                        </Card>
-
-                        {/* Spacer (line gap between steps) */}
-                        {index < stepsData.length - 1 && (
-                            <Box
-                                sx={{
-
-                                    mx: 1, // spacing between cards
-                                }}
-                            />
-                        )}
-                    </React.Fragment>
-                ))}
-            </Box>
-
-
+            <br />
+            <CollegeApplicantProcessTabs />
             <br />
             <br />
 

@@ -986,12 +986,46 @@ router.get("/active_school_year", async (req, res) => {
   }
 });
 
+router.get("/active_school_year_by_id/:id", async (req, res) => {
+  try {
+    const query = `
+      SELECT
+        asyt.id,
+        asyt.id AS school_year_id,
+        asyt.year_id,
+        asyt.semester_id,
+        asyt.astatus,
+        yt.year_description,
+        yt.year_description AS current_year,
+        yt.year_description + 1 AS next_year,
+        st.semester_description
+      FROM active_school_year_table AS asyt
+      INNER JOIN year_table AS yt ON asyt.year_id = yt.year_id
+      INNER JOIN semester_table AS st ON asyt.semester_id = st.semester_id
+      WHERE asyt.id = ?
+      LIMIT 1
+    `;
+    const [result] = await db3.query(query, [req.params.id]);
+    res.json(result);
+  } catch (err) {
+    console.error("Server Error: ", err);
+    res.status(500).send({ message: "Internal Error", err });
+  }
+});
+
 router.get("/get_selecterd_year/:selectedSchoolYear/:selectedSchoolSemester", async (req, res) => {
     const { selectedSchoolYear, selectedSchoolSemester } = req.params;
     try {
       const query = `
     SELECT
-    asyt.id AS school_year_id
+    asyt.id AS school_year_id,
+    asyt.id,
+    asyt.year_id,
+    asyt.semester_id,
+    yt.year_description,
+    yt.year_description AS current_year,
+    yt.year_description + 1 AS next_year,
+    st.semester_description
   FROM active_school_year_table AS asyt
     INNER JOIN year_table AS yt ON asyt.year_id = yt.year_id
     INNER JOIN semester_table AS st ON asyt.semester_id = st.semester_id

@@ -29,22 +29,17 @@ import { Snackbar, Alert } from "@mui/material";
 import { FaFileExcel } from "react-icons/fa";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import SchoolIcon from "@mui/icons-material/School";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import API_BASE_URL from "../apiConfig";
-import { useLocation, useNavigate } from "react-router-dom";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
+import { useLocation } from "react-router-dom";
 import {
   getDepartmentIdsFromAdminData,
   resolveStudentRegistrarScope,
   syncRegistrarScopeFromAdminData,
   getScopedDepartmentIds 
 } from "../utils/registrarCurriculumRestriction";
-import PersonIcon from "@mui/icons-material/Person";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 import { postAuditEvent, getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import {
@@ -339,62 +334,7 @@ const CourseTaggingForCollege = () => {
     }
   };
 
-  const tabs = [
-    {
-      label: "Student List",
-      to: "/college_student_list",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Student Profile",
-      to: "/student_college_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Student Online Requirements",
-      to: "/student_online_requirements_college",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Course Tagging",
-      to: "/college_course_tagging",
-      icon: <UploadFileIcon fontSize="large" />,
-    },
-    {
-      label: "Search COR",
-      to: "/college_search_certification_of_registration",
-      icon: <MenuBookIcon fontSize="large" />,
-    },
-    {
-      label: "Class List",
-      to: "/college_class_list",
-      icon: <PersonSearchIcon fontSize="large" />,
-    },
-  ];
-
-  const navigate = useNavigate();
   const location = useLocation();
-  const [activeStep, setActiveStep] = useState(3);
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid =
-      personID ||
-      sessionStorage.getItem("edit_person_id") ||
-      sessionStorage.getItem("admin_edit_person_id");
-    const sn = studentNumber || sessionStorage.getItem("edit_student_number");
-
-    if (pid) {
-      sessionStorage.setItem("edit_person_id", String(pid));
-      if (sn) sessionStorage.setItem("edit_student_number", String(sn));
-      navigate(`${to}?person_id=${pid}`);
-    } else if (sn) {
-      sessionStorage.setItem("edit_student_number", String(sn));
-      navigate(`${to}?student_number=${sn}`);
-    } else {
-      navigate(to); // no id → open without query
-    }
-  };
 
   useEffect(() => {
     const updateDate = () => {
@@ -1871,63 +1811,7 @@ const CourseTaggingForCollege = () => {
 
       <br />
       <br />
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
-
+      <CollegeEnrollmentTabs />
       <br />
       <br />
 

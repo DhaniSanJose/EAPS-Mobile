@@ -218,9 +218,40 @@ const ProgramSlotLimit = () => {
     fetchDepartments();
   }, []);
 
-  // NOTE: Auto-selecting the first department on load was removed on purpose.
-  // The registrar must explicitly choose a department before any program data
-  // is fetched or displayed (see gating in the render section below).
+  // Default the department dropdown to the first available item (no "All Departments").
+  // Re-select the first item when the branch filter changes and the current
+  // selection is no longer in the filtered list.
+  useEffect(() => {
+    const available = department.filter(
+      (dep) =>
+        (dep.is_allowed === undefined || Number(dep.is_allowed) !== 0) &&
+        (!selectedBranch ||
+          dep.components === undefined ||
+          dep.components === null ||
+          Number(dep.components) === Number(selectedBranch)),
+    );
+
+    if (available.length === 0) {
+      if (selectedDepartmentFilter) {
+        setSelectedDepartmentFilter("");
+        setSelectedProgram("");
+        setPrograms([]);
+      }
+      return;
+    }
+
+    const stillValid = available.some(
+      (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+    );
+
+    if (!stillValid) {
+      const firstId = available[0].dprtmnt_id;
+      setSelectedDepartmentFilter(firstId);
+      setSelectedProgram("");
+      setPrograms([]);
+      fetchPrograms(firstId);
+    }
+  }, [department, selectedBranch, selectedDepartmentFilter]);
 
   useEffect(() => {
     // programs is already scoped to the selected department (see fetchPrograms),
@@ -448,7 +479,7 @@ const ProgramSlotLimit = () => {
             : item,
         ),
       );
-      showSnack("Failed to update e_status. Please try again.", "error");
+      showSnack("Failed to update status. Please try again.", "error");
     }
   };
 
@@ -531,8 +562,6 @@ const ProgramSlotLimit = () => {
   };
 
   // Fires whenever the registrar picks a department from the dropdown.
-  // This is now the ONLY place programs get fetched for a department —
-  // nothing auto-selects on mount anymore.
   const handleCollegeChange = (e) => {
     const selectedId = e.target.value;
     setSelectedDepartmentFilter(selectedId);
@@ -751,18 +780,19 @@ const ProgramSlotLimit = () => {
             </Select>
           </FormControl>
 
-          {/* Department dropdown now uses the FULL department list and defaults
-              to nothing selected — the registrar must explicitly pick one. */}
           <FormControl fullWidth>
             <Select
-              value={selectedDepartmentFilter}
+              value={
+                availableDepartments.some(
+                  (dep) =>
+                    String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+                )
+                  ? selectedDepartmentFilter
+                  : availableDepartments[0]?.dprtmnt_id ?? ""
+              }
               onChange={handleCollegeChange}
-              displayEmpty
               MenuProps={{ PaperProps: { sx: { marginTop: "8px" } } }}
             >
-              <MenuItem value="">
-                All Departments
-              </MenuItem>
               {availableDepartments.map((dep) => (
                 <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_id}>
                   {dep.dprtmnt_name}
@@ -1127,7 +1157,7 @@ const ProgramSlotLimit = () => {
                       }}
                     >
                       <Typography fontSize={13}>
-                        <strong>e_status</strong>
+                        <strong>Status</strong>
                       </Typography>
                       <FormControlLabel
                         sx={{ mr: 0 }}
@@ -1143,7 +1173,7 @@ const ProgramSlotLimit = () => {
                         }
                         label={
                           <Typography fontSize={12}>
-                            {Number(row.e_status) === 1 ? "ON (Hidden)" : "OFF"}
+                            {Number(row.e_status) === 1 ? "Inactive" : "Active"}
                           </Typography>
                         }
                         labelPlacement="start"

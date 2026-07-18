@@ -136,9 +136,106 @@ const updateJob = (job, patch) => {
   Object.assign(job, patch, { updated_at: new Date().toISOString() });
 };
 
+const COR_EXPORT_CONCURRENCY = Math.max(
+  1,
+  Math.min(4, Number(process.env.COR_EXPORT_CONCURRENCY || 2)),
+);
+
+const waitForCorReady = async (page, studentNumber, timeoutMs = 45000) => {
+  await page.waitForFunction(
+    (expectedStudentNumber) => {
+      if (window.__COR_READY !== true) return false;
+      if (window.__COR_ENROLLED_READY !== true) return false;
+
+      const root = document.getElementById("server-cor-export");
+      if (!root) return false;
+
+      const filledValues = Array.from(
+        root.querySelectorAll("input, textarea, select"),
+      )
+        .map((element) =>
+          String(element.value || element.getAttribute("value") || "").trim(),
+        )
+        .filter(Boolean);
+
+      return (
+        filledValues.includes(String(expectedStudentNumber)) ||
+        filledValues.length >= 4
+      );
+    },
+    { timeout: timeoutMs, polling: 100 },
+    studentNumber,
+  );
+};
+
+const renderCorPdf = async (page, job, student, { bootstrap }) => {
+  const studentNumber = student.student_number;
+  const payload = {
+    student_number: studentNumber,
+    person_id: student.person_id || "",
+    preload: student.preload || null,
+  };
+
+  if (bootstrap) {
+    const url = new URL("/cor_export_render", job.frontend_origin);
+    url.searchParams.set("job_id", job.id);
+    url.searchParams.set("fast", "1");
+    await page.goto(url.toString(), {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+    await page.waitForFunction(
+      () =>
+        typeof window.__loadCorForExport === "function" &&
+        window.__COR_EXPORT_BOOTSTRAPPED === true,
+      { timeout: 30000, polling: 50 },
+    );
+  }
+
+  await page.evaluate(async (nextPayload) => {
+    window.__COR_READY = false;
+    window.__COR_FIT_COMPLETE = false;
+    window.__COR_FITS_A4 = false;
+    window.__COR_ENROLLED_READY = false;
+    await window.__loadCorForExport(nextPayload);
+  }, payload);
+
+  await waitForCorReady(page, studentNumber);
+
+  // Brief paint settle; avoid heavy post-fit measuring loops.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+
+  if (bootstrap) {
+    await page.addStyleTag({
+      content:
+        "@page { size: A4; margin: 0; } html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }",
+    });
+  }
+
+  const pdf = await page.pdf({
+    width: "210mm",
+    height: "297mm",
+    printBackground: true,
+    displayHeaderFooter: false,
+    preferCSSPageSize: true,
+    margin: { top: "0mm", right: "0mm", bottom: "0mm", left: "0mm" },
+  });
+
+  return {
+    name: `${sanitizeFileName(studentNumber)}_Certificate_Of_Registration.pdf`,
+    data: Buffer.from(pdf),
+  };
+};
+
 const runCorExportJob = async (job) => {
   let browser;
-  const files = [];
+  const files = new Array(job.students.length);
+  let completed = 0;
 
   try {
     updateJob(job, { status: "running", message: "Launching browser..." });
@@ -146,155 +243,48 @@ const runCorExportJob = async (job) => {
     browser = await puppeteer.launch({
       headless: "new",
       ...(executablePath ? { executablePath } : {}),
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
     });
 
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 1 });
+    const workerCount = Math.min(COR_EXPORT_CONCURRENCY, job.students.length);
+    const workers = Array.from({ length: workerCount }, async (_, workerIndex) => {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 1 });
+      let bootstrapped = false;
 
-    for (let i = 0; i < job.students.length; i += 1) {
-      const student = job.students[i];
-      const studentNumber = student.student_number;
-      updateJob(job, {
-        current: i,
-        progress: Math.round((i / job.total) * 100),
-        message: `Rendering COR ${i + 1}/${job.total}: ${studentNumber}`,
-      });
+      for (let i = workerIndex; i < job.students.length; i += workerCount) {
+        const student = job.students[i];
+        updateJob(job, {
+          current: completed,
+          progress: Math.round((completed / job.total) * 95),
+          message: `Rendering COR ${completed + 1}/${job.total}: ${student.student_number}`,
+        });
 
-      const url = new URL("/cor_export_render", job.frontend_origin);
-      url.searchParams.set("student_number", studentNumber);
-      url.searchParams.set("job_id", job.id);
-      if (student.person_id) url.searchParams.set("person_id", student.person_id);
+        files[i] = await renderCorPdf(page, job, student, {
+          bootstrap: !bootstrapped,
+        });
+        bootstrapped = true;
 
-      await page.goto(url.toString(), {
-        waitUntil: "networkidle0",
-        timeout: 90000,
-      });
-      await page.waitForFunction(
-        (expectedStudentNumber) => {
-          const root = document.getElementById("server-cor-export");
-          if (!root) return false;
+        completed += 1;
+        updateJob(job, {
+          current: completed,
+          progress: Math.round((completed / job.total) * 95),
+          message: `Generated ${completed}/${job.total}`,
+        });
+      }
 
-          const filledInputs = Array.from(
-            root.querySelectorAll("input, textarea, select"),
-          ).filter((element) =>
-            String(element.value || element.getAttribute("value") || "").trim(),
-          );
-          const filledValues = filledInputs.map((element) =>
-            String(element.value || element.getAttribute("value") || "").trim(),
-          );
-          const hasStudentNumber = filledValues.some(
-            (value) => value === expectedStudentNumber,
-          );
+      await page.close().catch(() => {});
+    });
 
-          return (
-            window.__COR_READY === true &&
-            window.__COR_FIT_COMPLETE === true &&
-            window.__COR_FITS_A4 === true &&
-            (hasStudentNumber || filledInputs.length >= 5)
-          );
-        },
-        { timeout: 90000 },
-        studentNumber,
-      );
-      await page.evaluate(() => {
-        const pageRoot = document.getElementById("server-cor-export");
-        const content = pageRoot?.firstElementChild?.tagName === "STYLE"
-          ? pageRoot.children[1]
-          : pageRoot?.firstElementChild;
-        if (!pageRoot || !content) return;
-
-        const getScale = () => {
-          const transform = window.getComputedStyle(content).transform;
-          if (!transform || transform === "none") return 1;
-          const match = transform.match(/matrix\(([^,]+)/);
-          return match ? Number(match[1]) || 1 : 1;
-        };
-
-        const pageRect = pageRoot.getBoundingClientRect();
-        const allRects = Array.from(content.querySelectorAll("*")).map((node) =>
-          node.getBoundingClientRect(),
-        );
-        const minLeft = Math.min(...allRects.map((rect) => rect.left));
-        const maxRight = Math.max(...allRects.map((rect) => rect.right));
-        const minTop = Math.min(...allRects.map((rect) => rect.top));
-        const maxBottom = Math.max(...allRects.map((rect) => rect.bottom));
-        const overflowX = Math.max(1, maxRight - minLeft);
-        const overflowY = Math.max(1, maxBottom - minTop);
-        const currentScale = getScale();
-        const correction = Math.min(
-          1,
-          (pageRect.width - 12) / overflowX,
-          (pageRect.height - 18) / overflowY,
-        );
-
-        if (correction < 1) {
-          const nextScale = Math.max(0.1, currentScale * correction);
-          content.style.transform = `scale(${nextScale})`;
-          window.__COR_SCALE = nextScale;
-        }
-
-        const finalRects = Array.from(content.querySelectorAll("*")).map((node) =>
-          node.getBoundingClientRect(),
-        );
-        const finalMinLeft = Math.min(...finalRects.map((rect) => rect.left));
-        const finalMaxRight = Math.max(...finalRects.map((rect) => rect.right));
-        const finalMinTop = Math.min(...finalRects.map((rect) => rect.top));
-        const finalMaxBottom = Math.max(...finalRects.map((rect) => rect.bottom));
-        const visualWidth = finalMaxRight - finalMinLeft;
-        const visualHeight = finalMaxBottom - finalMinTop;
-        const currentLeft = Number.parseFloat(content.style.left || "0") || 0;
-        const currentTop = Number.parseFloat(content.style.top || "0") || 0;
-
-        content.style.left = `${currentLeft + (pageRect.left + (pageRect.width - visualWidth) / 2 - finalMinLeft)}px`;
-        content.style.top = `${currentTop + (pageRect.top + (pageRect.height - visualHeight) / 2 - finalMinTop)}px`;
-      });
-      await page.waitForFunction(
-        () => {
-          const pageRoot = document.getElementById("server-cor-export");
-          const content = pageRoot?.firstElementChild?.tagName === "STYLE"
-            ? pageRoot.children[1]
-            : pageRoot?.firstElementChild;
-          if (!pageRoot || !content) return false;
-
-          const pageRect = pageRoot.getBoundingClientRect();
-          const allRects = Array.from(content.querySelectorAll("*")).map((node) =>
-            node.getBoundingClientRect(),
-          );
-          const maxBottom = Math.max(...allRects.map((rect) => rect.bottom));
-
-          return maxBottom <= pageRect.bottom - 2;
-        },
-        { timeout: 5000 },
-      );
-      await page.addStyleTag({
-        content:
-          "@page { size: A4; margin: 0; } html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }",
-      });
-
-      const pdf = await page.pdf({
-        width: "210mm",
-        height: "297mm",
-        printBackground: true,
-        displayHeaderFooter: false,
-        preferCSSPageSize: true,
-        margin: { top: "0mm", right: "0mm", bottom: "0mm", left: "0mm" },
-      });
-
-      files.push({
-        name: `${sanitizeFileName(studentNumber)}_Certificate_Of_Registration.pdf`,
-        data: Buffer.from(pdf),
-      });
-
-      updateJob(job, {
-        current: i + 1,
-        progress: Math.round(((i + 1) / job.total) * 95),
-        message: `Generated ${i + 1}/${job.total}`,
-      });
-    }
+    await Promise.all(workers);
 
     updateJob(job, { message: "Creating ZIP file...", progress: 98 });
-    const zip = createZipBuffer(files);
+    const zip = createZipBuffer(files.filter(Boolean));
     fs.writeFileSync(job.file_path, zip);
     updateJob(job, {
       status: "done",

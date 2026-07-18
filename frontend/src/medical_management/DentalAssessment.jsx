@@ -22,21 +22,13 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate, useLocation } from "react-router-dom";
 import SaveIcon from '@mui/icons-material/Save';
-import SchoolIcon from '@mui/icons-material/School';
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonIcon from "@mui/icons-material/Person";
-import DescriptionIcon from "@mui/icons-material/Description";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import HowToRegIcon from '@mui/icons-material/HowToReg';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { motion } from "framer-motion";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import MedicalProcessTabs from "../components/MedicalProcessTabs";
 import API_BASE_URL from "../apiConfig";
 import { Snackbar, Alert } from "@mui/material";
-import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
@@ -245,18 +237,6 @@ const DentalAssessment = () => {
 
 
     const navigate = useNavigate();
-    const [activeStep, setActiveStep] = useState(4);
-
-    const tabs = [
-        { label: "Student List", to: "/medical_student_list", icon: <SchoolIcon fontSize="large" /> },
-        { label: "Student Profile", to: "/medical_personal_information", icon: <PersonIcon fontSize="large" /> },
-        { label: "Student Online Requirements", to: "/medical_online_requirements", icon: <AssignmentIcon fontSize="large" /> }, // updated icon
-        { label: "Medical History", to: "/medical_requirements_form", icon: <HealthAndSafetyIcon fontSize="large" /> },
-        { label: "Dental Assessment", to: "/dental_assessment", icon: <DescriptionIcon fontSize="large" /> },
-        { label: "Physical and Neurological Examination", to: "/physical_neuro_exam", icon: <PsychologyIcon fontSize="large" /> },
-    ];
-
-
 
     const handleCheckbox = (e) => {
         const { name, checked } = e.target;
@@ -537,30 +517,6 @@ const DentalAssessment = () => {
         */
     }, [location.search]);
 
-    const handleStepClick = (index, to) => {
-        setActiveStep(index);
-        const params = new URLSearchParams(location.search);
-        const pid =
-            params.get("person_id") ||
-            sessionStorage.getItem("edit_person_id") ||
-            sessionStorage.getItem("admin_edit_person_id");
-        const sn =
-            params.get("student_number") ||
-            sessionStorage.getItem("edit_student_number") ||
-            studentNumber;
-
-        if (pid) {
-            sessionStorage.setItem("edit_person_id", String(pid));
-            if (sn) sessionStorage.setItem("edit_student_number", String(sn));
-            navigate(`${to}?person_id=${pid}`);
-        } else if (sn) {
-            sessionStorage.setItem("edit_student_number", String(sn));
-            navigate(`${to}?student_number=${sn}`);
-        } else {
-            navigate(to); // no id → open without query
-        }
-    };
-
     useEffect(() => {
         const storedId = sessionStorage.getItem("edit_student_number");
 
@@ -782,61 +738,7 @@ const DentalAssessment = () => {
             <br />
             <br />
 
-            <Box
-                sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap", // ❌ prevent wrapping
-                    width: "100%",
-
-                    gap: 2,
-                }}
-            >
-                {tabs.map((tab, index) => (
-                    <Card
-                        key={index}
-                        onClick={() => handleStepClick(index, tab.to)}
-                        sx={{
-                            flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-                            height: 135,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            borderRadius: 2,
-                            border: `1px solid ${borderColor}`,
-                            backgroundColor:
-                                activeStep === index
-                                    ? settings?.header_color || "#1976d2"
-                                    : "#E8C999",
-                            color: activeStep === index ? "#fff" : "#000",
-                            boxShadow:
-                                activeStep === index
-                                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                            transition: "0.3s ease",
-                            "&:hover": {
-                                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-                            },
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                            }}
-                        >
-                            <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-                            <Typography
-                                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                            >
-                                {tab.label}
-                            </Typography>
-                        </Box>
-                    </Card>
-                ))}
-            </Box>
+            <MedicalProcessTabs />
 
             <br />
             <br />

@@ -380,6 +380,28 @@ const ProgramEvaluationForRegistrar = () => {
     return Number.isFinite(value) ? Math.round(value) : 0;
   };
 
+  const formatStudentName = (data = {}) => {
+    const lastName = (data.last_name ?? "").toString().trim();
+    const firstName = (data.first_name ?? "").toString().trim();
+    const middleName = (data.middle_name ?? "").toString().trim();
+    const givenNames = [firstName, middleName].filter(Boolean).join(" ");
+
+    if (!lastName && !givenNames) return "";
+    if (!lastName) return givenNames;
+    if (!givenNames) return lastName;
+    return `${lastName}, ${givenNames}`;
+  };
+
+  const formatCurriculumLabel = (data = {}) => {
+    const parts = [
+      (data.program_code ?? "").toString().trim(),
+      (data.year_description ?? "").toString().trim(),
+    ].filter(Boolean);
+
+    if (!parts.length) return "";
+    return `${parts.join(" ")} RP (ORIGINAL)`;
+  };
+
   const totalLec = (course_unit) => toWholeUnit(course_unit);
   const totalLab = (lab_unit) => toWholeUnit(lab_unit);
 
@@ -391,6 +413,125 @@ const ProgramEvaluationForRegistrar = () => {
       groupedDetails[key].push(item);
     });
   }
+
+  const getSemesterBucket = (semesterDescription = "") => {
+    const value = semesterDescription.toLowerCase();
+    if (value.includes("second")) return "second";
+    if (value.includes("summer") || value.includes("mid")) return "summer";
+    if (value.includes("first")) return "first";
+    return "other";
+  };
+
+  const printSemesterGroups = Object.entries(groupedDetails)
+    .map(([key, courses]) => ({
+      key,
+      courses,
+      bucket: getSemesterBucket(courses[0]?.semester_description),
+      yearOrder: parseInt(String(courses[0]?.section || "")[0], 10) || 99,
+    }))
+    .sort((a, b) => a.yearOrder - b.yearOrder || a.key.localeCompare(b.key));
+
+  const printLeftGroups = printSemesterGroups.filter((group) => group.bucket === "first" || group.bucket === "other");
+  const printRightGroups = printSemesterGroups.filter((group) => group.bucket === "second");
+  const printSummerGroups = printSemesterGroups.filter((group) => group.bucket === "summer");
+
+  const renderPrintSemesterBlock = (group) => {
+    const { key, courses } = group;
+    return (
+      <Box
+        className="print-semester-block"
+        style={{
+          paddingLeft: "1rem",
+          marginBottom: "0.75rem",
+          boxSizing: "border-box",
+          width: "100%",
+          height: "fit-content",
+        }}
+        key={key}
+      >
+        <table style={{ height: "auto" }}>
+          <thead>
+            <tr>
+              <td style={{ textAlign: "center" }}>{getLevelBySection(courses[0].section)} - {courses[0].semester_description}</td>
+            </tr>
+            <tr style={{ display: "flex", borderBottom: "solid 1px rgba(0,0,0,0.1)" }}>
+              <td style={{ fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", width: "6rem" }}>
+                <span>GRADE</span>
+              </td>
+              <td style={{ fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", width: "28rem" }}>
+                <span>COURSE CODE / TITLE</span>
+              </td>
+              <td>
+                <div style={{ margin: "-1px", fontWeight: "700", textAlign: "center", width: "5rem" }}>UNIT</div>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <div style={{ fontWeight: "700", fontSize: "0.9rem", textAlign: "center", width: "50%" }}>
+                    <span>LEC</span>
+                  </div>
+                  <div style={{ textAlign: "center", fontWeight: "700", fontSize: "0.9rem", width: "50%" }}>
+                    <span>LAB</span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            {courses.map((p) => {
+              const rawGrade = gradeEdits[p.course_id] ?? p.final_grade ?? "";
+              const printableGrade = handleGradeConversion(rawGrade);
+
+              return (
+                <tr style={{ display: "flex", borderBottom: "solid 1px rgba(0,0,0,0.1)" }} key={p.enrolled_id}>
+                  <td style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "6rem" }}>
+                    <span>{printableGrade}</span>
+                  </td>
+                  <td className="print-course-cell" style={{ display: "flex", width: "28rem", alignItems: "flex-start", minWidth: 0 }}>
+                    <span className="print-course-code" style={{ width: "100px", flexShrink: 0 }}>{p.course_code}</span>
+                    <span
+                      className="print-course-title"
+                      style={{
+                        margin: "0",
+                        padding: "0",
+                        whiteSpace: "normal",
+                        overflowWrap: "break-word",
+                        wordBreak: "normal",
+                        lineHeight: 1.15,
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      {p.course_description}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
+                        <span>{toWholeUnit(p.course_unit)}</span>
+                      </div>
+                      <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
+                        <span>{toWholeUnit(p.lab_unit)}</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            <tr style={{ display: "flex", fontWeight: "700" }}>
+              <td style={{ width: "6rem" }}></td>
+              <td style={{ width: "28rem", textAlign: "right", paddingRight: "1rem" }}></td>
+              <td style={{ display: "flex", alignItems: "center" }}>
+                <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
+                  <span>{courses.reduce((sum, p) => sum + totalLec(p.course_unit), 0)}</span>
+                </div>
+                <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
+                  <span>{courses.reduce((sum, p) => sum + totalLab(p.lab_unit), 0)}</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </Box>
+    );
+  };
 
   const divToPrintRef = useRef();
   const printDiv = async () => { window.print(); };
@@ -593,6 +734,7 @@ const ProgramEvaluationForRegistrar = () => {
 
             .program-evaluation-print-layout tbody tr {
               border-bottom: solid 1px rgba(0,0,0,0.08) !important;
+              align-items: flex-start !important;
             }
 
             .program-evaluation-print-layout tbody td > div {
@@ -600,21 +742,27 @@ const ProgramEvaluationForRegistrar = () => {
             }
 
             .program-evaluation-print-layout .print-course-title {
-              display: flex !important;
-              align-items: center !important;
+              display: -webkit-box !important;
+              -webkit-box-orient: vertical !important;
+              -webkit-line-clamp: 2 !important;
+              align-items: flex-start !important;
               flex: 1 1 auto !important;
               min-width: 0 !important;
+              max-width: 100% !important;
               max-height: none !important;
               padding-top: 1px !important;
               padding-bottom: 1px !important;
-              white-space: nowrap !important;
-              text-overflow: ellipsis !important;
+              white-space: normal !important;
+              overflow-wrap: anywhere !important;
+              word-break: break-word !important;
+              line-height: 1.15 !important;
+              text-overflow: clip !important;
               overflow: hidden !important;
             }
 
             .program-evaluation-print-layout .print-course-code {
               display: flex !important;
-              align-items: center !important;
+              align-items: flex-start !important;
               flex: 0 0 6.4rem !important;
               width: 6.4rem !important;
               padding-top: 1px !important;
@@ -623,7 +771,7 @@ const ProgramEvaluationForRegistrar = () => {
             }
 
             .program-evaluation-print-layout .print-course-cell {
-              align-items: center !important;
+              align-items: flex-start !important;
               min-width: 0 !important;
             }
 
@@ -647,8 +795,43 @@ const ProgramEvaluationForRegistrar = () => {
               margin-bottom: 0 !important;
             }
 
-            .program-evaluation-print-layout .print-first-semester-block {
-              margin-top: 10px !important;
+            .program-evaluation-print-layout .print-semester-row {
+              display: flex !important;
+              flex-wrap: nowrap !important;
+              align-items: flex-start !important;
+              gap: 0.5rem !important;
+            }
+
+            .program-evaluation-print-layout .print-semester-column {
+              flex: 1 1 50% !important;
+              width: 50% !important;
+              max-width: 50% !important;
+              display: flex !important;
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 0.35rem !important;
+            }
+
+            .program-evaluation-print-layout .print-semester-block {
+              width: 100% !important;
+              align-self: flex-start !important;
+              height: fit-content !important;
+              max-height: none !important;
+              margin-bottom: 0.35rem !important;
+            }
+
+            .program-evaluation-print-layout .print-semester-block table {
+              height: auto !important;
+              width: auto !important;
+            }
+
+            .program-evaluation-print-layout .print-semester-block tbody {
+              height: auto !important;
+            }
+
+            .program-evaluation-print-layout .print-summer-row {
+              width: 100% !important;
+              margin-top: 0.35rem !important;
             }
 
             button { display: none !important; }
@@ -679,6 +862,7 @@ const ProgramEvaluationForRegistrar = () => {
             margin: "-1rem auto 2rem",
             maxWidth: "84rem",
             width: "100%",
+            overflowX: "auto",
           }}
           ref={divToPrintRef}
         >
@@ -757,7 +941,7 @@ const ProgramEvaluationForRegistrar = () => {
                   <Box style={{ display: "flex", width: "38rem" }}>
                     <Typography style={{ width: "9rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Student Name:</Typography>
                     <Typography style={{ fontSize: "1.06rem", fontWeight: "500" }}>
-                      {studentData.last_name}, {studentData.first_name} {studentData.middle_name}
+                      {formatStudentName(studentData)}
                     </Typography>
                   </Box>
                   <Box style={{ display: "flex" }}>
@@ -780,7 +964,7 @@ const ProgramEvaluationForRegistrar = () => {
                 <Box style={{ display: "flex" }}>
                   <Typography style={{ width: "9rem", marginTop: "0.7rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Curriculum:</Typography>
                   <Typography style={{ fontSize: "1.06rem", fontWeight: "500", marginTop: "0.7rem" }}>
-                    {studentData.program_code} {studentData.year_description} RP (ORIGINAL)
+                    {formatCurriculumLabel(studentData)}
                   </Typography>
                 </Box>
               </Box>
@@ -870,7 +1054,7 @@ const ProgramEvaluationForRegistrar = () => {
                               </td>
                               {/* Description */}
                               <td style={{ display: "flex", width: "28rem" }}>
-                                <span style={{ margin: "0", padding: "0" }}>{p.course_description}</span>
+                                <span style={{ margin: "0", padding: "0", whiteSpace: "normal", lineHeight: 1.25 }}>{p.course_description}</span>
                               </td>
                               {/* Pre-req */}
                               <td style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "10rem" }}>
@@ -1066,7 +1250,7 @@ const ProgramEvaluationForRegistrar = () => {
                 <Box style={{ display: "flex", width: "38rem" }}>
                   <Typography style={{ width: "9rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Student Name:</Typography>
                   <Typography style={{ fontSize: "1.06rem", fontWeight: "500" }}>
-                    {studentData.last_name}, {studentData.first_name} {studentData.middle_name}
+                    {formatStudentName(studentData)}
                   </Typography>
                 </Box>
                 <Box style={{ display: "flex" }}>
@@ -1089,87 +1273,24 @@ const ProgramEvaluationForRegistrar = () => {
               <Box style={{ display: "flex" }}>
                 <Typography style={{ width: "9rem", marginTop: "0.7rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Curriculum:</Typography>
                 <Typography style={{ fontSize: "1.06rem", fontWeight: "500", marginTop: "0.7rem" }}>
-                  {studentData.program_code} {studentData.year_description} RP (ORIGINAL)
+                  {formatCurriculumLabel(studentData)}
                 </Typography>
               </Box>
             </Box>
 
-            <Box style={{ display: "flex", flexWrap: "wrap" }}>
-              {Object.entries(groupedDetails).map(([key, courses], index) => (
-                <Box
-                  className={index < 2 ? "print-first-semester-block" : undefined}
-                  style={{ paddingLeft: "1rem", flex: "0 0 50%", marginBottom: "1rem", boxSizing: "border-box" }}
-                  key={key}
-                >
-                  <table>
-                    <thead>
-                      <tr>
-                        <td style={{ textAlign: "center" }}>{getLevelBySection(courses[0].section)} - {courses[0].semester_description}</td>
-                      </tr>
-                      <tr style={{ display: "flex", borderBottom: "solid 1px rgba(0,0,0,0.1)" }}>
-                        <td style={{ fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", width: "6rem" }}>
-                          <span>GRADE</span>
-                        </td>
-                        <td style={{ fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", width: "28rem" }}>
-                          <span>COURSE CODE / TITLE</span>
-                        </td>
-                        <td>
-                          <div style={{ margin: "-1px", fontWeight: "700", textAlign: "center", width: "5rem" }}>UNIT</div>
-                          <div style={{ display: "flex", alignItems: "center" }}>
-                            <div style={{ fontWeight: "700", fontSize: "0.9rem", textAlign: "center", width: "50%" }}>
-                              <span>LEC</span>
-                            </div>
-                            <div style={{ textAlign: "center", fontWeight: "700", fontSize: "0.9rem", width: "50%" }}>
-                              <span>LAB</span>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {courses.map((p) => {
-                        const rawGrade = gradeEdits[p.course_id] ?? p.final_grade ?? "";
-                        const printableGrade = handleGradeConversion(rawGrade);
-
-                        return (
-                          <tr style={{ display: "flex", borderBottom: "solid 1px rgba(0,0,0,0.1)" }} key={p.enrolled_id}>
-                            <td style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "6rem" }}>
-                              <span>{printableGrade}</span>
-                            </td>
-                            <td className="print-course-cell" style={{ display: "flex", width: "28rem" }}>
-                              <span className="print-course-code" style={{ width: "100px" }}>{p.course_code}</span>
-                              <span className="print-course-title" style={{ margin: "0", padding: "0" }}>{p.course_description}</span>
-                            </td>
-                            <td>
-                              <div style={{ display: "flex", alignItems: "center" }}>
-                                <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
-                                  <span>{toWholeUnit(p.course_unit)}</span>
-                                </div>
-                                <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
-                                  <span>{toWholeUnit(p.lab_unit)}</span>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      <tr style={{ display: "flex", fontWeight: "700" }}>
-                        <td style={{ width: "6rem" }}></td>
-                        <td style={{ width: "28rem", textAlign: "right", paddingRight: "1rem" }}></td>
-                        <td style={{ display: "flex", alignItems: "center" }}>
-                          <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
-                            <span>{courses.reduce((sum, p) => sum + totalLec(p.course_unit), 0)}</span>
-                          </div>
-                          <div style={{ fontSize: "0.9rem", width: "2.5rem", textAlign: "center" }}>
-                            <span>{courses.reduce((sum, p) => sum + totalLab(p.lab_unit), 0)}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </Box>
-              ))}
+            <Box className="print-semester-row" style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+              <Box className="print-semester-column" style={{ flex: "1 1 50%", width: "50%", display: "flex", flexDirection: "column" }}>
+                {printLeftGroups.map(renderPrintSemesterBlock)}
+              </Box>
+              <Box className="print-semester-column" style={{ flex: "1 1 50%", width: "50%", display: "flex", flexDirection: "column" }}>
+                {printRightGroups.map(renderPrintSemesterBlock)}
+              </Box>
             </Box>
+            {printSummerGroups.length > 0 && (
+              <Box className="print-summer-row" style={{ width: "100%" }}>
+                {printSummerGroups.map(renderPrintSemesterBlock)}
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>

@@ -23,7 +23,6 @@ import PersonIcon from "@mui/icons-material/Person";
 import SchoolIcon from "@mui/icons-material/School";
 import ExamPermit from "../applicant/ExamPermit";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
@@ -40,14 +39,13 @@ import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import ScoreIcon from '@mui/icons-material/Score';
 import DateField from "../components/DateField";
-import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import FormalExample from "../assets/formalexample.png";
 import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
+import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
 const AdminDashboard1 = () => {
   useAuditMac();
@@ -110,9 +108,6 @@ const AdminDashboard1 = () => {
 
 
 
-  const [currentStep, setCurrentStep] = useState(1);
-
-
   const navigate = useNavigate();
   const [explicitSelection, setExplicitSelection] = useState(false);
 
@@ -127,55 +122,6 @@ const AdminDashboard1 = () => {
       console.error("❌ person_with_applicant failed:", err);
     }
   };
-
-
-  const handleNavigateStep = (index, to) => {
-    setCurrentStep(index);
-
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-    if (pid) {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
-
-
-  const tabs = [
-    {
-      label: "Applicant List",
-      to: "/applicant_list_registrar",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Profile",
-      to: "/applicant_registrar_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Online Requirements",
-      to: "/applicant_online_requirements_college",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Examination Score",
-      to: "/registrar_entrance_examination_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-
-    {
-      label: "Qualifying / Interview Exam Score",
-      to: "/registrar_qualifying_interview_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-
-    {
-      label: "Student Numbering Panel",
-      to: "/student_numbering",
-      icon: <FormatListNumberedIcon fontSize="large" />,
-    },
-
-  ];
 
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
@@ -539,45 +485,6 @@ const AdminDashboard1 = () => {
       navigate(to);
     }
   };
-
-
-  const stepsData = [
-    {
-      label: "Applicant List",
-      to: "/applicant_list_registrar",
-      icon: <SchoolIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Profile",
-      to: "/applicant_registrar_personal_information",
-      icon: <PersonIcon fontSize="large" />,
-    },
-    {
-      label: "Applicant Online Requirements",
-      to: "/applicant_online_requirements_registrar",
-      icon: <AssignmentIcon fontSize="large" />,
-    },
-    {
-      label: "Entrance Examination Score",
-      to: "/registrar_entrance_examination_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-
-    {
-      label: "Qualifying / Interview Exam Score",
-      to: "/registrar_qualifying_interview_score",
-      icon: <ScoreIcon fontSize="large" />,
-    },
-
-    {
-      label: "Student Numbering Panel",
-      to: "/student_numbering",
-      icon: <FormatListNumberedIcon fontSize="large" />,
-    },
-  ];
-
-  const [visitedSteps, setVisitedSteps] = useState(Array(stepsData.length).fill(false));
-
 
   // ✅ Safe handleUpdate function (no DB errors, correct applicant update)
   const handleUpdate = async (updatedData) => {
@@ -1601,70 +1508,7 @@ const AdminDashboard1 = () => {
       <br />
       <br />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          width: "100%",
-
-        }}
-      >
-        {stepsData.map((step, index) => (
-          <React.Fragment key={index}>
-            {/* Step Card */}
-            <Card
-              onClick={() => handleNavigateStep(index, step.to)}
-              sx={{
-                flex: 1,
-                maxWidth: `${100 / stepsData.length}%`, // evenly fit 100%
-                height: 140,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                borderRadius: 2,
-                border: `1px solid ${borderColor}`,
-                backgroundColor: currentStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
-                color: currentStep === index ? "#fff" : "#000",
-                boxShadow:
-                  currentStep === index
-                    ? "0px 4px 10px rgba(0,0,0,0.3)"
-                    : "0px 2px 6px rgba(0,0,0,0.15)",
-                transition: "0.3s ease",
-                "&:hover": {
-                  backgroundColor: currentStep === index ? "#000" : "#f5d98f",
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
-              >
-                <Box sx={{ fontSize: 32, mb: 0.5 }}>{step.icon}</Box>
-                <Typography
-                  sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-                >
-                  {step.label}
-                </Typography>
-              </Box>
-            </Card>
-
-            {/* Spacer instead of line */}
-            {index < stepsData.length - 1 && (
-              <Box
-                sx={{
-
-                  mx: 1, // margin to keep spacing
-                }}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </Box>
+      <RegistrarApplicantProcessTabs />
 
       <br />
       <br />

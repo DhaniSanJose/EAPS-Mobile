@@ -8,7 +8,6 @@ import {
   Paper,
   Table,
   TableBody,
-  Card,
   TableCell,
   TableContainer,
   TableHead,
@@ -25,37 +24,16 @@ import { restrictToRegistrarCurriculum } from "../utils/registrarCurriculumRestr
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import Search from "@mui/icons-material/Search";
 import { Link, useLocation } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { io } from "socket.io-client";
 import { Snackbar, Alert } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import SchoolIcon from "@mui/icons-material/School";
-import ListAltIcon from "@mui/icons-material/ListAlt";
-import PersonIcon from "@mui/icons-material/Person";
-import DescriptionIcon from "@mui/icons-material/Description";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import HowToRegIcon from "@mui/icons-material/HowToReg";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import PersonSearchIcon from "@mui/icons-material/PersonSearch";
-import AssignmentIcon from "@mui/icons-material/Assignment";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
-
-const tabs = [
-  { label: "Student List", to: "/college_student_list", icon: <SchoolIcon fontSize="large" /> },
-  { label: "Student Profile", to: "/student_college_personal_information", icon: <PersonIcon fontSize="large" /> },
-  { label: "Student Online Requirements", to: "/student_online_requirements_college", icon: <AssignmentIcon fontSize="large" /> },
-  { label: "Course Tagging", to: "/college_course_tagging", icon: <UploadFileIcon fontSize="large" /> },
-  { label: "Search COR", to: "/college_search_certification_of_registration", icon: <MenuBookIcon fontSize="large" /> },
-  { label: "Class List", to: "/college_class_list", icon: <PersonSearchIcon fontSize="large" /> },
-
-];
+import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 
 const OfficialRequirements = () => {
   useAuditMac();
@@ -98,11 +76,6 @@ const OfficialRequirements = () => {
     if (settings.campus_address) setCampusAddress(settings.campus_address);
   }, [settings]);
 
-  const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(2);
-  const [clickedSteps, setClickedSteps] = useState(
-    Array(tabs.length).fill(false),
-  );
   const socketRef = useRef(null);
 
   // ------------------------------------
@@ -179,30 +152,6 @@ const OfficialRequirements = () => {
       })
       .catch((err) => console.error("Auto search failed:", err));
   }, [location.search]);
-
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid =
-      selectedPerson?.person_id ||
-      person?.person_id ||
-      sessionStorage.getItem("edit_person_id") ||
-      sessionStorage.getItem("admin_edit_person_id");
-    const sn =
-      selectedPerson?.student_number ||
-      person?.student_number ||
-      sessionStorage.getItem("edit_student_number");
-
-    if (pid) {
-      sessionStorage.setItem("edit_person_id", String(pid));
-      if (sn) sessionStorage.setItem("edit_student_number", String(sn));
-      navigate(`${to}?person_id=${pid}`);
-    } else if (sn) {
-      sessionStorage.setItem("edit_student_number", String(sn));
-      navigate(`${to}?student_number=${sn}`);
-    } else {
-      navigate(to); // no id → open without query
-    }
-  };
 
   useEffect(() => {
     const storedId = sessionStorage.getItem("edit_student_number");
@@ -1067,63 +1016,7 @@ const OfficialRequirements = () => {
 
       <br />
       <br />
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
-
+      <CollegeEnrollmentTabs />
       <br />
       <br />
 
