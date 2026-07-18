@@ -282,8 +282,10 @@ const AssignScheduleToApplicants = () => {
             axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
           ),
         );
+
+
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = restrictToRegistrarCurriculum(merged);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
         setCurriculumOptions(restricted);
         setAllCurriculums(restricted);
       } catch (error) {
@@ -294,22 +296,15 @@ const AssignScheduleToApplicants = () => {
     fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-  useEffect(() => {
-    const departmentIds =
-      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
-        ? adminData.dprtmnt_ids
-        : adminData.dprtmnt_id
-          ? [adminData.dprtmnt_id]
-          : [];
-
-    if (departmentIds.length) return;
-
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
-      setAllCurriculums(restrictedCurriculums);
-      setCurriculumOptions(restrictedCurriculums);
-    });
-  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   useEffect(() => {
     axios

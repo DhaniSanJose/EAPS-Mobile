@@ -181,7 +181,7 @@ router.get("/programs/availability", async (req, res) => {
         "SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1",
       ),
       db3.query(`
-        SELECT 
+        SELECT DISTINCT
           dc.dprtmnt_curriculum_id,
           dc.dprtmnt_id,
           dc.curriculum_id,
@@ -232,7 +232,7 @@ router.get("/programs/availability", async (req, res) => {
         [curriculumIds, activeSchoolYearId],
       ),
       db3.query(
-        `SELECT
+        `SELECT DISTINCT
            sts.active_curriculum AS curriculum_id,
            COUNT(DISTINCT sts.student_number) AS total_enrolled
          FROM enrollment.student_status_table sts

@@ -162,7 +162,7 @@ const ApplicantList = () => {
 
     sessionStorage.setItem("admin_edit_person_id", String(personId));
     sessionStorage.setItem("edit_person_id", String(personId));
-    sessionStorage.setItem("admin_edit_person_id_source", "applicant_list_college");
+    sessionStorage.setItem("admin_edit_person_id_source", "admission_applicant_list");
     sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
     sessionStorage.setItem("admin_edit_person_data", JSON.stringify(applicant));
     if (searchValue) {
@@ -433,12 +433,12 @@ const ApplicantList = () => {
         prev.map((p) =>
           p.person_id === person_id
             ? {
-                ...p,
-                registrar_status: status,
-                submitted_documents: status, // sync with checkbox
-                remarks: status ? 1 : 0,
-                missing_documents: status ? [] : null,
-              }
+              ...p,
+              registrar_status: status,
+              submitted_documents: status, // sync with checkbox
+              remarks: status ? 1 : 0,
+              missing_documents: status ? [] : null,
+            }
             : p,
         ),
       );
@@ -491,8 +491,10 @@ const ApplicantList = () => {
             axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
           ),
         );
+
+
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = restrictToRegistrarCurriculum(merged);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
         setCurriculumOptions(restricted);
         setAllCurriculums(restricted);
       } catch (error) {
@@ -502,6 +504,16 @@ const ApplicantList = () => {
 
     fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
   const [sortBy, setSortBy] = useState("name");
@@ -528,16 +540,16 @@ const ApplicantList = () => {
     : "";
   const selectedDepartmentFilterValue =
     selectedDepartmentFilter === "" ||
-    department.some(
-      (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter),
-    )
+      department.some(
+        (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter),
+      )
       ? selectedDepartmentFilter
       : "";
   const selectedProgramFilterValue =
     selectedProgramFilter === "" ||
-    curriculumOptions.some(
-      (prog) => String(prog.program_code) === String(selectedProgramFilter),
-    )
+      curriculumOptions.some(
+        (prog) => String(prog.program_code) === String(selectedProgramFilter),
+      )
       ? selectedProgramFilter
       : "";
   const isProgramLocked = isRegistrarProgramSelectionLocked();
@@ -780,7 +792,7 @@ const ApplicantList = () => {
         overrideBySearch ||
         selectedSchoolSemester === "" ||
         normalize(personData.middle_code) ===
-          normalize(selectedSemester?.semester_code);
+        normalize(selectedSemester?.semester_code);
 
       /* 📆 FROM–TO DATE RANGE (fixed 100%) */
       let matchesDateRange = true;
@@ -1018,15 +1030,7 @@ const ApplicantList = () => {
   useEffect(() => {
     if (!department.length) return;
 
-    // One department access → select that department
-    // Multiple department access → keep "All Departments" (empty value)
-    if (department.length === 1) {
-      const onlyDept = department[0].dprtmnt_name;
-      if (selectedDepartmentFilter !== onlyDept) {
-        setSelectedDepartmentFilter(onlyDept);
-        handleDepartmentChange(onlyDept);
-      }
-    } else if (
+    if (
       selectedDepartmentFilter &&
       !department.some(
         (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter),
@@ -1052,195 +1056,147 @@ const ApplicantList = () => {
   const [applicants, setApplicants] = useState([]);
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
+
+  const handleExportApplicantListPdf = async () => {
     const resolvedCampusAddress = campusAddress || "No address set in Settings";
 
-    // ✅ Dynamic logo and company name
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
-    // ✅ Split company name into two balanced lines
     const words = name.split(" ");
     const middleIndex = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    // ✅ Generate printable HTML
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-    newWin.document.write(`
-       <html>
-         <head>
-           <title>Applicant List</title>
-          <style>
-   @page { size: A4 landscape; margin: 5mm; }
- 
-   body {
-     font-family: Arial;
-     margin: 0;
-     padding: 0;
-   }
- 
-   .print-container {
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     text-align: center;
-     padding-left: 10px;
-     padding-right: 10px;
-   }
- 
- .print-header {
-   position: relative;
-   width: 100%;
-   text-align: center;
-   margin-top: 10px;
- }
- 
- .print-header img {
-   position: absolute;
-   left: 220px; /* adjust if needed */
-   top: -10px;
-   width: 120px;
-   height: 120px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-top {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   gap: 15px;
-   margin-left: 50px; /* ✅ your requested spacing */
- }
- 
- .header-top img {
-   width: 80px;
-   height: 80px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-text {
-   display: inline-block;
-   padding-left: 100px; /* ✅ VERY IMPORTANT (logo width + spacing) */
- }
- 
-   table {
-     border-collapse: collapse;
-     width: 100%;
-     margin-top: 20px;
-     border: 1.5px solid black; /* slightly thicker for landscape clarity */
-     table-layout: fixed;
-   }
- 
-   th, td {
-     border: 1.5px solid black;
-     padding: 6px 8px;
-     font-size: 13px; /* slightly bigger (more space in landscape) */
-     text-align: center;
-     word-wrap: break-word;
-   }
- 
-   table tr td:last-child,
-   table tr th:last-child {
-     border-right: 1.5px solid black !important;
-   }
- 
-   th {
-     background-color: lightgray;
-     color: black;
-     -webkit-print-color-adjust: exact;
-     print-color-adjust: exact;
-   }
- </style>
-         </head>
-         <body onload="window.print(); setTimeout(() => window.close(), 100);">
-           <div class="print-container">
-   
-             <!-- ✅ HEADER -->
-        <div class="print-header">
-   <img src="${logoSrc}" alt="School Logo" />
- 
-   <div class="header-text">
-                 <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-   
-                 <!-- ✅ Dynamic company name -->
-                 ${
-                   name
-                     ? `
-                       <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                         ${firstLine}
-                       </b>
-                       ${
-                         secondLine
-                           ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                               <b>${secondLine}</b>
-                             </div>`
-                           : ""
-                       }
-                     `
-                     : ""
-                 }
-   
-                 <!-- ✅ Dynamic campus address -->
-                 <div style="font-size: 13px; font-family: Arial">${resolvedCampusAddress}</div>
-   
-                 <div style="margin-top: 30px;">
-                   <b style="font-size: 24px; letter-spacing: 1px;">Applicant List</b>
-                 </div>
-               </div>
-             </div>
-   
-             <!-- ✅ TABLE -->
-             <table>
-               <thead>
-                
-                 <tr>
-     <th style="width:10%">Applicant ID</th>
-     <th style="width:35%">Applicant Name</th>
-     <th style="width:15%">Program</th>
-     <th style="width:10%">SHS GWA</th>
-     <th style="width:10%">Date Applied</th>
-     <th style="width:20%">Status</th>
- 
-                 </tr>
-               </thead>
-               <tbody>
-                 ${filteredPersons
-                   .map(
-                     (person) => `
-                       <tr>
-                         <td style="width:10%">${person.applicant_number || ""}</td>
-                         <td style="width:40%">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                         <td style="width:15%">${
-                           allCurriculums.find(
-                             (item) =>
-                               item.curriculum_id?.toString() ===
-                               person.program?.toString(),
-                           )?.program_code ?? "N/A"
-                         }</td>                 
-                         <td style="width:10%">${person.generalAverage1 || ""}</td>
-                         <td style="width:10%">${new Date(
-                           person.created_at.split("T")[0],
-                         ).toLocaleDateString("en-PH", {
-                           year: "numeric",
-                           month: "short",
-                           day: "2-digit",
-                         })}</td>
-                         <td style="width:15%">${getApplicantStatus(person)}</td>
-                       </tr>
-                     `,
-                   )
-                   .join("")}
-               </tbody>
-             </table>
-           </div>
-         </body>
-       </html>
-     `);
-    newWin.document.close();
+    // ✅ Department label (left corner) — selectedDepartmentFilter already
+    // stores the dprtmnt_name string (see matchesDepartment filter logic),
+    // so no lookup needed, just fall back when nothing's selected.
+    const selectedDepartmentLabel = selectedDepartmentFilter || "All Departments";
+
+    // ✅ Program label (right corner) — selectedProgramFilter stores
+    // program_code, so look up the full description from curriculumOptions.
+    const selectedProgramLabel = selectedProgramFilter
+      ? curriculumOptions.find(
+        (p) => p.program_code === selectedProgramFilter,
+      )?.program_description || selectedProgramFilter
+      : "All Programs";
+
+    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+    // no onload print script. The server wraps this with matching CSS.
+    const innerHtml = `
+    <div class="print-header">
+
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
+
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
+
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${name
+        ? `
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                       <b>${secondLine}</b>
+                     </div>`
+          : ""
+        }
+            `
+        : ""
+      }
+
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">Applicant List</b>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:9%">Applicant ID</th>
+          <th style="width:28%">Applicant Name</th>
+          <th style="width:16%">Department</th>
+          <th style="width:11%">Program</th>
+          <th style="width:8%">SHS GWA</th>
+          <th style="width:10%">Date Applied</th>
+          <th style="width:18%">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filteredPersons
+        .map((person) => {
+          const programInfo = allCurriculums.find(
+            (item) =>
+              item.curriculum_id?.toString() === person.program?.toString(),
+          );
+          return `
+              <tr>
+                <td>${person.applicant_number || ""}</td>
+                <td class="applicant-name">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
+                <td>${programInfo?.dprtmnt_name ?? "N/A"}</td>
+                <td>${programInfo?.program_code ?? "N/A"}</td>
+                <td>${person.generalAverage1 || ""}</td>
+                <td>${new Date(
+            person.created_at.split("T")[0],
+          ).toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+          })}</td>
+                <td>${getApplicantStatus(person)}</td>
+              </tr>
+            `;
+        })
+        .join("")}
+      </tbody>
+    </table>
+    </div>
+  `;
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-applicant-list-pdf`,
+        { html: innerHtml },
+        {
+          responseType: "blob",
+          headers: getFlatAuditHeaders({
+            "x-employee-id": employeeID,
+            "x-page-id": pageId,
+          }),
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Applicant List PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Applicant List PDF.",
+        severity: "error",
+      });
+    }
   };
 
   // Put this at the very bottom before the return
@@ -1252,25 +1208,25 @@ const ApplicantList = () => {
     return <Unauthorized />;
   }
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
     <Box
@@ -1397,7 +1353,7 @@ const ApplicantList = () => {
           <Box display="flex" alignItems="flex-end" gap={2}>
             {/* Print Button */}
             <button
-              onClick={printDiv}
+              onClick={handleExportApplicantListPdf}
               style={{
                 padding: "5px 20px",
                 border: "2px solid black",
@@ -1427,7 +1383,7 @@ const ApplicantList = () => {
               type="button"
             >
               <FcPrint size={20} />
-              Print Applicant List
+              Download Applicant List
             </button>
 
             {/* To Date */}
@@ -1822,9 +1778,7 @@ const ApplicantList = () => {
                   }}
                   displayEmpty
                 >
-                  {department.length > 1 && (
-                    <MenuItem value="">All Departments</MenuItem>
-                  )}
+                  <MenuItem value="">All Departments</MenuItem>
                   {department.map((dep) => (
                     <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})
@@ -2187,10 +2141,10 @@ const ApplicantList = () => {
 
                     fontWeight:
                       Number(person.submitted_documents) === 1 ||
-                      isDuplicateApplicant(person) ||
-                      isSuspiciousDuplicate(person) ||
-                      isExamTakenDuplicate(person) ||
-                      (person.schedule_id && Number(person.email_sent) === 1)
+                        isDuplicateApplicant(person) ||
+                        isSuspiciousDuplicate(person) ||
+                        isExamTakenDuplicate(person) ||
+                        (person.schedule_id && Number(person.email_sent) === 1)
                         ? "bold"
                         : "normal",
                   }}
@@ -2423,20 +2377,20 @@ const ApplicantList = () => {
                           width: "160px",
                           backgroundColor:
                             person.submitted_documents === 1 &&
-                            person.registrar_status === 1 &&
-                            Array.isArray(person.missing_documents) &&
-                            person.missing_documents.length === 0
+                              person.registrar_status === 1 &&
+                              Array.isArray(person.missing_documents) &&
+                              person.missing_documents.length === 0
                               ? "#4CAF50"
                               : Array.isArray(person.missing_documents) &&
-                                  person.missing_documents.length > 0
+                                person.missing_documents.length > 0
                                 ? "#FFD580"
                                 : "#D6F0FF",
                           border: "3px solid black",
                           color:
                             person.submitted_documents === 1 &&
-                            person.registrar_status === 1 &&
-                            Array.isArray(person.missing_documents) &&
-                            person.missing_documents.length === 0
+                              person.registrar_status === 1 &&
+                              Array.isArray(person.missing_documents) &&
+                              person.missing_documents.length === 0
                               ? "white"
                               : "black",
                           fontWeight: "bold",
@@ -2445,21 +2399,21 @@ const ApplicantList = () => {
                           "&:hover": {
                             backgroundColor:
                               person.submitted_documents === 1 &&
-                              person.registrar_status === 1 &&
-                              Array.isArray(person.missing_documents) &&
-                              person.missing_documents.length === 0
+                                person.registrar_status === 1 &&
+                                Array.isArray(person.missing_documents) &&
+                                person.missing_documents.length === 0
                                 ? "#45A049"
                                 : Array.isArray(person.missing_documents) &&
-                                    person.missing_documents.length > 0
+                                  person.missing_documents.length > 0
                                   ? "#FFC04D"
                                   : "#B9E3FF",
                           },
                         }}
                       >
                         {person.submitted_documents === 1 &&
-                        person.registrar_status === 1 &&
-                        Array.isArray(person.missing_documents) &&
-                        person.missing_documents.length === 0
+                          person.registrar_status === 1 &&
+                          Array.isArray(person.missing_documents) &&
+                          person.missing_documents.length === 0
                           ? "✅ Completed"
                           : "📋 Missing Docs"}
                       </Button>
@@ -2548,9 +2502,9 @@ const ApplicantList = () => {
               }}
             >
               {Array.isArray(activePerson?.missing_documents) &&
-              activePerson.missing_documents.length === 0 &&
-              activePerson?.submitted_documents === 1 &&
-              activePerson?.registrar_status === 1
+                activePerson.missing_documents.length === 0 &&
+                activePerson?.submitted_documents === 1 &&
+                activePerson?.registrar_status === 1
                 ? "✅ Completed All Documents"
                 : "Mark Missing Documents"}
             </DialogTitle>
@@ -2588,13 +2542,13 @@ const ApplicantList = () => {
                         key={doc.key}
                         control={
                           <Checkbox
-                          disabled
+                            disabled
                             checked={
                               isCompleted
                                 ? true
                                 : selectedArray.includes(doc.key)
                             }
-                    
+
                             onChange={(e) => {
                               if (isCompleted) return;
                               const updated = e.target.checked
@@ -2637,14 +2591,14 @@ const ApplicantList = () => {
                 activePerson?.submitted_documents === 1 &&
                 activePerson?.registrar_status === 1
               ) && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleSaveMissingDocs}
-                >
-                  Save
-                </Button>
-              )}
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleSaveMissingDocs}
+                  >
+                    Save
+                  </Button>
+                )}
             </DialogActions>
           </Dialog>
         </Table>

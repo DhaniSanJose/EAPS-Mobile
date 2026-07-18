@@ -50,22 +50,6 @@ const InterviewScheduleHoverTile = () => {
     toTime: "",
   });
 
-  // const tabs = [
-
-  //     { label: "Qualifying / Interview Room Assignment", to: "/assign_qualifying_interview_exam", icon: <MeetingRoomIcon fontSize="large" /> },
-  //     // { label: "Qualifying / Interview Schedule Management", to: "/college_qualifying_interview_schedule_management", icon: <ScheduleIcon fontSize="large" /> },
-  //     { label: "Qualifying / Interviewer Applicant's List", to: "/qualifying_interview_room_assignment", icon: <PeopleIcon fontSize="large" /> },
-
-  // ];
-
-  // const [activeStep, setActiveStep] = useState(2);
-  // const [clickedSteps, setClickedSteps] = useState(Array(tabs.length).fill(false));
-
-  // const handleStepClick = (index, to) => {
-  //     setActiveStep(index);
-  //     navigate(to); // this will actually change the page
-  // };
-
   const branches = Array.isArray(settings?.branches)
     ? settings.branches
     : typeof settings?.branches === "string"
@@ -110,6 +94,20 @@ const InterviewScheduleHoverTile = () => {
   const handleSchoolYearChange = (e) => setSelectedSchoolYear(e.target.value);
   const handleSchoolSemesterChange = (e) =>
     setSelectedSchoolSemester(e.target.value);
+
+  // Human-readable labels for the currently selected year/semester,
+  // used in the "no schedule found" empty state below.
+  const selectedYearLabel = (() => {
+    const sy = schoolYears.find((y) => y.year_id === selectedSchoolYear);
+    return sy ? `${sy.current_year} - ${sy.next_year}` : "school year";
+  })();
+
+  const selectedSemesterLabel = (() => {
+    const sem = schoolSemester.find(
+      (s) => s.semester_id === selectedSchoolSemester,
+    );
+    return sem ? sem.semester_description : "semester";
+  })();
 
   useEffect(() => {
     const fetchSchedules = async () => {
@@ -202,32 +200,47 @@ const InterviewScheduleHoverTile = () => {
     });
   };
 
+  const getOccupancyRatio = (current, quota) => {
+    if (!quota || quota <= 0) return 0;
+    return current / quota;
+  };
+
   const getOccupancyColor = (current, quota) => {
-    const ratio = current / quota;
-    if (ratio === 1) return "#d32f2f";
+    const ratio = getOccupancyRatio(current, quota);
+    if (ratio >= 1) return "#d32f2f";
     if (ratio >= 0.7) return "#f57c00";
     return "#388e3c";
   };
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // Disable right-click and block common DevTools shortcuts.
+  // Registered once on mount (with cleanup) instead of on every render,
+  // which previously stacked up duplicate listeners on each re-render.
+  useEffect(() => {
+    const handleContextMenu = (e) => e.preventDefault();
+    const handleKeyDown = (e) => {
+      const isBlockedKey =
+        e.key === "F12" ||
+        e.key === "F11" ||
+        (e.ctrlKey &&
+          e.shiftKey &&
+          (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+        (e.ctrlKey && e.key.toLowerCase() === "u") ||
+        (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+      if (isBlockedKey) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   return (
     <Box
@@ -256,13 +269,12 @@ const InterviewScheduleHoverTile = () => {
           QUALIFYING / INTERVIEW ROOM MANAGEMENT
         </Typography>
 
-
         <TextField
           variant="outlined"
           placeholder="Search Qualifying / Interviewer Name / Email"
           size="small"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)} // only update state
+          onChange={(e) => setSearchQuery(e.target.value)}
           sx={{
             width: 450,
             backgroundColor: "#fff",
@@ -273,72 +285,12 @@ const InterviewScheduleHoverTile = () => {
             startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
           }}
         />
-
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
       <br />
       <br />
-
-      {/* <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap", // ❌ prevent wrapping
-          width: "100%",
-
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={index}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`, // evenly divide row
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? settings?.header_color || "#1976d2"
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box> */}
-
-
-
 
       <TableContainer
         component={Paper}
@@ -374,7 +326,7 @@ const InterviewScheduleHoverTile = () => {
             gap: 4,
           }}
         >
-          {/* LEFT SIDE: School Year, Semester, Building, Room, From Time, To Time */}
+          {/* LEFT SIDE: Branch, School Year, Semester, Building, From Time, To Time */}
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
             <Box sx={{ display: "flex", flexDirection: "column" }}>
               <Typography fontSize={13} sx={{ mb: 1 }}>
@@ -453,8 +405,6 @@ const InterviewScheduleHoverTile = () => {
               </FormControl>
             </Box>
 
-            {/* Room */}
-
             {/* From Time */}
             <Box sx={{ display: "flex", flexDirection: "column" }}>
               <Typography fontSize={13} sx={{ mb: 1 }}>
@@ -527,104 +477,125 @@ const InterviewScheduleHoverTile = () => {
 
       {/* Schedule Tiles */}
       <Grid container spacing={3}>
-        {filteredSchedules.map((schedule) => (
-          <Grid
-            item
-            xs={12}
-            sm={6}
-            md={2.4}
-            lg={2.4}
-            key={schedule.schedule_id}
-          >
-            <Card
-              onClick={() =>
-                navigate(
-                  `/qualifying_interviewer_applicant_list?schedule=${schedule.schedule_id}&interviewer=${encodeURIComponent(schedule.interviewer)}`,
-                )
-              }
+        {filteredSchedules.length === 0 && (
+          <Grid item xs={12}>
+            <Box
               sx={{
-                cursor: "pointer",
-                borderRadius: "16px",
-                overflow: "hidden",
-                boxShadow: 4,
-                border: `1px solid ${borderColor}`,
-                transition: "0.3s ease",
-                "&:hover": {
-                  transform: "translateY(-4px) scale(1.03)",
-                  boxShadow: 6,
-                },
+                border: `2px dashed ${borderColor}`,
+                borderRadius: 2,
+                p: 3,
+                textAlign: "center",
+                backgroundColor: "#fafafa",
               }}
             >
-              <Box
+              <Typography sx={{ fontWeight: "bold" }}>
+                There is no schedule in this {selectedYearLabel} and{" "}
+                {selectedSemesterLabel}.
+              </Typography>
+            </Box>
+          </Grid>
+        )}
+
+        {filteredSchedules.map((schedule) => {
+          const occupancy = getOfficialOccupancy(schedule);
+          const ratio = getOccupancyRatio(occupancy, schedule.room_quota);
+
+          return (
+            <Grid
+              item
+              xs={12}
+              sm={6}
+              md={2.4}
+              lg={2.4}
+              key={schedule.schedule_id}
+            >
+              <Card
+                onClick={() =>
+                  navigate(
+                    `/qualifying_interviewer_applicant_list?schedule=${schedule.schedule_id}&interviewer=${encodeURIComponent(schedule.interviewer)}`,
+                  )
+                }
                 sx={{
-                  backgroundColor: settings?.header_color || "#1976d2",
-                  color: "#fff",
-                  p: 1.5,
+                  cursor: "pointer",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  boxShadow: 4,
+                  border: `1px solid ${borderColor}`,
+                  transition: "0.3s ease",
+                  "&:hover": {
+                    transform: "translateY(-4px) scale(1.03)",
+                    boxShadow: 6,
+                  },
                 }}
               >
-                <Typography
-                  fontWeight="bold"
-                  fontSize="16px"
-                  sx={{ textAlign: "center" }}
-                >
-                  Schedule #{schedule.schedule_id}
-                </Typography>
-              </Box>
-
-              <CardContent>
-                <Typography fontSize="14px" mb={0.5}>
-                  <strong>Interviewer:</strong> {schedule.interviewer}
-                </Typography>
-                <Typography fontSize="14px" mb={0.5}>
-                  <strong>Building:</strong> {schedule.building_description}
-                </Typography>
-                <Typography fontSize="14px" mb={0.5}>
-                  <strong>Room:</strong> {schedule.room_description}
-                </Typography>
-                <Typography fontSize="14px" mb={0.5}>
-                  <strong>Date:</strong> {schedule.day_description}
-                </Typography>
-                <Typography fontSize="14px" mb={1}>
-                  <strong>Time:</strong> {formatTime12(schedule.start_time)} -{" "}
-                  {formatTime12(schedule.end_time)}
-                </Typography>
-
-                <Typography fontSize="14px" fontWeight="bold" mb={0.5}>
-                  Applicants: {getOfficialOccupancy(schedule)}/{schedule.room_quota}
-                </Typography>
-
-                <LinearProgress
-                  variant="determinate"
-                  value={
-                    (getOfficialOccupancy(schedule) / schedule.room_quota) * 100
-                  }
+                <Box
                   sx={{
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: "#eee",
-                    "& .MuiLinearProgress-bar": {
-                      backgroundColor: getOccupancyColor(
-                        getOfficialOccupancy(schedule),
-                        schedule.room_quota,
-                      ),
-                    },
+                    backgroundColor: settings?.header_color || "#1976d2",
+                    color: "#fff",
+                    p: 1.5,
                   }}
-                />
-
-                <Box sx={{ mt: 1 }}>
-                  {getOfficialOccupancy(schedule) >= schedule.room_quota ? (
-                    <Chip label="Full" color="error" size="small" />
-                  ) : getOfficialOccupancy(schedule) / schedule.room_quota >=
-                    0.7 ? (
-                    <Chip label="Almost Full" color="warning" size="small" />
-                  ) : (
-                    <Chip label="Available" color="success" size="small" />
-                  )}
+                >
+                  <Typography
+                    fontWeight="bold"
+                    fontSize="16px"
+                    sx={{ textAlign: "center" }}
+                  >
+                    Schedule #{schedule.schedule_id}
+                  </Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
+
+                <CardContent>
+                  <Typography fontSize="14px" mb={0.5}>
+                    <strong>Interviewer:</strong> {schedule.interviewer}
+                  </Typography>
+                  <Typography fontSize="14px" mb={0.5}>
+                    <strong>Building:</strong> {schedule.building_description}
+                  </Typography>
+                  <Typography fontSize="14px" mb={0.5}>
+                    <strong>Room:</strong> {schedule.room_description}
+                  </Typography>
+                  <Typography fontSize="14px" mb={0.5}>
+                    <strong>Date:</strong> {schedule.day_description}
+                  </Typography>
+                  <Typography fontSize="14px" mb={1}>
+                    <strong>Time:</strong> {formatTime12(schedule.start_time)} -{" "}
+                    {formatTime12(schedule.end_time)}
+                  </Typography>
+
+                  <Typography fontSize="14px" fontWeight="bold" mb={0.5}>
+                    Applicants: {occupancy}/{schedule.room_quota}
+                  </Typography>
+
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(ratio * 100, 100)}
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: "#eee",
+                      "& .MuiLinearProgress-bar": {
+                        backgroundColor: getOccupancyColor(
+                          occupancy,
+                          schedule.room_quota,
+                        ),
+                      },
+                    }}
+                  />
+
+                  <Box sx={{ mt: 1 }}>
+                    {ratio >= 1 ? (
+                      <Chip label="Full" color="error" size="small" />
+                    ) : ratio >= 0.7 ? (
+                      <Chip label="Almost Full" color="warning" size="small" />
+                    ) : (
+                      <Chip label="Available" color="success" size="small" />
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
     </Box>
   );

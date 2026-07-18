@@ -44,7 +44,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.42:5173",
+  "http://192.168.1.10:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -2371,6 +2371,7 @@ app.get("/api/person_with_applicant/:id", async (req, res) => {
       `
       SELECT
         pt.*,
+        p.applyingAs,
         ant.applicant_number,
         CASE
           WHEN ia.status = 1 OR ia.status = 'Accepted' THEN 'Accepted'

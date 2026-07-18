@@ -5439,7 +5439,7 @@ Click the link below to log in:
     SELECT
       p.*,
       an.applicant_number,
-
+      p.applyingAs,
       ps.qualifying_result   AS qualifying_exam_score,
       ps.interview_result    AS qualifying_interview_score,
       ps.exam_result         AS exam_score
@@ -5467,6 +5467,7 @@ Click the link below to log in:
     SELECT
       p.*,
       an.applicant_number,
+      p.applyingAs,
       ps.qualifying_result   AS qualifying_exam_score,
       ps.interview_result    AS qualifying_interview_score,
       ps.exam_result         AS exam_score

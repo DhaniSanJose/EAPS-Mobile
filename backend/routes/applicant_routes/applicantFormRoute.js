@@ -367,7 +367,8 @@ router.post("/add-applicant", async (req, res) => {
     last_name,
     birthOfDate,
     academicProgram,
-    applyingAs
+    applyingAs,
+    program, // ✅ NEW — curriculum_id of the course the applicant is applying for
   } = req.body;
 
   let person_id = null;
@@ -375,6 +376,14 @@ router.post("/add-applicant", async (req, res) => {
   try {
     if (!email || !password || !first_name || !last_name || !birthOfDate) {
       return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // ✅ NEW — Course Applied is the field the registrar actually needs to
+    // save (it's what curriculum/program filtering, the applicant list, and
+    // the exported PDFs all read from). Reject early instead of silently
+    // creating an applicant with no program on record.
+    if (!program) {
+      return res.status(400).json({ message: "Course/Program (program) is required." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -390,8 +399,8 @@ router.post("/add-applicant", async (req, res) => {
 
     const [personResult] = await db.query(
       `INSERT INTO person_table
-       (campus, emailAddress, first_name, middle_name, last_name, birthOfDate, academicProgram, applyingAs, termsOfAgreement, current_step)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)`,
+       (campus, emailAddress, first_name, middle_name, last_name, birthOfDate, academicProgram, applyingAs, program, termsOfAgreement, current_step)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)`,
       [
         campus || 1,
         email.trim().toLowerCase(),
@@ -400,7 +409,8 @@ router.post("/add-applicant", async (req, res) => {
         last_name.trim(),
         birthOfDate,
         academicProgram,
-        applyingAs
+        applyingAs,
+        program, // ✅ NEW
       ]
     );
 

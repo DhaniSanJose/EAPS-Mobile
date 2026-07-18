@@ -601,6 +601,41 @@ const ApplicationProcessAdmin = () => {
 
     if (!departmentIds.length) return;
 
+    const fetchDepartments = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
+    fetchDepartments();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
     const fetchCurriculums = async () => {
       try {
         const responses = await Promise.all(
@@ -608,8 +643,10 @@ const ApplicationProcessAdmin = () => {
             axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
           ),
         );
+
+
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = restrictToRegistrarCurriculum(merged);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
         setCurriculumOptions(restricted);
         setAllCurriculums(restricted);
       } catch (error) {
@@ -620,22 +657,15 @@ const ApplicationProcessAdmin = () => {
     fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-  useEffect(() => {
-    const departmentIds =
-      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
-        ? adminData.dprtmnt_ids
-        : adminData.dprtmnt_id
-          ? [adminData.dprtmnt_id]
-          : [];
-
-    if (departmentIds.length) return;
-
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
-      setAllCurriculums(restrictedCurriculums);
-      setCurriculumOptions(restrictedCurriculums);
-    });
-  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   const filteredDepartments = department.filter((dep) =>
     allCurriculums.some(
@@ -769,7 +799,7 @@ const ApplicationProcessAdmin = () => {
 
       const matchesProgram =
         selectedProgramFilter === "" ||
-        String(personData.program) === String(selectedProgramFilter);
+        String(programInfo?.program_code) === String(selectedProgramFilter);
 
       const matchesDepartment =
         selectedDepartmentFilter === "" ||
@@ -939,12 +969,7 @@ const ApplicationProcessAdmin = () => {
   useEffect(() => {
     if (!department.length) return;
 
-    if (department.length === 1) {
-      const onlyDeptId = String(department[0].dprtmnt_id);
-      if (String(selectedDepartmentFilter) !== onlyDeptId) {
-        handleDepartmentChange(onlyDeptId);
-      }
-    } else if (
+    if (
       selectedDepartmentFilter &&
       !department.some(
         (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
@@ -1055,192 +1080,146 @@ const ApplicationProcessAdmin = () => {
   const [applicants, setApplicants] = useState([]);
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
+  const handleExportApplicantListPdf = async () => {
     const resolvedCampusAddress = campusAddress || "No address set in Settings";
 
-    // ✅ Dynamic logo and company name
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
-    // ✅ Split company name into two balanced lines
     const words = name.split(" ");
     const middleIndex = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    // ✅ Generate printable HTML
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-    newWin.document.write(`
-          <html>
-            <head>
-              <title>Applicant List</title>
-             <style>
-      @page { size: A4 landscape; margin: 5mm; }
-    
-      body {
-        font-family: Arial;
-        margin: 0;
-        padding: 0;
-      }
-    
-      .print-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        padding-left: 10px;
-        padding-right: 10px;
-      }
-    
-    .print-header {
-      position: relative;
-      width: 100%;
-      text-align: center;
-      margin-top: 10px;
-    }
-    
-    .print-header img {
-      position: absolute;
-      left: 220px; /* adjust if needed */
-      top: -10px;
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    
-    .header-top {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 15px;
-      margin-left: 50px; /* ✅ your requested spacing */
-    }
-    
-    .header-top img {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    
-    .header-text {
-      display: inline-block;
-      padding-left: 100px; /* ✅ VERY IMPORTANT (logo width + spacing) */
-    }
-    
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-top: 20px;
-        border: 1.5px solid black; /* slightly thicker for landscape clarity */
-        table-layout: fixed;
-      }
-    
-      th, td {
-        border: 1.5px solid black;
-        padding: 6px 8px;
-        font-size: 13px; /* slightly bigger (more space in landscape) */
-        text-align: center;
-        word-wrap: break-word;
-      }
-    
-      table tr td:last-child,
-      table tr th:last-child {
-        border-right: 1.5px solid black !important;
-      }
-    
-      th {
-        background-color: lightgray;
-        color: black;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-    </style>
-            </head>
-            <body onload="window.print(); setTimeout(() => window.close(), 100);">
-              <div class="print-container">
-      
-                <!-- ✅ HEADER -->
-           <div class="print-header">
-      <img src="${logoSrc}" alt="School Logo" />
-    
-      <div class="header-text">
-                    <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-      
-                    <!-- ✅ Dynamic company name -->
-                    ${name
+    // ✅ Department label (left corner) — selectedDepartmentFilter already
+    // stores the dprtmnt_name string (see matchesDepartment filter logic),
+    // so no lookup needed, just fall back when nothing's selected.
+    const selectedDepartmentLabel = selectedDepartmentFilter || "All Departments";
+
+    // ✅ Program label (right corner) — selectedProgramFilter stores
+    // program_code, so look up the full description from curriculumOptions.
+    const selectedProgramLabel = selectedProgramFilter
+      ? curriculumOptions.find(
+        (p) => p.program_code === selectedProgramFilter,
+      )?.program_description || selectedProgramFilter
+      : "All Programs";
+
+    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+    // no onload print script. The server wraps this with matching CSS.
+    const innerHtml = `
+     <div class="print-header">
+ 
+       <div class="print-corner-label left">
+         Department:<br/>${selectedDepartmentLabel}
+       </div>
+ 
+       <div class="print-corner-label right">
+         Program:<br/>${selectedProgramLabel}
+       </div>
+ 
+       <div class="header-content">
+         <img src="${logoSrc}" alt="School Logo" />
+ 
+         <div class="header-text">
+           <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+ 
+           ${name
         ? `
-                          <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                            ${firstLine}
-                          </b>
-                          ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                                  <b>${secondLine}</b>
-                                </div>`
+               <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                 ${firstLine}
+               </b>
+               ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                        <b>${secondLine}</b>
+                      </div>`
           : ""
         }
-                        `
+             `
         : ""
       }
-      
-                    <!-- ✅ Dynamic campus address -->
-                    <div style="font-size: 13px; font-family: Arial">${resolvedCampusAddress}</div>
-      
-                    <div style="margin-top: 30px;">
-                      <b style="font-size: 24px; letter-spacing: 1px;">Applicant List</b>
-                    </div>
-                  </div>
-                </div>
-      
-                <!-- ✅ TABLE -->
-                <table>
-                  <thead>
-                   
-                    <tr>
-        <th style="width:10%">Applicant ID</th>
-        <th style="width:35%">Applicant Name</th>
-        <th style="width:15%">Program</th>
-        <th style="width:10%">SHS GWA</th>
-        <th style="width:10%">Date Applied</th>
-        <th style="width:20%">Status</th>
-    
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${filteredPersons
-        .map(
-          (person) => `
-                          <tr>
-                            <td style="width:10%">${person.applicant_number || ""}</td>
-                            <td style="width:40%">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                            <td style="width:15%">${allCurriculums.find(
+ 
+           <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
+         </div>
+       </div>
+ 
+       <div style="margin-top: 20px; text-align: center;">
+         <b style="font-size: 20px; letter-spacing: 1px;">Applicant List</b>
+       </div>
+     </div>
+ 
+     <div class="table-wrapper">
+     <table>
+       <thead>
+         <tr>
+           <th style="width:9%">Applicant ID</th>
+           <th style="width:28%">Applicant Name</th>
+           <th style="width:16%">Department</th>
+           <th style="width:11%">Program</th>
+           <th style="width:8%">SHS GWA</th>
+           <th style="width:10%">Date Applied</th>
+           <th style="width:18%">Status</th>
+         </tr>
+       </thead>
+       <tbody>
+         ${filteredPersons
+        .map((person) => {
+          const programInfo = allCurriculums.find(
             (item) =>
-              item.curriculum_id?.toString() ===
-              person.program?.toString(),
-          )?.program_code ?? "N/A"
-            }</td>                 
-                            <td style="width:10%">${person.generalAverage1 || ""}</td>
-                            <td style="width:10%">${new Date(
-              person.created_at.split("T")[0],
-            ).toLocaleDateString("en-PH", {
-              year: "numeric",
-              month: "short",
-              day: "2-digit",
-            })}</td>
-                            <td style="width:15%">${getApplicantStatus(person)}</td>
-                          </tr>
-                        `,
-        )
+              item.curriculum_id?.toString() === person.program?.toString(),
+          );
+          return `
+               <tr>
+                 <td>${person.applicant_number || ""}</td>
+                 <td class="applicant-name">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
+                 <td>${programInfo?.dprtmnt_name ?? "N/A"}</td>
+                 <td>${programInfo?.program_code ?? "N/A"}</td>
+                 <td>${person.generalAverage1 || ""}</td>
+                 <td>${new Date(
+            person.created_at.split("T")[0],
+          ).toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+          })}</td>
+                 <td>${getApplicantStatus(person)}</td>
+               </tr>
+             `;
+        })
         .join("")}
-                  </tbody>
-                </table>
-              </div>
-            </body>
-          </html>
-        `);
-    newWin.document.close();
+       </tbody>
+     </table>
+     </div>
+   `;
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-applicant-list-pdf`,
+        { html: innerHtml },
+        {
+          responseType: "blob",
+          headers: getFlatAuditHeaders({
+            "x-employee-id": employeeID,
+            "x-page-id": pageId,
+          }),
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Applicant List PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Applicant List PDF.",
+        severity: "error",
+      });
+    }
   };
 
   const [snackbar, setSnackbar] = useState({
@@ -1423,8 +1402,9 @@ const ApplicationProcessAdmin = () => {
           {/* Right Side: Print Button + Dates (in one row) */}
           <Box display="flex" alignItems="flex-end" gap={2}>
             {/* Print Button */}
+
             <button
-              onClick={printDiv}
+              onClick={handleExportApplicantListPdf}
               style={{
                 padding: "5px 20px",
                 border: "2px solid black",
@@ -1454,8 +1434,9 @@ const ApplicationProcessAdmin = () => {
               type="button"
             >
               <FcPrint size={20} />
-              Print Applicant List
+              Download Applicant List
             </button>
+
 
             {/* From Date */}
             <FormControl size="small" sx={{ width: 200 }}>
@@ -1851,9 +1832,7 @@ const ApplicationProcessAdmin = () => {
                   }}
                   displayEmpty
                 >
-                  {department.length > 1 && (
-                    <MenuItem value="">All Departments</MenuItem>
-                  )}
+                  <MenuItem value="">All Departments</MenuItem>
                   {filteredDepartments.map((dep) => (
                     <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})
@@ -1874,7 +1853,7 @@ const ApplicationProcessAdmin = () => {
                   displayEmpty
                 >
                   <MenuItem value="">All Programs</MenuItem>
-                  {curriculumOptions.map((prog) => (
+                  {filteredCurriculumOptions.map((prog) => (
                     <MenuItem
                       key={prog.curriculum_id}
                       value={prog.program_code}
@@ -2519,120 +2498,120 @@ const ApplicationProcessAdmin = () => {
           </TableBody>
 
           <Dialog
-                    open={openDialog}
-                    onClose={handleCloseDialog}
-                    fullWidth
-                    maxWidth="sm"
-                  >
-                    <DialogTitle
-                      sx={{
-                        background: settings?.header_color || "#9E0000",
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: "1.2rem",
-                        py: 2,
-                      }}
-                    >
-                      {Array.isArray(activePerson?.missing_documents) &&
-                      activePerson.missing_documents.length === 0 &&
+            open={openDialog}
+            onClose={handleCloseDialog}
+            fullWidth
+            maxWidth="sm"
+          >
+            <DialogTitle
+              sx={{
+                background: settings?.header_color || "#9E0000",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: "1.2rem",
+                py: 2,
+              }}
+            >
+              {Array.isArray(activePerson?.missing_documents) &&
+                activePerson.missing_documents.length === 0 &&
+                activePerson?.submitted_documents === 1 &&
+                activePerson?.registrar_status === 1
+                ? "✅ Completed All Documents"
+                : "Mark Missing Documents"}
+            </DialogTitle>
+
+            <DialogContent
+              sx={{ maxHeight: 400, overflowY: "auto", p: 3, mt: 2 }}
+            >
+              {activeDocumentOptions.length === 0 ? (
+                <Typography sx={{ textAlign: "center", color: "gray", mt: 2 }}>
+                  No requirements found in database.
+                </Typography>
+              ) : (
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                    gap: 1.5,
+                    alignItems: "center",
+                  }}
+                >
+                  {activeDocumentOptions.map((doc) => {
+                    const selectedArray = Array.isArray(
+                      activePerson?.missing_documents,
+                    )
+                      ? activePerson.missing_documents
+                      : [];
+
+                    const isCompleted =
+                      selectedArray.length === 0 &&
                       activePerson?.submitted_documents === 1 &&
-                      activePerson?.registrar_status === 1
-                        ? "✅ Completed All Documents"
-                        : "Mark Missing Documents"}
-                    </DialogTitle>
-        
-                    <DialogContent
-                      sx={{ maxHeight: 400, overflowY: "auto", p: 3, mt: 2 }}
-                    >
-                      {activeDocumentOptions.length === 0 ? (
-                        <Typography sx={{ textAlign: "center", color: "gray", mt: 2 }}>
-                          No requirements found in database.
-                        </Typography>
-                      ) : (
-                        <Box
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                            gap: 1.5,
-                            alignItems: "center",
-                          }}
-                        >
-                          {activeDocumentOptions.map((doc) => {
-                            const selectedArray = Array.isArray(
-                              activePerson?.missing_documents,
-                            )
-                              ? activePerson.missing_documents
-                              : [];
-        
-                            const isCompleted =
-                              selectedArray.length === 0 &&
-                              activePerson?.submitted_documents === 1 &&
-                              activePerson?.registrar_status === 1;
-        
-                            return (
-                              <FormControlLabel
-                                key={doc.key}
-                                control={
-                                  <Checkbox
-                                  disabled
-                                    checked={
-                                      isCompleted
-                                        ? true
-                                        : selectedArray.includes(doc.key)
-                                    }
-                            
-                                    onChange={(e) => {
-                                      if (isCompleted) return;
-                                      const updated = e.target.checked
-                                        ? [...selectedArray, doc.key]
-                                        : selectedArray.filter((x) => x !== doc.key);
-                                      setActivePerson((prev) =>
-                                        prev
-                                          ? { ...prev, missing_documents: updated }
-                                          : prev,
-                                      );
-                                    }}
-                                  />
-                                }
-                                label={doc.label}
-                                sx={{
-                                  backgroundColor: "#fdfdfd",
-                                  borderRadius: "8px",
-                                  px: 1,
-                                  py: 0.5,
-                                  border: "1px solid #ddd",
-                                }}
-                              />
-                            );
-                          })}
-                        </Box>
-                      )}
-                    </DialogContent>
-        
-                    <DialogActions sx={{ px: 3, pb: 2 }}>
-                      <Button
-                        color="error"
-                        variant="outlined"
-                        onClick={handleCloseDialog}
-                      >
-                        Cancel
-                      </Button>
-                      {!(
-                        Array.isArray(activePerson?.missing_documents) &&
-                        activePerson.missing_documents.length === 0 &&
-                        activePerson?.submitted_documents === 1 &&
-                        activePerson?.registrar_status === 1
-                      ) && (
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          onClick={handleSaveMissingDocs}
-                        >
-                          Save
-                        </Button>
-                      )}
-                    </DialogActions>
-                  </Dialog>
+                      activePerson?.registrar_status === 1;
+
+                    return (
+                      <FormControlLabel
+                        key={doc.key}
+                        control={
+                          <Checkbox
+                            disabled
+                            checked={
+                              isCompleted
+                                ? true
+                                : selectedArray.includes(doc.key)
+                            }
+
+                            onChange={(e) => {
+                              if (isCompleted) return;
+                              const updated = e.target.checked
+                                ? [...selectedArray, doc.key]
+                                : selectedArray.filter((x) => x !== doc.key);
+                              setActivePerson((prev) =>
+                                prev
+                                  ? { ...prev, missing_documents: updated }
+                                  : prev,
+                              );
+                            }}
+                          />
+                        }
+                        label={doc.label}
+                        sx={{
+                          backgroundColor: "#fdfdfd",
+                          borderRadius: "8px",
+                          px: 1,
+                          py: 0.5,
+                          border: "1px solid #ddd",
+                        }}
+                      />
+                    );
+                  })}
+                </Box>
+              )}
+            </DialogContent>
+
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button
+                color="error"
+                variant="outlined"
+                onClick={handleCloseDialog}
+              >
+                Cancel
+              </Button>
+              {!(
+                Array.isArray(activePerson?.missing_documents) &&
+                activePerson.missing_documents.length === 0 &&
+                activePerson?.submitted_documents === 1 &&
+                activePerson?.registrar_status === 1
+              ) && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleSaveMissingDocs}
+                  >
+                    Save
+                  </Button>
+                )}
+            </DialogActions>
+          </Dialog>
         </Table>
       </TableContainer>
 

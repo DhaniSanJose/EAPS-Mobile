@@ -272,159 +272,148 @@ const EvaluatorApplicantList = () => {
     fetchCurriculums();
   }, []);
 
-  const printDiv = () => {
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
+ 
+
+  const handleExportEvaluatorApplicantListPdf = async () => {
+    const resolvedAddress = campusAddress || settings?.address || "No address set in Settings";
 
     const logoSrc = fetchedLogo || EaristLogo;
-    const name = companyName?.trim() || "No Company Name Available";
+    const name = companyName?.trim() || "";
 
     const words = name.split(" ");
     const middleIndex = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    const branchList = Array.isArray(branches) ? branches : [];
-    const matchedBranch = branchList.find(
-      (branch) =>
-        String(branch?.branch).trim().toLowerCase() ===
-        String(evaluator?.branch || "")
-          .trim()
-          .toLowerCase(),
-    );
-    const address =
-      matchedBranch?.address ||
-      campusAddress ||
-      settings?.address ||
-      "No address set in Settings";
-    const today = new Date().toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  
 
-    const borderColor = "black"; // table border color
-    const headerColor = "lightgray"; // dynamic header color
+    const startTimeStr = evaluator?.start_time
+      ? new Date("1970-01-01T" + evaluator.start_time).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+      : "";
+    const endTimeStr = evaluator?.end_time
+      ? new Date("1970-01-01T" + evaluator.end_time).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+      : "";
 
-    const htmlContent = `
-<html>
-  <head>
-    <title>EVALUATOR APPLICANT LIST</title>
-    <style>
-      @page { size: A4 landscape; margin: 5mm; }
-      body { font-family: Arial; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      .print-container { display: flex; flex-direction: column; align-items: center; text-align: center; }
- .print-header img {
-   position: absolute;
-    left: 180px; /* adjust if needed */
-   top: -5px;
-   width: 120px;
-   height: 120px;
-   border-radius: 50%;
-   object-fit: cover;
- }
-      .print-header div { font-size: 12px; }
-      b.header-title { font-size: 18px !important; }
-      table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-      th, td { border: 1px solid ${borderColor}; padding: 3px 4px; font-size: 10px; line-height: 1.1; }
-      th { text-align: center; background-color: ${headerColor}; color: black; }
-      th:nth-child(1) { width: 3%; }
-      th:nth-child(2) { width: 10%; }
-      th:nth-child(3) { width: 25%; }
-      th:nth-child(4) { width: 25%; }
-      th:nth-child(5) { width: 10%; }
+    const innerHtml = `
+    <div class="print-header">
 
-      .header-top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  margin-left: 50px; /* ✅ your requested spacing */
-}
-
-.header-top img {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.header-text {
-  display: inline-block;
-  padding-left: 100px; /* ✅ VERY IMPORTANT */
-}
-    </style>
-  </head>
-  <body onload="window.print(); setTimeout(() => window.close(), 100);">
-    <div class="print-container">
-      <div class="print-header">
+    
+      <div class="header-content">
         <img src="${logoSrc}" alt="School Logo" />
-        <div>
-          <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-          <b style="letter-spacing:1px; font-size:20px; font-family:Arial, serif;">${firstLine}</b>
-          ${secondLine ? `<div style="letter-spacing:1px; font-size:20px; font-family:Arial, serif;"><b>${secondLine}</b></div>` : ""}
-          <div style="font-size:12px;">${address}</div>
-          <div style="margin-top:50px;"><b style="font-size:20px; letter-spacing:1px;">EVALUATOR APPLICANT LIST</b></div>
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${name
+        ? `
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                       <b>${secondLine}</b>
+                     </div>`
+          : ""
+        }
+            `
+        : ""
+      }
+
+          <div style="font-size: 12px; font-family: Arial">${resolvedAddress}</div>
         </div>
       </div>
 
-      <div style="margin-top:20px; width:100%; display:flex; flex-direction:column; gap:8px;">
-        <div style="display:flex; justify-content:space-between; width:100%;">
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">EVALUATOR APPLICANT LIST</b>
+      </div>
+
+      <div class="info-row">
+        <div class="info-row-line">
           <span><b>Evaluator:</b> ${evaluator?.evaluator || "N/A"}</span>
           <span><b>Building:</b> ${evaluator?.building_description || "N/A"}</span>
         </div>
-        <div style="display:flex; justify-content:space-between; width:100%;">
+        <div class="info-row-line">
           <span><b>Room:</b> ${evaluator?.room_description || "N/A"}</span>
-          <span><b>Schedule:</b>
-            ${formatDateLong(evaluator?.schedule_date) || ""} |
-            ${evaluator?.start_time ? new Date("1970-01-01T" + evaluator.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) : ""} -
-            ${evaluator?.end_time ? new Date("1970-01-01T" + evaluator.end_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) : ""}
-          </span>
+          <span><b>Schedule:</b> ${formatDateLong(evaluator?.schedule_date) || ""} | ${startTimeStr} - ${endTimeStr}</span>
         </div>
       </div>
+    </div>
 
-      <table>
-        <thead>
-          <tr>
-          
-            <th style="width:20%">Applicant ID</th>
-            <th style="width:30%">Applicant Name</th>
-            <th style="width:30%">Program</th>
-            <th style="width:20%">Signature</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${applicants
-        .map((a, index) => {
+    <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:10%">Applicant ID</th>
+          <th style="width:30%">Applicant Name</th>
+          <th style="width:40%">Program</th>
+          <th style="width:20%">Signature</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${applicants
+        .map((a) => {
           const programItem = curriculumOptions.find(
-            (item) =>
-              item.curriculum_id?.toString() === a.program?.toString(),
+            (item) => item.curriculum_id?.toString() === a.program?.toString(),
           );
           const program = programItem
             ? `(${programItem.program_code}) - ${programItem.program_description} ${programItem.major || ""}`
             : "N/A";
           return `
-            <tr>
-              <td style="width:20%; text-align:center;">${a.applicant_number}</td>
-              <td style="width:30%; text-align:left;">${a.last_name}, ${a.first_name} ${a.middle_name || ""}</td>
-              <td style="width:30%; text-align:center;">${program}</td>
-              <td style="width:20%; text-align:center;"></td>
-            </tr>`;
+              <tr>
+                <td>${a.applicant_number}</td>
+                <td class="applicant-name">${a.last_name}, ${a.first_name} ${a.middle_name || ""}</td>
+                <td>${program}</td>
+                <td></td>
+              </tr>
+            `;
         })
         .join("")}
-          <tr>
-            <td colspan="5" style="text-align:right; font-weight:bold;">Total Applicants: ${applicants.length}</td>
-          </tr>
-        </tbody>
-      </table>
+      </tbody>
+    </table>
     </div>
-  </body>
-</html>
-`;
+  `;
 
-    newWin.document.write(htmlContent);
-    newWin.document.close();
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-schedule-applicant-list-pdf`,
+        {
+          html: innerHtml,
+          title: "EVALUATOR APPLICANT LIST",
+          fileNamePrefix: "Evaluator_Applicant_List",
+        },
+        {
+          responseType: "blob",
+          headers: getFlatAuditHeaders(withAuditActor()),
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Evaluator_Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Evaluator Applicant List PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Evaluator Applicant List PDF.",
+        severity: "error",
+        key: new Date().getTime(),
+      });
+    }
   };
+
 
   const formatDateLong = (dateString) => {
     if (!dateString) return "";
@@ -580,7 +569,7 @@ const EvaluatorApplicantList = () => {
 
       {applicants.length > 0 && (
         <Button
-          onClick={printDiv}
+          onClick={handleExportEvaluatorApplicantListPdf}
           variant="outlined"
           sx={{
             padding: "5px 20px",
@@ -605,7 +594,7 @@ const EvaluatorApplicantList = () => {
           }}
           startIcon={<FcPrint size={20} />}
         >
-          Print Applicant List
+          Download Applicant List
         </Button>
       )}
       <br />

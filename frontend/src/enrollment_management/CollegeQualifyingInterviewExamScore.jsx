@@ -59,6 +59,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close"; // or use the custom SVG below
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
+import SaveIcon from "@mui/icons-material/Save";
 
 const QualifyingExamScore = () => {
   useAuditMac();
@@ -562,7 +563,48 @@ const QualifyingExamScore = () => {
   const [allCurriculums, setAllCurriculums] = useState([]);
 
   useEffect(() => {
-    const departmentIds = getDepartmentIdsFromAdminData(adminData);
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
+    const fetchDepartments = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
+    fetchDepartments();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
     if (!departmentIds.length) return;
 
     const fetchCurriculums = async () => {
@@ -572,16 +614,29 @@ const QualifyingExamScore = () => {
             axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
           ),
         );
+
+
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = restrictToRegistrarCurriculum(merged);
-        setAllCurriculums(restricted);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
         setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
       }
     };
+
     fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
   const [sortBy, setSortBy] = useState("name");
@@ -593,6 +648,19 @@ const QualifyingExamScore = () => {
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
   const isProgramLocked = isRegistrarProgramSelectionLocked();
   const [department, setDepartment] = useState([]);
+  const filteredDepartments = department.filter((dep) =>
+    allCurriculums.some(
+      (curriculum) =>
+        String(curriculum.dprtmnt_id) === String(dep.dprtmnt_id) &&
+        (!person.campus || String(curriculum.components) === String(person.campus))
+    )
+  );
+  const filteredCurriculumOptions = allCurriculums.filter(
+    (curriculum) =>
+      (!person.campus || String(curriculum.components) === String(person.campus)) &&
+      (!selectedDepartmentFilter ||
+        String(curriculum.dprtmnt_id) === String(selectedDepartmentFilter))
+  );
   const [schoolYears, setSchoolYears] = useState([]);
   const [semesters, setSchoolSemester] = useState([]);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
@@ -680,11 +748,10 @@ const QualifyingExamScore = () => {
 
     const matchesDepartment =
       selectedDepartmentFilter === "" ||
-      programInfo?.dprtmnt_name === selectedDepartmentFilter;
-
+      String(programInfo?.dprtmnt_id) === String(selectedDepartmentFilter);
     const matchesProgramFilter =
       selectedProgramFilter === "" ||
-      programInfo?.program_code === selectedProgramFilter;
+      String(programInfo?.curriculum_id) === String(selectedProgramFilter);
 
     /* 📅 CREATED_AT */
     const appliedDate = new Date(personData.created_at.split("T")[0]);
@@ -838,13 +905,7 @@ const QualifyingExamScore = () => {
     fetchDepartments();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-  useEffect(() => {
-    if (department.length > 0 && !selectedDepartmentFilter) {
-      const firstDept = department[0].dprtmnt_name;
-      setSelectedDepartmentFilter(firstDept);
-      handleDepartmentChange(firstDept); // if you also want to trigger it
-    }
-  }, [department, selectedDepartmentFilter]);
+
 
   const handleSnackClose = (_, reason) => {
     if (reason === "clickaway") return;
@@ -856,21 +917,11 @@ const QualifyingExamScore = () => {
     const assignedCurriculum = curriculumOptions.find((prog) =>
       isRegistrarCurriculumMatch(prog.curriculum_id),
     );
-    if (assignedCurriculum?.program_code) {
-      setSelectedProgramFilter(assignedCurriculum.program_code);
+    if (assignedCurriculum?.curriculum_id) {
+      setSelectedProgramFilter(String(assignedCurriculum.curriculum_id));
     }
   }, [curriculumOptions, isProgramLocked]);
 
-  useEffect(() => {
-    const departmentIds = getDepartmentIdsFromAdminData(adminData);
-    if (departmentIds.length) return;
-
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
-      setAllCurriculums(restrictedCurriculums);
-      setCurriculumOptions(restrictedCurriculums);
-    });
-  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
   const handleDepartmentChange = (selectedDept) => {
     setSelectedDepartmentFilter(selectedDept);
@@ -882,6 +933,11 @@ const QualifyingExamScore = () => {
       );
     }
     if (!isProgramLocked) setSelectedProgramFilter("");
+  };
+
+  const handleProgramFilterChange = (curriculumId) => {
+    setSelectedProgramFilter(curriculumId);
+    setCurrentPage(1);
   };
 
   const [applicants, setApplicants] = useState([]);
@@ -1009,169 +1065,90 @@ const QualifyingExamScore = () => {
 
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-
+  const handleExportQualifyingInterviewScorePdf = async () => {
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
-    // ✅ Balanced split
     const words = name.split(" ");
     const middleIndex = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    // ✅ Address
-    let campusAddress = "";
-    if (settings?.campus_address && settings.campus_address.trim() !== "") {
-      campusAddress = settings.campus_address;
-    } else if (settings?.address && settings.address.trim() !== "") {
-      campusAddress = settings.address;
-    } else {
-      campusAddress = "No address set in Settings";
-    }
+    const resolvedCampusAddress =
+      campusAddress || settings?.campus_address || settings?.address || "No address set in Settings";
 
-    const htmlContent = `
-  <html>
-    <head>
-      <title>Qualifying Examination Score</title>
-      <style>
-        @page { size: A4 landscape; margin: 10mm; }
+    const selectedProgramLabel = selectedProgramFilter
+      ? filteredCurriculumOptions.find(
+        (p) => String(p.curriculum_id) === String(selectedProgramFilter),
+      )?.program_description || "N/A"
+      : "All Programs";
 
-        body {
-          font-family: Arial;
-          margin: 0;
-          padding: 0;
-        }
+    const selectedDepartmentLabel = selectedDepartmentFilter
+      ? department.find(
+        (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
+      )?.dprtmnt_name || "N/A"
+      : "All Departments";
 
-        .print-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          padding: 0 15px;
-        }
+    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+    // no onload print script. The server wraps this with matching CSS.
+    const innerHtml = `
+    <div class="print-header">
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
 
-        /* ✅ CLEAN FLEX HEADER */
-        .print-header {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 20px;
-          width: 100%;
-          margin-top: 20px;
-        }
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
 
-        .print-header img {
-         width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          object-fit: cover;
-        }
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
 
-        .header-text {
-          text-align: center;
-        }
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
 
-        .header-text .gov {
-          font-size: 13px;
-        }
-
-        .header-text .school-name {
-          font-size: 20px;
-          font-weight: bold;
-          letter-spacing: 1px;
-
-          font-family: Arial;
-        }
-
-        .header-text .address {
-          font-size: 13px;
-          margin-top: 2px;
-        }
-
-        .header-text .title {
-          margin-top: 25px;
-          font-size: 22px;
-          font-weight: bold;
-          letter-spacing: 1px;
-        }
-
-        /* ✅ TABLE IMPROVED */
-        table {
-          border-collapse: collapse;
-          width: 100%;
-          margin-top: 25px;
-          border: 1.5px solid black;
-          table-layout: fixed;
-        }
-
-        th, td {
-          border: 1.5px solid black;
-          padding: 7px 8px;
-          font-size: 13px;
-          text-align: center;
-          word-wrap: break-word;
-        }
-
-        th {
-          background-color: lightgray;
-          color: black;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-
-        /* ✅ prevent cutoff */
-        th:last-child, td:last-child {
-          border-right: 1.5px solid black !important;
-        }
-
-      </style>
-    </head>
-
-    <body onload="window.print(); setTimeout(() => window.close(), 100);">
-      <div class="print-container">
-
-        <!-- ✅ HEADER -->
-        <div class="print-header">
-          <img src="${logoSrc}" alt="School Logo"/>
-
-          <div class="header-text">
-         <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-
-            ${name
+          ${name
         ? `
-              <div class="school-name">${firstLine}</div>
-              ${secondLine ? `<div class="school-name">${secondLine}</div>` : ""}
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                     <b>${secondLine}</b>
+                   </div>`
+          : ""
+        }
             `
         : ""
       }
 
-            <div class="address">${campusAddress}</div>
-
-            <div class="title">QUALIFYING EXAMINATION SCORE</div>
-          </div>
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
         </div>
+      </div>
 
-        <!-- ✅ TABLE -->
-        <table>
-          <thead>
-            <tr>
-              <th style="width:12%">Applicant ID</th>
-              <th style="width:25%">Applicant Name</th>
-              <th style="width:12%">Program</th>
-              <th style="width:10%">Qualifying Exam Score</th>
-              <th style="width:10%">Qualifying Status</th>
-              <th style="width:10%">Interview Exam Score</th>
-              <th style="width:10%">Interview Status</th>
-              <th style="width:10%">Total Avg</th>
-              <th style="width:10%">Status</th>
-            </tr>
-          </thead>
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">QUALIFYING / INTERVIEW EXAMINATION SCORE</b>
+      </div>
+    </div>
 
-          <tbody>
-            ${filteredPersons
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:10%">Applicant ID</th>
+            <th style="width:24%">Applicant Name</th>
+            <th style="width:12%">Program</th>
+            <th style="width:10%">Qualifying Exam Score</th>
+            <th style="width:9%">Qualifying Status</th>
+            <th style="width:10%">Interview Exam Score</th>
+            <th style="width:9%">Interview Status</th>
+            <th style="width:8%">Total Avg</th>
+            <th style="width:8%">Status</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${filteredPersons
         .map((person) => {
           const qualifyingExam =
             editScores[person.person_id]?.qualifying_exam_score ??
@@ -1186,36 +1163,116 @@ const QualifyingExamScore = () => {
           const computedTotalAve =
             (Number(qualifyingExam) + Number(qualifyingInterview)) / 2;
 
+          // Fixed: build the full name safely instead of concatenating
+          // possibly-undefined fields directly into the string.
+          const fullName = [
+            person.last_name,
+            [person.first_name, person.middle_name, person.extension]
+              .filter(Boolean)
+              .join(" "),
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          const qualifyingStatusVal =
+            editScores[person.person_id]?.qualifying_status !== undefined
+              ? editScores[person.person_id].qualifying_status
+              : person.qualifying_status;
+
+          const interviewStatusVal =
+            editScores[person.person_id]?.interview_status_result !== undefined
+              ? editScores[person.person_id].interview_status_result
+              : person.interview_status_result;
+
+          const qualifyingStatusLabel =
+            qualifyingStatusVal === 0
+              ? "Passed"
+              : qualifyingStatusVal === 1
+                ? "Failed"
+                : "—";
+
+          const interviewStatusLabel =
+            interviewStatusVal === 0
+              ? "Passed"
+              : interviewStatusVal === 1
+                ? "Failed"
+                : "—";
+
+          const collegeStatusLabel =
+            Number(getCurrentCollegeApprovalStatus(person)) === 1
+              ? "Accepted"
+              : Number(getCurrentCollegeApprovalStatus(person)) === 2
+                ? "Rejected"
+                : "Waiting List";
+
+          const programCode =
+            allCurriculums.find(
+              (item) =>
+                item.curriculum_id?.toString() === person.program?.toString(),
+            )?.program_code ?? "N/A";
+
           return `
                 <tr>
                   <td>${person.applicant_number ?? "N/A"}</td>
-                  <td>${person.last_name}, ${person.first_name} ${person.middle_name ?? ""} ${person.extension ?? ""}</td>
-                  <td>${allCurriculums.find(
-            (item) =>
-              item.curriculum_id?.toString() ===
-              person.program?.toString(),
-          )?.program_code ?? "N/A"
-            }</td>
+                  <td class="applicant-name">${fullName}</td>
+                  <td>${programCode}</td>
                   <td>${qualifyingExam}</td>
-              <td>${person.qualifying_status ?? "—"}</td>
+                  <td>${qualifyingStatusLabel}</td>
                   <td>${qualifyingInterview}</td>
-<td>${person.interview_status_result ?? "—"}</td>
+                  <td>${interviewStatusLabel}</td>
                   <td>${computedTotalAve.toFixed(2)}</td>
-                  <td>${person.college_approval_status ?? "N/A"}</td>
+                  <td>${collegeStatusLabel}</td>
                 </tr>
               `;
         })
         .join("")}
-          </tbody>
-        </table>
-
-      </div>
-    </body>
-  </html>
+        </tbody>
+      </table>
+    </div>
   `;
 
-    newWin.document.write(htmlContent);
-    newWin.document.close();
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-qualifying-interview-score-pdf`,
+        { html: innerHtml },
+        {
+          responseType: "blob",
+          headers: {
+            "x-audit-actor-id":
+              employeeID ||
+              localStorage.getItem("employee_id") ||
+              localStorage.getItem("email") ||
+              "unknown",
+            "x-audit-actor-role":
+              localStorage.getItem("access_description") ||
+              userRole ||
+              localStorage.getItem("role") ||
+              "registrar",
+          },
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute(
+        "download",
+        `Qualifying_Interview_Score_${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Qualifying/Interview Score PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Qualifying / Interview Score PDF.",
+        severity: "error",
+      });
+    }
   };
 
   const [file, setFile] = useState(null);
@@ -2930,7 +2987,7 @@ Thank you, best regards
             </Box>
 
             <button
-              onClick={printDiv}
+              onClick={handleExportQualifyingInterviewScorePdf}
               style={{
                 padding: "5px 20px",
                 border: "2px solid black",
@@ -2961,7 +3018,7 @@ Thank you, best regards
               type="button"
             >
               <FcPrint size={20} />
-              Print Qualfying / Interview Scores
+              Download Applicant Qualfying / Interview Scores
             </button>
           </Box>
         </Box>
@@ -3316,15 +3373,12 @@ Thank you, best regards
               <FormControl size="small" sx={{ width: "400px" }}>
                 <Select
                   value={selectedDepartmentFilter}
-                  onChange={(e) => {
-                    const selectedDept = e.target.value;
-                    setSelectedDepartmentFilter(selectedDept);
-                    handleDepartmentChange(selectedDept);
-                  }}
+                  onChange={(e) => handleDepartmentChange(e.target.value)}
                   displayEmpty
                 >
-                  {department.map((dep) => (
-                    <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
+                  <MenuItem value="">All Departments</MenuItem>
+                  {filteredDepartments.map((dep) => (
+                    <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})
                     </MenuItem>
                   ))}
@@ -3339,23 +3393,18 @@ Thank you, best regards
               <FormControl size="small" sx={{ width: "350px" }}>
                 <Select
                   value={selectedProgramFilter}
-                  onChange={(e) => setSelectedProgramFilter(e.target.value)}
-                  disabled={isProgramLocked}
+                  onChange={(e) => handleProgramFilterChange(e.target.value)}
                   displayEmpty
                 >
-                  {!isProgramLocked && (
-                    <MenuItem value="">All Programs</MenuItem>
-                  )}
-                  {curriculumOptions.map((prog) => (
-                    <MenuItem
-                      key={prog.curriculum_id}
-                      value={prog.program_code}
-                    >
+                  <MenuItem value="">All Programs</MenuItem>
+                  {filteredCurriculumOptions.map((prog) => (
+                    <MenuItem key={prog.curriculum_id} value={String(prog.curriculum_id)}>
                       {prog.program_code} - {prog.program_description}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
+
             </Box>
           </Box>
           {/* RIGHT SIDE: Action Buttons */}
@@ -3368,14 +3417,6 @@ Thank you, best regards
             }}
           >
             <Box display="flex" gap={2} alignItems="center">
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={saveAllRows}
-                sx={{ minWidth: 150 }}
-              >
-                SAVE ALL SCORES
-              </Button>
 
               <Button
                 variant="contained"
@@ -3429,35 +3470,66 @@ Thank you, best regards
             </Box>
           </Box>
         </Box>
-        <Typography
-          textAlign="left"
-          color="maroon"
-          sx={{ mb: 1, mt: 3, fontWeight: "bold" }}
-        >
-       Applicant Entrance Exam Filter
-        </Typography>
-        <Box display="flex" gap={2} mt={2} flexWrap="wrap">
-          <Typography fontSize={13} sx={{ minWidth: "70px" }}>
-            Total:
-          </Typography>
-          <TextField
-            label="Total"
-            size="small"
-            type="number"
-            value={minTotal}
-            onChange={(e) => setMinTotal(e.target.value)}
-          />
 
-          <Typography fontSize={13} sx={{ minWidth: "70px" }}>
-            Score:
-          </Typography>
-          <TextField
-            label="Score %"
-            size="small"
-            type="number"
-            value={minScorePercent}
-            onChange={(e) => setMinScorePercent(e.target.value)}
-          />
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          flexWrap="wrap"
+          mt={3}
+        >
+          {/* ✅ LEFT SIDE (FILTERS) */}
+          <Box>
+            <Typography
+              color="maroon"
+              sx={{ mb: 1, fontWeight: "bold" }}
+            >
+              Entrance Exam Score Filter:
+            </Typography>
+
+            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+
+              <Typography fontSize={13}>Total:</Typography>
+              <TextField
+                label="Total"
+                size="small"
+                type="number"
+                value={minTotal}
+                onChange={(e) => setMinTotal(e.target.value)}
+              />
+
+              <Typography fontSize={13}>Score:</Typography>
+              <TextField
+                label="Score %"
+                size="small"
+                type="number"
+                value={minScorePercent}
+                onChange={(e) => setMinScorePercent(e.target.value)}
+              />
+
+
+            </Box>
+          </Box>
+
+          {/* ✅ RIGHT SIDE (BUTTON) */}
+          <Box>
+
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={saveAllRows}
+              sx={{
+                width: "220px",
+                height: "45px",
+                fontWeight: "bold",
+                mt: 4,
+                mr: 1
+              }}
+            >
+              <SaveIcon fontSize="small" /> SAVE ALL SCORES
+            </Button>
+
+          </Box>
         </Box>
       </TableContainer>
 
@@ -4008,7 +4080,7 @@ Thank you, best regards
                         disabled={statusLocked}
                         onClick={() => saveSingleRow(person)}
                       >
-                        SAVE
+                        <SaveIcon fontSize="small" /> Save
                       </Button>
                     </TableCell>
 

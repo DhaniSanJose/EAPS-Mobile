@@ -42,10 +42,10 @@ import {
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import CampaignIcon from '@mui/icons-material/Campaign';
 import DateField from "../components/DateField";
-
+import SaveIcon from "@mui/icons-material/Save";
 
 const ApplicantScoring = () => {
-  useAuditMac();
+    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -144,7 +144,7 @@ const ApplicantScoring = () => {
             localStorage.getItem("email") ||
             "unknown",
         audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
-    ...getLoginMacPayload(),
+        ...getLoginMacPayload(),
     });
 
     useEffect(() => {
@@ -470,8 +470,10 @@ const ApplicantScoring = () => {
                         axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
                     ),
                 );
+
+
                 const merged = responses.flatMap((response) => response.data || []);
-                const restricted = restrictToRegistrarCurriculum(merged);
+                const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
                 setCurriculumOptions(restricted);
                 setAllCurriculums(restricted);
             } catch (error) {
@@ -481,6 +483,16 @@ const ApplicantScoring = () => {
 
         fetchCurriculums();
     }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+    const dedupeByProgramCode = (list) => {
+        const seen = new Map();
+        for (const item of list) {
+            if (!seen.has(item.program_code)) {
+                seen.set(item.program_code, item);
+            }
+        }
+        return [...seen.values()];
+    };
 
     useEffect(() => {
         const departmentIds =
@@ -857,216 +869,186 @@ const ApplicantScoring = () => {
     const divToPrintRef = useRef();
 
 
-    const printDiv = () => {
-        const newWin = window.open("", "Print-Window");
-        newWin.document.open();
 
+    const handleExportExamScoresPdf = async () => {
         const logoSrc = fetchedLogo || EaristLogo;
         const name = companyName?.trim() || "";
 
-        // ✅ Balanced split (better than simple half)
         const words = name.split(" ");
         const middleIndex = Math.ceil(words.length / 2);
         const firstLine = words.slice(0, middleIndex).join(" ");
         const secondLine = words.slice(middleIndex).join(" ");
 
-        const resolvedCampusAddress =
-            campusAddress || "No address set in Settings";
+        const resolvedCampusAddress = campusAddress || "No address set in Settings";
 
-        const htmlContent = `
-  <html>
-    <head>
-      <title>Entrance Examination Scores</title>
-      <style>
-        @page { size: A4 landscape; margin: 5mm; }
+        const selectedProgramLabel = selectedProgramFilter
+            ? filteredCurriculumOptions.find(
+                (p) => p.curriculum_id?.toString() === selectedProgramFilter,
+            )?.program_description || "N/A"
+            : "All Programs";
 
-        body {
-          font-family: Arial;
-          margin: 0;
-          padding: 0;
-        }
+        const selectedDepartmentLabel = selectedDepartmentFilter
+            ? department.find(
+                (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
+            )?.dprtmnt_name || "N/A"
+            : "All Departments";
 
-     .print-container {
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     text-align: center;
-     padding-left: 10px;
-     padding-right: 10px;
-   }
-
-       .print-header {
-  position: relative;
-  width: 100%;
-  text-align: center;
-  margin-top: 10px;
-}
-
-.print-header img {
-  position: absolute;
-  left: 220px; /* adjust if needed */
-  top: -10px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.header-text {
-  display: inline-block;
-  padding-left: 100px; /* important spacing */
-}
-        /* ✅ TABLE IMPROVEMENTS */
-        table {
-     border-collapse: collapse;
-     width: 100%;
-     margin-top: 20px;
-     border: 1.5px solid black; /* slightly thicker for landscape clarity */
-     table-layout: fixed;
-   }
-
-        th, td {
-          border: 1.5px solid black;
-          padding: 7px 8px;
-          font-size: 13px;
-          text-align: center;
-          word-wrap: break-word;
-        }
-
-        th {
-          background-color: lightgray;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-
-        /* ✅ Prevent last column cut */
-        th:last-child, td:last-child {
-          border-right: 1.5px solid black !important;
-        }
-
-      </style>
-    </head>
-
-    <body onload="window.print(); setTimeout(() => window.close(), 100);">
-              <div class="print-container">
-   
-             <!-- ✅ HEADER -->
+        // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+        // no onload print script. The server wraps this with matching CSS.
+        const innerHtml = `
     <div class="print-header">
-  <img src="${logoSrc}" alt="School Logo" />
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
 
-  <div class="header-text">
-    <div style="font-size: 13px; font-family: Arial">
-      Republic of the Philippines
-    </div>
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
 
-    ${name
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">
+            Republic of the Philippines
+          </div>
+
+          ${name
                 ? `
-        <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-          ${firstLine}
-        </b>
-        ${secondLine
-                    ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                 <b>${secondLine}</b>
-               </div>`
+                <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                  ${firstLine}
+                </b>
+                ${secondLine
+                    ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                         <b>${secondLine}</b>
+                       </div>`
                     : ""
                 }
-      `
+              `
                 : ""
             }
 
-    <div style="font-size: 13px; font-family: Arial">
-      ${resolvedCampusAddress}
+          <div style="font-size: 12px; font-family: Arial">
+            ${resolvedCampusAddress}
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">
+          Entrance Examination Scores
+        </b>
+      </div>
     </div>
 
-    <div style="margin-top: 30px;">
-      <b style="font-size: 24px; letter-spacing: 1px;">
-        Entrance Examination Scores
-      </b>
-    </div>
-  </div>
-</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:9%">Applicant ID</th>
+            <th style="width:26%">Applicant Name</th>
+            ${subjects.map((subject) => `<th style="width:6%">${subject.name}</th>`).join("")}
+            <th style="width:6%">Total</th>
+            <th style="width:6%">Score %</th>
+            <th style="width:7%">Status</th>
+          </tr>
+        </thead>
 
-        <!-- ✅ TABLE -->
-        <table>
-          <thead>
-            <tr>
-              <th style="width:10%">Applicant ID</th>
-              <th style="width:20%">Applicant Name</th>
-              <th style="width:12%">Program</th>
-              ${subjects.map(subject => `
-              <th style="width:7%">
-              ${subject.name}
-              </th>
-              `).join("")}
-              <th style="width:8%">Total</th>
-              <th style="width:8%">Score %</th>
-
-              <th style="width:8%">Status</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            ${filteredPersons.map((person) => {
-                const subjectScores = subjects.map((subject) => {
-                    return Number(
-                        editScores[person.person_id]?.[subject.id] ??
-                        person.scores?.[subject.id] ??
-                        0
+        <tbody>
+          ${filteredPersons
+                .map((person) => {
+                    const subjectScores = subjects.map((subject) =>
+                        Number(
+                            editScores[person.person_id]?.[subject.id] ??
+                            person.scores?.[subject.id] ??
+                            0,
+                        ),
                     );
-                });
 
-                const totalScore = subjectScores.reduce((sum, score) => sum + score, 0);
+                    const totalScore = subjectScores.reduce((sum, score) => sum + score, 0);
 
-                const maxTotal = subjects.reduce(
-                    (sum, subject) => sum + Number(subject.max_score || 0),
-                    0
-                );
+                    const maxTotal = subjects.reduce(
+                        (sum, subject) => sum + Number(subject.max_score || 0),
+                        0,
+                    );
 
-                const computedConvertedRating =
-                    maxTotal > 0
-                        ? ((totalScore / maxTotal) * 50) + 50
-                        : 0;
+                    const computedConvertedRating =
+                        maxTotal > 0 ? (totalScore / maxTotal) * 50 + 50 : 0;
 
+                    // Fixed: this was previously written with invalid
+                    // template-literal syntax outside of backticks
+                    // (`${person.last_name},,`), which is a syntax error.
+                    const fullName = [
+                        person.last_name,
+                        person.first_name,
+                        person.middle_name,
+                        person.extension,
+                    ]
+                        .filter(Boolean)
+                        .join(" ");
 
-
-                return `
+                    return `
                 <tr>
                   <td>${person.applicant_number || ""}</td>
-                  <td>${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                   <td>${allCurriculums.find(
-                    (item) => item.curriculum_id?.toString() === person.program?.toString()
-                )?.program_code ?? "N/A"
-                    }</td>
-              ${subjects.map(subject => {
-                        const score =
-                            Number(
-                                editScores[person.person_id]?.[subject.id] ??
-                                person.scores?.[subject.id] ??
-                                0
-                            );
-
-                        return `<td>${score}</td>`;
-                    }).join("")}
+                  <td class="applicant-name">${fullName}</td>
+                  ${subjects
+                            .map((subject) => {
+                                const score = Number(
+                                    editScores[person.person_id]?.[subject.id] ??
+                                    person.scores?.[subject.id] ??
+                                    0,
+                                );
+                                return `<td>${score}</td>`;
+                            })
+                            .join("")}
                   <td>${totalScore}</td>
                   <td>${Number(computedConvertedRating).toFixed(2)}</td>
-    
-                  <td>${person.status === 0 ? "PASSED" :
-                        person.status === 1 ? "FAILED" :
-                            ""}</td>
+                  <td>${person.status === 0
+                            ? "PASSED"
+                            : person.status === 1
+                                ? "FAILED"
+                                : ""
+                        }</td>
                 </tr>
               `;
-            }).join("")}
-          </tbody>
-        </table>
-
-      </div>
-    </body>
-  </html>
+                })
+                .join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 
-        newWin.document.write(htmlContent);
-        newWin.document.close();
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-exam-scores-pdf`,
+                { html: innerHtml },
+                {
+                    responseType: "blob",
+                    headers: {
+                        "x-audit-actor-id":
+                            localStorage.getItem("employee_id") ||
+                            localStorage.getItem("email") ||
+                            "unknown",
+                        "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+                    },
+                },
+            );
+
+            const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.setAttribute("download", `Entrance_Exam_Scores_${new Date().toISOString().slice(0, 10)}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Failed to generate Exam Scores PDF:", err);
+            // swap in your component's own snackbar/toast here if you have one
+            alert("Failed to generate PDF. Please try again.");
+        }
     };
+
 
 
     const [file, setFile] = useState(null);
@@ -1703,7 +1685,7 @@ const ApplicantScoring = () => {
                         {/* Print ECAT Score */}
                         <div style={{ position: "relative", zIndex: 999 }}>
                             <button
-                                onClick={printDiv}
+                                onClick={handleExportExamScoresPdf}
                                 style={{
                                     padding: "5px 20px",
                                     border: "2px solid black",
@@ -1720,7 +1702,7 @@ const ApplicantScoring = () => {
                                     textAlign: "center",
                                     gap: "8px",
                                     userSelect: "none",
-                                    width: "200px",
+                                    width: "230px",
                                     pointerEvents: "auto",
                                 }}
                                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
@@ -1730,7 +1712,7 @@ const ApplicantScoring = () => {
                                 type="button"
                             >
                                 <FcPrint size={20} />
-                                Print ECAT Score
+                                Download ECAT Score
                             </button>
                         </div>
 
@@ -1945,15 +1927,7 @@ const ApplicantScoring = () => {
 
 
 
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={saveAllRows}
-                            sx={{ width: "300px" }}
-                            disabled={saving}
-                        >
-                            SAVE ALL SCORES
-                        </Button>
+
                     </Box>
 
                     {/* MIDDLE COLUMN: SY & Semester */}
@@ -2063,7 +2037,7 @@ const ApplicantScoring = () => {
                             color="maroon"
                             sx={{ mb: 1, fontWeight: "bold" }}
                         >
-                            Entrance Exam Total Score:
+                            Entrance Exam Score Filter:
                         </Typography>
 
                         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
@@ -2092,6 +2066,22 @@ const ApplicantScoring = () => {
 
                     {/* ✅ RIGHT SIDE (BUTTON) */}
                     <Box>
+
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={saveAllRows}
+                            sx={{
+                                width: "220px",
+                                height: "45px",
+                                fontWeight: "bold",
+                                mt: 4,
+                                mr: 2
+                            }}
+                            disabled={saving}
+                        >
+                            <SaveIcon fontSize="small" /> SAVE ALL SCORES
+                        </Button>
                         <Button
                             variant="contained"
                             color="secondary"
@@ -2105,6 +2095,8 @@ const ApplicantScoring = () => {
                         >
                             SUBJECT MANAGEMENT
                         </Button>
+
+
                     </Box>
                 </Box>
 
@@ -2409,7 +2401,7 @@ const ApplicantScoring = () => {
                                             onClick={() => saveSingleRow(person)}
                                             disabled={saving}
                                         >
-                                            Save
+                                            <SaveIcon fontSize="small" /> Save
                                         </Button>
                                     </TableCell>
                                 </TableRow>

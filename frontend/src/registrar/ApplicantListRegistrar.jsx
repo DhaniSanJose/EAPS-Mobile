@@ -45,8 +45,19 @@ import ScoreIcon from '@mui/icons-material/Score';
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+import {
+  isRegistrarCurriculumMatch,
+  isRegistrarProgramSelectionLocked,
+  refreshRegistrarCurriculumId,
+  restrictToRegistrarCurriculum,
+  syncRegistrarScopeFromAdminData,
+} from "../utils/registrarCurriculumRestriction";
+import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
-const SuperAdminApplicantList = () => {
+
+
+
+const ApplicantListRegistrar = () => {
   useAuditMac();
   const socket = useRef(null);
 
@@ -87,6 +98,7 @@ const SuperAdminApplicantList = () => {
     // 🏷️ School Info
     if (settings.company_name) setCompanyName(settings.company_name);
     if (settings.short_term) setShortTerm(settings.short_term);
+    if (settings.campus_address) setCampusAddress(settings.campus_address);
 
     // ✅ Branches (JSON stored in DB)
     if (settings?.branches) {
@@ -145,207 +157,8 @@ const SuperAdminApplicantList = () => {
   const queryParams = new URLSearchParams(location.search);
   const queryPersonId = (queryParams.get("person_id") || "").trim();
 
-  const handleRowClick = (applicant) => {
-    const personId = applicant?.person_id;
-    if (!personId) return;
-
-    const searchValue =
-      applicant?.student_number ||
-      applicant?.applicant_number ||
-      `${applicant?.last_name ?? ""}, ${applicant?.first_name ?? ""}`.trim();
-
-    sessionStorage.setItem("admin_edit_person_id", String(personId));
-    sessionStorage.setItem("edit_person_id", String(personId));
-    sessionStorage.setItem("admin_edit_person_id_source", "super_admin_applicant_list");
-    sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
-    sessionStorage.setItem("admin_edit_person_data", JSON.stringify(applicant));
-    if (searchValue) {
-      sessionStorage.setItem("admin_edit_search_query", String(searchValue));
-    }
-    if (applicant?.student_number) {
-      sessionStorage.setItem(
-        "edit_student_number",
-        String(applicant.student_number),
-      );
-    }
-    if (applicant?.applicant_number) {
-      sessionStorage.setItem(
-        "edit_applicant_number",
-        String(applicant.applicant_number),
-      );
-    }
-
-    const studentQuery = applicant?.student_number
-      ? `&student_number=${encodeURIComponent(applicant.student_number)}`
-      : "";
-
-    navigate(`/applicant_registrar_personal_information?person_id=${personId}${studentQuery}`);
-  };
-
   const navigate = useNavigate();
-  const [activeStep, setActiveStep] = useState(0);
 
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-
-    if (pid && to !== "/applicant_list_registrar") {
-      navigate(`${to}?person_id=${pid}`);
-    } else {
-      navigate(to);
-    }
-  };
-
-  useEffect(() => {
-    if (location.search.includes("person_id")) {
-      navigate("/applicant_list_registrar", { replace: true });
-    }
-  }, [location, navigate]);
-
-  const [persons, setPersons] = useState([]);
-
-  const [selectedPerson, setSelectedPerson] = useState(null);
-  const [assignedNumber, setAssignedNumber] = useState("");
-  const [userID, setUserID] = useState("");
-  const [user, setUser] = useState("");
-  const [userRole, setUserRole] = useState("");
-  const [adminData, setAdminData] = useState({ dprtmnt_id: "" });
-
-  const [hasAccess, setHasAccess] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const pageId = 80;
-
-  const [employeeID, setEmployeeID] = useState("");
-
-  const getAuditHeaders = () => ({
-    headers: {
-      ...getFlatAuditHeaders(),
-      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-page-id": pageId,
-      "x-audit-actor-id":
-        employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
-    },
-  });
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("email");
-    const storedRole = localStorage.getItem("role");
-    const storedID = localStorage.getItem("person_id");
-    const storedEmployeeID = localStorage.getItem("employee_id");
-
-    if (storedUser && storedRole && storedID) {
-      setUser(storedUser);
-      setUserRole(storedRole);
-      setUserID(storedID);
-      setEmployeeID(storedEmployeeID);
-
-      if (storedRole === "registrar") {
-        checkAccess(storedEmployeeID);
-      } else {
-        window.location.href = "/login";
-      }
-    } else {
-      window.location.href = "/login";
-    }
-  }, []);
-
-  const checkAccess = async (employeeID) => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
-      );
-      if (response.data && response.data.page_privilege === 1) {
-        setHasAccess(true);
-      } else {
-        setHasAccess(false);
-      }
-    } catch (error) {
-      console.error("Error checking access:", error);
-      setHasAccess(false);
-      if (error.response && error.response.data.message) {
-        console.log(error.response.data.message);
-      } else {
-        console.log("An unexpected error occurred.");
-      }
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("email");
-    const storedRole = localStorage.getItem("role");
-    const loggedInPersonId = localStorage.getItem("person_id");
-    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
-
-    if (!storedUser || !storedRole || !loggedInPersonId) {
-      window.location.href = "/login";
-      return;
-    }
-
-    setUser(storedUser);
-    setUserRole(storedRole);
-
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (allowedRoles.includes(storedRole)) {
-      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-      sessionStorage.setItem("admin_edit_person_id", targetId);
-      setUserID(targetId);
-      return;
-    }
-
-    window.location.href = "/login";
-  }, [queryPersonId]);
-
-  const fetchPersonData = async () => {
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
-      setAdminData(res.data); // { dprtmnt_id: "..." }
-    } catch (err) {
-      console.error("Error fetching admin data:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchPersonData();
-    }
-  }, [user]);
-
-  const cleanName = (v) => (v ?? "").trim().toLowerCase();
-
-  const detectDuplicateNames = (list) => {
-    const map = {};
-
-    for (const p of list) {
-      const ln = cleanName(p.last_name);
-      const fn = cleanName(p.first_name);
-      const mn = cleanName(p.middle_name);
-
-      // Must have all 3 for strict duplicate match
-      if (!ln || !fn || !mn) continue;
-
-      const key = `${ln}|${fn}|${mn}`;
-
-      if (!map[key]) map[key] = 0;
-      map[key]++;
-    }
-
-    return (person) => {
-      const ln = cleanName(person.last_name);
-      const fn = cleanName(person.first_name);
-      const mn = cleanName(person.middle_name);
-
-      if (!ln || !fn || !mn) return false;
-
-      const key = `${ln}|${fn}|${mn}`;
-      return map[key] > 1;
-    };
-  };
-
-  const isDuplicateApplicant = detectDuplicateNames(persons);
 
   const tabs = [
     {
@@ -384,80 +197,102 @@ const SuperAdminApplicantList = () => {
   ];
 
 
-  // ── Name normalizer: strips accents, special chars, spaces ──
-  const normalizeName = (v) =>
-    (v ?? "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")  // remove accents
-      .replace(/[^a-z0-9]/g, "");       // remove dots, commas, spaces, etc.
+  const handleRowClick = (applicant) => {
+    const personId = applicant?.person_id;
+    if (!personId) return;
 
-  // ── DETECTOR 1: Suspicious name (special characters / slight variation) ──
-  // Catches: "Montano." vs "Montano", "De Leon" vs "DeLeon"
-  const detectSuspiciousDuplicates = (list) => {
-    const map = {};
-    for (const p of list) {
-      const ln = normalizeName(p.last_name);
-      const fn = normalizeName(p.first_name);
-      const bd = p.birthOfDate ? String(p.birthOfDate).split("T")[0] : "";
-      if (!ln || !fn) continue;
-      const key = `${ln}|${fn}|${bd}`;
-      if (!map[key]) map[key] = 0;
-      map[key]++;
+    const searchValue =
+      applicant?.applicant_number ||
+      `${applicant?.last_name ?? ""}, ${applicant?.first_name ?? ""}`.trim();
+
+    sessionStorage.setItem("admin_edit_person_id", String(personId));
+    sessionStorage.setItem("edit_person_id", String(personId));
+    sessionStorage.setItem("admin_edit_person_id_source", "applicant_list_registrar");
+    sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
+    sessionStorage.setItem("admin_edit_person_data", JSON.stringify(applicant));
+    if (searchValue) {
+      sessionStorage.setItem("admin_edit_search_query", String(searchValue));
+      sessionStorage.setItem("edit_applicant_number", String(searchValue));
     }
-    return (person) => {
-      const ln = normalizeName(person.last_name);
-      const fn = normalizeName(person.first_name);
-      const bd = person.birthOfDate ? String(person.birthOfDate).split("T")[0] : "";
-      if (!ln || !fn) return false;
-      const key = `${ln}|${fn}|${bd}`;
-      // Only flag if normalized key has duplicates BUT exact name doesn't
-      // (so it doesn't overlap with isDuplicateApplicant)
-      const exactLn = cleanName(person.last_name);
-      const exactFn = cleanName(person.first_name);
-      const exactMn = cleanName(person.middle_name);
-      const exactKey = `${exactLn}|${exactFn}|${exactMn}`;
-      const exactMap = {};
-      for (const p of list) {
-        const k = `${cleanName(p.last_name)}|${cleanName(p.first_name)}|${cleanName(p.middle_name)}`;
-        if (!exactMap[k]) exactMap[k] = 0;
-        exactMap[k]++;
-      }
-      return map[key] > 1 && exactMap[exactKey] <= 1;
-    };
+
+    navigate(`/applicant_registrar_personal_information?person_id=${personId}`);
   };
 
-  // ── DETECTOR 2: New account but someone with same name+birthday already took exam ──
-  // Catches: person registers fresh while their old account has email_sent=1 or exam_status=1
-  const detectExamTakenDuplicates = (list) => {
-    const examTakenKeys = new Set();
-    for (const p of list) {
-      const ln = normalizeName(p.last_name);
-      const fn = normalizeName(p.first_name);
-      const bd = p.birthOfDate ? String(p.birthOfDate).split("T")[0] : "";
-      if (!ln || !fn) continue;
-      if (Number(p.email_sent) === 1 || Number(p.exam_status) === 1) {
-        examTakenKeys.add(`${ln}|${fn}|${bd}`);
-      }
+
+  const [activeStep, setActiveStep] = useState(0);
+  const [clickedSteps, setClickedSteps] = useState(
+    Array(tabs.length).fill(false),
+  );
+
+  const handleStepClick = (index, to) => {
+    setActiveStep(index);
+    const pid = sessionStorage.getItem("admin_edit_person_id");
+
+    if (pid && to !== "/applicant_list_registrar") {
+      navigate(`${to}?person_id=${pid}`);
+    } else {
+      navigate(to);
     }
-    return (person) => {
-      const ln = normalizeName(person.last_name);
-      const fn = normalizeName(person.first_name);
-      const bd = person.birthOfDate ? String(person.birthOfDate).split("T")[0] : "";
-      if (!ln || !fn) return false;
-      const key = `${ln}|${fn}|${bd}`;
-      // Flag only the NEW account (hasn't taken exam yet)
-      return (
-        examTakenKeys.has(key) &&
-        Number(person.email_sent) !== 1 &&
-        Number(person.exam_status) !== 1
-      );
-    };
   };
 
-  const isSuspiciousDuplicate = detectSuspiciousDuplicates(persons);
-  const isExamTakenDuplicate = detectExamTakenDuplicates(persons);
+  useEffect(() => {
+    if (location.search.includes("person_id")) {
+      navigate("/applicant_list_registrar", { replace: true });
+    }
+  }, [location, navigate]);
+
+  const [persons, setPersons] = useState([]);
+
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [assignedNumber, setAssignedNumber] = useState("");
+  const [userID, setUserID] = useState("");
+  const [user, setUser] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [adminData, setAdminData] = useState({
+    dprtmnt_id: "",
+    dprtmnt_ids: [],
+  });
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const loggedInPersonId = localStorage.getItem("person_id");
+    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
+
+    if (!storedUser || !storedRole || !loggedInPersonId) {
+      window.location.href = "/login";
+      return;
+    }
+
+    setUser(storedUser);
+    setUserRole(storedRole);
+
+    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    if (allowedRoles.includes(storedRole)) {
+      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
+      sessionStorage.setItem("admin_edit_person_id", targetId);
+      setUserID(targetId);
+      return;
+    }
+
+    window.location.href = "/login";
+  }, [queryPersonId]);
+
+  const fetchPersonData = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+      setAdminData(res.data);
+      syncRegistrarScopeFromAdminData(res.data);
+    } catch (err) {
+      console.error("Error fetching admin data:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchPersonData();
+    }
+  }, [user]);
 
   // Helper to compute applicant status
   const getApplicantStatus = (personData) => {
@@ -499,6 +334,7 @@ const SuperAdminApplicantList = () => {
     last_name: "",
     first_name: "",
     middle_name: "",
+    birthOfDate: "",
     document_status: "",
     emailAddress: "",
     extension: "",
@@ -546,7 +382,74 @@ const SuperAdminApplicantList = () => {
   const [confirmAction, setConfirmAction] = useState(null); // holds which action to confirm
   const [confirmMessage, setConfirmMessage] = useState("");
 
-  const handleSubmittedDocumentsChange = async (upload_id, checked, person_id) => {
+  const [hasAccess, setHasAccess] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const pageId = 80;
+
+  const getAuditHeaders = () =>
+    getAuditConfig({
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    });
+
+  const [employeeID, setEmployeeID] = useState("");
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const storedID = localStorage.getItem("person_id");
+    const storedEmployeeID = localStorage.getItem("employee_id");
+
+    if (storedUser && storedRole && storedID) {
+      setUser(storedUser);
+      setUserRole(storedRole);
+      setUserID(storedID);
+      setEmployeeID(storedEmployeeID);
+
+      if (storedRole === "registrar") {
+        checkAccess(storedEmployeeID);
+      } else {
+        window.location.href = "/login";
+      }
+    } else {
+      window.location.href = "/login";
+    }
+  }, []);
+
+  const checkAccess = async (employeeID) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
+      if (response.data && response.data.page_privilege === 1) {
+        setHasAccess(true);
+      } else {
+        setHasAccess(false);
+      }
+    } catch (error) {
+      console.error("Error checking access:", error);
+      setHasAccess(false);
+      if (error.response && error.response.data.message) {
+        console.log(error.response.data.message);
+      } else {
+        console.log("An unexpected error occurred.");
+      }
+      setLoading(false);
+    }
+  };
+
+  const handleSubmittedDocumentsChange = async (
+    upload_id,
+    checked,
+    person_id,
+  ) => {
     try {
       const res = await axios.put(
         `${API_BASE_URL}/api/submitted-documents/${upload_id}`,
@@ -586,13 +489,15 @@ const SuperAdminApplicantList = () => {
 
   const handleRegistrarStatusChange = async (person_id, status) => {
     try {
+      // Optimistic UI update para sabay silang magreflect
       setPersons((prev) =>
         prev.map((p) =>
           p.person_id === person_id
             ? {
               ...p,
               registrar_status: status,
-              submitted_documents: status,
+              submitted_documents: status, // sync with checkbox
+              remarks: status ? 1 : 0,
               missing_documents: status ? [] : null,
             }
             : p,
@@ -609,23 +514,71 @@ const SuperAdminApplicantList = () => {
     }
   };
 
+  ``;
   useEffect(() => {
-    // Replace this with your actual API endpoint
-    fetch(`${API_BASE_URL}/api/all-applicants`)
-      .then((res) => res.json())
-      .then((data) => setPersons(data)); // ✅ Correct
+    if (!socket.current) return;
+
+    const handler = () => fetchApplicants();
+    socket.current.on("document_status_updated", handler);
+
+    return () => socket.current.off("document_status_updated", handler);
   }, []);
 
-  useEffect(() => {
-    socket.current.on("document_status_updated", () => {
-      fetch(`${API_BASE_URL}/api/all-applicants`)
-        .then((res) => res.json())
-        .then((data) => setPersons(data));
-    });
-    return () => socket.current.off("document_status_updated");
-  }, []);
+
+
+
 
   const [curriculumOptions, setCurriculumOptions] = useState([]);
+  const [allCurriculums, setAllCurriculums] = useState([]);
+  const scopeRevision = useRegistrarScopeRevision();
+
+  useEffect(() => {
+    if (userRole !== "registrar" || !employeeID) return;
+    refreshRegistrarCurriculumId(employeeID).catch((err) => {
+      console.error("Error refreshing registrar scope:", err);
+    });
+  }, [userRole, employeeID]);
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
+    const fetchCurriculums = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+          ),
+        );
+
+
+        const merged = responses.flatMap((response) => response.data || []);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
+        setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
+      } catch (error) {
+        console.error("Error fetching curriculum options:", error);
+      }
+    };
+
+    fetchCurriculums();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
   const [sortBy, setSortBy] = useState("name");
@@ -636,11 +589,45 @@ const SuperAdminApplicantList = () => {
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState("");
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
   const [department, setDepartment] = useState([]);
-  const [allCurriculums, setAllCurriculums] = useState([]);
   const [schoolYears, setSchoolYears] = useState([]);
   const [semesters, setSchoolSemester] = useState([]);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
   const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
+  const selectedSchoolYearValue = schoolYears.some(
+    (sy) => String(sy.year_id) === String(selectedSchoolYear),
+  )
+    ? selectedSchoolYear
+    : "";
+  const selectedSchoolSemesterValue = semesters.some(
+    (sem) => String(sem.semester_id) === String(selectedSchoolSemester),
+  )
+    ? selectedSchoolSemester
+    : "";
+  const selectedDepartmentFilterValue =
+    selectedDepartmentFilter === "" ||
+      department.some(
+        (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter),
+      )
+      ? selectedDepartmentFilter
+      : "";
+  const selectedProgramFilterValue =
+    selectedProgramFilter === "" ||
+      curriculumOptions.some(
+        (prog) => String(prog.program_code) === String(selectedProgramFilter),
+      )
+      ? selectedProgramFilter
+      : "";
+  const isProgramLocked = isRegistrarProgramSelectionLocked();
+
+  useEffect(() => {
+    if (!isProgramLocked) return;
+    const assignedCurriculum = curriculumOptions.find((prog) =>
+      isRegistrarCurriculumMatch(prog.curriculum_id),
+    );
+    if (assignedCurriculum?.program_code) {
+      setSelectedProgramFilter(assignedCurriculum.program_code);
+    }
+  }, [curriculumOptions, isProgramLocked]);
 
   useEffect(() => {
     axios
@@ -676,6 +663,118 @@ const SuperAdminApplicantList = () => {
     setSelectedSchoolSemester(event.target.value);
   };
 
+  const cleanName = (v) => (v ?? "").trim().toLowerCase();
+
+  const detectDuplicateNames = (list) => {
+    const map = {};
+
+    for (const p of list) {
+      const ln = cleanName(p.last_name);
+      const fn = cleanName(p.first_name);
+      const mn = cleanName(p.middle_name);
+
+      // Must have all 3 for strict duplicate match
+      if (!ln || !fn || !mn) continue;
+
+      const key = `${ln}|${fn}|${mn}`;
+
+      if (!map[key]) map[key] = 0;
+      map[key]++;
+    }
+
+    return (person) => {
+      const ln = cleanName(person.last_name);
+      const fn = cleanName(person.first_name);
+      const mn = cleanName(person.middle_name);
+
+      if (!ln || !fn || !mn) return false;
+
+      const key = `${ln}|${fn}|${mn}`;
+      return map[key] > 1;
+    };
+  };
+
+  const isDuplicateApplicant = detectDuplicateNames(persons);
+
+  // ── Name normalizer: strips accents, special chars, spaces ──
+  const normalizeName = (v) =>
+    (v ?? "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove accents
+      .replace(/[^a-z0-9]/g, ""); // remove dots, commas, spaces, etc.
+
+  // ── DETECTOR 1: Suspicious name (special characters / slight variation) ──
+  // Catches: "Montano." vs "Montano", "De Leon" vs "DeLeon"
+  const detectSuspiciousDuplicates = (list) => {
+    const map = {};
+    for (const p of list) {
+      const ln = normalizeName(p.last_name);
+      const fn = normalizeName(p.first_name);
+      const bd = p.birthOfDate ? String(p.birthOfDate).split("T")[0] : "";
+      if (!ln || !fn) continue;
+      const key = `${ln}|${fn}|${bd}`;
+      if (!map[key]) map[key] = 0;
+      map[key]++;
+    }
+    return (person) => {
+      const ln = normalizeName(person.last_name);
+      const fn = normalizeName(person.first_name);
+      const bd = person.birthOfDate
+        ? String(person.birthOfDate).split("T")[0]
+        : "";
+      if (!ln || !fn) return false;
+      const key = `${ln}|${fn}|${bd}`;
+      // Only flag if normalized key has duplicates BUT exact name doesn't
+      // (so it doesn't overlap with isDuplicateApplicant)
+      const exactLn = cleanName(person.last_name);
+      const exactFn = cleanName(person.first_name);
+      const exactMn = cleanName(person.middle_name);
+      const exactKey = `${exactLn}|${exactFn}|${exactMn}`;
+      const exactMap = {};
+      for (const p of list) {
+        const k = `${cleanName(p.last_name)}|${cleanName(p.first_name)}|${cleanName(p.middle_name)}`;
+        if (!exactMap[k]) exactMap[k] = 0;
+        exactMap[k]++;
+      }
+      return map[key] > 1 && exactMap[exactKey] <= 1;
+    };
+  };
+
+  // ── DETECTOR 2: New account but someone with same name+birthday already took exam ──
+  // Catches: person registers fresh while their old account has email_sent=1 or exam_status=1
+  const detectExamTakenDuplicates = (list) => {
+    const examTakenKeys = new Set();
+    for (const p of list) {
+      const ln = normalizeName(p.last_name);
+      const fn = normalizeName(p.first_name);
+      const bd = p.birthOfDate ? String(p.birthOfDate).split("T")[0] : "";
+      if (!ln || !fn) continue;
+      if (Number(p.email_sent) === 1 || Number(p.exam_status) === 1) {
+        examTakenKeys.add(`${ln}|${fn}|${bd}`);
+      }
+    }
+    return (person) => {
+      const ln = normalizeName(person.last_name);
+      const fn = normalizeName(person.first_name);
+      const bd = person.birthOfDate
+        ? String(person.birthOfDate).split("T")[0]
+        : "";
+      if (!ln || !fn) return false;
+      const key = `${ln}|${fn}|${bd}`;
+      // Flag only the NEW account (hasn't taken exam yet)
+      return (
+        examTakenKeys.has(key) &&
+        Number(person.email_sent) !== 1 &&
+        Number(person.exam_status) !== 1
+      );
+    };
+  };
+
+  const isSuspiciousDuplicate = detectSuspiciousDuplicates(persons);
+  const isExamTakenDuplicate = detectExamTakenDuplicates(persons);
+
   // helper to make string comparisons robust
   const normalize = (s) => (s ?? "").toString().trim().toLowerCase();
   const selectedSemester = semesters.find(
@@ -696,6 +795,8 @@ const SuperAdminApplicantList = () => {
       const fullText =
         `${personData.first_name} ${personData.middle_name} ${personData.last_name} ${personData.emailAddress ?? ""} ${personData.applicant_number ?? ""}`.toLowerCase();
       const matchesSearch = fullText.includes(searchQuery.toLowerCase());
+
+      /* 🏫 CAMPUS */
 
       /* 🏫 CAMPUS */
       const matchesCampus =
@@ -720,6 +821,9 @@ const SuperAdminApplicantList = () => {
       const programInfo = allCurriculums.find(
         (opt) =>
           opt.curriculum_id?.toString() === personData.program?.toString(),
+      );
+      const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(
+        personData.program,
       );
 
       const matchesProgram =
@@ -786,6 +890,7 @@ const SuperAdminApplicantList = () => {
         matchesSubmittedDocs &&
         matchesDepartment &&
         matchesProgram &&
+        matchesRegistrarCurriculum &&
         matchesSchoolYear &&
         matchesSemester &&
         matchesDateRange
@@ -825,7 +930,10 @@ const SuperAdminApplicantList = () => {
 
   const [itemsPerPage, setItemsPerPage] = useState(100);
 
-  const totalPages = Math.ceil(filteredPersons.length / itemsPerPage);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredPersons.length / itemsPerPage),
+  );
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentPersons = filteredPersons.slice(
@@ -849,22 +957,43 @@ const SuperAdminApplicantList = () => {
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/all-applicants`) // 👈 This is the new endpoint
       .then((res) => res.json())
-
+      .then((data) => setPersons(data))
       .catch((err) => console.error("Error fetching applicants:", err));
   }, []);
 
   useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
     const fetchDepartments = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/departments`); // ✅ Update if needed
-        setDepartment(response.data);
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
       } catch (error) {
         console.error("Error fetching departments:", error);
       }
     };
 
     fetchDepartments();
-  }, []);
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -947,11 +1076,35 @@ const SuperAdminApplicantList = () => {
   const activeDocumentOptions = getDocumentOptionsForPerson(activePerson);
 
   useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (departmentIds.length) return;
+
     axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      setAllCurriculums(res.data);
-      setCurriculumOptions(res.data);
+      const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
+      setAllCurriculums(restrictedCurriculums);
+      setCurriculumOptions(restrictedCurriculums);
     });
-  }, []);
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  useEffect(() => {
+    if (!department.length) return;
+
+    if (
+      selectedDepartmentFilter &&
+      !department.some(
+        (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter),
+      )
+    ) {
+      setSelectedDepartmentFilter("");
+      handleDepartmentChange("");
+    }
+  }, [department]);
 
   const handleDepartmentChange = (selectedDept) => {
     setSelectedDepartmentFilter(selectedDept);
@@ -962,198 +1115,153 @@ const SuperAdminApplicantList = () => {
         allCurriculums.filter((opt) => opt.dprtmnt_name === selectedDept),
       );
     }
-    setSelectedProgramFilter("");
+    if (!isProgramLocked) setSelectedProgramFilter("");
   };
 
   const [applicants, setApplicants] = useState([]);
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
+
+  const handleExportApplicantListPdf = async () => {
     const resolvedCampusAddress = campusAddress || "No address set in Settings";
 
-    // ✅ Dynamic logo and company name
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
-    // ✅ Split company name into two balanced lines
     const words = name.split(" ");
     const middleIndex = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    // ✅ Generate printable HTML
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-    newWin.document.write(`
-       <html>
-         <head>
-           <title>Applicant List</title>
-          <style>
-   @page { size: A4 landscape; margin: 5mm; }
- 
-   body {
-     font-family: Arial;
-     margin: 0;
-     padding: 0;
-   }
- 
-   .print-container {
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     text-align: center;
-     padding-left: 10px;
-     padding-right: 10px;
-   }
- 
- .print-header {
-   position: relative;
-   width: 100%;
-   text-align: center;
-   margin-top: 10px;
- }
- 
- .print-header img {
-   position: absolute;
-   left: 220px; /* adjust if needed */
-   top: -10px;
-   width: 120px;
-   height: 120px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-top {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   gap: 15px;
-   margin-left: 50px; /* ✅ your requested spacing */
- }
- 
- .header-top img {
-   width: 80px;
-   height: 80px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-text {
-   display: inline-block;
-   padding-left: 100px; /* ✅ VERY IMPORTANT (logo width + spacing) */
- }
- 
-   table {
-     border-collapse: collapse;
-     width: 100%;
-     margin-top: 20px;
-     border: 1.5px solid black; /* slightly thicker for landscape clarity */
-     table-layout: fixed;
-   }
- 
-   th, td {
-     border: 1.5px solid black;
-     padding: 6px 8px;
-     font-size: 13px; /* slightly bigger (more space in landscape) */
-     text-align: center;
-     word-wrap: break-word;
-   }
- 
-   table tr td:last-child,
-   table tr th:last-child {
-     border-right: 1.5px solid black !important;
-   }
- 
-   th {
-     background-color: lightgray;
-     color: black;
-     -webkit-print-color-adjust: exact;
-     print-color-adjust: exact;
-   }
- </style>
-         </head>
-         <body onload="window.print(); setTimeout(() => window.close(), 100);">
-           <div class="print-container">
-   
-             <!-- ✅ HEADER -->
-        <div class="print-header">
-   <img src="${logoSrc}" alt="School Logo" />
- 
-   <div class="header-text">
-                 <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-   
-                 <!-- ✅ Dynamic company name -->
-                 ${name
+    // ✅ Department label (left corner) — selectedDepartmentFilter already
+    // stores the dprtmnt_name string (see matchesDepartment filter logic),
+    // so no lookup needed, just fall back when nothing's selected.
+    const selectedDepartmentLabel = selectedDepartmentFilter || "All Departments";
+
+    // ✅ Program label (right corner) — selectedProgramFilter stores
+    // program_code, so look up the full description from curriculumOptions.
+    const selectedProgramLabel = selectedProgramFilter
+      ? curriculumOptions.find(
+        (p) => p.program_code === selectedProgramFilter,
+      )?.program_description || selectedProgramFilter
+      : "All Programs";
+
+    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+    // no onload print script. The server wraps this with matching CSS.
+    const innerHtml = `
+    <div class="print-header">
+
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
+
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
+
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${name
         ? `
-                       <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                         ${firstLine}
-                       </b>
-                       ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                               <b>${secondLine}</b>
-                             </div>`
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                       <b>${secondLine}</b>
+                     </div>`
           : ""
         }
-                     `
+            `
         : ""
       }
-   
-                 <!-- ✅ Dynamic campus address -->
-                 <div style="font-size: 13px; font-family: Arial">${resolvedCampusAddress}</div>
-   
-                 <div style="margin-top: 30px;">
-                   <b style="font-size: 24px; letter-spacing: 1px;">Applicant List</b>
-                 </div>
-               </div>
-             </div>
-   
-             <!-- ✅ TABLE -->
-             <table>
-               <thead>
-                
-                 <tr>
-     <th style="width:10%">Applicant ID</th>
-     <th style="width:35%">Applicant Name</th>
-     <th style="width:15%">Program</th>
-     <th style="width:10%">SHS GWA</th>
-     <th style="width:10%">Date Applied</th>
-     <th style="width:20%">Status</th>
- 
-                 </tr>
-               </thead>
-               <tbody>
-                 ${filteredPersons
-        .map(
-          (person) => `
-                       <tr>
-                         <td style="width:10%">${person.applicant_number || ""}</td>
-                         <td style="width:40%">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                         <td style="width:15%">${allCurriculums.find(
+
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">Applicant List</b>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:9%">Applicant ID</th>
+          <th style="width:28%">Applicant Name</th>
+          <th style="width:16%">Department</th>
+          <th style="width:11%">Program</th>
+          <th style="width:8%">SHS GWA</th>
+          <th style="width:10%">Date Applied</th>
+          <th style="width:18%">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filteredPersons
+        .map((person) => {
+          const programInfo = allCurriculums.find(
             (item) =>
-              item.curriculum_id?.toString() ===
-              person.program?.toString(),
-          )?.program_code ?? "N/A"
-            }</td>                 
-                         <td style="width:10%">${person.generalAverage1 || ""}</td>
-                         <td style="width:10%">${new Date(
-              person.created_at.split("T")[0],
-            ).toLocaleDateString("en-PH", {
-              year: "numeric",
-              month: "short",
-              day: "2-digit",
-            })}</td>
-                         <td style="width:15%">${getApplicantStatus(person)}</td>
-                       </tr>
-                     `,
-        )
+              item.curriculum_id?.toString() === person.program?.toString(),
+          );
+          return `
+              <tr>
+                <td>${person.applicant_number || ""}</td>
+                <td class="applicant-name">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
+                <td>${programInfo?.dprtmnt_name ?? "N/A"}</td>
+                <td>${programInfo?.program_code ?? "N/A"}</td>
+                <td>${person.generalAverage1 || ""}</td>
+                <td>${new Date(
+            person.created_at.split("T")[0],
+          ).toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+          })}</td>
+                <td>${getApplicantStatus(person)}</td>
+              </tr>
+            `;
+        })
         .join("")}
-               </tbody>
-             </table>
-           </div>
-         </body>
-       </html>
-     `);
-    newWin.document.close();
+      </tbody>
+    </table>
+    </div>
+  `;
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-applicant-list-pdf`,
+        { html: innerHtml },
+        {
+          responseType: "blob",
+          headers: getFlatAuditHeaders({
+            "x-employee-id": employeeID,
+            "x-page-id": pageId,
+          }),
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Applicant List PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Applicant List PDF.",
+        severity: "error",
+      });
+    }
   };
 
   // Put this at the very bottom before the return
@@ -1166,24 +1274,25 @@ const SuperAdminApplicantList = () => {
   }
 
   // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
+
 
   return (
     <Box
@@ -1363,8 +1472,9 @@ const SuperAdminApplicantList = () => {
           {/* Right Side: Print Button + Dates (in one row) */}
           <Box display="flex" alignItems="flex-end" gap={2}>
             {/* Print Button */}
+
             <button
-              onClick={printDiv}
+              onClick={handleExportApplicantListPdf}
               style={{
                 padding: "5px 20px",
                 border: "2px solid black",
@@ -1394,7 +1504,7 @@ const SuperAdminApplicantList = () => {
               type="button"
             >
               <FcPrint size={20} />
-              Print Applicant List
+              Download Applicant List
             </button>
 
             {/* From Date */}
@@ -1774,7 +1884,6 @@ const SuperAdminApplicantList = () => {
             </Box>
           </Box>
 
-          {/* RIGHT COLUMN: Department & Program */}
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="center" gap={1}>
               <Typography fontSize={13} sx={{ minWidth: "100px" }}>
@@ -1782,7 +1891,7 @@ const SuperAdminApplicantList = () => {
               </Typography>
               <FormControl size="small" sx={{ width: "400px" }}>
                 <Select
-                  value={selectedDepartmentFilter}
+                  value={selectedDepartmentFilterValue}
                   onChange={(e) => {
                     const selectedDept = e.target.value;
                     setSelectedDepartmentFilter(selectedDept);
@@ -1790,6 +1899,7 @@ const SuperAdminApplicantList = () => {
                   }}
                   displayEmpty
                 >
+                  <MenuItem value="">All Departments</MenuItem>
                   {department.map((dep) => (
                     <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})
@@ -1805,11 +1915,14 @@ const SuperAdminApplicantList = () => {
               </Typography>
               <FormControl size="small" sx={{ width: "350px" }}>
                 <Select
-                  value={selectedProgramFilter}
+                  value={selectedProgramFilterValue}
                   onChange={(e) => setSelectedProgramFilter(e.target.value)}
+                  disabled={isProgramLocked}
                   displayEmpty
                 >
-                  <MenuItem value="">All Programs</MenuItem>
+                  {!isProgramLocked && (
+                    <MenuItem value="">All Programs</MenuItem>
+                  )}
                   {curriculumOptions.map((prog) => (
                     <MenuItem
                       key={prog.curriculum_id}
@@ -1821,7 +1934,6 @@ const SuperAdminApplicantList = () => {
                 </Select>
               </FormControl>
             </Box>
-
           </Box>
         </Box>
         <Box display="flex" flexDirection="column" alignItems="center" gap={1} mb={1}>
@@ -2728,4 +2840,4 @@ const SuperAdminApplicantList = () => {
   );
 };
 
-export default SuperAdminApplicantList;
+export default ApplicantListRegistrar;

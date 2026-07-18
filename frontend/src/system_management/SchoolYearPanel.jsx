@@ -23,6 +23,8 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import CloseIcon from "@mui/icons-material/Close";
+import { useNavigate } from "react-router-dom";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
@@ -35,6 +37,7 @@ import useAuditMac from "../utils/useAuditMac";
 const SchoolYearPanel = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const navigate = useNavigate();
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [borderColor, setBorderColor] = useState("#000000");
@@ -48,6 +51,16 @@ const SchoolYearPanel = () => {
   const [loading, setLoading] = useState(false);
 
   const pageId = 55;
+
+  // 🔐 Identity verification (password gate) state
+  const [authOpen, setAuthOpen] = useState(true);
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authPassed, setAuthPassed] = useState(false);
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockTimer, setLockTimer] = useState(0);
+  const lockIntervalRef = useRef(null);
 
   const getAuditHeaders = () => ({
     headers: {
@@ -111,6 +124,102 @@ const SchoolYearPanel = () => {
       setLoading(false);
     }
   };
+
+  // 🔐 Handle password verification submit
+  const handleAuthSubmit = async () => {
+    if (isLocked) return;
+    if (!authPassword) {
+      setAuthError("Password is required.");
+      return;
+    }
+    try {
+      const personId = localStorage.getItem("person_id");
+      const res = await axios.post(`${API_BASE_URL}/api/verify-password`, {
+        person_id: personId,
+        password: authPassword,
+      });
+
+      if (res.data.success) {
+        setAuthPassed(true);
+        setAuthOpen(false);
+        setIsLocked(false);
+        setLockTimer(0);
+        if (lockIntervalRef.current) clearInterval(lockIntervalRef.current);
+      }
+    } catch (err) {
+      const data = err.response?.data;
+
+      if (data?.locked) {
+        // 🔒 Backend says locked — start countdown from remainingSeconds
+        setIsLocked(true);
+        setLockTimer(data.remainingSeconds);
+        setAuthError(data.message);
+        setAuthPassword("");
+
+        if (lockIntervalRef.current) clearInterval(lockIntervalRef.current);
+
+        lockIntervalRef.current = setInterval(() => {
+          setLockTimer((prev) => {
+            if (prev <= 1) {
+              clearInterval(lockIntervalRef.current);
+              setIsLocked(false);
+              setAuthError("");
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        // ❌ Wrong password but not locked yet
+        setAuthPassword("");
+        setAuthError(
+          data?.attemptsLeft !== undefined
+            ? `❌ Invalid password. ${data.attemptsLeft} attempt(s) remaining.`
+            : data?.message || "❌ Invalid password.",
+        );
+      }
+    }
+  };
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (lockIntervalRef.current) clearInterval(lockIntervalRef.current);
+    };
+  }, []);
+
+  // 🔒 Check lock status on mount (handles page reload)
+  useEffect(() => {
+    const personId = localStorage.getItem("person_id");
+    if (!personId) return;
+
+    axios
+      .get(`${API_BASE_URL}/api/check-lock-status/${personId}`)
+      .then((res) => {
+        if (res.data.locked) {
+          setIsLocked(true);
+          setLockTimer(res.data.remainingSeconds);
+          setAuthError(
+            `Account locked. Try again in ${Math.ceil(res.data.remainingSeconds / 60)} minute(s).`,
+          );
+
+          if (lockIntervalRef.current) clearInterval(lockIntervalRef.current);
+
+          lockIntervalRef.current = setInterval(() => {
+            setLockTimer((prev) => {
+              if (prev <= 1) {
+                clearInterval(lockIntervalRef.current);
+                setIsLocked(false);
+                setAuthError("");
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        }
+      })
+      .catch((err) => console.error("Lock check failed:", err));
+  }, []);
 
   const fetchYears = async () => {
     try { const res = await axios.get(`${API_BASE_URL}/api/year_table`); setYears(res.data); }
@@ -499,6 +608,279 @@ const SchoolYearPanel = () => {
     }
   });
 
+  // 🔐 Require password verification before showing the panel
+  if (!authPassed) {
+    const minutes = Math.floor(lockTimer / 60);
+    const seconds = lockTimer % 60;
+
+    return (
+      <Dialog
+        open={authOpen}
+        onClose={(_, reason) => {
+          if (reason === "backdropClick" || isLocked) return;
+          setAuthOpen(false);
+          navigate("/registrar_dashboard");
+        }}
+        PaperProps={{
+          sx: {
+            borderRadius: "16px",
+            overflow: "hidden",
+            minWidth: 420,
+            boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: isLocked ? "#7a0000" : settings?.header_color || "#1976d2",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontWeight: "bold",
+            px: 3,
+            py: 2,
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              {isLocked ? "🔒" : "🔐"}
+            </Box>
+            <Box>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
+                {isLocked ? "Access Locked" : "Identity Verification"}
+              </Typography>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
+                {isLocked
+                  ? "Too many failed attempts"
+                  : "Confirm your credentials to access the School Year Panel"}
+              </Typography>
+            </Box>
+          </Box>
+          {!isLocked && (
+            <IconButton
+              onClick={() => {
+                setAuthOpen(false);
+                navigate("/registrar_dashboard");
+              }}
+              sx={{
+                color: "white",
+                border: "2px solid rgba(255,255,255,0.6)",
+                borderRadius: "50%",
+                width: 38,
+                height: 38,
+                padding: 0,
+                "&:hover": {
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  border: "2px solid white",
+                },
+              }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          )}
+        </DialogTitle>
+
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+          {isLocked ? (
+            <Box textAlign="center" py={2}>
+              <Box
+                sx={{
+                  width: 90,
+                  height: 90,
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #fff0f0, #ffe0e0)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 20px",
+                  border: "3px solid #f44336",
+                }}
+              >
+                <Typography fontSize={38}>🔒</Typography>
+              </Box>
+              <Typography
+                fontWeight="bold"
+                fontSize={18}
+                color="#c62828"
+                mb={1}
+              >
+                Account Temporarily Locked
+              </Typography>
+              <Typography fontSize={13} color="#555" mb={3}>
+                You've exceeded the maximum number of password attempts. Please
+                wait before trying again.
+              </Typography>
+              <Box
+                sx={{
+                  background: "linear-gradient(135deg, #fff3e0, #ffe0b2)",
+                  borderRadius: "12px",
+                  border: "1px solid #ffb74d",
+                  py: 2.5,
+                  px: 3,
+                  mb: 2,
+                }}
+              >
+                <Typography
+                  fontSize={12}
+                  color="#e65100"
+                  fontWeight="bold"
+                  mb={0.5}
+                >
+                  TIME REMAINING
+                </Typography>
+                <Typography
+                  fontSize={40}
+                  fontWeight="bold"
+                  color="#bf360c"
+                  fontFamily="monospace"
+                  letterSpacing={4}
+                >
+                  {String(minutes).padStart(2, "0")}:
+                  {String(seconds).padStart(2, "0")}
+                </Typography>
+                <Typography fontSize={11} color="#e65100" mt={0.5}>
+                  minutes : seconds
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Box>
+              <Typography
+                fontSize={13}
+                fontWeight="bold"
+                color="#333"
+                mb={0.5}
+                mt={2}
+              >
+                Enter your account password
+              </Typography>
+
+              <Typography
+                fontSize={12}
+                color="#666"
+                mb={1.5}
+              >
+                You must be logged in to your account to continue. For security purposes,
+                you have a maximum of <strong>3 password attempts</strong>. After 3
+                unsuccessful attempts, your account will be temporarily locked for
+                <strong> 3 minutes</strong>. Please make sure you enter the correct password.
+              </Typography>
+              <TextField
+                type={showAuthPassword ? "text" : "password"}
+                fullWidth
+                size="small"
+                placeholder="••••••••"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                autoComplete="new-password"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAuthSubmit();
+                }}
+                disabled={isLocked}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    fontSize: 14,
+                    "&.Mui-focused fieldset": {
+                      borderColor: settings?.header_color || "#1976d2",
+                      borderWidth: 2,
+                    },
+                  },
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowAuthPassword(!showAuthPassword)}
+                        size="small"
+                        edge="end"
+                      >
+                        {showAuthPassword ? (
+                          <VisibilityOff fontSize="small" />
+                        ) : (
+                          <Visibility fontSize="small" />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              {authError && !isLocked && (
+                <Box
+                  sx={{
+                    mt: 1.5,
+                    p: 1.25,
+                    backgroundColor: "#ffebee",
+                    borderRadius: "8px",
+                    border: "1px solid #ef9a9a",
+                  }}
+                >
+                  <Typography fontSize={12.5} color="#c62828">
+                    {authError}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
+          {!isLocked && (
+            <>
+              <Button
+                onClick={() => {
+                  setAuthOpen(false);
+                  navigate("/registrar_dashboard");
+                }}
+                color="error"
+              variant="outlined"
+              > 
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleAuthSubmit}
+                disabled={isLocked}
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  px: 3,
+                  fontWeight: "bold",
+                  backgroundColor: settings?.header_color || "#1976d2",
+                  "&:hover": { opacity: 0.9 },
+                }}
+              >
+                Verify & Continue
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+    );
+  }
+
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", padding: 2, mt: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
@@ -837,7 +1219,7 @@ const SchoolYearPanel = () => {
               <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                   <Typography fontSize="14px" fontWeight="bold" color="white">
-                Total School Years Records:  {filteredSchoolYears.length}
+                    Total School Years Records:  {filteredSchoolYears.length}
                   </Typography>
 
 
@@ -1095,14 +1477,37 @@ const SchoolYearPanel = () => {
 
               <DialogContentText sx={{ color: "#E65100", fontSize: "0.95rem", mb: 2.5 }}>
                 Activating this school year will deactivate all other school years.
+                All modules that filter by active school year — including Schedules,
+                Subject/Curriculum Tagging, and Student Tagging — will switch to this
+                new active term. Any subjects, schedules, or students tagged only
+                under the previous school year will no longer appear until they are
+                re-tagged under this new active school year.
+                <br />
+                <br />
                 Student status records are generated only for the immediate next term after
                 the currently active school year. If the active year is 2025, turning on
                 years below 2025 or years 2027 and above will not generate new student
                 status rows.
               </DialogContentText>
 
-              <Typography fontSize={13} fontWeight="bold" color="#333" mb={0.75}>
-                Enter your password
+              <Typography
+                fontSize={12}
+                color="#666"
+                mb={1.5}
+              >
+                To continue, verify your identity using your account password. You have a
+                maximum of <strong>3 password attempts</strong>. After 3 incorrect attempts,
+                your account will be temporarily locked for <strong>3 minutes</strong>.
+                Please make sure your password is correct before submitting.
+              </Typography>
+
+              <Typography
+                fontSize={13}
+                fontWeight="bold"
+                color="#333"
+                mb={0.75}
+              >
+                Enter your account password
               </Typography>
               <TextField
                 type={showActivatePassword ? "text" : "password"}
@@ -1168,7 +1573,8 @@ const SchoolYearPanel = () => {
           {!activateLocked && (
             <>
               <Button
-                variant="outlined"
+                   color="error"
+              variant="outlined"
                 onClick={resetActivateDialogState}
                 disabled={isActivating}
               >
@@ -1232,8 +1638,8 @@ const SchoolYearPanel = () => {
 
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button
-            variant="outlined"
-            color="error"
+          color="error"
+              variant="outlined"
             onClick={() => { setOpenDeleteDialog(false); setSchoolYearToDelete(null); }}
           >
             Cancel

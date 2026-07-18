@@ -308,178 +308,129 @@ const InterviewerApplicantList = () => {
 
 
 
-  const printDiv = () => {
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
+  const [exportingList, setExportingList] = useState(false);
 
-    const logoSrc = fetchedLogo || EaristLogo;
-    const name = companyName?.trim() || "No Company Name Available";
+  const handleExportInterviewerApplicantListPdf = async () => {
+    setExportingList(true);
+    try {
+      const resolvedAddress = campusAddress || settings?.address || "No address set in Settings";
+      const logoSrc = fetchedLogo || EaristLogo;
+      const name = companyName?.trim() || "";
 
-    const words = name.split(" ");
-    const mid = Math.ceil(words.length / 2);
-    const firstLine = words.slice(0, mid).join(" ");
-    const secondLine = words.slice(mid).join(" ");
+      const words = name.split(" ");
+      const middleIndex = Math.ceil(words.length / 2);
+      const firstLine = words.slice(0, middleIndex).join(" ");
+      const secondLine = words.slice(middleIndex).join(" ");
 
-    const branchList = Array.isArray(branches) ? branches : [];
-    const matchedBranch = branchList.find(
-      (branch) =>
-        String(branch?.branch).trim().toLowerCase() ===
-        String(interviewerData?.branch || "").trim().toLowerCase()
-    );
-    const campus =
-      matchedBranch?.address ||
-      matchedBranch?.branch_address ||
-      campusAddress ||
-      settings?.address ||
-      "No address set in Settings";
+      const startTimeStr = interviewerData?.start_time
+        ? new Date("1970-01-01T" + interviewerData.start_time).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+        : "";
+      const endTimeStr = interviewerData?.end_time
+        ? new Date("1970-01-01T" + interviewerData.end_time).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+        : "";
 
-    const today = new Date().toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    const borderColor = "black"; // border color for table
-
-    const htmlContent = `
-<html>
-<head>
-  <title>INTERVIEWER / QUALIFYING APPLICANT LIST</title>
-  <style>
-    @page { size: A4 landscape; margin: 5mm; }
-
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-
-    .print-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-    }
-
- .print-header img {
-   position: absolute;
-  left: 180px; /* adjust if needed */
-   top: -5px;
-   width: 120px;
-   height: 120px;
-   border-radius: 50%;
-   object-fit: cover;
- }
-    .print-header div { font-size: 12px; }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    th, td {
-      border: 1px solid ${borderColor};
-      padding: 3px 4px;
-      font-size: 10px;
-      line-height: 1.1;
-    }
-
-    th {
-      text-align: center;
-      background-color: lightgray;
-      color: black;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-
-    /* Column width balancing like Proctor */
-    th:nth-child(1) { width: 3%; }
-    th:nth-child(2) { width: 10%; }
-    th:nth-child(3) { width: 25%; }
-    th:nth-child(4) { width: 25%; }
-    th:nth-child(5) { width: 10%; }
-
-    .info-row {
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      margin-top: 8px;
-      font-size: 11px;
-    }
-  </style>
-</head>
-
-<body onload="window.print(); setTimeout(() => window.close(), 100);">
-  <div class="print-container">
+      const innerHtml = `
       <div class="print-header">
-        <img src="${logoSrc}" alt="School Logo" />
-        <div>
-          <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-          <b style="letter-spacing:1px; font-size:20px; font-family: Arial">${firstLine}</b>
-          ${secondLine ? `<div style="letter-spacing:1px; font-size: 20px; font-family: Arial"><b>${secondLine}</b></div>` : ""}
-          <div style="font-size: 13px; font-family: Arial">${campus}</div>
-          <div style="margin-top:50px;"><b style="font-size:20px; letter-spacing:1px;">INTERVIEWER / QUALIFYING APPLICANT LIST</b></div>
+        <div class="header-content">
+          <img src="${logoSrc}" alt="School Logo" />
+          <div class="header-text">
+            <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+            ${name
+          ? `<b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">${firstLine}</b>
+                 ${secondLine ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;"><b>${secondLine}</b></div>` : ""}`
+          : ""}
+            <div style="font-size: 12px; font-family: Arial">${resolvedAddress}</div>
+          </div>
         </div>
-      </div>
-    <!-- INTERVIEW DETAILS -->
-      <div style="margin-top:20px; width:100%; display:flex; flex-direction:column; gap:8px;">
-        <div style="display:flex; justify-content:space-between; width:100%;">
-          <span><b>Interviewer:</b> ${interviewerData?.interviewer || "N/A"}</span>
-          <span><b>Building:</b> ${interviewerData?.building_description || "N/A"}</span>
+
+        <div style="margin-top: 20px; text-align: center;">
+          <b style="font-size: 20px; letter-spacing: 1px;">INTERVIEWER / QUALIFYING APPLICANT LIST</b>
         </div>
-        <div style="display:flex; justify-content:space-between; width:100%;">
-          <span><b>Room:</b> ${interviewerData?.room_description || "N/A"}</span>
-          <span><b>Schedule:</b>
-            ${formatDateLong(interviewerData?.schedule_date) || ""} |
-            ${interviewerData?.start_time ? new Date("1970-01-01T" + interviewerData.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) : ""} -
-            ${interviewerData?.end_time ? new Date("1970-01-01T" + interviewerData.end_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) : ""}
-          </span>
+
+        <div class="info-row">
+          <div class="info-row-line">
+            <span><b>Interviewer:</b> ${interviewerData?.interviewer || "N/A"}</span>
+            <span><b>Building:</b> ${interviewerData?.building_description || "N/A"}</span>
+          </div>
+          <div class="info-row-line">
+            <span><b>Room:</b> ${interviewerData?.room_description || "N/A"}</span>
+            <span><b>Schedule:</b> ${interviewerData?.day_description || ""} | ${startTimeStr} - ${endTimeStr}</span>
+          </div>
         </div>
       </div>
 
-    <!-- TABLE -->
-    <table>
-      <thead>
-        <tr>
-        
-            <th style="width:20%">Applicant ID</th>
-            <th style="width:30%">Applicant Name</th>
-            <th style="width:30%">Program</th>
-            <th style="width:20%">Signature</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${applicants.map((a, index) => {
-      const programItem = curriculumOptions.find(item => item.curriculum_id?.toString() === a.program?.toString());
-      const program = programItem ? `(${programItem.program_code}) - ${programItem.program_description} ${programItem.major || ""}` : "N/A";
-
-      return `
+      <div class="table-wrapper">
+        <table>
+          <thead>
             <tr>
-             <td style="width:20%; text-align:center;">${a.applicant_number}</td>
-              <td style="width:30%; text-align:left;">${a.last_name}, ${a.first_name} ${a.middle_name || ""}</td>
-              <td style="width:30%; text-align:center;">${program}</td>
-              <td style="width:20%; text-align:center;"></td>
-            </tr>`;
-    }).join("")}
-        <tr>
-          <td colspan="5" style="text-align:right; font-weight:bold;">Total Applicants: ${applicants.length}</td>
-        </tr>
-      </tbody>
-    </table>
+              <th style="width:10%">Applicant ID</th>
+              <th style="width:30%">Applicant Name</th>
+              <th style="width:40%">Program</th>
+              <th style="width:20%">Signature</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${applicants
+          .map((a) => {
+            const programItem = curriculumOptions.find(
+              (item) => item.curriculum_id?.toString() === a.program?.toString(),
+            );
+            const program = programItem
+              ? `(${programItem.program_code}) - ${programItem.program_description} ${programItem.major || ""}`
+              : "N/A";
+            return `
+                  <tr>
+                    <td>${a.applicant_number}</td>
+                    <td class="applicant-name">${a.last_name}, ${a.first_name} ${a.middle_name || ""}</td>
+                    <td>${program}</td>
+                    <td></td>
+                  </tr>
+                `;
+          })
+          .join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
 
-  </div>
-</body>
-</html>
-`;
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-schedule-applicant-list-pdf`,
+        {
+          html: innerHtml,
+          title: "INTERVIEWER APPLICANT LIST",
+          fileNamePrefix: "Interviewer_Applicant_List",
+        },
+        { responseType: "blob" },
+      );
 
-    newWin.document.write(htmlContent);
-    newWin.document.close();
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Interviewer_Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Interviewer Applicant List PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Interviewer Applicant List PDF.",
+        severity: "error",
+        key: new Date().getTime(),
+      });
+    } finally {
+      setExportingList(false);
+    }
   };
-
-
 
   // 🔎 Auto-search whenever searchQuery changes (debounced)
   useEffect(() => {
@@ -508,25 +459,25 @@ const InterviewerApplicantList = () => {
     );
   }
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
     <Box
@@ -643,8 +594,7 @@ const InterviewerApplicantList = () => {
         ))}
       </Box> */}
 
-      <br />
-      <br />
+
 
       {interviewerData && (
         <Box
@@ -685,7 +635,7 @@ const InterviewerApplicantList = () => {
 
       {applicants.length > 0 && (
         <Button
-          onClick={printDiv}
+          onClick={handleExportInterviewerApplicantListPdf}
           variant="outlined"
           sx={{
             padding: "5px 20px",
@@ -710,7 +660,7 @@ const InterviewerApplicantList = () => {
           }}
           startIcon={<FcPrint size={20} />}
         >
-          Print Applicant List
+          Download Applicant List
         </Button>
 
       )}

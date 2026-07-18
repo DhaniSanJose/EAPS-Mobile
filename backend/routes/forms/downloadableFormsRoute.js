@@ -1065,4 +1065,802 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────
+// ADD THESE TWO ROUTES to your existing router file (the one with
+// /generate-admission-form-pdf, /generate-exam-permit-pdf, etc).
+// Paste them in above `module.exports = router;`.
+// They reuse launchBrowser(), waitForImages(), and insertPdfExportAudit()
+// which are already defined in that file — no new imports needed.
+// ─────────────────────────────────────────────────────────────────────────
+
+// ─── 7. Entrance Examination Scores ─────────────────────────────────────────
+router.post("/generate-exam-scores-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Portrait A4 @ 96dpi, matches the @page { size: A4 portrait; margin: 8mm; }
+    // rule from the original printDiv() window.
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Mirrors the <style> block from printDiv() in the Exam Scores component
+    // exactly (corner labels, table-wrapper, header-content, etc). The
+    // `html` payload here is just the .print-container's inner markup —
+    // the client no longer sends the onload="window.print()" wrapper since
+    // we're not opening a browser print dialog anymore.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      background: #ffffff;
+    }
+
+    .print-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .print-header {
+      position: relative;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .header-content img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      margin-top: 50px;
+    }
+
+    .header-text {
+      text-align: center;
+      margin-top: 50px;
+    }
+
+    .print-corner-label {
+      position: absolute;
+      top: 0;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .print-corner-label.left {
+      left: 0;
+      text-align: left;
+    }
+
+    .print-corner-label.right {
+      right: 0;
+      text-align: right;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1.5px solid black;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1.5px solid black;
+      padding: 4px 3px;
+      font-size: 9px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    th {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    td.applicant-name {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    // Not tied to a single applicant, so date-stamp the filename like the
+    // Admission Services CSM route does.
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fileName = `Entrance_Exam_Scores_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Entrance Examination Scores",
+      legacyAction: "EXAM_SCORES_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Entrance Examination Scores PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Exam Scores PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+// ─── 8. Applicant List ──────────────────────────────────────────────────────
+router.post("/generate-applicant-list-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Portrait A4 @ 96dpi, matches @page { size: A4 portrait; margin: 8mm; }
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Mirrors the corner-label header style used by the Entrance Examination
+    // Scores printDiv() (Department left / Program right, centered logo +
+    // school name block), now applied to the Applicant List export as well.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      background: #ffffff;
+    }
+
+    .print-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .print-header {
+      position: relative;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .header-content img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      margin-top: 50px;
+    }
+
+    .header-text {
+      text-align: center;
+      margin-top: 50px;
+    }
+
+    .print-corner-label {
+      position: absolute;
+      top: 0;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .print-corner-label.left {
+      left: 0;
+      text-align: left;
+    }
+
+    .print-corner-label.right {
+      right: 0;
+      text-align: right;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1.5px solid black;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1.5px solid black;
+      padding: 4px 3px;
+      font-size: 9px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    th {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    td.applicant-name {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fileName = `Applicant_List_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Applicant List",
+      legacyAction: "APPLICANT_LIST_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Applicant List PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Applicant List PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+
+router.post("/generate-schedule-applicant-list-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, title, fileNamePrefix } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+    if (!title || typeof title !== "string") {
+      return res.status(400).json({ message: "No title received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Portrait A4 @ 96dpi, matches @page { size: A4 portrait; margin: 8mm; }
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Same corner-label header style used by the Entrance Examination Scores /
+    // Applicant List export (Department|College left / Program right, centered
+    // logo + school name block), reused here for Proctor / Interviewer /
+    // Evaluator applicant list exports.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${title}</title>
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      background: #ffffff;
+    }
+
+    .print-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .print-header {
+      position: relative;
+      width: 100%;
+  
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .header-content img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+  
+    }
+
+    .header-text {
+      text-align: center;
+     
+    }
+
+
+    .info-row {
+      margin-top: 16px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .info-row-line {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 12px;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1.5px solid black;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1.5px solid black;
+      padding: 4px 3px;
+      font-size: 9px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    th {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    td.applicant-name {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const prefix = fileNamePrefix || title.replace(/[^a-z0-9]+/gi, "_");
+    const fileName = `${prefix}_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: title,
+      legacyAction: "SCHEDULE_APPLICANT_LIST_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the ${title} PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Schedule Applicant List PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
+  let browser;
+ 
+  try {
+    const { html } = req.body;
+ 
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+ 
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+ 
+    // Portrait A4 @ 96dpi, matches @page { size: A4 portrait; margin: 8mm; }
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+ 
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+ 
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+ 
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+ 
+    * { box-sizing: border-box; }
+ 
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      background: #ffffff;
+    }
+ 
+    .print-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+ 
+    .print-header {
+      position: relative;
+      width: 100%;
+      margin-top: 10px;
+    }
+ 
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+ 
+    .header-content img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      margin-top: 50px;
+    }
+ 
+    .header-text {
+      text-align: center;
+      margin-top: 50px;
+    }
+ 
+    .print-corner-label {
+      position: absolute;
+      top: 0;
+      font-size: 12px;
+      font-weight: bold;
+    }
+ 
+    .print-corner-label.left {
+      left: 0;
+      text-align: left;
+    }
+ 
+    .print-corner-label.right {
+      right: 0;
+      text-align: right;
+    }
+ 
+    .table-wrapper {
+      width: 100%;
+      margin-top: 20px;
+    }
+ 
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1.5px solid black;
+      table-layout: fixed;
+    }
+ 
+    th, td {
+      border: 1.5px solid black;
+      padding: 4px 3px;
+      font-size: 9px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+ 
+    th {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+ 
+    td.applicant-name {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+ 
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+ 
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+ 
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+    });
+ 
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+ 
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fileName = `Qualifying_Interview_Score_${timestamp}.pdf`;
+ 
+    await insertPdfExportAudit(req, {
+      documentLabel: "Qualifying / Interview Score",
+      legacyAction: "QUALIFYING_INTERVIEW_SCORE_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Qualifying / Interview Score PDF.`,
+    });
+ 
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+ 
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Qualifying/Interview Score PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 module.exports = router;

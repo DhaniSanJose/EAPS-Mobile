@@ -54,18 +54,19 @@ import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 
+
+
+
 const ApplicantScoringReadOnly = () => {
     useAuditMac();
-
-
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
     const [subtitleColor, setSubtitleColor] = useState("#555555");
     const [borderColor, setBorderColor] = useState("#000000");
     const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-    const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-    const [stepperColor, setStepperColor] = useState("#000000");
+    const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
+    const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
 
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
@@ -76,6 +77,7 @@ const ApplicantScoringReadOnly = () => {
     useEffect(() => {
         if (!settings) return;
 
+        // 🎨 Colors
         if (settings.title_color) setTitleColor(settings.title_color);
         if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
         if (settings.border_color) setBorderColor(settings.border_color);
@@ -83,6 +85,7 @@ const ApplicantScoringReadOnly = () => {
         if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
         if (settings.stepper_color) setStepperColor(settings.stepper_color);
 
+        // 🏫 Logo
         if (settings.logo_url) {
             setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
         } else {
@@ -117,6 +120,7 @@ const ApplicantScoringReadOnly = () => {
 
     const location = useLocation();
 
+
     const handleRowClick = (applicant) => {
         const personId = applicant?.person_id;
         if (!personId) return;
@@ -127,7 +131,7 @@ const ApplicantScoringReadOnly = () => {
 
         sessionStorage.setItem("admin_edit_person_id", String(personId));
         sessionStorage.setItem("edit_person_id", String(personId));
-        sessionStorage.setItem("admin_edit_person_id_source", "applicant_list_college");
+        sessionStorage.setItem("admin_edit_person_id_source", "applicant_list_registrar");
         sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
         sessionStorage.setItem("admin_edit_person_data", JSON.stringify(applicant));
 
@@ -136,49 +140,15 @@ const ApplicantScoringReadOnly = () => {
             sessionStorage.setItem("edit_applicant_number", String(searchValue));
         }
 
-        navigate(`/admin_dashboard1?person_id=${personId}`);
+        navigate(`/applicant_registrar_personal_information?person_id=${personId}`);
     };
 
-  const tabs = [
-      {
-        label: "Applicant List",
-        to: "/applicant_list_registrar",
-        icon: <SchoolIcon fontSize="large" />,
-      },
-      {
-        label: "Applicant Profile",
-        to: "/applicant_registrar_personal_information",
-        icon: <PersonIcon fontSize="large" />,
-      },
-      {
-        label: "Applicant Online Requirements",
-        to: "/applicant_online_requirements_registrar",
-        icon: <AssignmentIcon fontSize="large" />,
-      },
-      {
-        label: "Entrance Examination Score",
-        to: "/registrar_entrance_examination_score",
-        icon: <ScoreIcon fontSize="large" />,
-      },
-  
-      {
-        label: "Qualifying / Interview Exam Score",
-        to: "/registrar_qualifying_interview_score",
-        icon: <ScoreIcon fontSize="large" />,
-      },
-  
-      {
-        label: "Student Numbering Panel",
-        to: "/student_numbering",
-        icon: <FormatListNumberedIcon fontSize="large" />,
-      },
-  
-    ];
+
 
     const [hasAccess, setHasAccess] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    const pageId = 151;
+    const pageId = 168;
 
     const [employeeID, setEmployeeID] = useState("");
 
@@ -238,10 +208,6 @@ const ApplicantScoringReadOnly = () => {
 
 
     const navigate = useNavigate();
-    const [activeStep, setActiveStep] = useState(3);
-    const [clickedSteps, setClickedSteps] = useState(Array(tabs.length).fill(false));
-
-
 
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
@@ -249,13 +215,16 @@ const ApplicantScoringReadOnly = () => {
 
         if (!personIdFromUrl) return;
 
+        // fetch info of that person
         axios
             .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
             .then((res) => {
                 if (res.data?.applicant_number) {
 
+                    // AUTO-INSERT applicant_number into search bar
                     setSearchQuery(res.data.applicant_number);
 
+                    // If you have a fetchUploads() or fetchExamScore() — call it
                     if (typeof fetchUploadsByApplicantNumber === "function") {
                         fetchUploadsByApplicantNumber(res.data.applicant_number);
                     }
@@ -275,17 +244,6 @@ const ApplicantScoringReadOnly = () => {
         }
     }, [location, navigate]);
 
-    const handleStepClick = (index, to) => {
-        setActiveStep(index);
-
-        const pid = sessionStorage.getItem("admin_edit_person_id");
-        if (pid) {
-            navigate(`${to}?person_id=${pid}`);
-        } else {
-            navigate(to);
-        }
-    };
-
 
 
 
@@ -296,7 +254,27 @@ const ApplicantScoringReadOnly = () => {
     const [userID, setUserID] = useState("");
     const [user, setUser] = useState("");
     const [userRole, setUserRole] = useState("");
-    const [adminData, setAdminData] = useState({ dprtmnt_id: "", dprtmnt_ids: [] });
+    const [adminData, setAdminData] = useState({
+        dprtmnt_id: "",
+        dprtmnt_ids: [],
+    });
+    const scopeRevision = useRegistrarScopeRevision();
+
+    const fetchPersonData = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
+            setAdminData(res.data);
+            syncRegistrarScopeFromAdminData(res.data);
+        } catch (err) {
+            console.error("Error fetching admin data:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (user) fetchPersonData();
+    }, [user]);
+
+
 
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = queryParams.get("person_id")?.trim() || "";
@@ -322,12 +300,16 @@ const ApplicantScoringReadOnly = () => {
 
         const lastSelected = sessionStorage.getItem("admin_edit_person_id");
 
+        // ⭐ CASE 1: URL HAS ?person_id=
         if (queryPersonId !== "") {
             sessionStorage.setItem("admin_edit_person_id", queryPersonId);
             setUserID(queryPersonId);
             return;
         }
 
+
+
+        // ⭐ CASE 3: No URL ID and no last selected → start blank
         setUserID("");
     }, [queryPersonId]);
 
@@ -356,25 +338,10 @@ const ApplicantScoringReadOnly = () => {
         window.location.href = "/login";
     }, [queryPersonId]);
 
-    const fetchPersonData = async () => {
-        try {
-            const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
-            setAdminData(res.data);
-            syncRegistrarScopeFromAdminData(res.data);
-        } catch (err) {
-            console.error("Error fetching admin data:", err);
-        }
-    };
-
-    useEffect(() => {
-        if (user) {
-            fetchPersonData();
-        }
-    }, [user]);
-
 
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchError, setSearchError] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [snack, setSnack] = useState({ open: false, message: '', severity: 'info' });
     const [person, setPerson] = useState({
@@ -388,7 +355,6 @@ const ApplicantScoringReadOnly = () => {
         program: "",
         created_at: "",
         middle_code: "",
-        generalAverage1: "",
     });
 
     useEffect(() => {
@@ -413,14 +379,18 @@ const ApplicantScoringReadOnly = () => {
     }, [settings, branches, person?.campus]);
     const [allApplicants, setAllApplicants] = useState([]);
 
+    // ⬇️ Add this inside ApplicantList component, before useEffect
     const fetchApplicants = async () => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/api-applicant-scoring`);
 
+            // ✅ NEW: extract properly
             const { data, subjects } = res.data;
 
+            // ✅ set subjects (IMPORTANT for your scoring logic)
             setSubjects(subjects);
 
+            // ✅ Remove duplicates based on applicant_number
             const uniqueData = Object.values(
                 data.reduce((acc, curr) => {
                     acc[curr.applicant_number] = curr;
@@ -462,7 +432,7 @@ const ApplicantScoringReadOnly = () => {
 
     useEffect(() => {
         const delayDebounce = setTimeout(async () => {
-            if (searchQuery.trim() === "") return;
+            if (searchQuery.trim() === "") return; // Don't search empty
 
             try {
                 const res = await axios.get(`${API_BASE_URL}/api/search-person`, {
@@ -484,16 +454,72 @@ const ApplicantScoringReadOnly = () => {
                 console.error("Search failed:", err);
                 setSearchError("Applicant not found");
             }
-        }, 500);
+        }, 500); // debounce
 
         return () => clearTimeout(delayDebounce);
     }, [searchQuery]);
 
 
     const [curriculumOptions, setCurriculumOptions] = useState([]);
+    const [allCurriculums, setAllCurriculums] = useState([]);
+
+    useEffect(() => {
+        const departmentIds =
+            Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+                ? adminData.dprtmnt_ids
+                : adminData.dprtmnt_id
+                    ? [adminData.dprtmnt_id]
+                    : [];
+
+        if (!departmentIds.length) return;
+
+        const fetchCurriculums = async () => {
+            try {
+                const responses = await Promise.all(
+                    departmentIds.map((departmentId) =>
+                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+                    ),
+                );
 
 
+                const merged = responses.flatMap((response) => response.data || []);
+                const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
+                setCurriculumOptions(restricted);
+                setAllCurriculums(restricted);
+            } catch (error) {
+                console.error("Error fetching curriculum options:", error);
+            }
+        };
 
+        fetchCurriculums();
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+    const dedupeByProgramCode = (list) => {
+        const seen = new Map();
+        for (const item of list) {
+            if (!seen.has(item.program_code)) {
+                seen.set(item.program_code, item);
+            }
+        }
+        return [...seen.values()];
+    };
+
+    useEffect(() => {
+        const departmentIds =
+            Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+                ? adminData.dprtmnt_ids
+                : adminData.dprtmnt_id
+                    ? [adminData.dprtmnt_id]
+                    : [];
+
+        if (departmentIds.length) return;
+
+        axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
+            const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
+            setAllCurriculums(restrictedCurriculums);
+            setCurriculumOptions(restrictedCurriculums);
+        });
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
     const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
     const [sortBy, setSortBy] = useState("name");
@@ -503,36 +529,21 @@ const ApplicantScoringReadOnly = () => {
 
     const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState("");
     const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
-    const isProgramLocked = isRegistrarProgramSelectionLocked();
-    const scopeRevision = useRegistrarScopeRevision();
     const [department, setDepartment] = useState([]);
-    const [allCurriculums, setAllCurriculums] = useState([]);
-    const selectedDepartmentFilterValue =
-        selectedDepartmentFilter === "" ||
-            department.some(
-                (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter)
-            )
-            ? selectedDepartmentFilter
-            : "";
-    const selectedProgramFilterValue =
-        selectedProgramFilter === "" ||
-            curriculumOptions.some(
-                (prog) => String(prog.program_code) === String(selectedProgramFilter)
-            )
-            ? selectedProgramFilter
-            : "";
+    const filteredDepartments = department.filter((dep) =>
+        allCurriculums.some(
+            (curriculum) =>
+                String(curriculum.dprtmnt_id) === String(dep.dprtmnt_id) &&
+                (!person.campus || String(curriculum.components) === String(person.campus))
+        )
+    );
 
-    useEffect(() => {
-        if (!isProgramLocked) return;
-        const assignedCurriculum = curriculumOptions.find((prog) =>
-            isRegistrarCurriculumMatch(prog.curriculum_id)
-        );
-        if (assignedCurriculum?.program_code) {
-            setSelectedProgramFilter(assignedCurriculum.program_code);
-        }
-    }, [curriculumOptions, isProgramLocked]);
-
-
+    const filteredCurriculumOptions = allCurriculums.filter(
+        (curriculum) =>
+            (!person.campus || String(curriculum.components) === String(person.campus)) &&
+            (!selectedDepartmentFilter ||
+                String(curriculum.dprtmnt_id) === String(selectedDepartmentFilter))
+    );
 
     const [schoolYears, setSchoolYears] = useState([]);
     const [semesters, setSchoolSemester] = useState([]);
@@ -576,6 +587,7 @@ const ApplicantScoringReadOnly = () => {
         setSelectedSchoolSemester(event.target.value);
     };
 
+    // helper to make string comparisons robust
     const normalize = (s) => (s ?? "").toString().trim().toLowerCase();
     const selectedSemester = semesters.find(
         (sem) => String(sem.semester_id) === String(selectedSchoolSemester)
@@ -597,36 +609,43 @@ const ApplicantScoringReadOnly = () => {
     const filteredPersons = persons
         .filter((personData) => {
 
+            /* 🔎 SEARCH */
             const fullText = `${personData.first_name} ${personData.middle_name} ${personData.last_name} ${personData.emailAddress ?? ''} ${personData.applicant_number ?? ''}`.toLowerCase();
             const matchesSearch = fullText.includes(searchQuery.toLowerCase());
 
+            /* 🏫 CAMPUS */
             const matchesCampus =
                 !person.campus || String(personData.campus) === String(person.campus);
 
+            /* 📄 DOCUMENT STATUS */
             const matchesApplicantStatus =
                 selectedApplicantStatus === "" ||
                 normalize(personData.document_status) === normalize(selectedApplicantStatus);
 
+            /* 📝 REGISTRAR STATUS */
             const matchesRegistrarStatus =
                 selectedRegistrarStatus === "" ||
                 (selectedRegistrarStatus === "Submitted" && personData.registrar_status === 1) ||
                 (selectedRegistrarStatus === "Unsubmitted / Incomplete" && personData.registrar_status === 0);
 
+            /* 🎓 PROGRAM / DEPARTMENT */
             const programInfo = allCurriculums.find(
                 (opt) => opt.curriculum_id?.toString() === personData.program?.toString()
             );
             const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(
-                personData.program
+                personData.program,
+                allCurriculums,
             );
-
-            const matchesDepartment =
-                selectedDepartmentFilter === "" ||
-                programInfo?.dprtmnt_name === selectedDepartmentFilter;
 
             const matchesProgram =
                 selectedProgramFilter === "" ||
-                programInfo?.program_code === selectedProgramFilter;
+                String(personData.program) === String(selectedProgramFilter);
 
+            const matchesDepartment =
+                selectedDepartmentFilter === "" ||
+                String(programInfo?.dprtmnt_id) === String(selectedDepartmentFilter);
+
+            /* 📅 CREATED AT */
             const appliedDate = parseDateOnlyLocal(personData.created_at);
             if (!appliedDate) return true;
 
@@ -638,10 +657,12 @@ const ApplicantScoringReadOnly = () => {
                 selectedSchoolYear === "" ||
                 (schoolYear && String(applicantAppliedYear) === String(schoolYear.current_year));
 
+            /* 🕒 SEMESTER */
             const matchesSemester =
                 selectedSchoolSemester === "" ||
                 normalize(personData.middle_code) === normalize(selectedSemester?.semester_code);
 
+            /* 📆 DATE RANGE */
             let matchesDateRange = true;
 
             let from = parseDateOnlyLocal(person.fromDate);
@@ -659,9 +680,11 @@ const ApplicantScoringReadOnly = () => {
             if (from && appliedDate < from) matchesDateRange = false;
             if (to && appliedDate > to) matchesDateRange = false;
 
+            /* 📥 SUBMITTED DOCUMENTS */
             const matchesSubmittedDocs =
                 !showSubmittedOnly || personData.submitted_documents === 1;
 
+            /* 🧮 SCORES */
             const subjectScores = subjects.map((subject) =>
                 Number(personData.scores?.[subject.id] ?? 0)
             );
@@ -701,16 +724,16 @@ const ApplicantScoringReadOnly = () => {
                     finalRating >= Number(minFinalRating) &&
                     finalRating < Number(minFinalRating) + 1
                 );
-
+            /* FINAL RESULT */
             return (
                 matchesSearch &&
                 matchesCampus &&
                 matchesApplicantStatus &&
                 matchesRegistrarStatus &&
                 matchesSubmittedDocs &&
-                matchesRegistrarCurriculum &&
                 matchesDepartment &&
                 matchesProgram &&
+                matchesRegistrarCurriculum &&
                 matchesSchoolYear &&
                 matchesSemester &&
                 matchesDateRange &&
@@ -720,6 +743,7 @@ const ApplicantScoringReadOnly = () => {
             );
         })
 
+        /* 🔽 SORTING */
         .sort((a, b) => {
 
             const getFinalRating = (person) => {
@@ -737,6 +761,7 @@ const ApplicantScoringReadOnly = () => {
             const aFinal = getFinalRating(a);
             const bFinal = getFinalRating(b);
 
+            /* ⭐ IF TIE → FIRST COME FIRST SERVE */
             const dateA = parseDateOnlyLocal(a.created_at) || new Date(0);
             const dateB = parseDateOnlyLocal(b.created_at) || new Date(0);
 
@@ -765,7 +790,13 @@ const ApplicantScoringReadOnly = () => {
     }
 
     useEffect(() => {
-        const departmentIds = getDepartmentIdsFromAdminData(adminData);
+        const departmentIds =
+            Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+                ? adminData.dprtmnt_ids
+                : adminData.dprtmnt_id
+                    ? [adminData.dprtmnt_id]
+                    : [];
+
         if (!departmentIds.length) return;
 
         const fetchDepartments = async () => {
@@ -793,55 +824,28 @@ const ApplicantScoringReadOnly = () => {
     }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
     useEffect(() => {
-        const departmentIds = getDepartmentIdsFromAdminData(adminData);
-        if (!departmentIds.length) return;
+        if (!department.length) return;
 
-        const fetchCurriculums = async () => {
-            try {
-                const responses = await Promise.all(
-                    departmentIds.map((departmentId) =>
-                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
-                    ),
-                );
-                const merged = responses.flatMap((response) => response.data || []);
-                const restrictedCurriculums = restrictToRegistrarCurriculum(merged);
-                setAllCurriculums(restrictedCurriculums);
-                setCurriculumOptions(restrictedCurriculums);
-            } catch (error) {
-                console.error("Error fetching curriculum options:", error);
+        if (department.length === 1) {
+            const onlyDeptId = String(department[0].dprtmnt_id);
+            if (String(selectedDepartmentFilter) !== onlyDeptId) {
+                handleDepartmentChange(onlyDeptId);
             }
-        };
-
-        fetchCurriculums();
-    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
-
-    useEffect(() => {
-        const departmentIds = getDepartmentIdsFromAdminData(adminData);
-        if (departmentIds.length) return;
-
-        axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-            const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
-            setAllCurriculums(restrictedCurriculums);
-            setCurriculumOptions(restrictedCurriculums);
-        });
-    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
-
-    useEffect(() => {
-        if (department.length > 0 && allCurriculums.length > 0 && !selectedDepartmentFilter) {
-            const firstDept = department[0].dprtmnt_name;
-            setSelectedDepartmentFilter(firstDept);
-            setCurriculumOptions(
-                allCurriculums.filter((opt) => opt.dprtmnt_name === firstDept)
-            );
+        } else if (
+            selectedDepartmentFilter &&
+            !department.some(
+                (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+            )
+        ) {
+            handleDepartmentChange("");
         }
-    }, [department, allCurriculums, selectedDepartmentFilter]);
+    }, [department]);
 
     useEffect(() => {
         if (currentPage > totalPages) {
             setCurrentPage(totalPages || 1);
         }
     }, [filteredPersons.length, totalPages]);
-
 
     const handleSnackClose = (_, reason) => {
         if (reason === 'clickaway') return;
@@ -851,38 +855,21 @@ const ApplicantScoringReadOnly = () => {
 
 
 
-
     const handleCampusChange = (branchId) => {
         setPerson(prev => ({ ...prev, campus: branchId }));
-        if (!isProgramLocked) setSelectedProgramFilter("");
-        setCurrentPage(1);
-
-        // Re-apply department filter with first available department
-        if (department.length > 0) {
-            const firstDept = department[0].dprtmnt_name;
-            setSelectedDepartmentFilter(firstDept);
-            setCurriculumOptions(
-                allCurriculums.filter((opt) => opt.dprtmnt_name === firstDept)
-            );
-        }
-    };
-
-    const handleDepartmentChange = (selectedDept) => {
-        setSelectedDepartmentFilter(selectedDept);
-        if (!selectedDept) {
-            setCurriculumOptions(allCurriculums);
-        } else {
-            setCurriculumOptions(
-                allCurriculums.filter((opt) => opt.dprtmnt_name === selectedDept)
-            );
-        }
-        if (!isProgramLocked) setSelectedProgramFilter("");
+        setSelectedDepartmentFilter("");
+        setSelectedProgramFilter("");
         setCurrentPage(1);
     };
 
+    const handleDepartmentChange = (departmentId) => {
+        setSelectedDepartmentFilter(departmentId);
+        setSelectedProgramFilter("");
+        setCurrentPage(1);
+    };
 
-    const handleProgramFilterChange = (programCode) => {
-        setSelectedProgramFilter(programCode);
+    const handleProgramFilterChange = (curriculumId) => {
+        setSelectedProgramFilter(curriculumId);
         setCurrentPage(1);
     };
 
@@ -892,10 +879,8 @@ const ApplicantScoringReadOnly = () => {
     const divToPrintRef = useRef();
 
 
-    const printDiv = () => {
-        const newWin = window.open("", "Print-Window");
-        newWin.document.open();
 
+    const handleExportExamScoresPdf = async () => {
         const logoSrc = fetchedLogo || EaristLogo;
         const name = companyName?.trim() || "";
 
@@ -904,207 +889,550 @@ const ApplicantScoringReadOnly = () => {
         const firstLine = words.slice(0, middleIndex).join(" ");
         const secondLine = words.slice(middleIndex).join(" ");
 
-        const resolvedCampusAddress =
-            campusAddress || "No address set in Settings";
+        const resolvedCampusAddress = campusAddress || "No address set in Settings";
 
-        const htmlContent = `
-  <html>
-    <head>
-      <title>Entrance Examination Scores</title>
-      <style>
-        @page { size: A4 landscape; margin: 5mm; }
+        const selectedProgramLabel = selectedProgramFilter
+            ? filteredCurriculumOptions.find(
+                (p) => p.curriculum_id?.toString() === selectedProgramFilter,
+            )?.program_description || "N/A"
+            : "All Programs";
 
-        body {
-          font-family: Arial;
-          margin: 0;
-          padding: 0;
-        }
+        const selectedDepartmentLabel = selectedDepartmentFilter
+            ? department.find(
+                (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
+            )?.dprtmnt_name || "N/A"
+            : "All Departments";
 
-     .print-container {
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     text-align: center;
-     padding-left: 10px;
-     padding-right: 10px;
-   }
-
-       .print-header {
-  position: relative;
-  width: 100%;
-  text-align: center;
-  margin-top: 10px;
-}
-
-.print-header img {
-  position: absolute;
-  left: 220px;
-  top: -10px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.header-text {
-  display: inline-block;
-  padding-left: 100px;
-}
-        table {
-     border-collapse: collapse;
-     width: 100%;
-     margin-top: 20px;
-     border: 1.5px solid black;
-     table-layout: fixed;
-   }
-
-        th, td {
-          border: 1.5px solid black;
-          padding: 7px 8px;
-          font-size: 13px;
-          text-align: center;
-          word-wrap: break-word;
-        }
-
-        th {
-          background-color: lightgray;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-
-        th:last-child, td:last-child {
-          border-right: 1.5px solid black !important;
-        }
-
-      </style>
-    </head>
-
-    <body onload="window.print(); setTimeout(() => window.close(), 100);">
-              <div class="print-container">
-   
-             <!-- HEADER -->
+        // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+        // no onload print script. The server wraps this with matching CSS.
+        const innerHtml = `
     <div class="print-header">
-  <img src="${logoSrc}" alt="School Logo" />
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
 
-  <div class="header-text">
-    <div style="font-size: 13px; font-family: Arial">
-      Republic of the Philippines
-    </div>
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
 
-    ${name
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">
+            Republic of the Philippines
+          </div>
+
+          ${name
                 ? `
-        <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-          ${firstLine}
-        </b>
-        ${secondLine
-                    ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                 <b>${secondLine}</b>
-               </div>`
+                <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                  ${firstLine}
+                </b>
+                ${secondLine
+                    ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                         <b>${secondLine}</b>
+                       </div>`
                     : ""
                 }
-      `
+              `
                 : ""
             }
 
-    <div style="font-size: 13px; font-family: Arial">
-      ${resolvedCampusAddress}
+          <div style="font-size: 12px; font-family: Arial">
+            ${resolvedCampusAddress}
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">
+          Entrance Examination Scores
+        </b>
+      </div>
     </div>
 
-    <div style="margin-top: 30px;">
-      <b style="font-size: 24px; letter-spacing: 1px;">
-        Entrance Examination Scores
-      </b>
-    </div>
-  </div>
-</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:9%">Applicant ID</th>
+            <th style="width:26%">Applicant Name</th>
+            ${subjects.map((subject) => `<th style="width:6%">${subject.name}</th>`).join("")}
+            <th style="width:6%">Total</th>
+            <th style="width:6%">Score %</th>
+            <th style="width:7%">Status</th>
+          </tr>
+        </thead>
 
-        <!-- TABLE -->
-        <table>
-          <thead>
-            <tr>
-              <th style="width:10%">Applicant ID</th>
-              <th style="width:20%">Applicant Name</th>
-              <th style="width:12%">Program</th>
-              ${subjects.map(subject => `
-              <th style="width:7%">
-              ${subject.name}
-              </th>
-              `).join("")}
-              <th style="width:8%">Total</th>
-              <th style="width:8%">Score %</th>
-              <th style="width:8%">Status</th>
-            </tr>
-          </thead>
+        <tbody>
+          ${filteredPersons
+                .map((person) => {
+                    const subjectScores = subjects.map((subject) =>
+                        Number(
+                            editScores[person.person_id]?.[subject.id] ??
+                            person.scores?.[subject.id] ??
+                            0,
+                        ),
+                    );
 
-          <tbody>
-            ${filteredPersons.map((person) => {
-                const subjectScores = subjects.map((subject) => {
-                    return Number(person.scores?.[subject.id] ?? 0);
-                });
+                    const totalScore = subjectScores.reduce((sum, score) => sum + score, 0);
 
-                const totalScore = subjectScores.reduce((sum, score) => sum + score, 0);
+                    const maxTotal = subjects.reduce(
+                        (sum, subject) => sum + Number(subject.max_score || 0),
+                        0,
+                    );
 
-                const maxTotal = subjects.reduce(
-                    (sum, subject) => sum + Number(subject.max_score || 0),
-                    0
-                );
+                    const computedConvertedRating =
+                        maxTotal > 0 ? (totalScore / maxTotal) * 50 + 50 : 0;
 
-                const computedConvertedRating =
-                    maxTotal > 0
-                        ? ((totalScore / maxTotal) * 50) + 50
-                        : 0;
+                    // Fixed: this was previously written with invalid
+                    // template-literal syntax outside of backticks
+                    // (`${person.last_name},,`), which is a syntax error.
+                    const fullName = [
+                        person.last_name,
+                        person.first_name,
+                        person.middle_name,
+                        person.extension,
+                    ]
+                        .filter(Boolean)
+                        .join(" ");
 
-                return `
+                    return `
                 <tr>
                   <td>${person.applicant_number || ""}</td>
-                  <td>${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                   <td>${allCurriculums.find(
-                    (item) => item.curriculum_id?.toString() === person.program?.toString()
-                )?.program_code ?? "N/A"
-                    }</td>
-              ${subjects.map(subject => {
-                        const score = Number(person.scores?.[subject.id] ?? 0);
-                        return `<td>${score}</td>`;
-                    }).join("")}
+                  <td class="applicant-name">${fullName}</td>
+                  ${subjects
+                            .map((subject) => {
+                                const score = Number(
+                                    editScores[person.person_id]?.[subject.id] ??
+                                    person.scores?.[subject.id] ??
+                                    0,
+                                );
+                                return `<td>${score}</td>`;
+                            })
+                            .join("")}
                   <td>${totalScore}</td>
                   <td>${Number(computedConvertedRating).toFixed(2)}</td>
-                  <td>${person.status === 0 ? "PASSED" :
-                        person.status === 1 ? "FAILED" :
-                            ""}</td>
+                  <td>${person.status === 0
+                            ? "PASSED"
+                            : person.status === 1
+                                ? "FAILED"
+                                : ""
+                        }</td>
                 </tr>
               `;
-            }).join("")}
-          </tbody>
-        </table>
-
-      </div>
-    </body>
-  </html>
+                })
+                .join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 
-        newWin.document.write(htmlContent);
-        newWin.document.close();
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-exam-scores-pdf`,
+                { html: innerHtml },
+                {
+                    responseType: "blob",
+                    headers: {
+                        "x-audit-actor-id":
+                            localStorage.getItem("employee_id") ||
+                            localStorage.getItem("email") ||
+                            "unknown",
+                        "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+                    },
+                },
+            );
+
+            const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.setAttribute("download", `Entrance_Exam_Scores_${new Date().toISOString().slice(0, 10)}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Failed to generate Exam Scores PDF:", err);
+            // swap in your component's own snackbar/toast here if you have one
+            alert("Failed to generate PDF. Please try again.");
+        }
     };
 
-    // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+    const [activeStep, setActiveStep] = useState(3);
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+    const handleStepClick = (index, to) => {
+        setActiveStep(index);
+        const pid = sessionStorage.getItem("admin_edit_person_id");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
+        if (pid && to !== "/applicant_list_registrar") {
+            navigate(`${to}?person_id=${pid}`);
+        } else {
+            navigate(to);
         }
-    });
+    };
+    const tabs = [
+        {
+            label: "Applicant List",
+            to: "/applicant_list_registrar",
+            icon: <SchoolIcon fontSize="large" />,
+        },
+        {
+            label: "Applicant Profile",
+            to: "/applicant_registrar_personal_information",
+            icon: <PersonIcon fontSize="large" />,
+        },
+        {
+            label: "Applicant Online Requirements",
+            to: "/applicant_online_requirements_registrar",
+            icon: <AssignmentIcon fontSize="large" />,
+        },
+        {
+            label: "Entrance Examination Score",
+            to: "/registrar_entrance_examination_score",
+            icon: <ScoreIcon fontSize="large" />,
+        },
+
+        {
+            label: "Qualifying / Interview Exam Score",
+            to: "/registrar_qualifying_interview_score",
+            icon: <ScoreIcon fontSize="large" />,
+        },
+
+        {
+            label: "Student Numbering Panel",
+            to: "/student_numbering",
+            icon: <FormatListNumberedIcon fontSize="large" />,
+        },
+
+    ];
+
+
+
+    const [file, setFile] = useState(null);
+
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [editScores, setEditScores] = useState({});
+    const [saving, setSaving] = useState(false);
+
+
+    // Handlers
+    const handleFileChange = (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            setSelectedFile(e.target.files[0]);
+        }
+    };
+
+    const handleRemoveFile = () => {
+        setSelectedFile(null);
+        document.getElementById("excel-upload").value = "";
+    };
+
+    const formatFileSize = (bytes) => {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    };
+
+    const handleImport = async (userID) => {
+        try {
+            if (!selectedFile) {
+                setSnack({ open: true, message: "Please choose a file first!", severity: "warning" });
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append("file", selectedFile);
+            fd.append("userID", userID);
+            const actor = auditActor();
+            fd.append("audit_actor_id", actor.audit_actor_id);
+            fd.append("audit_actor_role", actor.audit_actor_role);
+            const macAddress = getLoginMacPayload().user_mac_address;
+            if (macAddress) fd.append("user_mac_address", macAddress);
+
+            const res = await axios.post(
+                `${API_BASE_URL}/api/exam/import`,
+                fd,
+                { headers: { "Content-Type": "multipart/form-data" } }
+            );
+
+            const errors = res.data.errors || [];
+
+            // ✅ ALL SUCCESS
+            if (res.data.success && errors.length === 0) {
+                setSnack({
+                    open: true,
+                    message: "✅ All applicants imported successfully!",
+                    severity: "success"
+                });
+            }
+
+            // ⚠️ PARTIAL SUCCESS (THIS IS YOUR CASE)
+            else if (errors.length > 0) {
+                // extract applicant IDs only
+                const failedApplicants = errors.map(e => {
+                    const match = e.match(/Applicant (\d+)/);
+                    return match ? match[1] : null;
+                }).filter(Boolean);
+
+                setSnack({
+                    open: true,
+                    message:
+                        `⚠️ Some applicants were NOT uploaded.\n\n` +
+                        `Failed: ${failedApplicants.join(", ")}\n\n` +
+                        `Others were successfully imported.`,
+                    severity: "warning"
+                });
+
+                console.warn("❌ Import errors:", errors);
+            }
+
+            // ❌ FULL FAILURE
+            else {
+                setSnack({
+                    open: true,
+                    message: res.data.message || res.data.error || "Failed to import",
+                    severity: "error"
+                });
+            }
+
+            await fetchApplicants();
+            setSelectedFile(null);
+
+            // ✅ Reset the file input so the same file can be re-imported without reload
+            const fileInput = document.getElementById("excel-upload");
+            if (fileInput) fileInput.value = "";
+
+        } catch (err) {
+            console.error("❌ Import error:", err);
+            setSnack({
+                open: true,
+                message: "Import failed: " + (err.response?.data?.error || err.message),
+                severity: "error"
+            });
+        }
+    };
+
+    const saveTimers = useRef({});
+
+    const handleScoreChange = (personId, subjectId, value) => {
+
+        const subject = subjects.find(s => s.id === subjectId);
+        const max = Number(subject?.max_score || 0);
+        const numericValue = Number(value);
+
+        // ❌ VALIDATION
+        if (numericValue > max) {
+            setSnack({
+                open: true,
+                message: `Score cannot exceed max score (${max})`,
+                severity: "error"
+            });
+            return; // ⛔ stop update
+        }
+
+        if (numericValue < 0) {
+            setSnack({
+                open: true,
+                message: "Score cannot be negative",
+                severity: "error"
+            });
+            return;
+        }
+
+        // ✅ NORMAL UPDATE
+        setEditScores((prev) => ({
+            ...prev,
+            [personId]: {
+                ...prev[personId],
+                [subjectId]: value
+            }
+        }));
+    };
+
+
+    const buildPayload = (person) => {
+        const editedScores = editScores[person.person_id] || {};
+
+        const subjectScores = subjects.map((subject) => ({
+            subject_id: subject.id,
+            score: Number(
+                editedScores[subject.id] ??
+                person.scores?.[subject.id] ??
+                0
+            )
+        }));
+
+        const total = subjectScores.reduce(
+            (sum, item) => sum + item.score,
+            0
+        );
+
+        const maxTotal = subjects.reduce(
+            (sum, subject) => sum + Number(subject.max_score || 0),
+            0
+        );
+
+        const percentage =
+            maxTotal > 0
+                ? (total / maxTotal) * 100
+                : 0;
+
+
+        return {
+            applicant_number: person.applicant_number,
+            scores: subjectScores,
+            total,
+            percentage,
+
+            status:
+                editedScores.status !== undefined
+                    ? editedScores.status      // 0, 1, or ""
+                    : person.status !== null && person.status !== undefined
+                        ? person.status
+                        : null
+        };
+    };
+
+    const saveSingleRow = async (person) => {
+        try {
+            setSaving(true);
+
+            const payload = buildPayload(person);
+
+            const res = await axios.post(
+                `${API_BASE_URL}/api/exam/save`,
+                {
+                    ...payload,
+                    ...auditActor(),
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                }
+            );
+
+            if (!res.data?.success) {
+                throw new Error(
+                    res.data?.error || "Save failed"
+                );
+            }
+
+            // convert array → object for frontend table
+            const updatedScores = payload.scores.reduce(
+                (acc, curr) => {
+                    acc[curr.subject_id] = curr.score;
+                    return acc;
+                },
+                {}
+            );
+
+            // update current row immediately
+            setPersons((prev) =>
+                prev.map((p) =>
+                    p.person_id === person.person_id
+                        ? {
+                            ...p,
+                            scores: updatedScores,
+                            total_score: payload.total,
+                            percentage: payload.percentage,
+
+                            status: payload.status
+                        }
+                        : p
+                )
+            );
+
+            // clear temporary edits
+            setEditScores((prev) => {
+                const copy = { ...prev };
+                delete copy[person.person_id];
+                return copy;
+            });
+
+            setSnack({
+                open: true,
+                message: "Row saved successfully!",
+                severity: "success"
+            });
+
+        } catch (err) {
+            console.error("SAVE ERROR:", err);
+
+            setSnack({
+                open: true,
+                message:
+                    "Save failed: " +
+                    (
+                        err.response?.data?.error ||
+                        err.message
+                    ),
+                severity: "error"
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const saveAllRows = async () => {
+        try {
+            setSaving(true);
+
+            for (const person of persons) {
+                const payload = buildPayload(person);
+
+                const res = await axios.post(
+                    `${API_BASE_URL}/api/exam/save`,
+                    {
+                        ...payload,
+                        ...auditActor(),
+                    },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${localStorage.getItem("token")}`
+                        }
+                    }
+                );
+
+                if (!res.data?.success) {
+                    throw new Error(
+                        res.data?.error ||
+                        `Failed saving ${person.applicant_number}`
+                    );
+                }
+            }
+
+            // refresh latest records from backend
+            await fetchApplicants();
+
+            // clear all temporary edits
+            setEditScores({});
+
+            setSnack({
+                open: true,
+                message: "All scores saved successfully!",
+                severity: "success"
+            });
+
+        } catch (err) {
+            console.error("SAVE ALL ERROR:", err);
+
+            setSnack({
+                open: true,
+                message:
+                    "Save All failed: " +
+                    (
+                        err.response?.data?.error ||
+                        err.message
+                    ),
+                severity: "error"
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
 
     // Put this at the very bottom before the return 
     if (loading || hasAccess === null) {
@@ -1116,6 +1444,28 @@ const ApplicantScoringReadOnly = () => {
             <Unauthorized />
         );
     }
+
+    // 🔒 Disable right-click
+    // document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    // document.addEventListener("keydown", (e) => {
+    //     const isBlockedKey =
+    //         e.key === "F12" ||
+    //         e.key === "F11" ||
+    //         (e.ctrlKey &&
+    //             e.shiftKey &&
+    //             (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "u") ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "p");
+
+    //     if (isBlockedKey) {
+    //         e.preventDefault();
+    //         e.stopPropagation();
+    //     }
+    // });
+
+
 
     return (
         <Box
@@ -1310,7 +1660,7 @@ const ApplicantScoringReadOnly = () => {
                         {/* Print ECAT Score */}
                         <div style={{ position: "relative", zIndex: 999 }}>
                             <button
-                                onClick={printDiv}
+                                onClick={handleExportExamScoresPdf}
                                 style={{
                                     padding: "5px 20px",
                                     border: "2px solid black",
@@ -1327,7 +1677,7 @@ const ApplicantScoringReadOnly = () => {
                                     textAlign: "center",
                                     gap: "8px",
                                     userSelect: "none",
-                                    width: "200px",
+                                    width: "230px",
                                     pointerEvents: "auto",
                                 }}
                                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
@@ -1337,7 +1687,7 @@ const ApplicantScoringReadOnly = () => {
                                 type="button"
                             >
                                 <FcPrint size={20} />
-                                Print ECAT Score
+                                Download ECAT Score
                             </button>
                         </div>
 
@@ -1596,44 +1946,43 @@ const ApplicantScoringReadOnly = () => {
                             <Typography fontSize={13} sx={{ minWidth: "100px" }}>Department:</Typography>
                             <FormControl size="small" sx={{ width: "400px" }}>
                                 <Select
-                                    value={selectedDepartmentFilterValue}
-                                    onChange={(e) => {
-                                        const selectedDept = e.target.value;
-                                        setSelectedDepartmentFilter(selectedDept);
-                                        handleDepartmentChange(selectedDept);
-                                    }}
+                                    value={selectedDepartmentFilter}
+                                    onChange={(e) => handleDepartmentChange(e.target.value)}
                                     displayEmpty
                                 >
-                                    {/* REMOVE the "All Departments" MenuItem — QualifyingExamScore doesn't have it */}
-                                    {department.map((dep) => (
-                                        <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
+                                    {department.length > 1 && (
+                                        <MenuItem value="">All Departments</MenuItem>
+                                    )}
+                                    {filteredDepartments.map((dep) => (
+                                        <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                                             {dep.dprtmnt_name} ({dep.dprtmnt_code})
                                         </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
+
+
                         </Box>
 
                         <Box display="flex" alignItems="center" gap={1}>
                             <Typography fontSize={13} sx={{ minWidth: "100px" }}>Program:</Typography>
                             <FormControl size="small" sx={{ width: "350px" }}>
                                 <Select
-                                    value={selectedProgramFilterValue}
+                                    value={selectedProgramFilter}
                                     onChange={(e) => handleProgramFilterChange(e.target.value)}
-                                    disabled={isProgramLocked}
                                     displayEmpty
                                 >
-                                    {!isProgramLocked && <MenuItem value="">All Programs</MenuItem>}
-                                    {curriculumOptions.map((prog) => (
-                                        <MenuItem key={prog.curriculum_id} value={prog.program_code}>
+                                    <MenuItem value="">All Programs</MenuItem>
+                                    {filteredCurriculumOptions.map((prog) => (
+                                        <MenuItem key={prog.curriculum_id} value={String(prog.curriculum_id)}>
                                             {prog.program_code} - {prog.program_description}
                                         </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
+
                         </Box>
                     </Box>
-
                 </Box>
                 <Box
                     display="flex"

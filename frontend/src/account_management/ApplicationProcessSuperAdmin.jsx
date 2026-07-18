@@ -14,7 +14,6 @@ import {
   Select,
   Card,
   TableCell,
-  Grid,
   TextField,
   MenuItem,
   InputLabel,
@@ -26,12 +25,13 @@ import {
   FormControlLabel,
   DialogActions,
   Modal,
+  Grid
 } from "@mui/material";
 import { io } from "socket.io-client";
 import { Snackbar, Alert } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
-import { getAuditConfig } from "../utils/auditEvents";
-import useAccountAuditMac from "./useAccountAuditMac";
+import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -42,11 +42,17 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import DateField from "../components/DateField";
 import DeleteIcon from "@mui/icons-material/Delete";
+import {
+  isRegistrarCurriculumMatch,
+  refreshRegistrarCurriculumId,
+  restrictToRegistrarCurriculum,
+  syncRegistrarScopeFromAdminData,
+} from "../utils/registrarCurriculumRestriction";
+import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import SaveIcon from "@mui/icons-material/Save";
 
 const ApplicationProcessAdmin = () => {
-  useAccountAuditMac();
-  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
+  useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
@@ -118,6 +124,7 @@ const ApplicationProcessAdmin = () => {
   const middle = Math.ceil(words.length / 2);
   const firstLine = words.slice(0, middle).join(" ");
   const secondLine = words.slice(middle).join(" ");
+
   const [documentOptions, setDocumentOptions] = useState([]);
 
   useEffect(() => {
@@ -163,7 +170,7 @@ const ApplicationProcessAdmin = () => {
     }
 
     // ✅ Always pass person_id in the URL
-    navigate(`/admin_dashboard1?person_id=${personId}`);
+    navigate(`//admission_personal_information?person_id=${personId}`);
   };
 
   const navigate = useNavigate();
@@ -193,31 +200,18 @@ const ApplicationProcessAdmin = () => {
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
-  const [adminData, setAdminData] = useState({ dprtmnt_id: "" });
+  const [adminData, setAdminData] = useState({
+    dprtmnt_id: "",
+    dprtmnt_ids: [],
+  });
+  const scopeRevision = useRegistrarScopeRevision();
 
   const [hasAccess, setHasAccess] = useState(null);
-  const [canCreate, setCanCreate] = useState(false);
-  const [canEdit, setCanEdit] = useState(false);
-  const [canDelete, setCanDelete] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const pageId = 147;
+  const pageId = 139;
 
   const [employeeID, setEmployeeID] = useState("");
-
-  const auditHeaders = () => ({
-    headers: {
-      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-page-id": pageId,
-      "x-audit-actor-id":
-        employeeID ||
-        localStorage.getItem("employee_id") ||
-        localStorage.getItem("email") ||
-        "unknown",
-      "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
-    },
-  });
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -248,21 +242,12 @@ const ApplicationProcessAdmin = () => {
       );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
-        setCanCreate(response.data?.can_create === 1);
-        setCanEdit(response.data?.can_edit === 1);
-        setCanDelete(response.data?.can_delete === 1);
       } else {
         setHasAccess(false);
-        setCanCreate(false);
-        setCanEdit(false);
-        setCanDelete(false);
       }
     } catch (error) {
       console.error("Error checking access:", error);
       setHasAccess(false);
-      setCanCreate(false);
-      setCanEdit(false);
-      setCanDelete(false);
       if (error.response && error.response.data.message) {
         console.log(error.response.data.message);
       } else {
@@ -300,7 +285,8 @@ const ApplicationProcessAdmin = () => {
   const fetchPersonData = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
-      setAdminData(res.data); // { dprtmnt_id: "..." }
+      setAdminData(res.data);
+      syncRegistrarScopeFromAdminData(res.data);
     } catch (err) {
       console.error("Error fetching admin data:", err);
     }
@@ -311,6 +297,13 @@ const ApplicationProcessAdmin = () => {
       fetchPersonData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (userRole !== "registrar" || !employeeID) return;
+    refreshRegistrarCurriculumId(employeeID).catch((err) => {
+      console.error("Error refreshing registrar scope:", err);
+    });
+  }, [userRole, employeeID]);
 
   const cleanName = (v) => (v ?? "").trim().toLowerCase();
 
@@ -512,15 +505,6 @@ const ApplicationProcessAdmin = () => {
     checked,
     person_id,
   ) => {
-    if (!canEdit) {
-      setSnack({
-        open: true,
-        message: "You do not have permission to update submitted documents.",
-        severity: "warning",
-      });
-      return;
-    }
-
     try {
       const res = await axios.put(
         `${API_BASE_URL}/api/submitted-documents/${upload_id}`,
@@ -528,7 +512,6 @@ const ApplicationProcessAdmin = () => {
           submitted_documents: checked ? 1 : 0,
           user_person_id: localStorage.getItem("person_id"),
         },
-        auditHeaders(),
       );
 
       if (checked && res.data.allCompleted) {
@@ -555,15 +538,6 @@ const ApplicationProcessAdmin = () => {
   };
 
   const handleRegistrarStatusChange = async (person_id, status) => {
-    if (!canEdit) {
-      setSnack({
-        open: true,
-        message: "You do not have permission to update registrar status.",
-        severity: "warning",
-      });
-      return;
-    }
-
     try {
       // Optimistic UI update para sabay silang magreflect
       setPersons((prev) =>
@@ -580,13 +554,9 @@ const ApplicationProcessAdmin = () => {
         ),
       );
 
-      await axios.put(
-        `${API_BASE_URL}/api/registrar-status/${person_id}`,
-        {
-          registrar_status: status,
-        },
-        auditHeaders(),
-      );
+      await axios.put(`${API_BASE_URL}/api/registrar-status/${person_id}`, {
+        registrar_status: status,
+      });
 
       fetchApplicants();
     } catch (err) {
@@ -622,6 +592,83 @@ const ApplicationProcessAdmin = () => {
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
   const [department, setDepartment] = useState([]);
   const [allCurriculums, setAllCurriculums] = useState([]);
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
+    const fetchDepartments = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
+    fetchDepartments();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
+    const fetchCurriculums = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+          ),
+        );
+
+
+        const merged = responses.flatMap((response) => response.data || []);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
+        setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
+      } catch (error) {
+        console.error("Error fetching curriculum options:", error);
+      }
+    };
+
+    fetchCurriculums();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
+
   const filteredDepartments = department.filter((dep) =>
     allCurriculums.some(
       (curriculum) =>
@@ -747,10 +794,14 @@ const ApplicationProcessAdmin = () => {
         (opt) =>
           opt.curriculum_id?.toString() === personData.program?.toString(),
       );
+      const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(
+        personData.program,
+        allCurriculums,
+      );
 
       const matchesProgram =
         selectedProgramFilter === "" ||
-        String(personData.program) === String(selectedProgramFilter);
+        String(programInfo?.program_code) === String(selectedProgramFilter);
 
       const matchesDepartment =
         selectedDepartmentFilter === "" ||
@@ -812,6 +863,7 @@ const ApplicationProcessAdmin = () => {
         matchesSubmittedDocs &&
         matchesDepartment &&
         matchesProgram &&
+        matchesRegistrarCurriculum &&
         matchesSchoolYear &&
         matchesSemester &&
         matchesDateRange
@@ -883,17 +935,51 @@ const ApplicationProcessAdmin = () => {
   }, []);
 
   useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
     const fetchDepartments = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/departments`); // ✅ Update if needed
-        setDepartment(response.data);
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
       } catch (error) {
         console.error("Error fetching departments:", error);
       }
     };
 
     fetchDepartments();
-  }, []);
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  useEffect(() => {
+    if (!department.length) return;
+
+    if (
+      selectedDepartmentFilter &&
+      !department.some(
+        (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+      )
+    ) {
+      handleDepartmentChange("");
+    }
+  }, [department]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -946,22 +1032,12 @@ const ApplicationProcessAdmin = () => {
   };
 
   const handleSaveMissingDocs = async () => {
-    if (!canEdit) {
-      setSnack({
-        open: true,
-        message: "You do not have permission to update missing documents.",
-        severity: "warning",
-      });
-      return;
-    }
-
     try {
       await axios.put(
         `${API_BASE_URL}/api/missing-documents/${activePerson.person_id}`,
         {
           missing_documents: selected, // this is your array of checked keys
         },
-        auditHeaders(),
       );
 
       setSnack({
@@ -985,13 +1061,6 @@ const ApplicationProcessAdmin = () => {
 
   const activeDocumentOptions = getDocumentOptionsForPerson(activePerson);
 
-  useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      setAllCurriculums(res.data);
-      setCurriculumOptions(res.data);
-    });
-  }, []);
-
   const handleCampusChange = (branchId) => {
     setPerson((prev) => ({ ...prev, campus: branchId }));
     setSelectedDepartmentFilter("");
@@ -1013,192 +1082,146 @@ const ApplicationProcessAdmin = () => {
   const [applicants, setApplicants] = useState([]);
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
+  const handleExportApplicantListPdf = async () => {
     const resolvedCampusAddress = campusAddress || "No address set in Settings";
 
-    // ✅ Dynamic logo and company name
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
-    // ✅ Split company name into two balanced lines
     const words = name.split(" ");
     const middleIndex = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    // ✅ Generate printable HTML
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-    newWin.document.write(`
-          <html>
-            <head>
-              <title>Applicant List</title>
-             <style>
-      @page { size: A4 landscape; margin: 5mm; }
-    
-      body {
-        font-family: Arial;
-        margin: 0;
-        padding: 0;
-      }
-    
-      .print-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        padding-left: 10px;
-        padding-right: 10px;
-      }
-    
-    .print-header {
-      position: relative;
-      width: 100%;
-      text-align: center;
-      margin-top: 10px;
-    }
-    
-    .print-header img {
-      position: absolute;
-      left: 220px; /* adjust if needed */
-      top: -10px;
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    
-    .header-top {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 15px;
-      margin-left: 50px; /* ✅ your requested spacing */
-    }
-    
-    .header-top img {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    
-    .header-text {
-      display: inline-block;
-      padding-left: 100px; /* ✅ VERY IMPORTANT (logo width + spacing) */
-    }
-    
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-top: 20px;
-        border: 1.5px solid black; /* slightly thicker for landscape clarity */
-        table-layout: fixed;
-      }
-    
-      th, td {
-        border: 1.5px solid black;
-        padding: 6px 8px;
-        font-size: 13px; /* slightly bigger (more space in landscape) */
-        text-align: center;
-        word-wrap: break-word;
-      }
-    
-      table tr td:last-child,
-      table tr th:last-child {
-        border-right: 1.5px solid black !important;
-      }
-    
-      th {
-        background-color: lightgray;
-        color: black;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-    </style>
-            </head>
-            <body onload="window.print(); setTimeout(() => window.close(), 100);">
-              <div class="print-container">
-      
-                <!-- ✅ HEADER -->
-           <div class="print-header">
-      <img src="${logoSrc}" alt="School Logo" />
-    
-      <div class="header-text">
-                    <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-      
-                    <!-- ✅ Dynamic company name -->
-                    ${name
+    // ✅ Department label (left corner) — selectedDepartmentFilter already
+    // stores the dprtmnt_name string (see matchesDepartment filter logic),
+    // so no lookup needed, just fall back when nothing's selected.
+    const selectedDepartmentLabel = selectedDepartmentFilter || "All Departments";
+
+    // ✅ Program label (right corner) — selectedProgramFilter stores
+    // program_code, so look up the full description from curriculumOptions.
+    const selectedProgramLabel = selectedProgramFilter
+      ? curriculumOptions.find(
+        (p) => p.program_code === selectedProgramFilter,
+      )?.program_description || selectedProgramFilter
+      : "All Programs";
+
+    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+    // no onload print script. The server wraps this with matching CSS.
+    const innerHtml = `
+     <div class="print-header">
+ 
+       <div class="print-corner-label left">
+         Department:<br/>${selectedDepartmentLabel}
+       </div>
+ 
+       <div class="print-corner-label right">
+         Program:<br/>${selectedProgramLabel}
+       </div>
+ 
+       <div class="header-content">
+         <img src="${logoSrc}" alt="School Logo" />
+ 
+         <div class="header-text">
+           <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+ 
+           ${name
         ? `
-                          <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                            ${firstLine}
-                          </b>
-                          ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                                  <b>${secondLine}</b>
-                                </div>`
+               <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                 ${firstLine}
+               </b>
+               ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                        <b>${secondLine}</b>
+                      </div>`
           : ""
         }
-                        `
+             `
         : ""
       }
-      
-                    <!-- ✅ Dynamic campus address -->
-                    <div style="font-size: 13px; font-family: Arial">${resolvedCampusAddress}</div>
-      
-                    <div style="margin-top: 30px;">
-                      <b style="font-size: 24px; letter-spacing: 1px;">Applicant List</b>
-                    </div>
-                  </div>
-                </div>
-      
-                <!-- ✅ TABLE -->
-                <table>
-                  <thead>
-                   
-                    <tr>
-        <th style="width:10%">Applicant ID</th>
-        <th style="width:35%">Applicant Name</th>
-        <th style="width:15%">Program</th>
-        <th style="width:10%">SHS GWA</th>
-        <th style="width:10%">Date Applied</th>
-        <th style="width:20%">Status</th>
-    
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${filteredPersons
-        .map(
-          (person) => `
-                          <tr>
-                            <td style="width:10%">${person.applicant_number || ""}</td>
-                            <td style="width:40%">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                            <td style="width:15%">${allCurriculums.find(
+ 
+           <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
+         </div>
+       </div>
+ 
+       <div style="margin-top: 20px; text-align: center;">
+         <b style="font-size: 20px; letter-spacing: 1px;">Applicant List</b>
+       </div>
+     </div>
+ 
+     <div class="table-wrapper">
+     <table>
+       <thead>
+         <tr>
+           <th style="width:9%">Applicant ID</th>
+           <th style="width:28%">Applicant Name</th>
+           <th style="width:16%">Department</th>
+           <th style="width:11%">Program</th>
+           <th style="width:8%">SHS GWA</th>
+           <th style="width:10%">Date Applied</th>
+           <th style="width:18%">Status</th>
+         </tr>
+       </thead>
+       <tbody>
+         ${filteredPersons
+        .map((person) => {
+          const programInfo = allCurriculums.find(
             (item) =>
-              item.curriculum_id?.toString() ===
-              person.program?.toString(),
-          )?.program_code ?? "N/A"
-            }</td>                 
-                            <td style="width:10%">${person.generalAverage1 || ""}</td>
-                            <td style="width:10%">${new Date(
-              person.created_at.split("T")[0],
-            ).toLocaleDateString("en-PH", {
-              year: "numeric",
-              month: "short",
-              day: "2-digit",
-            })}</td>
-                            <td style="width:15%">${getApplicantStatus(person)}</td>
-                          </tr>
-                        `,
-        )
+              item.curriculum_id?.toString() === person.program?.toString(),
+          );
+          return `
+               <tr>
+                 <td>${person.applicant_number || ""}</td>
+                 <td class="applicant-name">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
+                 <td>${programInfo?.dprtmnt_name ?? "N/A"}</td>
+                 <td>${programInfo?.program_code ?? "N/A"}</td>
+                 <td>${person.generalAverage1 || ""}</td>
+                 <td>${new Date(
+            person.created_at.split("T")[0],
+          ).toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+          })}</td>
+                 <td>${getApplicantStatus(person)}</td>
+               </tr>
+             `;
+        })
         .join("")}
-                  </tbody>
-                </table>
-              </div>
-            </body>
-          </html>
-        `);
-    newWin.document.close();
+       </tbody>
+     </table>
+     </div>
+   `;
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-applicant-list-pdf`,
+        { html: innerHtml },
+        {
+          responseType: "blob",
+          headers: getFlatAuditHeaders({
+            "x-employee-id": employeeID,
+            "x-page-id": pageId,
+          }),
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Applicant List PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Applicant List PDF.",
+        severity: "error",
+      });
+    }
   };
 
   const [snackbar, setSnackbar] = useState({
@@ -1209,6 +1232,8 @@ const ApplicationProcessAdmin = () => {
   const handleCloseSnackbar = () =>
     setSnackbar((prev) => ({ ...prev, open: false }));
 
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState(null);
   const [openAddApplicant, setOpenAddApplicant] = useState(false);
 
   const [applicantForm, setApplicantForm] = useState({
@@ -1218,15 +1243,62 @@ const ApplicationProcessAdmin = () => {
     birthOfDate: "",
     applyingAs: "",
     academicProgram: "",
+    program: "", // ✅ NEW — the actual course/curriculum applied for (curriculum_id)
     email: "",
     password: "",
   });
+
+  const filteredAddApplicantCurriculum = React.useMemo(() => {
+    const filtered = curriculumOptions.filter((item) => {
+      if (Number(item.e_status ?? 0) === 1) return false;
+
+      if (
+        applicantForm.academicProgram !== "" &&
+        applicantForm.academicProgram !== null
+      ) {
+        if (
+          Number(item.academic_program) !==
+          Number(applicantForm.academicProgram)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // ✅ De-dupe: /api/applied_program can return the same curriculum more
+    // than once (e.g. BSENTREP showing up 4x with identical slot counts).
+    // Keep the first occurrence per curriculum_id so the dropdown only
+    // lists each program once.
+    const seen = new Set();
+    const deduped = [];
+    for (const item of filtered) {
+      const dedupeKey =
+        item.curriculum_id ??
+        `${item.program_code}|${item.major ?? ""}|${item.components ?? ""}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      deduped.push(item);
+    }
+
+    return deduped;
+  }, [curriculumOptions, applicantForm.academicProgram]);
 
   const handleAddApplicant = async () => {
     if (!canCreate) {
       setSnack({
         open: true,
         message: "You do not have permission to create applicants.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    if (!applicantForm.program) {
+      setSnack({
+        open: true,
+        message: "Please select the Course/Program the applicant is applying for.",
         severity: "warning",
       });
       return;
@@ -1242,6 +1314,7 @@ const ApplicationProcessAdmin = () => {
         birthOfDate: applicantForm.birthOfDate,
         academicProgram: applicantForm.academicProgram,
         applyingAs: applicantForm.applyingAs,
+        program: applicantForm.program, // ✅ NEW — curriculum_id saved to person_table.program
       };
 
       const res = await axios.post(
@@ -1263,9 +1336,12 @@ const ApplicationProcessAdmin = () => {
         birthOfDate: "",
         applyingAs: "",
         academicProgram: "",
+        program: "",
         email: "",
         password: "",
       });
+
+      fetchApplicants();
     } catch (error) {
       console.error(error);
       setSnackbar(error.response?.data?.message || "Error adding applicant");
@@ -1273,30 +1349,28 @@ const ApplicationProcessAdmin = () => {
   };
 
   const handleApplicantChange = (e) => {
-    setApplicantForm({
-      ...applicantForm,
-      [e.target.name]: e.target.value,
+    const { name, value } = e.target;
+    setApplicantForm((prev) => {
+      const updated = { ...prev, [name]: value };
+      // Changing Academic Program invalidates whatever Course was picked,
+      // since the course list is scoped to the academic program.
+      if (name === "academicProgram") {
+        updated.program = "";
+      }
+      return updated;
     });
   };
 
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [accountToDelete, setAccountToDelete] = useState(null);
+
 
   const handleDeleteAccount = async (person_id) => {
-    if (!canDelete) {
-      setSnack({
-        open: true,
-        message: "You do not have permission to delete applicant accounts.",
-        severity: "warning",
-      });
-      return;
-    }
-
     try {
-      await axios.delete(
-        `${API_BASE_URL}/api/delete-account/${person_id}`,
-        auditHeaders(),
-      );
+      await axios.delete(`${API_BASE_URL}/api/delete-account/${person_id}`, {
+        headers: getFlatAuditHeaders({
+          "x-employee-id": employeeID,
+          "x-page-id": pageId,
+        }),
+      });
 
       setSnack({
         open: true,
@@ -1315,6 +1389,77 @@ const ApplicationProcessAdmin = () => {
       });
     }
   };
+
+  const [programAvailability, setProgramAvailability] = useState([]);
+  const [activeYearId, setActiveYearId] = useState(null);
+  const [activeSemesterId, setActiveSemesterId] = useState(null);
+
+  useEffect(() => {
+    const fetchActiveYearAndAvailability = async () => {
+      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+      const activeYear = yearRes.data[0];
+
+      if (activeYear) {
+        setActiveYearId(activeYear.year_id);
+        setActiveSemesterId(activeYear.semester_id);
+
+        const availRes = await axios.get(
+          `${API_BASE_URL}/api/programs/availability`,
+          {
+            params: {
+              year_id: activeYear.year_id,
+              semester_id: activeYear.semester_id,
+            },
+          }
+        );
+
+        setProgramAvailability(availRes.data);
+      }
+    };
+
+    fetchActiveYearAndAvailability();
+  }, []);
+
+  const availabilityMap = React.useMemo(() => {
+    const map = {};
+    programAvailability.forEach((p) => {
+      map[p.curriculum_id] = {
+        remaining: Number(p.remaining),
+        isFull: Number(p.remaining) <= 0,
+        e_status: Number(p.e_status ?? 0),
+      };
+    });
+    return map;
+  }, [programAvailability]);
+
+  const filteredCurriculum = curriculumOptions.filter((item) => {
+    // Hide programs with e_status = 1 (except currently selected choice)
+    const isSelected =
+      String(item.curriculum_id) === String(person.program) ||
+      String(item.curriculum_id) === String(person.program2) ||
+      String(item.curriculum_id) === String(person.program3);
+    const eStatus =
+      availabilityMap[item.curriculum_id]?.e_status ?? Number(item.e_status ?? 0);
+    if (!isSelected && eStatus === 1) {
+      return false;
+    }
+
+    // ✅ CAMPUS FILTER
+
+
+    // ✅ ACADEMIC PROGRAM FILTER
+    if (person.academicProgram !== "" && person.academicProgram !== null) {
+      if (
+        Number(item.academic_program) !==
+        Number(person.academicProgram)
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
 
   // Put this at the very bottom before the return
   if (loading || hasAccess === null) {
@@ -1344,6 +1489,8 @@ const ApplicationProcessAdmin = () => {
       e.stopPropagation();
     }
   });
+
+
 
   return (
     <Box
@@ -1471,8 +1618,9 @@ const ApplicationProcessAdmin = () => {
             </Button>
 
             {/* Print Button */}
+
             <button
-              onClick={printDiv}
+              onClick={handleExportApplicantListPdf}
               style={{
                 padding: "5px 20px",
                 border: "2px solid black",
@@ -1502,7 +1650,7 @@ const ApplicationProcessAdmin = () => {
               type="button"
             >
               <FcPrint size={20} />
-              Print Applicant List
+              Download Applicant List
             </button>
 
             {/* From Date */}
@@ -1901,9 +2049,9 @@ const ApplicationProcessAdmin = () => {
                   }}
                   displayEmpty
                 >
-                  <MenuItem value="">Select College</MenuItem>
+                  <MenuItem value="">All Departments</MenuItem>
                   {department.map((dep) => (
-                    <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
+                    <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})
                     </MenuItem>
                   ))}
@@ -1924,7 +2072,7 @@ const ApplicationProcessAdmin = () => {
                   displayEmpty
                 >
                   <MenuItem value="">All Programs</MenuItem>
-                  {curriculumOptions.map((prog) => (
+                  {filteredCurriculumOptions.map((prog) => (
                     <MenuItem
                       key={prog.curriculum_id}
                       value={prog.program_code}
@@ -2147,7 +2295,7 @@ const ApplicationProcessAdmin = () => {
             <DialogTitle>Confirm Action</DialogTitle>
             <DialogContent>
               {confirmMessage ||
-                "Are you sure you want to update this applicant’s status?"}
+                "Are you sure you want to update this applicant's status?"}
             </DialogContent>
             <DialogActions>
               <Button
@@ -2231,7 +2379,7 @@ const ApplicationProcessAdmin = () => {
                     onChange={(e) => {
                       const checked = e.target.checked;
                       setConfirmMessage(
-                        `Are you sure you want to mark this applicant’s Original Documents as ${checked ? "Submitted" : "Unsubmitted"}?`,
+                        `Are you sure you want to mark this applicant's Original Documents as ${checked ? "Submitted" : "Unsubmitted"}?`,
                       );
                       setConfirmAction(() => async () => {
                         setPersons((prev) =>
@@ -2475,68 +2623,6 @@ const ApplicationProcessAdmin = () => {
                     </Button>
                   </Box>
                 </TableCell>
-                {/*
-                                                                            <TableCell sx={{ textAlign: "center", border: "2px solid maroon" }}>
-                                                                                {person.registrar_status === 1 ? (
-                                                                                    <Box
-                                                                                        sx={{
-                                                                                            background: "#4CAF50",
-                                                                                            color: "white",
-                                                                                            borderRadius: 1,
-                                                                                            p: 0.5,
-                                                                                        }}
-                                                                                    >
-                                                                                        <Typography sx={{ fontWeight: "bold" }}>Submitted</Typography>
-                                                                                    </Box>
-                                                                                ) : person.registrar_status === 0 ? (
-                                                                                    <Box
-                                                                                        sx={{
-                                                                                            background: "#F44336",
-                                                                                            color: "white",
-                                                                                            borderRadius: 1,
-                                                                                            p: 0.5,
-                                                                                        }}
-                                                                                    >
-                                                                                        <Typography sx={{ fontWeight: "bold" }}>
-                                                                                            Unsubmitted / Incomplete
-                                                                                        </Typography>
-                                                                                    </Box>
-                                                                                ) : (
-                                                                                    <Box display="flex" justifyContent="center" gap={1}>
-                                                                                        <Button
-                                                                                            variant="contained"
-                                                                                            onClick={() => {
-                                                                                                setConfirmMessage(
-                                                                                                    "Are you sure you want to set Registrar Status to Submitted?"
-                                                                                                );
-                                                                                                setConfirmAction(() => async () => {
-                                                                                                    await handleRegistrarStatusChange(person.person_id, 1);
-                                                                                                });
-                                                                                                setConfirmOpen(true);
-                                                                                            }}
-                                                                                            sx={{ backgroundColor: "green", color: "white" }}
-                                                                                        >
-                                                                                            Submitted
-                                                                                        </Button>
-                                                                                        <Button
-                                                                                            variant="contained"
-                                                                                            onClick={() => {
-                                                                                                setConfirmMessage(
-                                                                                                    "Are you sure you want to set Registrar Status to Unsubmitted?"
-                                                                                                );
-                                                                                                setConfirmAction(() => async () => {
-                                                                                                    await handleRegistrarStatusChange(person.person_id, 0);
-                                                                                                });
-                                                                                                setConfirmOpen(true);
-                                                                                            }}
-                                                                                            sx={{ backgroundColor: "red", color: "white" }}
-                                                                                        >
-                                                                                            Unsubmitted
-                                                                                        </Button>
-                                                                                    </Box>
-                                                                                )}
-                                                                            </TableCell>
-                                                                            */}
               </TableRow>
             ))}
           </TableBody>
@@ -3008,38 +3094,20 @@ const ApplicationProcessAdmin = () => {
                     <MenuItem value="">
                       <em>Select Applying</em>
                     </MenuItem>
-
-                    <MenuItem value="Senior High School Graduate">
-                      Senior High School Graduate
-                    </MenuItem>
-
-                    <MenuItem value="Senior High School Graduating Student">
+                    <MenuItem value="1">Senior High School Graduate</MenuItem>
+                    <MenuItem value="2">
                       Senior High School Graduating Student
                     </MenuItem>
-
-                    <MenuItem value="ALS Passer">
+                    <MenuItem value="3">
                       ALS (Alternative Learning System) Passer
                     </MenuItem>
-
-                    <MenuItem value="Transferee">
+                    <MenuItem value="4">
                       Transferee from other University/College
                     </MenuItem>
-
-                    <MenuItem value="Cross Enrolee">
-                      Cross Enrolee Student
-                    </MenuItem>
-
-                    <MenuItem value="Foreign Applicant">
-                      Foreign Applicant/Student
-                    </MenuItem>
-
-                    <MenuItem value="Baccalaureate Graduate">
-                      Baccalaureate Graduate
-                    </MenuItem>
-
-                    <MenuItem value="Master Degree Graduate">
-                      Master Degree Graduate
-                    </MenuItem>
+                    <MenuItem value="5">Cross Enrolee Student</MenuItem>
+                    <MenuItem value="6">Foreign Applicant/Student</MenuItem>
+                    <MenuItem value="7">Baccalaureate Graduate</MenuItem>
+                    <MenuItem value="8">Master Degree Graduate</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -3076,6 +3144,70 @@ const ApplicationProcessAdmin = () => {
                     <MenuItem value="1">Graduate</MenuItem>
                     <MenuItem value="2">Techvoc</MenuItem>
                   </Select>
+                </FormControl>
+              </Grid>
+
+              {/* ✅ NEW — Course Applied (curriculum_id). This is the field that
+                  actually gets saved into person_table.program and is what the
+                  Applicant List table/PDF and Program filter dropdown read from. */}
+              <Grid item xs={12} md={6}>
+                <FormControl
+                  fullWidth
+                  required
+
+                >
+                  <InputLabel>Course Applied</InputLabel>
+                  <Select
+                    name="program"
+                    value={applicantForm.program || ""}
+                    onChange={handleApplicantChange}
+                    label="Course Applied"
+                  >
+                    <MenuItem value="">
+                      <em>Select Program</em>
+                    </MenuItem>
+
+                    {filteredAddApplicantCurriculum.map((item, index) => {
+                      const availability =
+                        availabilityMap[item.curriculum_id];
+                      const remaining = availability?.remaining ?? 0;
+                      const isFull = availability?.isFull;
+                      const branchLabel =
+                        branches.find(
+                          (b) => String(b.id) === String(item.components),
+                        )?.branch ?? "";
+
+                      return (
+                        <MenuItem
+                          key={item.curriculum_id ?? index}
+                          value={item.curriculum_id}
+                          disabled={isFull}
+                          sx={{
+                            color: isFull ? "red" : "inherit",
+                            fontWeight: isFull ? "bold" : "normal",
+                          }}
+                        >
+                          {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                            }${branchLabel ? ` (${branchLabel})` : ""}`}
+
+                          {/* Slot info */}
+                          {isFull ? (
+                            <span style={{ marginLeft: 8 }}>
+                              — FULL (0 slots left)
+                            </span>
+                          ) : (
+                            <span
+                              style={{ marginLeft: 8, color: "#2e7d32" }}
+                            >
+                              ({remaining} slots left)
+                            </span>
+                          )}
+                        </MenuItem>
+                      );
+                    })}
+                  </Select>
+
+
                 </FormControl>
               </Grid>
             </Grid>

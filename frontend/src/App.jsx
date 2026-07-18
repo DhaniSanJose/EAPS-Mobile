@@ -874,8 +874,8 @@ function App() {
 
                       <Route path="/applicant_services_survey" element={<ProtectedRoute allowedRoles={["applicant", "registrar"]}><ApplicantServicesSurvey /></ProtectedRoute>} />
                       <Route path="/office_of_the_registrar" element={<ProtectedRoute allowedRoles={["applicant"]}><OfficeOfTheRegistrar /></ProtectedRoute>} />
-                      <Route path="/verify_document_schedule_management" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentRoomAssignment /></ProtectedRoute>} />
-                      <Route path="/verify_document_room_assignment" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentScheduleManagement /></ProtectedRoute>} />
+                      <Route path="/verify_document_schedule_management" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentScheduleManagement /></ProtectedRoute>} />
+                      <Route path="/verify_document_room_assignment" element={<ProtectedRoute allowedRoles={["registrar"]}><VerifyDocumentRoomAssignment /></ProtectedRoute>} />
 
                       <Route path="/department_curriculum_panel" element={<ProtectedRoute><DepartmentCurriculumPanel /></ProtectedRoute>} />
                       <Route path="/program_slot_limit" element={<ProtectedRoute><ProgramSlotLimit /></ProtectedRoute>} />

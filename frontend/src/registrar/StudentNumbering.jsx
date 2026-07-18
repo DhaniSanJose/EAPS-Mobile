@@ -734,24 +734,30 @@ const StudentNumbering = () => {
 
     if (!departmentIds.length) return;
 
-    const fetchCurriculums = async () => {
+    const fetchDepartments = async () => {
       try {
         const responses = await Promise.all(
           departmentIds.map((departmentId) =>
-            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
           ),
         );
-        const merged = responses.flatMap((response) => response.data || []);
-        const restrictedCurriculums = restrictToRegistrarCurriculum(merged);
-        setAllCurriculums(restrictedCurriculums);
-        setCurriculumOptions(restrictedCurriculums);
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
       } catch (error) {
-        console.error("Error fetching curriculum options:", error);
+        console.error("Error fetching departments:", error);
       }
     };
 
-    fetchCurriculums();
+    fetchDepartments();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
 
   useEffect(() => {
     const departmentIds =
@@ -761,17 +767,38 @@ const StudentNumbering = () => {
           ? [adminData.dprtmnt_id]
           : [];
 
-    if (departmentIds.length) return;
+    if (!departmentIds.length) return;
 
-    axios
-      .get(`${API_BASE_URL}/api/applied_program`)
-      .then((res) => {
-        const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
-        setAllCurriculums(restrictedCurriculums);
-        setCurriculumOptions(restrictedCurriculums);
-      })
-      .catch((err) => console.error("Error fetching curriculum options:", err));
+    const fetchCurriculums = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+          ),
+        );
+
+
+        const merged = responses.flatMap((response) => response.data || []);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
+        setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
+      } catch (error) {
+        console.error("Error fetching curriculum options:", error);
+      }
+    };
+
+    fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   const maxButtonsToShow = 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
@@ -833,12 +860,6 @@ const StudentNumbering = () => {
     }
   }, [curriculumOptions, isProgramLocked]);
 
-  useEffect(() => {
-    if (department.length === 0 || selectedDepartmentFilter) return;
-    const firstDept = department[0].dprtmnt_name;
-    setSelectedDepartmentFilter(firstDept);
-    handleDepartmentChange(firstDept);
-  }, [department, selectedDepartmentFilter]);
 
 
 

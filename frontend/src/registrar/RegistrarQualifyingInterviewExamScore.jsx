@@ -42,46 +42,60 @@ import ScoreIcon from "@mui/icons-material/Score";
 import DateField from "../components/DateField";
 import PersonIcon from "@mui/icons-material/Person";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
-
-// ────────────────────────────────────────────────────────────────
-// READ-ONLY VIEW of Qualifying / Interview Exam Scores
-// Modeled after ApplicantScoringReadOnly.jsx (view-only for registrar)
-// No saving, importing, assigning, unassigning, status changes, or
-// email sending — this page is for viewing/printing only.
-// ────────────────────────────────────────────────────────────────
+import useAuditMac from "../utils/useAuditMac";
+import { io } from "socket.io-client";
 
 const QualifyingExamScoreReadOnly = () => {
+  useAuditMac();
+  const socket = useRef(null);
+
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
+  const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
+  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
+  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
 
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
+  const [shortTerm, setShortTerm] = useState("");
   const [campusAddress, setCampusAddress] = useState("");
   const [branches, setBranches] = useState([]);
 
   useEffect(() => {
     if (!settings) return;
 
+    // 🎨 Colors
     if (settings.title_color) setTitleColor(settings.title_color);
+    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
+    if (settings.main_button_color)
+      setMainButtonColor(settings.main_button_color);
+    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
+    if (settings.stepper_color) setStepperColor(settings.stepper_color);
 
+    // 🏫 Logo
     if (settings.logo_url) {
       setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
+    // 🏷️ School Info
     if (settings.company_name) setCompanyName(settings.company_name);
+    if (settings.short_term) setShortTerm(settings.short_term);
     if (settings.campus_address) setCampusAddress(settings.campus_address);
 
+    // ✅ Branches (JSON stored in DB)
     if (settings?.branches) {
       try {
         const parsed =
           typeof settings.branches === "string"
             ? JSON.parse(settings.branches)
             : settings.branches;
+
         setBranches(parsed);
       } catch (err) {
         console.error("Failed to parse branches:", err);
@@ -90,10 +104,26 @@ const QualifyingExamScoreReadOnly = () => {
     }
   }, [settings]);
 
+  useEffect(() => {
+    socket.current = io(API_BASE_URL, {
+      path: "/api/socket.io",
+      transports: ["websocket", "polling"],
+    });
+
+    return () => {
+      socket.current.disconnect();
+    };
+  }, []);
+  const words = companyName.trim().split(" ");
+  const middle = Math.ceil(words.length / 2);
+  const firstLine = words.slice(0, middle).join(" ");
+  const secondLine = words.slice(middle).join(" ");
+
   const location = useLocation();
-  const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
+
   const queryPersonId = (queryParams.get("person_id") || "").trim();
+
 
   const handleRowClick = (applicant) => {
     const personId = applicant?.person_id;
@@ -114,7 +144,7 @@ const QualifyingExamScoreReadOnly = () => {
       sessionStorage.setItem("edit_applicant_number", String(searchValue));
     }
 
-    navigate(`/applicant_college_personal_information?person_id=${personId}`);
+    navigate(`/applicant_registrar_personal_information?person_id=${personId}`);
   };
 
   const tabs = [
@@ -154,11 +184,17 @@ const QualifyingExamScoreReadOnly = () => {
   ];
 
 
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(4);
+  const [clickedSteps, setClickedSteps] = useState(
+    Array(tabs.length).fill(false),
+  );
 
   const handleStepClick = (index, to) => {
     setActiveStep(index);
+
     const pid = sessionStorage.getItem("admin_edit_person_id");
+
     if (pid) {
       navigate(`${to}?person_id=${pid}`);
     } else {
@@ -166,18 +202,213 @@ const QualifyingExamScoreReadOnly = () => {
     }
   };
 
-  // NOTE: adjust this pageId to whatever is registered for the
-  // read-only view in the page_access table (do not reuse the
-  // editable page's id).
-  const pageId = 152;
+  const COLLEGE_APPROVAL_STATUS = {
+    WAITING_LIST: 0,
+    ACCEPTED: 1,
+    REJECTED: 2,
+  };
 
-  const [hasAccess, setHasAccess] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [employeeID, setEmployeeID] = useState("");
+  const isCollegeStatusLocked = (person) =>
+    Number(person?.applicant_interview_status) === 1;
+
+  const buildPayload = (person, overrides = {}, options = {}) => {
+    const edits = { ...(editScores[person.person_id] || {}), ...overrides };
+    const selectedStatus = Number(
+      edits.status ?? person.college_approval_status ?? 0,
+    );
+    const includeStatus = options.includeStatus !== false;
+
+    return {
+      applicant_number: person.applicant_number,
+      qualifying_exam_score:
+        edits.qualifying_exam_score ?? person.qualifying_exam_score ?? 0,
+      qualifying_interview_score:
+        edits.qualifying_interview_score ??
+        person.qualifying_interview_score ??
+        0,
+      qualifying_status:
+        edits.qualifying_status !== undefined
+          ? edits.qualifying_status
+          : (person.qualifying_status ?? null), // ✅ NEW
+      interview_status_result:
+        edits.interview_status_result !== undefined
+          ? edits.interview_status_result
+          : (person.interview_status_result ?? null), // ✅ NEW
+      ...(includeStatus ? { status: selectedStatus } : {}),
+      user_person_id: userID,
+      audit_actor_id:
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      audit_actor_role:
+        localStorage.getItem("access_description") ||
+        userRole ||
+        localStorage.getItem("role") ||
+        "registrar",
+      audit_actor_email: localStorage.getItem("email") || "",
+      ...getLoginMacPayload(),
+    };
+  };
+
+  const auditPayload = (extra = {}) => ({
+    ...extra,
+    audit_actor_id:
+      employeeID ||
+      localStorage.getItem("employee_id") ||
+      localStorage.getItem("email") ||
+      "unknown",
+    audit_actor_role:
+      localStorage.getItem("access_description") ||
+      userRole ||
+      localStorage.getItem("role") ||
+      "registrar",
+    audit_actor_email: localStorage.getItem("email") || "",
+    ...getLoginMacPayload(),
+  });
+
+  const saveSingleRow = async (person) => {
+    try {
+      setLoading(true);
+
+      const payload = buildPayload(person);
+
+      const res = await axios.post(
+        `${API_BASE_URL}/api/interview/save`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+
+      if (!res.data?.success) {
+        throw new Error("Saving failed");
+      }
+
+      setSnack({
+        open: true,
+        message: "Score saved successfully!",
+        severity: "success",
+      });
+    } catch (err) {
+      console.error(err);
+
+      setSnack({
+        open: true,
+        message: "Save failed: " + (err.response?.data?.error || err.message),
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveAllRows = async () => {
+    try {
+      setLoading(true);
+
+      for (const person of persons) {
+        const payload = buildPayload(person);
+        const token = localStorage.getItem("token");
+
+        await axios.post(`${API_BASE_URL}/api/interview/save`, payload, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+
+      // Refresh table from DB for safety
+      await fetchApplicants();
+
+      setSnack({
+        open: true,
+        message: "All scores saved!",
+        severity: "success",
+      });
+    } catch (err) {
+      console.error(err);
+      setSnack({
+        open: true,
+        message:
+          "Save All failed: " + (err.response?.data?.error || err.message),
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [persons, setPersons] = useState([]);
+
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [assignedNumber, setAssignedNumber] = useState("");
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
   const [adminData, setAdminData] = useState({ dprtmnt_id: "", dprtmnt_ids: [] });
+  const [loading, setLoading] = useState(false);
+  const [loading2, setLoading2] = useState(false);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const loggedInPersonId = localStorage.getItem("person_id");
+    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
+
+    if (!storedUser || !storedRole || !loggedInPersonId) {
+      window.location.href = "/login";
+      return;
+    }
+
+    setUser(storedUser);
+    setUserRole(storedRole);
+
+    const allowedRoles = ["registrar", "applicant", "superadmin"];
+    if (allowedRoles.includes(storedRole)) {
+      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
+      sessionStorage.setItem("admin_edit_person_id", targetId);
+      setUserID(targetId);
+      return;
+    }
+
+    window.location.href = "/login";
+  }, [queryPersonId]);
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const personIdFromUrl = queryParams.get("person_id");
+
+    if (!personIdFromUrl) return;
+
+    // fetch info of that person
+    axios
+      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
+      .then((res) => {
+        if (res.data?.applicant_number) {
+          // AUTO-INSERT applicant_number into search bar
+          setSearchQuery(res.data.applicant_number);
+
+          // If you have a fetchUploads() or fetchExamScore() — call it
+          if (typeof fetchUploadsByApplicantNumber === "function") {
+            fetchUploadsByApplicantNumber(res.data.applicant_number);
+          }
+
+          if (typeof fetchApplicants === "function") {
+            fetchApplicants();
+          }
+        }
+      })
+      .catch((err) => console.error("Auto search failed:", err));
+  }, [location.search]);
+
+  const [hasAccess, setHasAccess] = useState(null);
+
+  const pageId = 169;
+
+  const [employeeID, setEmployeeID] = useState("");
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -214,61 +445,59 @@ const QualifyingExamScoreReadOnly = () => {
     } catch (error) {
       console.error("Error checking access:", error);
       setHasAccess(false);
+      if (error.response && error.response.data.message) {
+        console.log(error.response.data.message);
+      } else {
+        console.log("An unexpected error occurred.");
+      }
+      setLoading2(false);
     }
   };
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("email");
-    const storedRole = localStorage.getItem("role");
-    const loggedInPersonId = localStorage.getItem("person_id");
-    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
-
-    if (!storedUser || !storedRole || !loggedInPersonId) {
-      window.location.href = "/login";
-      return;
-    }
-
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (allowedRoles.includes(storedRole)) {
-      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-      sessionStorage.setItem("admin_edit_person_id", targetId);
-      setUserID(targetId);
-      return;
-    }
-
-    window.location.href = "/login";
-  }, [queryPersonId]);
 
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [snack, setSnack] = useState({ open: false, message: "", severity: "info" });
+  const [snack, setSnack] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
   const [person, setPerson] = useState({
     campus: "",
-    fromDate: "",
-    toDate: "",
+    last_name: "",
+    first_name: "",
+    middle_name: "",
+    document_status: "",
+    extension: "",
+    strand: "",
+    generalAverage1: "",
+    program: "",
+    created_at: "",
+    middle_code: "",
+    emailAddress: "",
   });
-
-  const [persons, setPersons] = useState([]);
-  const [subjects, setSubjects] = useState([]);
+  const [allApplicants, setAllApplicants] = useState([]);
 
   const fetchApplicants = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/applicants-with-number`);
 
       const data = Array.isArray(res.data?.data) ? res.data.data : [];
-      const fetchedSubjects = Array.isArray(res.data?.subjects) ? res.data.subjects : [];
+      const fetchedSubjects = Array.isArray(res.data?.subjects)
+        ? res.data.subjects
+        : [];
 
-      const normalized = data.map((p) => ({
+      const withAssignedFlag = data.map((p) => ({
         ...p,
+        assigned: false,
         college_approval_status: Number(p.college_approval_status ?? 0),
         qualifying_exam_score: Number(p.qualifying_exam_score) || 0,
         qualifying_interview_score: Number(p.qualifying_interview_score) || 0,
-        qualifying_status: p.qualifying_status ?? null,
-        interview_status_result: p.interview_status_result ?? null,
+        qualifying_status: p.qualifying_status ?? null, // ✅ NEW
+        interview_status_result: p.interview_status_result ?? null, // ✅ NEW
       }));
 
-      setPersons(normalized);
+      setPersons(withAssignedFlag);
       setSubjects(fetchedSubjects);
     } catch (err) {
       console.error("Error fetching applicants:", err);
@@ -280,17 +509,8 @@ const QualifyingExamScoreReadOnly = () => {
     fetchApplicants();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids]);
 
-  const fetchSubjects = async () => {
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/subjects`);
-      setSubjects(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
-    fetchSubjects();
+    fetchApplicants();
   }, []);
 
   const fetchPersonData = async () => {
@@ -303,8 +523,26 @@ const QualifyingExamScoreReadOnly = () => {
     }
   };
 
+  const [subjects, setSubjects] = useState([]);
+
+  const fetchSubjects = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/subjects`);
+
+      setSubjects(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
-    if (user) fetchPersonData();
+    fetchSubjects();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchPersonData();
+    }
   }, [user]);
 
   const [curriculumOptions, setCurriculumOptions] = useState([]);
@@ -312,7 +550,48 @@ const QualifyingExamScoreReadOnly = () => {
   const [allCurriculums, setAllCurriculums] = useState([]);
 
   useEffect(() => {
-    const departmentIds = getDepartmentIdsFromAdminData(adminData);
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
+
+    const fetchDepartments = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
+    fetchDepartments();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
     if (!departmentIds.length) return;
 
     const fetchCurriculums = async () => {
@@ -322,38 +601,58 @@ const QualifyingExamScoreReadOnly = () => {
             axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
           ),
         );
+
+
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = restrictToRegistrarCurriculum(merged);
-        setAllCurriculums(restricted);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
         setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
       }
     };
+
     fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-  useEffect(() => {
-    const departmentIds = getDepartmentIdsFromAdminData(adminData);
-    if (departmentIds.length) return;
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
-      setAllCurriculums(restrictedCurriculums);
-      setCurriculumOptions(restrictedCurriculums);
-    });
-  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
-
+  const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
+
+  const [selectedRegistrarStatus, setSelectedRegistrarStatus] = useState("");
+
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState("");
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
   const isProgramLocked = isRegistrarProgramSelectionLocked();
   const [department, setDepartment] = useState([]);
+  const filteredDepartments = department.filter((dep) =>
+    allCurriculums.some(
+      (curriculum) =>
+        String(curriculum.dprtmnt_id) === String(dep.dprtmnt_id) &&
+        (!person.campus || String(curriculum.components) === String(person.campus))
+    )
+  );
+  const filteredCurriculumOptions = allCurriculums.filter(
+    (curriculum) =>
+      (!person.campus || String(curriculum.components) === String(person.campus)) &&
+      (!selectedDepartmentFilter ||
+        String(curriculum.dprtmnt_id) === String(selectedDepartmentFilter))
+  );
   const [schoolYears, setSchoolYears] = useState([]);
   const [semesters, setSchoolSemester] = useState([]);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
   const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
+  const [selectedActiveSchoolYear, setSelectedActiveSchoolYear] = useState("");
 
   useEffect(() => {
     axios
@@ -381,20 +680,32 @@ const QualifyingExamScoreReadOnly = () => {
       .catch((err) => console.error(err));
   }, []);
 
-  const handleSchoolYearChange = (event) => setSelectedSchoolYear(event.target.value);
-  const handleSchoolSemesterChange = (event) => setSelectedSchoolSemester(event.target.value);
+  const handleSchoolYearChange = (event) => {
+    setSelectedSchoolYear(event.target.value);
+  };
 
+  const handleSchoolSemesterChange = (event) => {
+    setSelectedSchoolSemester(event.target.value);
+  };
+
+  // helper to make string comparisons robust
   const normalize = (s) => (s ?? "").toString().trim().toLowerCase();
   const selectedSemester = semesters.find(
     (sem) => String(sem.semester_id) === String(selectedSchoolSemester),
   );
-
+  const [showSubmittedOnly, setShowSubmittedOnly] = useState(false);
   const [topCount, setTopCount] = useState(100);
   const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [minScore, setMinScore] = useState("");
+  const [maxScore, setMaxScore] = useState("");
+  const [exactRating, setExactRating] = useState("");
+  const [editScores, setEditScores] = useState({});
+
   const [minTotal, setMinTotal] = useState("");
   const [minScorePercent, setMinScorePercent] = useState("");
 
   const filteredPersons = persons.filter((personData) => {
+    /* 🔎 SEARCH */
     const query = searchQuery.toLowerCase();
     const fullName =
       `${personData.first_name ?? ""} ${personData.middle_name ?? ""} ${personData.last_name ?? ""}`.toLowerCase();
@@ -403,17 +714,24 @@ const QualifyingExamScoreReadOnly = () => {
       ?.toString()
       .toLowerCase()
       .includes(query);
+
     const matchesName = fullName.includes(query);
     const matchesEmail = personData.emailAddress?.toLowerCase().includes(query);
 
+    /* 🏫 CAMPUS */
     const matchesCampus = !person.campus || personData.campus === person.campus;
 
+    /* 🎓 PROGRAM */
     const programInfo = allCurriculums.find(
       (opt) => opt.curriculum_id?.toString() === personData.program?.toString(),
     );
-    const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(personData.program);
+    const matchesRegistrarCurriculum = isRegistrarCurriculumMatch(
+      personData.program,
+    );
 
-    const matchesProgramQuery = programInfo?.program_code?.toLowerCase().includes(query);
+    const matchesProgramQuery = programInfo?.program_code
+      ?.toLowerCase()
+      .includes(query);
 
     const matchesDepartment =
       selectedDepartmentFilter === "" ||
@@ -423,33 +741,53 @@ const QualifyingExamScoreReadOnly = () => {
       selectedProgramFilter === "" ||
       programInfo?.program_code === selectedProgramFilter;
 
+    /* 📅 CREATED_AT */
     const appliedDate = new Date(personData.created_at.split("T")[0]);
     const applicantAppliedYear = appliedDate.getFullYear();
 
-    const schoolYear = schoolYears.find((sy) => sy.year_id === selectedSchoolYear);
+    const schoolYear = schoolYears.find(
+      (sy) => sy.year_id === selectedSchoolYear,
+    );
 
     const matchesSchoolYear =
       selectedSchoolYear === "" ||
-      (schoolYear && String(applicantAppliedYear) === String(schoolYear.current_year));
+      (schoolYear &&
+        String(applicantAppliedYear) === String(schoolYear.current_year));
 
     const matchesSemester =
       selectedSchoolSemester === "" ||
-      normalize(personData.middle_code) === normalize(selectedSemester?.semester_code);
+      normalize(personData.middle_code) ===
+      normalize(selectedSemester?.semester_code);
 
-    const subjectScores = subjects.map((subject) => Number(personData.scores?.[subject.id] ?? 0));
+    /* 🧮 SCORE COMPUTATION (MUST COME BEFORE FILTERS) */
+    const subjectScores = subjects.map((subject) =>
+      Number(personData.scores?.[subject.id] ?? 0),
+    );
+
     const total = subjectScores.reduce((sum, score) => sum + score, 0);
-    const maxTotal = subjects.reduce((sum, subject) => sum + Number(subject.max_score || 0), 0);
+
+    const maxTotal = subjects.reduce(
+      (sum, subject) => sum + Number(subject.max_score || 0),
+      0,
+    );
+
     const scorePercent = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
 
     const matchesTotal =
-      minTotal === "" || (total >= Number(minTotal) && total < Number(minTotal) + 1);
+      minTotal === "" ||
+      (total >= Number(minTotal) && total < Number(minTotal) + 1);
 
     const matchesScorePercent =
       minScorePercent === "" ||
-      (scorePercent >= Number(minScorePercent) && scorePercent < Number(minScorePercent) + 1);
+      (scorePercent >= Number(minScorePercent) &&
+        scorePercent < Number(minScorePercent) + 1);
 
+    /* FINAL FILTER RESULT */
     return (
-      (matchesApplicantID || matchesName || matchesEmail || matchesProgramQuery) &&
+      (matchesApplicantID ||
+        matchesName ||
+        matchesEmail ||
+        matchesProgramQuery) &&
       matchesDepartment &&
       matchesRegistrarCurriculum &&
       matchesProgramFilter &&
@@ -461,25 +799,50 @@ const QualifyingExamScoreReadOnly = () => {
     );
   });
 
+  /* ⭐ SORTING (ALSO FIXED CREATED_AT) */
   const sortedPersons = React.useMemo(() => {
     return filteredPersons
       .slice()
       .sort((a, b) => {
-        const aTotal =
-          (Number(a.qualifying_exam_score) + Number(a.qualifying_interview_score)) / 2;
-        const bTotal =
-          (Number(b.qualifying_exam_score) + Number(b.qualifying_interview_score)) / 2;
+        const aExam = Number(
+          editScores[a.person_id]?.qualifying_exam_score ??
+          a.qualifying_exam_score ??
+          0,
+        );
+        const aInterview = Number(
+          editScores[a.person_id]?.qualifying_interview_score ??
+          a.qualifying_interview_score ??
+          0,
+        );
+        const aTotal = (aExam + aInterview) / 2;
 
+        const bExam = Number(
+          editScores[b.person_id]?.qualifying_exam_score ??
+          b.qualifying_exam_score ??
+          0,
+        );
+        const bInterview = Number(
+          editScores[b.person_id]?.qualifying_interview_score ??
+          b.qualifying_interview_score ??
+          0,
+        );
+        const bTotal = (bExam + bInterview) / 2;
+
+        /* ⭐ SORT BY TOTAL SCORE FIRST */
         if (bTotal !== aTotal) return bTotal - aTotal;
 
+        /* ⭐ THEN BY CREATED_AT USING MANILA SAFE PARSING */
         const dateA = new Date(a.created_at.split("T")[0]);
         const dateB = new Date(b.created_at.split("T")[0]);
-        return dateA - dateB;
+
+        return dateA - dateB; // earliest first
       })
       .slice(0, topCount);
-  }, [filteredPersons, topCount]);
+  }, [filteredPersons, editScores, topCount]);
 
+  // ✅ 3. Pagination logic AFTER sortedPersons exists
   const totalPages = Math.ceil(sortedPersons.length / itemsPerPage);
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentPersons = sortedPersons.slice(indexOfFirstItem, indexOfLastItem);
@@ -489,6 +852,19 @@ const QualifyingExamScoreReadOnly = () => {
       setCurrentPage(totalPages || 1);
     }
   }, [sortedPersons.length, totalPages]);
+
+  const maxButtonsToShow = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
+  let endPage = Math.min(totalPages, startPage + maxButtonsToShow - 1);
+
+  if (endPage - startPage < maxButtonsToShow - 1) {
+    startPage = Math.max(1, endPage - maxButtonsToShow + 1);
+  }
+
+  const visiblePages = [];
+  for (let i = startPage; i <= endPage; i++) {
+    visiblePages.push(i);
+  }
 
   useEffect(() => {
     const departmentIds = getDepartmentIdsFromAdminData(adminData);
@@ -501,9 +877,13 @@ const QualifyingExamScoreReadOnly = () => {
             axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
           ),
         );
-        const mergedDepartments = responses.flatMap((response) => response.data || []);
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
         const uniqueDepartments = [
-          ...new Map(mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep])).values(),
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
         ];
         setDepartment(uniqueDepartments);
       } catch (error) {
@@ -513,24 +893,12 @@ const QualifyingExamScoreReadOnly = () => {
     fetchDepartments();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-  const handleDepartmentChange = (selectedDept) => {
-    setSelectedDepartmentFilter(selectedDept);
-    if (!selectedDept) {
-      setCurriculumOptions(allCurriculums);
-    } else {
-      setCurriculumOptions(allCurriculums.filter((opt) => opt.dprtmnt_name === selectedDept));
-    }
-    if (!isProgramLocked) setSelectedProgramFilter("");
-    setCurrentPage(1);
-  };
 
-  useEffect(() => {
-    if (department.length > 0 && !selectedDepartmentFilter) {
-      const firstDept = department[0].dprtmnt_name;
-      setSelectedDepartmentFilter(firstDept);
-      handleDepartmentChange(firstDept);
-    }
-  }, [department, selectedDepartmentFilter]);
+
+  const handleSnackClose = (_, reason) => {
+    if (reason === "clickaway") return;
+    setSnack((prev) => ({ ...prev, open: false }));
+  };
 
   useEffect(() => {
     if (!isProgramLocked) return;
@@ -542,33 +910,145 @@ const QualifyingExamScoreReadOnly = () => {
     }
   }, [curriculumOptions, isProgramLocked]);
 
-  const handleSnackClose = (_, reason) => {
-    if (reason === "clickaway") return;
-    setSnack((prev) => ({ ...prev, open: false }));
+
+  const handleDepartmentChange = (selectedDept) => {
+    setSelectedDepartmentFilter(selectedDept);
+    if (!selectedDept) {
+      setCurriculumOptions(allCurriculums);
+    } else {
+      setCurriculumOptions(
+        allCurriculums.filter((opt) => opt.dprtmnt_name === selectedDept),
+      );
+    }
+    if (!isProgramLocked) setSelectedProgramFilter("");
   };
 
-  // Auto-load a single applicant when arriving with ?person_id=
+  const [applicants, setApplicants] = useState([]);
+
   useEffect(() => {
-    const personIdFromUrl = queryParams.get("person_id");
-    if (!personIdFromUrl) return;
+    const personIdFromQuery = queryParams.get("person_id");
 
-    axios
-      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
-      .then((res) => {
-        if (res.data?.applicant_number) {
-          setSearchQuery(res.data.applicant_number);
-        }
-      })
-      .catch((err) => console.error("Auto search failed:", err));
-  }, [location.search]);
+    // ✅ If specific applicant → fetch single
+    if (personIdFromQuery) {
+      axios
+        .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromQuery}`)
+        .then((res) => {
+          const fixed = {
+            ...res.data,
+            qualifying_exam_score: res.data.qualifying_exam_score ?? 0,
+            qualifying_interview_score:
+              res.data.qualifying_interview_score ?? 0,
+            final_rating: res.data.final_rating ?? 0,
+            college_approval_status: Number(
+              res.data.college_approval_status ?? 0,
+            ),
+            qualifying_status: res.data.qualifying_status ?? null,
+            interview_status_result: res.data.interview_status_result ?? null,
+          };
 
-  // ── PRINT (view/report only — no editing controls) ──
+          setPersons([fixed]); // ✅ correct
+        })
+        .catch((err) => {
+          console.error("❌ Error fetching single applicant:", err);
+          setPersons([]);
+        });
+    } else {
+      // ✅ USE YOUR EXISTING FUNCTION (IMPORTANT)
+      fetchApplicants();
+    }
+  }, [queryPersonId]);
+
+  const handleStatusChange = async (applicantId, newStatus) => {
+    const nextStatus = Number(newStatus);
+    try {
+      const targetPerson = persons.find(
+        (p) => p.applicant_number === applicantId,
+      );
+
+      if (isCollegeStatusLocked(targetPerson)) {
+        setSnack({
+          open: true,
+          message:
+            "Status can no longer be changed after interview_status is set.",
+          severity: "warning",
+        });
+        return;
+      }
+
+      if (targetPerson?.person_id) {
+        setEditScores((prev) => ({
+          ...prev,
+          [targetPerson.person_id]: {
+            ...prev[targetPerson.person_id],
+            status: nextStatus,
+          },
+        }));
+      }
+
+      // ✅ Optimistic update first so UI doesn't flicker
+      setPersons((prev) =>
+        prev.map((p) =>
+          p.applicant_number === applicantId
+            ? { ...p, college_approval_status: nextStatus }
+            : p,
+        ),
+      );
+
+      await axios.put(
+        `${API_BASE_URL}/api/interview_applicants/${applicantId}/status`,
+        {
+          status: nextStatus,
+          ...auditPayload(),
+        },
+      );
+
+      setSnack({
+        open: true,
+        message: "Status updated successfully.",
+        severity: "success",
+      });
+
+      // ✅ Re-fetch to sync with DB (will now return correct string labels)
+      await fetchApplicants();
+    } catch (err) {
+      console.error("Error updating status:", err);
+
+      const targetPerson = persons.find(
+        (p) => p.applicant_number === applicantId,
+      );
+      if (targetPerson?.person_id) {
+        setEditScores((prev) => {
+          const next = { ...prev };
+          const row = { ...(next[targetPerson.person_id] || {}) };
+          delete row.status;
+
+          if (Object.keys(row).length === 0) {
+            delete next[targetPerson.person_id];
+          } else {
+            next[targetPerson.person_id] = row;
+          }
+
+          return next;
+        });
+      }
+
+      // ✅ Revert optimistic update on failure
+      await fetchApplicants();
+
+      setSnack({
+        open: true,
+        message:
+          err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update status.",
+        severity: "error",
+      });
+    }
+  };
+
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-
+  const handleExportQualifyingInterviewScorePdf = async () => {
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
@@ -577,138 +1057,1572 @@ const QualifyingExamScoreReadOnly = () => {
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    let resolvedCampusAddress = "";
-    if (settings?.campus_address && settings.campus_address.trim() !== "") {
-      resolvedCampusAddress = settings.campus_address;
-    } else if (settings?.address && settings.address.trim() !== "") {
-      resolvedCampusAddress = settings.address;
-    } else {
-      resolvedCampusAddress = "No address set in Settings";
-    }
+    const resolvedCampusAddress =
+      campusAddress || settings?.campus_address || settings?.address || "No address set in Settings";
 
-    const htmlContent = `
-  <html>
-    <head>
-      <title>Qualifying Examination Score</title>
-      <style>
-        @page { size: A4 landscape; margin: 10mm; }
-        body { font-family: Arial; margin: 0; padding: 0; }
-        .print-container { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 15px; }
-        .print-header { display: flex; align-items: center; justify-content: center; gap: 20px; width: 100%; margin-top: 20px; }
-        .print-header img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; }
-        .header-text { text-align: center; }
-        .header-text .gov { font-size: 13px; }
-        .header-text .school-name { font-size: 20px; font-weight: bold; letter-spacing: 1px; font-family: Arial; }
-        .header-text .address { font-size: 13px; margin-top: 2px; }
-        .header-text .title { margin-top: 25px; font-size: 22px; font-weight: bold; letter-spacing: 1px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 25px; border: 1.5px solid black; table-layout: fixed; }
-        th, td { border: 1.5px solid black; padding: 7px 8px; font-size: 13px; text-align: center; word-wrap: break-word; }
-        th { background-color: lightgray; color: black; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        th:last-child, td:last-child { border-right: 1.5px solid black !important; }
-      </style>
-    </head>
+    const selectedProgramLabel = selectedProgramFilter
+      ? filteredCurriculumOptions.find(
+        (p) => String(p.curriculum_id) === String(selectedProgramFilter),
+      )?.program_description || "N/A"
+      : "All Programs";
 
-    <body onload="window.print(); setTimeout(() => window.close(), 100);">
-      <div class="print-container">
-        <div class="print-header">
-          <img src="${logoSrc}" alt="School Logo"/>
-          <div class="header-text">
-            <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-            ${name
+    const selectedDepartmentLabel = selectedDepartmentFilter
+      ? department.find(
+        (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
+      )?.dprtmnt_name || "N/A"
+      : "All Departments";
+
+    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+    // no onload print script. The server wraps this with matching CSS.
+    const innerHtml = `
+    <div class="print-header">
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
+
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
+
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${name
         ? `
-              <div class="school-name">${firstLine}</div>
-              ${secondLine ? `<div class="school-name">${secondLine}</div>` : ""}
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                     <b>${secondLine}</b>
+                   </div>`
+          : ""
+        }
             `
         : ""
       }
-            <div class="address">${resolvedCampusAddress}</div>
-            <div class="title">QUALIFYING EXAMINATION SCORE</div>
-          </div>
+
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
         </div>
+      </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th style="width:12%">Applicant ID</th>
-              <th style="width:25%">Applicant Name</th>
-              <th style="width:12%">Program</th>
-              <th style="width:10%">Qualifying Exam Score</th>
-              <th style="width:10%">Qualifying Status</th>
-              <th style="width:10%">Interview Exam Score</th>
-              <th style="width:10%">Interview Status</th>
-              <th style="width:10%">Total Avg</th>
-              <th style="width:10%">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${filteredPersons
-        .map((p) => {
-          const qualifyingExam = p.qualifying_exam_score ?? 0;
-          const qualifyingInterview = p.qualifying_interview_score ?? 0;
-          const computedTotalAve = (Number(qualifyingExam) + Number(qualifyingInterview)) / 2;
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">QUALIFYING / INTERVIEW EXAMINATION SCORE</b>
+      </div>
+    </div>
 
-          const statusLabel =
-            Number(p.college_approval_status) === 1
-              ? "Accepted"
-              : Number(p.college_approval_status) === 2
-                ? "Rejected"
-                : "Waiting List";
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:10%">Applicant ID</th>
+            <th style="width:24%">Applicant Name</th>
+            <th style="width:12%">Program</th>
+            <th style="width:10%">Qualifying Exam Score</th>
+            <th style="width:9%">Qualifying Status</th>
+            <th style="width:10%">Interview Exam Score</th>
+            <th style="width:9%">Interview Status</th>
+            <th style="width:8%">Total Avg</th>
+            <th style="width:8%">Status</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${filteredPersons
+        .map((person) => {
+          const qualifyingExam =
+            editScores[person.person_id]?.qualifying_exam_score ??
+            person.qualifying_exam_score ??
+            0;
+
+          const qualifyingInterview =
+            editScores[person.person_id]?.qualifying_interview_score ??
+            person.qualifying_interview_score ??
+            0;
+
+          const computedTotalAve =
+            (Number(qualifyingExam) + Number(qualifyingInterview)) / 2;
+
+          // Fixed: build the full name safely instead of concatenating
+          // possibly-undefined fields directly into the string.
+          const fullName = [
+            person.last_name,
+            [person.first_name, person.middle_name, person.extension]
+              .filter(Boolean)
+              .join(" "),
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          const qualifyingStatusVal =
+            editScores[person.person_id]?.qualifying_status !== undefined
+              ? editScores[person.person_id].qualifying_status
+              : person.qualifying_status;
+
+          const interviewStatusVal =
+            editScores[person.person_id]?.interview_status_result !== undefined
+              ? editScores[person.person_id].interview_status_result
+              : person.interview_status_result;
 
           const qualifyingStatusLabel =
-            p.qualifying_status === 0 ? "Passed" : p.qualifying_status === 1 ? "Failed" : "—";
-          const interviewStatusLabel =
-            p.interview_status_result === 0
+            qualifyingStatusVal === 0
               ? "Passed"
-              : p.interview_status_result === 1
+              : qualifyingStatusVal === 1
                 ? "Failed"
                 : "—";
 
+          const interviewStatusLabel =
+            interviewStatusVal === 0
+              ? "Passed"
+              : interviewStatusVal === 1
+                ? "Failed"
+                : "—";
+
+          const collegeStatusLabel =
+            Number(getCurrentCollegeApprovalStatus(person)) === 1
+              ? "Accepted"
+              : Number(getCurrentCollegeApprovalStatus(person)) === 2
+                ? "Rejected"
+                : "Waiting List";
+
+          const programCode =
+            allCurriculums.find(
+              (item) =>
+                item.curriculum_id?.toString() === person.program?.toString(),
+            )?.program_code ?? "N/A";
+
           return `
                 <tr>
-                  <td>${p.applicant_number ?? "N/A"}</td>
-                  <td>${p.last_name}, ${p.first_name} ${p.middle_name ?? ""} ${p.extension ?? ""}</td>
-                  <td>${allCurriculums.find(
-            (item) => item.curriculum_id?.toString() === p.program?.toString(),
-          )?.program_code ?? "N/A"
-            }</td>
+                  <td>${person.applicant_number ?? "N/A"}</td>
+                  <td class="applicant-name">${fullName}</td>
+                  <td>${programCode}</td>
                   <td>${qualifyingExam}</td>
                   <td>${qualifyingStatusLabel}</td>
                   <td>${qualifyingInterview}</td>
                   <td>${interviewStatusLabel}</td>
                   <td>${computedTotalAve.toFixed(2)}</td>
-                  <td>${statusLabel}</td>
+                  <td>${collegeStatusLabel}</td>
                 </tr>
               `;
         })
         .join("")}
-          </tbody>
-        </table>
-      </div>
-    </body>
-  </html>
+        </tbody>
+      </table>
+    </div>
   `;
 
-    newWin.document.write(htmlContent);
-    newWin.document.close();
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-qualifying-interview-score-pdf`,
+        { html: innerHtml },
+        {
+          responseType: "blob",
+          headers: {
+            "x-audit-actor-id":
+              employeeID ||
+              localStorage.getItem("employee_id") ||
+              localStorage.getItem("email") ||
+              "unknown",
+            "x-audit-actor-role":
+              localStorage.getItem("access_description") ||
+              userRole ||
+              localStorage.getItem("role") ||
+              "registrar",
+          },
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute(
+        "download",
+        `Qualifying_Interview_Score_${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Qualifying/Interview Score PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Qualifying / Interview Score PDF.",
+        severity: "error",
+      });
+    }
   };
 
-  // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  const [file, setFile] = useState(null);
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  const [selectedFile, setSelectedFile] = useState(null);
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
+  const handleClose = (_, reason) => {
+    if (reason === "clickaway") return;
+    setSnack((prev) => ({ ...prev, open: false }));
+  };
+
+  // when file chosen
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
     }
-  });
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    document.getElementById("excel-upload").value = "";
+  };
+
+  // when import button clicked
+  const handleImport = async () => {
+    try {
+      if (!selectedFile) {
+        setSnack({
+          open: true,
+          message: "Please choose a file first!",
+          severity: "warning",
+        });
+        return;
+      }
+
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+
+      let sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+        defval: "",
+      });
+
+      sheet = sheet
+        .filter((row) => row["Applicant ID"])
+        .map((row) => ({
+          applicant_number: String(row["Applicant ID"] || "").trim(),
+
+          qualifying_exam_score: Number(row["Qualifying Exam Score"]) || 0,
+
+          qualifying_interview_score: Number(row["Interview Exam Score"]) || 0,
+
+          qualifying_status: String(row["Qualifying Result"] || "").trim(),
+
+          interview_status_result: String(row["Interview Result"] || "").trim(),
+
+          status: String(row["College Status"] || "").trim(),
+        }));
+
+      if (sheet.length === 0) {
+        setSnack({
+          open: true,
+          message: "Excel file had no valid rows!",
+          severity: "warning",
+        });
+        return;
+      }
+
+      setLoading(true);
+
+      const res = await axios.post(
+        `${API_BASE_URL}/api/qualifying_exam/import`,
+        { userID, data: sheet, ...auditPayload() },
+        { headers: { "Content-Type": "application/json" } },
+      );
+
+      const errors = res.data.errors || [];
+
+      // ✅ STEP 1: Patch state immediately from updatedRows (instant UI update)
+      if (
+        Array.isArray(res.data.updatedRows) &&
+        res.data.updatedRows.length > 0
+      ) {
+        const patchMap = {};
+        res.data.updatedRows.forEach((r) => {
+          patchMap[r.applicant_number] = r;
+        });
+
+        setPersons((prev) =>
+          prev.map((p) => {
+            const patch = patchMap[p.applicant_number];
+            if (!patch) return p;
+            return {
+              ...p,
+              qualifying_exam_score: Number(patch.qualifying_result) || 0,
+              qualifying_interview_score: Number(patch.interview_result) || 0,
+              exam_result: Number(patch.exam_result) || 0,
+              college_approval_status: Number(
+                patch.college_approval_status ?? 0,
+              ),
+            };
+          }),
+        );
+      }
+
+      // ✅ STEP 2: Wait briefly for DB to fully commit, then re-fetch to sync
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await fetchApplicants(); // ✅ now awaited — guarantees fresh data replaces state
+
+      setSelectedFile(null);
+
+      if (res.data.success && errors.length === 0) {
+        setSnack({
+          open: true,
+          message: "✅ All applicants imported successfully!",
+          severity: "success",
+        });
+      } else if (errors.length > 0) {
+        const failedApplicants = errors
+          .map((e) => {
+            const m = e.match(/Applicant (\S+)/);
+            return m ? m[1] : null;
+          })
+          .filter(Boolean);
+        setSnack({
+          open: true,
+          message: `⚠️ Some applicants skipped. Failed: ${failedApplicants.join(", ")}`,
+          severity: "warning",
+        });
+      } else {
+        setSnack({
+          open: true,
+          message: res.data.message || "Import failed",
+          severity: "error",
+        });
+      }
+    } catch (err) {
+      console.error("❌ Import error:", err.response?.data || err.message);
+      setSnack({
+        open: true,
+        message: "Import failed: " + (err.response?.data?.error || err.message),
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const syncPendingScores = async () => {
+      const pending = JSON.parse(
+        localStorage.getItem("pendingQualifying") || "[]",
+      );
+      if (pending.length === 0) return;
+
+      const stillPending = [];
+      for (const p of pending) {
+        try {
+          await axios.post(`${API_BASE_URL}/api/interview`, p);
+          console.log("✅ Synced pending qualifying:", p);
+        } catch {
+          stillPending.push(p); // keep if still failing
+        }
+      }
+      localStorage.setItem("pendingQualifying", JSON.stringify(stillPending));
+    };
+
+    // run once + whenever internet comes back
+    syncPendingScores();
+    window.addEventListener("online", syncPendingScores);
+    return () => window.removeEventListener("online", syncPendingScores);
+  }, []);
+
+  const debounceTimers = useRef({});
+  const manualSaveRef = useRef({});
+
+  const saveResultStatusChange = async (person, field, value) => {
+    try {
+      const payload = buildPayload(
+        person,
+        { [field]: value },
+        { includeStatus: false },
+      );
+
+      const res = await axios.post(
+        `${API_BASE_URL}/api/interview/save`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+
+      if (!res.data?.success) {
+        throw new Error("Saving failed");
+      }
+
+      setPersons((prev) =>
+        prev.map((p) =>
+          p.person_id === person.person_id ? { ...p, [field]: value } : p,
+        ),
+      );
+
+      setSnack({
+        open: true,
+        message: "Result status updated successfully.",
+        severity: "success",
+      });
+    } catch (err) {
+      console.error("Error updating result status:", err);
+
+      setEditScores((prev) => {
+        const next = { ...prev };
+        const row = { ...(next[person.person_id] || {}) };
+        delete row[field];
+
+        if (Object.keys(row).length === 0) {
+          delete next[person.person_id];
+        } else {
+          next[person.person_id] = row;
+        }
+
+        return next;
+      });
+
+      await fetchApplicants();
+
+      setSnack({
+        open: true,
+        message: "Failed to update result status.",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleScoreChange = (person, field, value) => {
+    setEditScores((prev) => ({
+      ...prev,
+      [person.person_id]: {
+        ...prev[person.person_id],
+        [field]: value,
+      },
+    }));
+
+    if (field === "qualifying_status" || field === "interview_status_result") {
+      saveResultStatusChange(person, field, value);
+    }
+  };
+
+  const [customCount, setCustomCount] = useState(0);
+  const [selectedSchedule, setSelectedSchedule] = useState("");
+
+  useEffect(() => {
+    socket.current.on("schedule_updated", ({ schedule_id }) => {
+      console.log("📢 Schedule updated:", schedule_id);
+
+      fetchApplicants();
+    });
+
+    return () => socket.current.off("schedule_updated");
+  }, []);
+
+  const applyLocalCollegeStatus = (applicantNumber, status) => {
+    applyLocalCollegeStatusForApplicants([applicantNumber], status);
+  };
+
+  const applyLocalCollegeStatusForApplicants = (applicantNumbers, status) => {
+    const nextStatus = Number(status);
+    const applicantNumberSet = new Set(
+      applicantNumbers.map((applicantNumber) => String(applicantNumber)),
+    );
+
+    setPersons((prev) =>
+      prev.map((p) =>
+        applicantNumberSet.has(String(p.applicant_number))
+          ? {
+            ...p,
+            assigned: nextStatus === COLLEGE_APPROVAL_STATUS.ACCEPTED,
+            college_approval_status: nextStatus,
+            applicant_interview_status:
+              nextStatus === COLLEGE_APPROVAL_STATUS.WAITING_LIST
+                ? 0
+                : p.applicant_interview_status,
+          }
+          : p,
+      ),
+    );
+
+    setEditScores((prev) => {
+      const next = { ...prev };
+
+      persons.forEach((p) => {
+        if (!p.person_id || !applicantNumberSet.has(String(p.applicant_number)))
+          return;
+        next[p.person_id] = {
+          ...next[p.person_id],
+          status: nextStatus,
+        };
+      });
+
+      return next;
+    });
+  };
+
+  const getCurrentCollegeApprovalStatus = (personData) =>
+    Number(
+      editScores[personData.person_id]?.status ??
+      personData.college_approval_status ??
+      0,
+    );
+
+  const handleAssignSingle = (applicant_number) => {
+    applyLocalCollegeStatus(applicant_number, COLLEGE_APPROVAL_STATUS.ACCEPTED);
+
+    axios
+      .put(
+        `${API_BASE_URL}/api/interview_applicants/assign/${applicant_number}`,
+        auditPayload({ assignment_mode: "single" }),
+      )
+      .then((res) => {
+        console.log("Assign response:", res.data);
+
+        setSnack({
+          open: true,
+          message: `Applicant ${applicant_number} assigned.`,
+          severity: "success",
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to assign applicant:", err);
+        fetchApplicants();
+        setSnack({
+          open: true,
+          message: "Failed to assign applicant.",
+          severity: "error",
+        });
+      });
+  };
+
+  const handleAssignMax = () => {
+    // ✅ Get only unassigned applicants in the selected department
+    const unassigned = persons.filter((p) => {
+      if (
+        getCurrentCollegeApprovalStatus(p) === COLLEGE_APPROVAL_STATUS.ACCEPTED
+      )
+        return false;
+
+      const programInfo = allCurriculums.find(
+        (opt) => opt.curriculum_id?.toString() === p.program?.toString(),
+      );
+
+      // School year filter: compare applicant year with selectedSchoolYear
+      const applicantAppliedYear = new Date(
+        p.created_at.split("T")[0],
+      ).getFullYear();
+      const schoolYear = schoolYears.find(
+        (sy) => sy.year_id === selectedSchoolYear,
+      );
+
+      const matchesDepartment =
+        !selectedDepartmentFilter ||
+        programInfo?.dprtmnt_name === selectedDepartmentFilter;
+
+      const matchesProgram =
+        !selectedProgramFilter ||
+        programInfo?.program_code === selectedProgramFilter;
+
+      const matchesSchoolYear =
+        !selectedSchoolYear ||
+        (schoolYear &&
+          String(applicantAppliedYear) === String(schoolYear.current_year));
+
+      const matchesSemester =
+        !selectedSchoolSemester ||
+        normalize(p.middle_code) === normalize(selectedSemester?.semester_code);
+
+      return (
+        matchesDepartment &&
+        matchesProgram &&
+        matchesSchoolYear &&
+        matchesSemester
+      );
+    });
+
+    if (unassigned.length === 0) {
+      setSnack({
+        open: true,
+        message: "No applicants available to assign in this department.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    // Limit to 100 applicants
+    const maxToAssign = Math.min(unassigned.length, 100);
+    const toAssign = unassigned.slice(0, maxToAssign);
+
+    const applicantNumbersToAssign = toAssign.map((a) => a.applicant_number);
+    applyLocalCollegeStatusForApplicants(
+      applicantNumbersToAssign,
+      COLLEGE_APPROVAL_STATUS.ACCEPTED,
+    );
+
+    axios
+      .put(`${API_BASE_URL}/api/interview_applicants/assign`, {
+        applicant_numbers: applicantNumbersToAssign,
+        ...auditPayload({
+          assignment_mode: "max",
+          selected_department: selectedDepartmentFilter,
+        }),
+      })
+      .then((res) => {
+        console.log("Updated statuses:", res.data);
+        setSnack({
+          open: true,
+          message: `Assigned ${toAssign.length} applicant${toAssign.length > 1 ? "s" : ""} in ${selectedDepartmentFilter}.`,
+          severity: "success",
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to update applicant statuses:", err);
+        fetchApplicants();
+      });
+  };
+
+  const handleAssignCustom = (countParam) => {
+    let count =
+      typeof countParam === "number" && !isNaN(countParam)
+        ? countParam
+        : Number(customCount);
+
+    if (isNaN(count) || count <= 0) {
+      setSnack({
+        open: true,
+        message: "Please enter a valid number.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    // ✅ Get only unassigned applicants in the selected department
+    const unassigned = persons.filter((p) => {
+      if (
+        getCurrentCollegeApprovalStatus(p) === COLLEGE_APPROVAL_STATUS.ACCEPTED
+      )
+        return false;
+
+      const programInfo = allCurriculums.find(
+        (opt) => opt.curriculum_id?.toString() === p.program?.toString(),
+      );
+
+      // School year filter: compare applicant year with selectedSchoolYear
+      const applicantAppliedYear = new Date(
+        p.created_at.split("T")[0],
+      ).getFullYear();
+      const schoolYear = schoolYears.find(
+        (sy) => sy.year_id === selectedSchoolYear,
+      );
+
+      const matchesDepartment =
+        !selectedDepartmentFilter ||
+        programInfo?.dprtmnt_name === selectedDepartmentFilter;
+
+      const matchesProgram =
+        !selectedProgramFilter ||
+        programInfo?.program_code === selectedProgramFilter;
+
+      const matchesSchoolYear =
+        !selectedSchoolYear ||
+        (schoolYear &&
+          String(applicantAppliedYear) === String(schoolYear.current_year));
+
+      const matchesSemester =
+        !selectedSchoolSemester ||
+        normalize(p.middle_code) === normalize(selectedSemester?.semester_code);
+
+      return (
+        matchesDepartment &&
+        matchesProgram &&
+        matchesSchoolYear &&
+        matchesSemester
+      );
+    });
+
+    if (unassigned.length === 0) {
+      setSnack({
+        open: true,
+        message: "No applicants available to assign in this department.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    // ✅ Sort applicants by total average score (highest first)
+    const sortedUnassigned = [...unassigned].sort((a, b) => {
+      const aExam =
+        editScores[a.person_id]?.qualifying_exam_score ??
+        a.qualifying_exam_score ??
+        0;
+      const aInterview =
+        editScores[a.person_id]?.qualifying_interview_score ??
+        a.qualifying_interview_score ??
+        0;
+      const aScore = (Number(aExam) + Number(aInterview)) / 2;
+
+      const bExam =
+        editScores[b.person_id]?.qualifying_exam_score ??
+        b.qualifying_exam_score ??
+        0;
+      const bInterview =
+        editScores[b.person_id]?.qualifying_interview_score ??
+        b.qualifying_interview_score ??
+        0;
+      const bScore = (Number(bExam) + Number(bInterview)) / 2;
+
+      return bScore - aScore; // higher scores first
+    });
+
+    // ✅ Take only up to the requested count
+    const maxToAssign = Math.min(sortedUnassigned.length, count);
+    const toAssign = sortedUnassigned.slice(0, maxToAssign);
+
+    // ✅ Update persons list (mark assigned)
+    const applicantNumbersToAssign = toAssign.map((a) => a.applicant_number);
+    applyLocalCollegeStatusForApplicants(
+      applicantNumbersToAssign,
+      COLLEGE_APPROVAL_STATUS.ACCEPTED,
+    );
+
+    axios
+      .put(`${API_BASE_URL}/api/interview_applicants/assign`, {
+        applicant_numbers: applicantNumbersToAssign,
+        ...auditPayload({
+          assignment_mode: "custom",
+          selected_department: selectedDepartmentFilter,
+        }),
+      })
+      .then((res) => {
+        console.log("Updated statuses:", res.data);
+        setSnack({
+          open: true,
+          message: `Assigned ${toAssign.length} applicant${toAssign.length > 1 ? "s" : ""} in ${selectedDepartmentFilter}.`,
+          severity: "success",
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to update applicant statuses:", err);
+        fetchApplicants();
+      });
+  };
+
+  const handleUnassignImmediate = (applicant_number) => {
+    applyLocalCollegeStatus(
+      applicant_number,
+      COLLEGE_APPROVAL_STATUS.WAITING_LIST,
+    );
+
+    axios
+      .put(
+        `${API_BASE_URL}/api/interview_applicants/unassign/${applicant_number}`,
+        auditPayload({ assignment_mode: "single" }),
+      )
+      .then((res) => {
+        setSnack({
+          open: true,
+          message: `Applicant ${applicant_number} unassigned.`,
+          severity: "info",
+        });
+        console.log("Unassign response:", res.data);
+      })
+      .catch((err) => {
+        console.error("Failed to unassign applicant:", err);
+        fetchApplicants();
+        setSnack({
+          open: true,
+          message: "Failed to unassign applicant.",
+          severity: "error",
+        });
+      });
+  };
+
+  // handleUnassignAll
+  const handleUnassignAll = () => {
+    setPersons((prev) =>
+      prev.map((p) => ({
+        ...p,
+        assigned: false,
+        college_approval_status: COLLEGE_APPROVAL_STATUS.WAITING_LIST,
+        applicant_interview_status: 0,
+      })),
+    );
+    setEditScores((prev) => {
+      const next = { ...prev };
+      persons.forEach((p) => {
+        if (!p.person_id) return;
+        next[p.person_id] = {
+          ...next[p.person_id],
+          status: COLLEGE_APPROVAL_STATUS.WAITING_LIST,
+        };
+      });
+      return next;
+    });
+
+    axios
+      .put(`${API_BASE_URL}/api/interview_applicants/unassign-all`, {
+        applicant_numbers: persons.map((a) => a.applicant_number),
+        ...auditPayload({ assignment_mode: "all" }),
+      })
+      .then((res) => {
+        console.log("Updated statuses:", res.data);
+        setSnack({
+          open: true,
+          message: "All applicants unassigned. They can be assigned again.",
+          severity: "info",
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to update applicant statuses:", err);
+        fetchApplicants();
+      });
+  };
+
+  const [selectedApplicants, setSelectedApplicants] = useState(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [singleConfirmOpen, setSingleConfirmOpen] = useState(false);
+  const [finalizeConfirmOpen, setFinalizeConfirmOpen] = useState(false);
+  const [finalizeConfirmMode, setFinalizeConfirmMode] = useState("bulk");
+  const [dprtmntName, setDepartmentName] = useState("");
+
+  const resolveSenderForApplicant = async (applicant) => {
+    const currentEmployeeId = employeeID || localStorage.getItem("employee_id");
+    const programId = applicant?.program; // this is curriculum_id from admission.person_table
+
+    // Try to find in allCurriculums (which has enrollment curriculum_ids like 8736)
+    const curriculumMatch = allCurriculums.find(
+      (c) => String(c.curriculum_id) === String(programId),
+    );
+
+    const departmentId =
+      curriculumMatch?.dprtmnt_id ||
+      getDepartmentIdsFromAdminData(adminData)[0] ||
+      adminData.dprtmnt_id;
+
+    console.log("🔍 resolveSender:", {
+      applicant_program: programId,
+      curriculumMatch: curriculumMatch || "NOT FOUND in allCurriculums",
+      departmentId,
+      currentEmployeeId,
+    });
+
+    if (!currentEmployeeId) {
+      throw new Error("No employee ID found. Please log out and log in again.");
+    }
+    if (!programId) {
+      throw new Error("Program ID missing for this applicant.");
+    }
+
+    const res = await axios.get(
+      `${API_BASE_URL}/api/email-templates/active-senders`,
+      {
+        params: {
+          department_id: departmentId,
+          program_id: programId, // send the raw value — backend will resolve it
+          employee_id: currentEmployeeId,
+        },
+      },
+    );
+
+    if (!Array.isArray(res.data) || res.data.length === 0) {
+      throw new Error(
+        `No active email account for employee ${currentEmployeeId}, program=${programId}, department=${departmentId}.`,
+      );
+    }
+
+    return res.data[0].sender_name;
+  };
+
+  useEffect(() => {
+    const departmentIds = getDepartmentIdsFromAdminData(adminData);
+    const primaryDepartmentId = departmentIds[0];
+    if (!primaryDepartmentId) return;
+
+    const fetchDepartment = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/dprtmnt_curriculum/${primaryDepartmentId}`,
+        );
+        setDepartmentName(res.data[0]?.dprtmnt_name);
+      } catch (err) {
+        console.error("Error fetching active senders:", err);
+      }
+    };
+
+    fetchDepartment();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids]);
+
+  const [emailMessage, setEmailMessage] = useState("");
+
+  const [customReminders, setCustomReminders] = useState(
+    `⚠️ Important Reminder:
+
+1. Proceed to the Clinic for your Medical Examination.
+   - Bring and present your Admission Form Process so they can verify if you're eligible to take the Medical Examination.
+
+2. After completing your Medical Examination, proceed to the Registrar's Office to submit your Original Documents within 7 days.
+   - Submissions are accepted only during working hours, Monday to Friday, from 8:00 AM to 5:00 PM.
+
+3. Please note that failure to comply within 7 days may result in your slot being given to another applicant.
+
+You have until May 11, 2026 to complete the admission process.`,
+  );
+
+  const [finalPreview, setFinalPreview] = useState("");
+
+  useEffect(() => {
+    if (!confirmOpen && !singleConfirmOpen) return;
+    setFinalPreview(
+      emailMessage + "\n\n" + customReminders + "\n\nThank you and good luck!",
+    );
+  }, [emailMessage, customReminders, confirmOpen, singleConfirmOpen]);
+
+  const [requirements, setRequirements] = useState([]);
+
+  const fetchRequirements = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/requirements`);
+      setRequirements(res.data);
+      return res.data; // 👈 useful for email building
+    } catch (err) {
+      console.error("Failed to fetch requirements:", err);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    fetchRequirements();
+  }, []);
+
+  const filterRequirementsForApplicant = (applicant, list = requirements) => {
+    if (!Array.isArray(list)) return [];
+
+    const applyingAs = String(applicant?.applyingAs ?? "");
+
+    return list.filter((req) => {
+      const applicantType = String(req.applicant_type ?? 0);
+      return (
+        applicantType === applyingAs ||
+        applicantType === "0" ||
+        applicantType.toLowerCase() === "all"
+      );
+    });
+  };
+
+  const [selectedCopies, setSelectedCopies] = useState({});
+
+  const handleSelect = (reqId, type = null) => {
+    setSelectedCopies((prev) => {
+      const updated = { ...prev };
+
+      // ✅ Remove selection if null
+      if (type === null) {
+        delete updated[reqId];
+      } else {
+        updated[reqId] = type;
+      }
+
+      const applicant = persons.find(
+        (p) => p.applicant_number === selectedApplicant,
+      );
+
+      const reqText = buildRequirementsText(applicant, requirements, updated);
+
+      const newMessage = buildFullMessage(applicant, reqText);
+
+      setEmailMessage(newMessage);
+
+      return updated;
+    });
+  };
+
+  const buildFullMessage = (applicant, reqText) => {
+    return `Dear ${applicant?.last_name || ""}, ${applicant?.first_name || ""} ${applicant?.middle_name || ""}
+
+Congratulations on passing the Interview/Qualifying Exam!
+
+Please follow the steps below to complete your Admission process:
+
+📄 REQUIRED DOCUMENTS:
+${reqText}`.trim();
+  };
+
+  const buildRequirementsText = (
+    applicant,
+    list = requirements,
+    copies = selectedCopies,
+  ) => {
+    const filtered = filterRequirementsForApplicant(applicant, list);
+
+    if (!filtered || filtered.length === 0) {
+      return "No requirements listed.";
+    }
+
+    const mainReqs = filtered.filter(
+      (r) => !r.category?.toLowerCase().includes("medical"),
+    );
+
+    const medReqs = filtered.filter((r) =>
+      r.category?.toLowerCase().includes("medical"),
+    );
+
+    let text = "";
+
+    if (mainReqs.length > 0) {
+      text += "Main Requirements:\n";
+
+      mainReqs.forEach((req, i) => {
+        const sel = copies[req.id];
+
+        text += `${i + 1}. ${req.description}`;
+
+        // optional label
+        if (Number(req.is_optional) === 1) {
+          text += " (Optional)";
+        }
+
+        if (sel === "original") {
+          text += " (Original Copy)";
+        }
+
+        if (sel === "xerox") {
+          text += " (Xerox Copy)";
+        }
+
+        text += "\n";
+      });
+    }
+
+    if (medReqs.length > 0) {
+      text += "\nMedical Requirements:\n";
+
+      medReqs.forEach((req, i) => {
+        const sel = copies[req.id];
+
+        text += `${i + 1}. ${req.description}`;
+
+        // optional label
+        if (Number(req.is_optional) === 1) {
+          text += " (Optional)";
+        }
+
+        if (sel === "original") {
+          text += " (Original Copy)";
+        }
+
+        if (sel === "xerox") {
+          text += " (Xerox Copy)";
+        }
+
+        text += "\n";
+      });
+    }
+
+    return text.trim();
+  };
+
+  const handleOpenDialog = (applicant = null) => {
+    const today = new Date();
+    const validUntil = new Date(today);
+    validUntil.setDate(today.getDate() + 7);
+
+    const formattedValidUntil = validUntil.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    const reqText = buildRequirementsText(applicant, requirements);
+
+    // ✅ Use dynamic company name from settings
+    const companyName = settings?.company_name || "Student Information System";
+
+    const defaultMessage = `
+Dear ${applicant?.last_name || ""}, ${applicant?.first_name || ""} ${applicant?.middle_name || ""}
+
+Congratulations on passing the Interview/Qualifying Exam!
+
+Please follow the steps below to complete your Admission process:
+
+📄 REQUIRED DOCUMENTS:
+${reqText}
+
+1. Proceed to the Clinic for your Medical Examination.  
+   - Bring and present your Admission Form Process so they can verify if you're eligible to take the Medical Examination.
+
+2. After completing your Medical Examination, proceed to the Registrar’s Office to submit your Original Documents within 7 days.  
+   - Submissions are accepted only during working hours, Monday to Friday, from 8:00 AM to 5:00 PM.
+
+3. Please note that failure to comply within 7 days may result in your slot being given to another applicant.
+
+You have until ${formattedValidUntil} to complete the admission process.
+
+Thank you, best regards
+`.trim();
+
+    setSelectedApplicant(applicant?.applicant_number || null);
+    const message = buildFullMessage(applicant, reqText);
+    setEmailMessage(message);
+    setConfirmOpen(true);
+  };
+
+  const handleOpenDialogSingle = (applicant) => {
+    const today = new Date();
+    const validUntil = new Date(today);
+    validUntil.setDate(today.getDate() + 7);
+
+    const formattedValidUntil = validUntil.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    const reqText = buildRequirementsText(applicant, requirements);
+
+    // ✅ Use dynamic company name from settings
+    const companyName = settings?.company_name || "Student Information System";
+
+    const defaultMessage = `
+Dear ${applicant?.last_name || ""}, ${applicant?.first_name || ""} ${applicant?.middle_name || ""}
+
+Congratulations on passing the Interview/Qualifying Exam!
+
+Please follow the steps below to complete your Admission process:
+
+📄 REQUIRED DOCUMENTS:
+${reqText}
+
+1. Proceed to the Clinic for your Medical Examination.  
+   - Bring and present your Admission Form Process so they can verify if you're eligible to take the Medical Examination.
+
+2. After completing your Medical Examination, proceed to the Registrar’s Office to submit your Original Documents within 7 days.  
+   - Submissions are accepted only during working hours, Monday to Friday, from 8:00 AM to 5:00 PM.
+
+3. Please note that failure to comply within 7 days may result in your slot being given to another applicant.
+
+You have until ${formattedValidUntil} to complete the admission process.
+
+Thank you, best regards
+`.trim();
+
+    setSelectedApplicant(applicant?.applicant_number || null);
+    const message = buildFullMessage(applicant, reqText);
+    setEmailMessage(message);
+    setSingleConfirmOpen(true);
+  };
+
+  const getEmailTargets = (mode = finalizeConfirmMode) => {
+    if (mode === "single") {
+      return selectedApplicant
+        ? persons.filter((p) => p.applicant_number === selectedApplicant)
+        : [];
+    }
+
+    return selectedApplicant
+      ? persons.filter((p) => p.applicant_number === selectedApplicant)
+      : persons.filter(
+        (p) =>
+          Number(p.college_approval_status) ===
+          COLLEGE_APPROVAL_STATUS.ACCEPTED &&
+          Number(p.applicant_interview_status) !== 1,
+      );
+  };
+
+  const getApplicantDisplayName = (applicant) =>
+    [
+      applicant?.last_name,
+      [applicant?.first_name, applicant?.middle_name].filter(Boolean).join(" "),
+    ]
+      .filter(Boolean)
+      .join(", ") ||
+    applicant?.applicant_number ||
+    "this applicant";
+
+  const openFinalizeConfirmation = (mode) => {
+    const targets = getEmailTargets(mode);
+
+    if (targets.length === 0) {
+      setSnack({
+        open: true,
+        message:
+          mode === "single"
+            ? "Please select one applicant first."
+            : "No applicants to send email to.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setFinalizeConfirmMode(mode);
+    setFinalizeConfirmOpen(true);
+  };
+
+  const handleFinalizeConfirmed = () => {
+    setFinalizeConfirmOpen(false);
+    if (finalizeConfirmMode === "single") {
+      confirmSendEmailSingle();
+      return;
+    }
+    confirmSendEmails();
+  };
+
+  const confirmSendEmailSingle = async () => {
+    setLoading2(true);
+    const targets = selectedApplicant
+      ? persons.filter((p) => p.applicant_number === selectedApplicant)
+      : [];
+
+    if (targets.length === 0) {
+      setLoading2(false);
+      setSnack({ open: true, message: "Please select one applicant first.", severity: "warning" });
+      return;
+    }
+
+    const loggedInPersonId = localStorage.getItem("person_id");
+
+    let successCount = 0;
+    const successfulApplicantNumbers = new Set();
+
+    for (const applicant of targets) {
+      const recipientEmail =
+        applicant.email || applicant.email_address || applicant.emailAddress;
+
+      if (!recipientEmail) {
+        console.warn(`⚠️ Applicant ${applicant.applicant_number} has no email field`);
+        continue;
+      }
+
+      try {
+        // ✅ Resolve department_id and program_id
+        const programId = applicant?.program;
+        const curriculumMatch = allCurriculums.find(
+          (curriculum) => String(curriculum.curriculum_id) === String(programId),
+        );
+        const departmentId =
+          curriculumMatch?.dprtmnt_id ||
+          getDepartmentIdsFromAdminData(adminData)[0] ||
+          adminData.dprtmnt_id;
+
+        const resolvedSender = await resolveSenderForApplicant(applicant);
+
+        await axios.post(`${API_BASE_URL}/api/send-email`, {
+          to: recipientEmail,
+          subject: emailSubject,
+          html: finalPreview.replace(/\n/g, "<br/>"),
+          senderName: resolvedSender,
+          user_person_id: loggedInPersonId,
+          applicant_number: applicant.applicant_number,
+          update_interview_status: true,
+          interview_status_value: 1,
+          department_id: departmentId,   // ✅ ADDED
+          program_id: programId,         // ✅ ADDED
+          applicant_name: [
+            applicant.first_name,
+            applicant.middle_name,
+            applicant.last_name,
+          ].filter(Boolean).join(" "),
+          ...auditPayload(),
+        });
+
+        successCount++;
+        successfulApplicantNumbers.add(applicant.applicant_number);
+      } catch (err) {
+        console.error(`❌ Failed for ${applicant.applicant_number}`, err);
+      }
+
+      await new Promise((res) => setTimeout(res, 200));
+    }
+
+    setPersons((prev) =>
+      prev.map((p) =>
+        successfulApplicantNumbers.has(p.applicant_number)
+          ? { ...p, applicant_interview_status: 1 }
+          : p,
+      ),
+    );
+
+    setSnack({
+      open: true,
+      message: `Emails sent to ${successCount} out of ${targets.length} applicants`,
+      severity: successCount === targets.length ? "success" : "warning",
+    });
+
+    setSingleConfirmOpen(false);
+    setSelectedApplicant(null);
+    setLoading2(false);
+  };
+
+  const confirmSendEmails = async () => {
+    setLoading2(true);
+    const targets = selectedApplicant
+      ? persons.filter((p) => p.applicant_number === selectedApplicant)
+      : persons.filter(
+        (p) =>
+          Number(p.college_approval_status) === COLLEGE_APPROVAL_STATUS.ACCEPTED &&
+          Number(p.applicant_interview_status) !== 1,
+      );
+
+    if (targets.length === 0) {
+      setLoading2(false);
+      setSnack({ open: true, message: "No applicants to send email to.", severity: "warning" });
+      return;
+    }
+
+    let successCount = 0;
+    const successfulApplicantNumbers = new Set();
+
+    for (const applicant of targets) {
+      const recipientEmail =
+        applicant.email || applicant.email_address || applicant.emailAddress;
+
+      if (!recipientEmail) {
+        console.warn(`⚠️ Applicant ${applicant.applicant_number} has no email field`);
+        continue;
+      }
+
+      try {
+        // ✅ Resolve department_id and program_id per applicant
+        const programId = applicant?.program;
+        const curriculumMatch = allCurriculums.find(
+          (curriculum) => String(curriculum.curriculum_id) === String(programId),
+        );
+        const departmentId =
+          curriculumMatch?.dprtmnt_id ||
+          getDepartmentIdsFromAdminData(adminData)[0] ||
+          adminData.dprtmnt_id;
+
+        const resolvedSender = await resolveSenderForApplicant(applicant);
+
+        await axios.post(`${API_BASE_URL}/api/send-email`, {
+          to: recipientEmail,
+          subject: emailSubject,
+          html: finalPreview.replace(/\n/g, "<br/>"),
+          senderName: resolvedSender,
+          user_person_id: userID,
+          applicant_number: applicant.applicant_number,
+          update_interview_status: true,
+          interview_status_value: 1,
+          department_id: departmentId,   // ✅ ADDED
+          program_id: programId,         // ✅ ADDED
+          applicant_name: [
+            applicant.first_name,
+            applicant.middle_name,
+            applicant.last_name,
+          ].filter(Boolean).join(" "),
+          ...auditPayload(),
+        });
+
+        successCount++;
+        successfulApplicantNumbers.add(applicant.applicant_number);
+      } catch (err) {
+        console.error(`❌ Failed for ${applicant.applicant_number}`, err);
+      }
+
+      await new Promise((res) => setTimeout(res, 200));
+    }
+
+    setPersons((prev) =>
+      prev.map((p) =>
+        successfulApplicantNumbers.has(p.applicant_number)
+          ? { ...p, applicant_interview_status: 1 }
+          : p,
+      ),
+    );
+
+    setSnack({
+      open: true,
+      message: `Emails sent to ${successCount} out of ${targets.length} applicants`,
+      severity: successCount === targets.length ? "success" : "warning",
+    });
+
+    setConfirmOpen(false);
+    setSelectedApplicant(null);
+    setLoading2(false);
+  };
+
+  // Email fields - start empty
+  const [emailSubject, setEmailSubject] = useState(
+    "Submission of Original Documents",
+  );
+
+  const [schedules, setSchedules] = useState([]);
+
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/interview_schedules_with_count`,
+        );
+        setSchedules(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Error fetching schedules:", err);
+      }
+    };
+
+    fetchSchedules();
+  }, []);
+
+  const [selectedApplicant, setSelectedApplicant] = useState(null);
+
+  const [acceptCount, setAcceptCount] = useState(10);
+  const handleAcceptTop = async () => {
+    try {
+      if (!acceptCount || acceptCount <= 0) {
+        return setSnack({
+          open: true,
+          message: "Please enter a valid number of applicants to accept.",
+          severity: "error",
+        });
+      }
+
+      const unassigned = persons.filter((p) => {
+        if (
+          getCurrentCollegeApprovalStatus(p) ===
+          COLLEGE_APPROVAL_STATUS.ACCEPTED
+        )
+          return false;
+
+        const programInfo = allCurriculums.find(
+          (opt) => opt.curriculum_id?.toString() === p.program?.toString(),
+        );
+
+        // School year filter: compare applicant year with selectedSchoolYear
+        const applicantAppliedYear = new Date(
+          p.created_at.split("T")[0],
+        ).getFullYear();
+        const schoolYear = schoolYears.find(
+          (sy) => sy.year_id === selectedSchoolYear,
+        );
+
+        const matchesDepartment =
+          !selectedDepartmentFilter ||
+          programInfo?.dprtmnt_name === selectedDepartmentFilter;
+
+        const matchesProgram =
+          !selectedProgramFilter ||
+          programInfo?.program_code === selectedProgramFilter;
+
+        const matchesSchoolYear =
+          !selectedSchoolYear ||
+          (schoolYear &&
+            String(applicantAppliedYear) === String(schoolYear.current_year));
+
+        const matchesSemester =
+          !selectedSchoolSemester ||
+          normalize(p.middle_code) ===
+          normalize(selectedSemester?.semester_code);
+
+        return (
+          matchesDepartment &&
+          matchesProgram &&
+          matchesSchoolYear &&
+          matchesSemester
+        );
+      });
+
+      if (unassigned.length === 0) {
+        setSnack({
+          open: true,
+          message: "No applicants available to assign in this department.",
+          severity: "warning",
+        });
+        return;
+      }
+
+      const sortedUnassigned = [...unassigned].sort((a, b) => {
+        const aExam =
+          editScores[a.person_id]?.qualifying_exam_score ??
+          a.qualifying_exam_score ??
+          0;
+        const aInterview =
+          editScores[a.person_id]?.qualifying_interview_score ??
+          a.qualifying_interview_score ??
+          0;
+        const aScore = (Number(aExam) + Number(aInterview)) / 2;
+
+        const bExam =
+          editScores[b.person_id]?.qualifying_exam_score ??
+          b.qualifying_exam_score ??
+          0;
+        const bInterview =
+          editScores[b.person_id]?.qualifying_interview_score ??
+          b.qualifying_interview_score ??
+          0;
+        const bScore = (Number(bExam) + Number(bInterview)) / 2;
+
+        return bScore - aScore; // higher scores first
+      });
+
+      // ✅ Take only up to the requested count
+      const maxToAssign = Math.min(sortedUnassigned.length, acceptCount);
+      const toAssign = sortedUnassigned.slice(0, maxToAssign);
+
+      const applicantNumbersToAssign = toAssign.map((a) => a.applicant_number);
+      applyLocalCollegeStatusForApplicants(
+        applicantNumbersToAssign,
+        COLLEGE_APPROVAL_STATUS.ACCEPTED,
+      );
+
+      axios
+        .put(`${API_BASE_URL}/api/interview_applicants/assign`, {
+          applicant_numbers: applicantNumbersToAssign,
+          ...auditPayload({
+            assignment_mode: "top",
+            selected_department: selectedDepartmentFilter,
+          }),
+        })
+        .then((res) => {
+          console.log("Updated statuses:", res.data);
+          setSnack({
+            open: true,
+            message: `Top ${acceptCount} applicants in ${selectedDepartmentFilter} are now accepted.`,
+            severity: "success",
+          });
+        })
+        .catch((err) => {
+          console.error("Failed to update applicant statuses:", err);
+          fetchApplicants();
+        });
+    } catch (err) {
+      console.error("Error accepting top applicants:", err);
+      setSnack({
+        open: true,
+        message: err.response?.data?.message || "Failed to accept applicants.",
+        severity: "error",
+      });
+    }
+  };
+
+  // Put this at the very bottom before the return
+  if (loading || hasAccess === null) {
+    return <LoadingOverlay open={loading} message="Loading..." />;
+  }
+
+  if (!hasAccess) {
+    return <Unauthorized />;
+  }
+
+  // 🔒 Disable right-click
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
+
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
+
 
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
@@ -734,7 +2648,7 @@ const QualifyingExamScoreReadOnly = () => {
           variant="h4"
           sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}
         >
-          QUALIFYING / INTERVIEW EXAMINATION SCORE 
+          QUALIFYING / INTERVIEW EXAMINATION SCORE
         </Typography>
 
         <TextField
@@ -799,7 +2713,7 @@ const QualifyingExamScoreReadOnly = () => {
           <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
-                Qualifying / Interview Examination Score (Read Only)
+                Qualifying / Interview Examination Score
               </TableCell>
             </TableRow>
           </TableHead>
@@ -862,7 +2776,7 @@ const QualifyingExamScoreReadOnly = () => {
             </Box>
 
             <button
-              onClick={printDiv}
+              onClick={handleExportQualifyingInterviewScorePdf}
               style={{
                 padding: "5px 20px",
                 border: "2px solid black",
@@ -887,7 +2801,7 @@ const QualifyingExamScoreReadOnly = () => {
               type="button"
             >
               <FcPrint size={20} />
-              Print Qualifying / Interview Scores
+              Download Applicant Qualfying / Interview Scores
             </button>
           </Box>
         </Box>
@@ -1089,6 +3003,7 @@ const QualifyingExamScoreReadOnly = () => {
                   }}
                   displayEmpty
                 >
+                  <MenuItem value="">All Departments</MenuItem>
                   {department.map((dep) => (
                     <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})
@@ -1123,7 +3038,7 @@ const QualifyingExamScoreReadOnly = () => {
         </Box>
 
         <Typography textAlign="left" color="maroon" sx={{ mb: 1, mt: 3, fontWeight: "bold" }}>
-        Applicant Entrance Exam Filter
+          Entrance Exam Total Score:
         </Typography>
         <Box display="flex" gap={2} mt={2} flexWrap="wrap">
           <Typography fontSize={13} sx={{ minWidth: "70px" }}>Total:</Typography>

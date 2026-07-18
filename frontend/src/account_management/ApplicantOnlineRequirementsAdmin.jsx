@@ -45,7 +45,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import CloseIcon from "@mui/icons-material/Close";
-import FormalExample from "../assets/formalexample.png";
 
 
 const SuperAdminRequirementsUploader = () => {
@@ -585,6 +584,42 @@ const SuperAdminRequirementsUploader = () => {
       console.log("Document status updated and UI refreshed!");
     } catch (err) {
       console.error("Error updating document status:", err);
+    }
+  };
+
+  const handleApplyingAsChange = async (event) => {
+    if (!canEdit) {
+      showSnackbar("You do not have permission to update Applying As.", "warning");
+      return;
+    }
+
+    const newValue = event.target.value;
+    if (!newValue || newValue === person.applyingAs) return;
+
+    const personId = selectedPerson?.person_id || person?.person_id;
+    if (!personId) {
+      showSnackbar("Please select an applicant first.", "warning");
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/person/${personId}`,
+        { applyingAs: newValue },
+        getAuditConfig({ "x-audit-change-section": "personal_information" })
+      );
+
+      setPerson((prev) => ({ ...prev, applyingAs: newValue }));
+
+      // ✅ keep selectedPerson in sync so the requirements-filter effect re-runs
+      setSelectedPerson((prev) =>
+        prev ? { ...prev, applyingAs: newValue } : prev
+      );
+
+      showSnackbar("✅ Applying As updated successfully.", "success");
+    } catch (err) {
+      console.error("Error updating applyingAs:", err);
+      showSnackbar("❌ Failed to update Applying As.", "error");
     }
   };
 
@@ -1373,6 +1408,7 @@ const SuperAdminRequirementsUploader = () => {
                 size="small"
                 name="applyingAs"
                 value={person.applyingAs || ""}
+                onChange={handleApplyingAsChange}
                 placeholder="Select applyingAs"
                 sx={{ width: "400px" }}
                 InputProps={{ sx: { height: 35 } }}
@@ -1453,35 +1489,6 @@ const SuperAdminRequirementsUploader = () => {
             {/* Document Type, Remarks, and Document File */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 4, mb: 2 }}>
               {/* Document Type */}
-              {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, }}>
-                  <Typography sx={{ fontSize: "14px", fontFamily: "Poppins, sans-serif", width: "90px" }}>
-                    Document Type:
-                  </Typography>
-                  <TextField
-                    select
-                    size="small"
-                    placeholder="Select Documents"
-                    value={selectedFiles.requirements_id || ''}
-                    onChange={(e) =>
-                      setSelectedFiles(prev => ({
-                        ...prev,
-                        requirements_id: e.target.value,
-                      }))
-                    }
-                    sx={{ width: 200 }} // match width
-                    InputProps={{ sx: { height: 38 } }} // match height
-                    inputProps={{ style: { padding: "4px 8px", fontSize: "12px" } }}
-                  >
-                    <MenuItem value="">
-                      <em>Select Documents</em>
-                    </MenuItem>
-                    <MenuItem value={1}>PSA Birth Certificate</MenuItem>
-                    <MenuItem value={2}>Form 138 (With at least 3rd Quarter posting / No failing grade)</MenuItem>
-                    <MenuItem value={3}>Certificate of Good Moral Character</MenuItem>
-                    <MenuItem value={4}>Certificate Belonging to Graduating Class</MenuItem>
-                  </TextField>
-                </Box> */}
-
               {/* ---------------------------------------------------------------------- */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Typography
@@ -1533,38 +1540,6 @@ const SuperAdminRequirementsUploader = () => {
                 </TextField>
               </Box>
               {/* ---------------------------------------------------------------------- */}
-              {/*
-                Remarks
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography sx={{ fontSize: "14px", fontFamily: "Poppins, sans-serif", width: "80px" }}>
-                    Remarks
-                  </Typography>
-                  <TextField
-                    select
-                    size="small"
-                    placeholder="Select Remarks"
-                    value={selectedFiles.remarks || ''}
-                    onChange={(e) =>
-                      setSelectedFiles(prev => ({
-                        ...prev,
-                        remarks: e.target.value,
-                      }))
-                    }
-                    sx={{ width: 250 }}
-                    InputProps={{ sx: { height: 38 } }}
-                    inputProps={{ style: { padding: "4px 8px", fontSize: "12px" } }}
-                  >
-                    <MenuItem value="">
-                      <em>Select Remarks</em>
-                    </MenuItem>
-                    {remarksOptions.map((option, index) => (
-                      <MenuItem key={index} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-*/}
               <Box
                 sx={{
                   display: "flex",
@@ -1824,48 +1799,77 @@ const SuperAdminRequirementsUploader = () => {
           </Alert>
         </Snackbar>
         {/* Confirmation Dialog */}
-        <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-          <DialogTitle>
-            {confirmAction === "upload" ? "Confirm Upload" : "Confirm Deletion"}
+        <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} fullWidth maxWidth="sm">
+          <DialogTitle
+            sx={{
+              background: settings?.header_color || "#9E0000",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: "1.2rem",
+              py: 2,
+            }}
+          >
+            {confirmAction === "upload" ? "📤 Confirm Upload" : "🗑️ Confirm Deletion"}
           </DialogTitle>
-          <DialogContent>
-            {confirmAction === "upload" ? (
-              <>
-                Are you sure you want to upload{" "}
-                <strong>{targetDoc?.label}</strong>?<br />
-                Added by: <strong>{localStorage.getItem("username")}</strong>
-              </>
-            ) : (
-              <>
-                Are you sure you want to delete
-                <strong>
-                  {targetDoc?.label ||
-                    targetDoc?.short_label ||
-                    targetDoc?.file_path}
-                </strong>
-                ?<br />
-                Deleted by: <strong>{localStorage.getItem("username")}</strong>
-              </>
-            )}
+
+          <DialogContent sx={{ maxHeight: 400, overflowY: "auto", p: 3, mt: 2 }}>
+            <Box
+              sx={{
+                backgroundColor: "#fdfdfd",
+                borderRadius: "8px",
+                px: 2,
+                py: 2,
+                border: "1px solid #ddd",
+                fontSize: "0.95rem",
+                lineHeight: 1.8,
+              }}
+            >
+              {confirmAction === "upload" ? (
+                <Typography>
+                  Are you sure you want to upload{" "}
+                  <strong>{targetDoc?.label}</strong>?<br />
+                  Added by:{" "}
+                  <strong>{localStorage.getItem("username")}</strong>
+                </Typography>
+              ) : (
+                <Typography>
+                  Are you sure you want to delete{" "}
+                  <strong>
+                    {targetDoc?.label || targetDoc?.short_label || targetDoc?.file_path}
+                  </strong>
+                  ?<br />
+                  Deleted by:{" "}
+                  <strong>{localStorage.getItem("username")}</strong>
+                </Typography>
+              )}
+            </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setConfirmOpen(false)}
+
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
               color="error"
               variant="outlined"
+              onClick={() => setConfirmOpen(false)}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleConfirmAction}
-
               variant="contained"
+              onClick={handleConfirmAction}
+              sx={{
+                backgroundColor: settings?.header_color || "#9E0000",
+                "&:hover": {
+                  backgroundColor: settings?.header_color
+                    ? `${settings.header_color}cc`
+                    : "#7a0000",
+                },
+              }}
             >
               Yes, Confirm
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Photo Upload Modal - matches AdminDashboard1 style */}
         {/* Photo Upload Modal */}
         <Modal
           open={photoModalOpen}
@@ -1886,245 +1890,217 @@ const SuperAdminRequirementsUploader = () => {
             <Box
               sx={{
                 position: "relative",
-                width: 900,
-                maxWidth: "95vw",
+                width: 600,
                 bgcolor: "background.paper",
                 borderRadius: 3,
                 boxShadow: 24,
+                p: 4,
                 maxHeight: "90vh",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
+                overflowY: "auto",
               }}
             >
+              {/* Close (X) Button in top-right */}
+              <IconButton
+                aria-label="close"
+                onClick={() => {
+                  setPhotoModalOpen(false);
+                  setPhotoFile(null);
+                  setPhotoPreview(null);
+                }}
+                sx={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  color: "#fff",
+                  backgroundColor: settings?.header_color || "#1976d2",
+                  border: `1px solid ${borderColor}`,
+                  "&:hover": { bgcolor: "black" },
+                }}
+              >
+                <CloseIcon />
+              </IconButton>
+
               {/* Header */}
               <Box
                 sx={{
-                  bgcolor: settings?.header_color || "#1976d2",
+                  backgroundColor: settings?.header_color || "#1976d2",
+                  border: `1px solid ${borderColor}`,
                   color: "white",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                   py: 2,
                   px: 3,
+                  borderRadius: 2,
+                  textAlign: "center",
+                  mb: 3,
                 }}
               >
                 <Typography variant="h6" fontWeight="bold">
-                  Upload Your Photo
+                  Upload Student 2×2 Photo
                 </Typography>
-                <IconButton
-                  onClick={() => {
-                    setPhotoModalOpen(false);
-                    setPhotoFile(null);
-                    setPhotoPreview(null);
-                  }}
-                  sx={{
-                    color: "white",
-                    border: "2px solid rgba(255,255,255,0.6)",
-                    borderRadius: "50%",
-                    width: 40,
-                    height: 40,
-                    padding: 0,
-                    "&:hover": {
-                      backgroundColor: "rgba(255,255,255,0.2)",
-                      border: "2px solid white",
-                    },
-                  }}
-                >
-                  <CloseIcon sx={{ fontSize: 18 }} />
-                </IconButton>
               </Box>
 
-              {/* Body */}
-              <Box
-                sx={{
-                  p: 3,
-                  overflowY: "auto",
-                  borderTop: "1px solid #e0e0e0",
-                  borderBottom: "1px solid #e0e0e0",
-                }}
-              >
-                <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-                  {/* LEFT SIDE — Sample/Reference Photo */}
-                  <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
-                      ✅ Sample Format (Follow this exactly)
-                    </Typography>
+              {/* Preview Image */}
+              {(photoPreview || person.profile_img) && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    my: 2,
+                    position: "relative",
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={
+                      photoPreview
+                        ? photoPreview
+                        : `${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}?v=${photoVersion}`
+                    }
+                    alt="Preview"
+                    sx={{
+                      width: "192px",
+                      height: "192px",
+                      objectFit: "cover",
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: 2,
+                    }}
+                  />
 
-                    <Box
-                      component="img"
-                      src={FormalExample}
-                      alt="Formal Photo Example"
-                      sx={{
-                        width: "100%",
-                        maxWidth: 420,
-                        height: 260,
-                        mx: "auto",
-                        border: `1px solid ${borderColor}`,
-                        borderRadius: 2,
-                        backgroundColor: "#fff",
-                      }}
-                    />
+                  {/* ❌ REMOVE BUTTON */}
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      if (photoPreview) {
+                        // Clear newly selected file only
+                        setPhotoFile(null);
+                        setPhotoPreview(null);
+                      } else {
+                        // Delete existing saved photo from DB
+                        handleDeleteExistingPhoto();
+                      }
+                    }}
+                    sx={{
+                      position: "absolute",
+                      top: -8,
+                      right: "calc(50% - 96px)",
+                      minWidth: 0,
+                      width: 28,
+                      height: 28,
+                      fontSize: "18px",
+                      p: 0,
+                      color: "#fff",
+                      bgcolor: "#d32f2f",
+                      borderRadius: "50%",
+                      "&:hover": { bgcolor: "#b71c1c" },
+                    }}
+                  >
+                    ×
+                  </Button>
+                </Box>
+              )}
 
-                    <Box
-                      sx={{
-                        border: "2px dashed #ccc",
-                        p: 2,
-                        borderRadius: 2,
-                        backgroundColor: "#f9f9f9",
-                      }}
-                    >
-                      <Typography variant="body1" fontWeight="bold" mb={1}>
-                        Guidelines:
-                      </Typography>
-                      <Box sx={{ ml: 1, fontSize: "14px" }}>
-                        - Size: 2" x 2"
-                        <br />
-                        - Color: Your photo must be in colored.
-                        <br />
-                        - Background: White.
-                        <br />
-                        - Head size and position: Look directly into the camera at a
-                        straight angle, face centered.
-                        <br />
-                        - File types: JPEG, JPG, PNG
-                        <br />
-                        - Attire must be formal.
-                        <br />
-                        - Required File Size: 2mb
-                      </Box>
-                    </Box>
-                  </Box>
-
-                  {/* RIGHT SIDE — Upload area */}
-                  <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
-                      📤 Your Photo
-                    </Typography>
-
-                    {/* Preview */}
-                    {(photoPreview || person.profile_img) && (
-                      <Box sx={{ display: "flex", justifyContent: "center", position: "relative" }}>
-                        <Box
-                          component="img"
-                          src={
-                            photoPreview
-                              ? photoPreview
-                              : `${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}?v=${photoVersion}`
-                          }
-                          alt="Preview"
-                          sx={{
-                            width: "192px",
-                            height: "192px",
-                            objectFit: "cover",
-                            border: `1px solid ${borderColor}`,
-                            borderRadius: 2,
-                          }}
-                        />
-
-                        <Button
-                          size="small"
-                          onClick={async () => {
-                            if (photoPreview) {
-                              // Just clear the newly selected file, don't touch saved photo
-                              setPhotoFile(null);
-                              setPhotoPreview(null);
-                            } else {
-                              // Actually delete the saved photo
-                              await handleDeleteExistingPhoto();
-                            }
-                          }}
-                          sx={{
-                            position: "absolute",
-                            top: -8,
-                            right: "calc(50% - 103px)",
-                            minWidth: 0,
-                            width: 28,
-                            height: 28,
-                            fontSize: "18px",
-                            p: 0,
-                            color: "#fff",
-                            bgcolor: "#d32f2f",
-                            borderRadius: "50%",
-                            "&:hover": { bgcolor: "#b71c1c" },
-                          }}
-                        >
-                          ×
-                        </Button>
-                      </Box>
-                    )}
-
-                    {!photoPreview && !person.profile_img && (
-                      <Box
-                        sx={{
-                          height: 192,
-                          border: "1px dashed #ccc",
-                          borderRadius: 2,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "text.secondary",
-                          fontSize: 13,
-                          textAlign: "center",
-                          px: 2,
-                        }}
-                      >
-                        No photo selected yet — match the sample on the left.
-                      </Box>
-                    )}
-
-                    <Typography
-                      sx={{ fontSize: "16px", color: mainButtonColor, fontWeight: "bold" }}
-                    >
-                      Select Your Image:
-                    </Typography>
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png"
-                      onClick={(e) => (e.target.value = null)}
-                      onChange={handlePhotoFileChange}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "10px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                      }}
-                    />
-
-                    <Typography variant="caption" color="text.secondary">
-                      Click the × on your preview to remove it, choose a new file, then
-                      press Upload.
+              {/* No photo placeholder */}
+              {!photoPreview && !person.profile_img && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    my: 2,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 192,
+                      height: 192,
+                      border: "2px dashed #ccc",
+                      borderRadius: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#f5f5f5",
+                    }}
+                  >
+                    <Typography fontSize={12} color="textSecondary" textAlign="center" px={2}>
+                      No photo yet
                     </Typography>
                   </Box>
                 </Box>
+              )}
+
+              {/* Guidelines Section */}
+              <Box
+                sx={{
+                  border: "2px dashed #ccc",
+                  p: 2,
+                  borderRadius: 2,
+                  mb: 3,
+                  backgroundColor: "#f9f9f9",
+                }}
+              >
+                <Typography variant="body1" fontWeight="bold" mb={1}>
+                  Guidelines:
+                </Typography>
+                <Box sx={{ ml: 2, fontSize: "15px" }}>
+                  - Size: 2" x 2"<br />
+                  - Color: Your photo must be in colored.<br />
+                  - Background: White.<br />
+                  - Head size and position: Look directly into the camera at a straight angle, face centered.<br />
+                  - File types: JPEG, JPG, PNG<br />
+                  - Attire must be formal.<br />
+                  - Required File Size: 2mb
+                </Box>
+
+                <Typography variant="body1" fontWeight="bold" mt={2}>
+                  How to Change the Photo?
+                </Typography>
+                <Box sx={{ ml: 2, fontSize: "15px" }}>
+                  - Click the X Button<br />
+                  - Choose a new file<br />
+                  - Click the Upload button
+                </Box>
               </Box>
 
-              {/* Footer */}
-              <Box sx={{ p: 2, display: "flex", justifyContent: "space-between" }}>
-                <Button
-                  onClick={() => {
-                    setPhotoModalOpen(false);
-                    setPhotoFile(null);
-                    setPhotoPreview(null);
-                  }}
-                  color="error"
-                  variant="outlined"
-                >
-                  Cancel
-                </Button>
+              {/* File Input */}
+              <Typography
+                sx={{
+                  fontSize: "18px",
+                  color: mainButtonColor,
+                  fontWeight: "bold",
+                  mb: 1,
+                }}
+              >
+                Select Your Image:
+              </Typography>
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png"
+                onClick={(e) => (e.target.value = null)}
+                onChange={handlePhotoFileChange}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "10px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  marginBottom: "16px",
+                }}
+              />
 
-                <Button
-                  onClick={handlePhotoUpload}
-                  variant="contained"
-                  color="success"
-                  size="small"
-                  disabled={!photoFile}
-                  sx={{ minWidth: "140px", height: "40px" }}
-                >
-                  Upload
-                </Button>
-              </Box>
+              {/* Upload Button */}
+              <Button
+                variant="contained"
+                fullWidth
+                disabled={!photoFile}
+                onClick={handlePhotoUpload}
+                sx={{
+                  backgroundColor: settings?.header_color || "#1976d2",
+                  border: `1px solid ${borderColor}`,
+                  color: "white",
+                  fontWeight: "bold",
+                  "&:hover": { backgroundColor: "#000000" },
+                }}
+              >
+                Upload
+              </Button>
             </Box>
           </Box>
         </Modal>

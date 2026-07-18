@@ -294,36 +294,36 @@ const AssignScheduleToApplicantsInterviewer = () => {
 
   const tabs = [
     {
-             label: "Applicant List",
-             to: "/applicant_list_college",
-             icon: <SchoolIcon fontSize="large" />,
-           },
-           {
-             label: "Applicant Profile",
-             to: "/applicant_college_personal_information",
-             icon: <PersonIcon fontSize="large" />,
-           },
-           {
-             label: "Applicant Online Requirements",
-             to: "/applicant_online_requirements_college",
-             icon: <AssignmentIcon fontSize="large" />,
-           },
-           {
-             label: "Entrance Examination Score",
-             to: "/college_entrance_examination_score",
-             icon: <ScoreIcon fontSize="large" />,
-           },
-           {
-             label: "Qualifying / Interview Schedule Management",
-             to: "/college_qualifying_interview_schedule_management",
-             icon: <ScheduleIcon fontSize="large" />,
-           },
-           {
-             label: "Qualifying / Interview Exam Score",
-             to: "/college_qualifying_interview_score",
-             icon: <ScoreIcon fontSize="large" />,
-           },
-         
+      label: "Applicant List",
+      to: "/applicant_list_college",
+      icon: <SchoolIcon fontSize="large" />,
+    },
+    {
+      label: "Applicant Profile",
+      to: "/applicant_college_personal_information",
+      icon: <PersonIcon fontSize="large" />,
+    },
+    {
+      label: "Applicant Online Requirements",
+      to: "/applicant_online_requirements_college",
+      icon: <AssignmentIcon fontSize="large" />,
+    },
+    {
+      label: "Entrance Examination Score",
+      to: "/college_entrance_examination_score",
+      icon: <ScoreIcon fontSize="large" />,
+    },
+    {
+      label: "Qualifying / Interview Schedule Management",
+      to: "/college_qualifying_interview_schedule_management",
+      icon: <ScheduleIcon fontSize="large" />,
+    },
+    {
+      label: "Qualifying / Interview Exam Score",
+      to: "/college_qualifying_interview_score",
+      icon: <ScoreIcon fontSize="large" />,
+    },
+
   ];
 
   const handleStepClick = (index, to) => {
@@ -351,9 +351,49 @@ const AssignScheduleToApplicantsInterviewer = () => {
   const [curriculumLookup, setCurriculumLookup] = useState([]);
 
   useEffect(() => {
-    const departmentIds = getDepartmentIdsFromAdminData(adminData);
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
     if (!departmentIds.length) return;
 
+    const fetchDepartments = async () => {
+      try {
+        const responses = await Promise.all(
+          departmentIds.map((departmentId) =>
+            axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+          ),
+        );
+        const mergedDepartments = responses.flatMap(
+          (response) => response.data || [],
+        );
+        const uniqueDepartments = [
+          ...new Map(
+            mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+          ).values(),
+        ];
+        setDepartment(uniqueDepartments);
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
+    fetchDepartments();
+  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+
+  useEffect(() => {
+    const departmentIds =
+      Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
+        ? adminData.dprtmnt_ids
+        : adminData.dprtmnt_id
+          ? [adminData.dprtmnt_id]
+          : [];
+
+    if (!departmentIds.length) return;
     const fetchCurriculums = async () => {
       try {
         const responses = await Promise.all(
@@ -361,30 +401,29 @@ const AssignScheduleToApplicantsInterviewer = () => {
             axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
           ),
         );
+
         const merged = responses.flatMap((response) => response.data || []);
-        setCurriculumLookup(merged);
-        const restricted = restrictToRegistrarCurriculum(merged);
-        setAllCurriculums(restricted);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
         setCurriculumOptions(restricted);
+        setAllCurriculums(restricted);
+        setCurriculumLookup(restricted); // ✅ this was missing
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
       }
     };
+
     fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-  useEffect(() => {
-    const departmentIds = getDepartmentIdsFromAdminData(adminData);
-    if (departmentIds.length) return;
-
-    axios.get(`${API_BASE_URL}/api/applied_program`).then((res) => {
-      const merged = res.data || [];
-      setCurriculumLookup(merged);
-      const restrictedCurriculums = restrictToRegistrarCurriculum(merged);
-      setAllCurriculums(restrictedCurriculums);
-      setCurriculumOptions(restrictedCurriculums);
-    });
-  }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   const [schoolYears, setSchoolYears] = useState([]);
   const [semesters, setSchoolSemester] = useState([]);
@@ -2173,9 +2212,7 @@ ${requirementsSection}
                 displayEmpty
               >
                 {showAllDepartmentsOption && (
-                  <MenuItem value="">
-                    <em>All Departments</em>
-                  </MenuItem>
+                  <MenuItem value="">All Departments</MenuItem>
                 )}
                 {selectableDepartments.map((dep) => (
                   <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
@@ -2260,7 +2297,7 @@ ${requirementsSection}
           </Box>
         </Box>
         <Typography color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
-          Applicant Entrance Exam Filter
+          Entrance Exam Score Filter:
         </Typography>
 
         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">

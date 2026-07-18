@@ -218,33 +218,26 @@ const ProgramSlotLimit = () => {
     fetchDepartments();
   }, []);
 
-  useEffect(() => {
-    if (department.length > 0 && !selectedDepartmentFilter) {
-      const firstDeptId = department[0].dprtmnt_id;
-      setSelectedDepartmentFilter(firstDeptId);
-      fetchPrograms(firstDeptId);
-    }
-  }, [department, selectedDepartmentFilter]);
+  // NOTE: Auto-selecting the first department on load was removed on purpose.
+  // The registrar must explicitly choose a department before any program data
+  // is fetched or displayed (see gating in the render section below).
 
   useEffect(() => {
-    const nextPrograms = programs.filter(
-      (program) =>
-        !selectedBranch || program.components === Number(selectedBranch),
-    );
-
-    if (nextPrograms.length === 0) {
+    // programs is already scoped to the selected department (see fetchPrograms),
+    // so it doesn't need a second pass filtering by branch/components here.
+    if (programs.length === 0) {
       if (selectedProgram) setSelectedProgram("");
       return;
     }
 
-    const selectedStillExists = nextPrograms.some(
+    const selectedStillExists = programs.some(
       (program) => String(program.curriculum_id) === String(selectedProgram),
     );
 
     if (!selectedProgram || !selectedStillExists) {
-      setSelectedProgram(nextPrograms[0].curriculum_id);
+      setSelectedProgram(programs[0].curriculum_id);
     }
-  }, [programs, selectedProgram, selectedBranch]);
+  }, [programs, selectedProgram]);
 
   useEffect(() => {
     axios
@@ -537,12 +530,29 @@ const ProgramSlotLimit = () => {
     setConfirmAllProgramsOpen(true);
   };
 
+  // Fires whenever the registrar picks a department from the dropdown.
+  // This is now the ONLY place programs get fetched for a department —
+  // nothing auto-selects on mount anymore.
   const handleCollegeChange = (e) => {
     const selectedId = e.target.value;
     setSelectedDepartmentFilter(selectedId);
     setSelectedProgram("");
     setPrograms([]);
-    fetchPrograms(selectedId);
+
+    // Departments carry their own campus via dprtmnt_table.components (1 = Manila,
+    // 2 = Cavite). Sync the Branch selector to match so it never silently disagrees
+    // with the department the registrar just picked (this was hiding every Cavite
+    // program: the branch stayed on Manila while the department switched to Cavite).
+    const deptObj = department.find(
+      (dep) => String(dep.dprtmnt_id) === String(selectedId),
+    );
+    if (deptObj && deptObj.components !== undefined && deptObj.components !== null) {
+      setSelectedBranch(String(deptObj.components));
+    }
+
+    if (selectedId) {
+      fetchPrograms(selectedId);
+    }
   };
 
   const handleOpenAddSlot = (row) => {
@@ -557,29 +567,39 @@ const ProgramSlotLimit = () => {
     setSlotsToAdd("");
   };
 
+  // Once a department is selected, that IS the campus scope — no need to also
+  // cross-check program.components against the Branch selector. That double
+  // filter was the actual bug: selectedBranch defaults to Manila and doesn't
+  // change just because a Cavite department gets picked, so every Cavite
+  // program (components = 2) got silently dropped even though the department
+  // filter matched fine.
   const filteredSlots = slots.filter(
     (row) =>
       (!selectedDepartmentFilter ||
         row.dprtmnt_id === Number(selectedDepartmentFilter)) &&
-      (!selectedBranch || row.components === Number(selectedBranch)) &&
       (!searchTerm ||
         `${row.program_code} ${row.program_description} ${row.major || ""}`
           .toLowerCase()
           .includes(searchTerm.toLowerCase()))
   );
 
-  const filteredDepartments = department.filter((dep) =>
-    slots.some(
-      (row) =>
-        row.dprtmnt_id === dep.dprtmnt_id &&
-        (!selectedBranch || row.components === Number(selectedBranch)),
-    ),
+  // Full department list (from /api/get_department), independent of whatever
+  // has slot rows for the current year/semester — so departments with no slot
+  // records yet still show up. The Branch selector here only pre-filters which
+  // departments are offered, using dprtmnt_table.components directly (the
+  // department's own campus flag), not anything derived from slots/programs.
+  const availableDepartments = department.filter(
+    (dep) =>
+      (dep.is_allowed === undefined || Number(dep.is_allowed) !== 0) &&
+      (!selectedBranch ||
+        dep.components === undefined ||
+        dep.components === null ||
+        Number(dep.components) === Number(selectedBranch)),
   );
 
-  const filteredPrograms = programs.filter(
-    (program) =>
-      !selectedBranch || program.components === Number(selectedBranch),
-  );
+  // Programs are already scoped to the selected department by
+  // /api/applied_program/:dprtmnt_id, so no additional branch filtering needed.
+  const filteredPrograms = programs;
 
   const currentCalendarYear = new Date().getFullYear();
   const earliestVisibleYear = currentCalendarYear - 10;
@@ -591,22 +611,6 @@ const ProgramSlotLimit = () => {
       startYear >= earliestVisibleYear
     );
   });
-
-  useEffect(() => {
-    if (filteredDepartments.length > 0) {
-      const exists = filteredDepartments.some(
-        (dep) => dep.dprtmnt_id === Number(selectedDepartmentFilter)
-      );
-      if (!selectedDepartmentFilter || !exists) {
-        const firstDeptId = filteredDepartments[0].dprtmnt_id;
-        setSelectedDepartmentFilter(firstDeptId);
-        fetchPrograms(firstDeptId);
-      }
-    } else {
-      setSelectedDepartmentFilter("");
-      setPrograms([]);
-    }
-  }, [filteredDepartments, selectedDepartmentFilter]);
 
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
@@ -643,26 +647,8 @@ const ProgramSlotLimit = () => {
     setSelectedBranch(branchId);
     setSelectedProgram("");
     setSelectedDepartmentFilter("");
+    setPrograms([]);
   };
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
-
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
 
   return (
     <Box
@@ -765,13 +751,19 @@ const ProgramSlotLimit = () => {
             </Select>
           </FormControl>
 
+          {/* Department dropdown now uses the FULL department list and defaults
+              to nothing selected — the registrar must explicitly pick one. */}
           <FormControl fullWidth>
             <Select
               value={selectedDepartmentFilter}
               onChange={handleCollegeChange}
+              displayEmpty
               MenuProps={{ PaperProps: { sx: { marginTop: "8px" } } }}
             >
-              {filteredDepartments.map((dep) => (
+              <MenuItem value="">
+                All Departments
+              </MenuItem>
+              {availableDepartments.map((dep) => (
                 <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_id}>
                   {dep.dprtmnt_name}
                 </MenuItem>
@@ -779,7 +771,7 @@ const ProgramSlotLimit = () => {
             </Select>
           </FormControl>
 
-          <FormControl fullWidth>
+          <FormControl fullWidth disabled={!selectedDepartmentFilter}>
             <Select
               value={selectedProgram}
               onChange={(e) => setSelectedProgram(e.target.value)}
@@ -1058,163 +1050,189 @@ const ProgramSlotLimit = () => {
         </DialogActions>
       </Dialog>
 
-      {/* ── Program Cards ── */}
-      <Grid container spacing={3} columns={4}>
-        {filteredSlots.map((row) => {
-          const remaining = row.remaining;
-          const percentage =
-            row.max_slots > 0
-              ? Math.min((row.total_enrolled / row.max_slots) * 100, 100)
-              : 0;
+      {/* ── Program Cards (gated behind an explicit department selection) ── */}
+      {!selectedDepartmentFilter ? (
+        <Paper
+          sx={{
+            p: 6,
+            textAlign: "center",
+            color: "text.secondary",
+            border: `1px dashed ${borderColor}`,
+          }}
+        >
+          <Typography fontSize={18} fontWeight={600}>
+            Select a department above to view its program slots.
+          </Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={3} columns={4}>
+          {filteredSlots.map((row) => {
+            const remaining = row.remaining;
+            const percentage =
+              row.max_slots > 0
+                ? Math.min((row.total_enrolled / row.max_slots) * 100, 100)
+                : 0;
 
-          return (
-            <Grid item xs={1} key={row.program_id}>
-              <Card
-                sx={{
-                  height: 380,
-                  display: "flex",
-                  flexDirection: "column",
-                  borderRadius: 3,
-                  border: `1px solid ${borderColor}`,
-                  boxShadow: 3,
-                  transition: "0.25s ease",
-                  "&:hover": { transform: "translateY(-3px)", boxShadow: 6 },
-                }}
-              >
-                <Box
+            return (
+              <Grid item xs={1} key={row.program_id}>
+                <Card
                   sx={{
-                    backgroundColor: remaining <= 0 ? "#d32f2f" : "#388e3c",
-                    color: "white",
-                    px: 2,
-                    py: 1.5,
-                    minHeight: 76,
+                    height: 380,
+                    display: "flex",
+                    flexDirection: "column",
+                    borderRadius: 3,
+                    border: `1px solid ${borderColor}`,
+                    boxShadow: 3,
+                    transition: "0.25s ease",
+                    "&:hover": { transform: "translateY(-3px)", boxShadow: 6 },
                   }}
                 >
-                  <Typography fontWeight={600} fontSize={14} lineHeight={1.3}>
-                    ({row.program_code}) {row.program_description}
-                  </Typography>
-                  <Typography fontSize={12} opacity={0.9} noWrap>
-                    {row.major}
-                  </Typography>
-                </Box>
-
-                <CardContent sx={{ flex: 1 }}>
-                  <Typography fontSize={28} fontWeight={700}>
-                    {remaining}
-                  </Typography>
-                  <Typography fontSize={20}>
-                    <strong>Max Slots:</strong> {row.max_slots}
-                  </Typography>
-                  <Typography fontSize={13}>
-                    <strong>Enrolled:</strong> {row.total_enrolled}
-                  </Typography>
-                  <Typography fontSize={13} mb={1}>
-                    <strong>Remaining:</strong> {remaining}
-                  </Typography>
-
                   <Box
                     sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      mb: 1,
+                      backgroundColor: remaining <= 0 ? "#d32f2f" : "#388e3c",
+                      color: "white",
+                      px: 2,
+                      py: 1.5,
+                      minHeight: 76,
                     }}
                   >
-                    <Typography fontSize={13}>
-                      <strong>e_status</strong>
+                    <Typography fontWeight={600} fontSize={14} lineHeight={1.3}>
+                      ({row.program_code}) {row.program_description}
                     </Typography>
-                    <FormControlLabel
-                      sx={{ mr: 0 }}
-                      control={
-                        <Switch
-                          size="small"
-                          checked={Number(row.e_status) === 1}
-                          onChange={(e) =>
-                            toggleProgramEStatus(row, e.target.checked)
-                          }
-                          color="warning"
-                        />
-                      }
-                      label={
-                        <Typography fontSize={12}>
-                          {Number(row.e_status) === 1 ? "ON (Hidden)" : "OFF"}
-                        </Typography>
-                      }
-                      labelPlacement="start"
-                    />
+                    <Typography fontSize={12} opacity={0.9} noWrap>
+                      {row.major}
+                    </Typography>
                   </Box>
 
-                  <LinearProgress
-                    variant="determinate"
-                    value={percentage}
-                    sx={{
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: "#eee",
-                      "& .MuiLinearProgress-bar": {
-                        backgroundColor:
-                          remaining <= 0
-                            ? "#d32f2f"
-                            : percentage >= 70
-                              ? "#f57c00"
-                              : "#388e3c",
-                      },
-                    }}
-                  />
+                  <CardContent sx={{ flex: 1 }}>
+                    <Typography fontSize={28} fontWeight={700}>
+                      {remaining}
+                    </Typography>
+                    <Typography fontSize={20}>
+                      <strong>Max Slots:</strong> {row.max_slots}
+                    </Typography>
+                    <Typography fontSize={13}>
+                      <strong>Enrolled:</strong> {row.total_enrolled}
+                    </Typography>
+                    <Typography fontSize={13} mb={1}>
+                      <strong>Remaining:</strong> {remaining}
+                    </Typography>
 
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      mt: 4,
-                    }}
-                  >
-                    <Chip
-                      size="medium"
-                      sx={{ width: "100px", height: "40px" }}
-                      label={remaining <= 0 ? "FULL" : "OPEN"}
-                      color={remaining <= 0 ? "error" : "success"}
-                    />
-                    <Box display="flex" gap={1}>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        sx={{
-                          backgroundColor: "green",
-                          color: "white",
-                          width: "100px",
-                          height: "35px",
-                        }}
-                        onClick={() => handleOpenAddSlot(row)}
-                      >
-                        Add Slot
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        sx={{
-                          backgroundColor: "#9E0000",
-                          color: "white",
-                          width: "80px",
-                          height: "35px",
-                          "&:hover": { backgroundColor: "#7b0000" },
-                        }}
-                        onClick={() => {
-                          setResetTargetRow(row);
-                          setConfirmResetSingleOpen(true);
-                        }}
-                      >
-                        Reset
-                      </Button>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 1,
+                      }}
+                    >
+                      <Typography fontSize={13}>
+                        <strong>e_status</strong>
+                      </Typography>
+                      <FormControlLabel
+                        sx={{ mr: 0 }}
+                        control={
+                          <Switch
+                            size="small"
+                            checked={Number(row.e_status) === 1}
+                            onChange={(e) =>
+                              toggleProgramEStatus(row, e.target.checked)
+                            }
+                            color="warning"
+                          />
+                        }
+                        label={
+                          <Typography fontSize={12}>
+                            {Number(row.e_status) === 1 ? "ON (Hidden)" : "OFF"}
+                          </Typography>
+                        }
+                        labelPlacement="start"
+                      />
                     </Box>
-                  </Box>
-                </CardContent>
-              </Card>
+
+                    <LinearProgress
+                      variant="determinate"
+                      value={percentage}
+                      sx={{
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#eee",
+                        "& .MuiLinearProgress-bar": {
+                          backgroundColor:
+                            remaining <= 0
+                              ? "#d32f2f"
+                              : percentage >= 70
+                                ? "#f57c00"
+                                : "#388e3c",
+                        },
+                      }}
+                    />
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mt: 4,
+                      }}
+                    >
+                      <Chip
+                        size="medium"
+                        sx={{ width: "100px", height: "40px" }}
+                        label={remaining <= 0 ? "FULL" : "OPEN"}
+                        color={remaining <= 0 ? "error" : "success"}
+                      />
+                      <Box display="flex" gap={1}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          sx={{
+                            backgroundColor: "green",
+                            color: "white",
+                            width: "100px",
+                            height: "35px",
+                          }}
+                          onClick={() => handleOpenAddSlot(row)}
+                        >
+                          Add Slot
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          sx={{
+                            backgroundColor: "#9E0000",
+                            color: "white",
+                            width: "80px",
+                            height: "35px",
+                            "&:hover": { backgroundColor: "#7b0000" },
+                          }}
+                          onClick={() => {
+                            setResetTargetRow(row);
+                            setConfirmResetSingleOpen(true);
+                          }}
+                        >
+                          Reset
+                        </Button>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+
+          {filteredSlots.length === 0 && (
+            <Grid item xs={4}>
+              <Paper sx={{ p: 4, textAlign: "center", color: "text.secondary" }}>
+                <Typography>
+                  No programs found for {selectedDepartmentName}
+                  {searchTerm ? ` matching "${searchTerm}"` : ""}.
+                </Typography>
+              </Paper>
             </Grid>
-          );
-        })}
-      </Grid>
+          )}
+        </Grid>
+      )}
 
       {/* ── Reset Single Program Confirmation ── */}
       <Dialog open={confirmResetSingleOpen} onClose={() => setConfirmResetSingleOpen(false)}>
@@ -1343,6 +1361,6 @@ const ProgramSlotLimit = () => {
       </Snackbar>
     </Box>
   );
+};
 
-}
 export default ProgramSlotLimit;

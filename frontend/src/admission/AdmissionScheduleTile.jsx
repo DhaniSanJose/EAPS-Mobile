@@ -33,7 +33,7 @@ import DateField from "../components/DateField";
 import AdmissionRoomAssignmentTabs from "../components/AdmissionRoomAssignmentTabs";
 
 const ScheduleHoverTile = () => {
-  useAuditMac();
+    useAuditMac();
     const navigate = useNavigate();
     const settings = useContext(SettingsContext);
 
@@ -318,11 +318,18 @@ const ScheduleHoverTile = () => {
             <br />
             <br />
 
-            <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, }}>
+            <TableContainer
+                component={Paper}
+                sx={{ width: "100%", border: `1px solid ${borderColor}` }}
+            >
                 <Table>
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                    <TableHead
+                        sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+                    >
                         <TableRow>
-                            <TableCell sx={{ color: 'white', textAlign: "Center" }}>Application Date</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "Center" }}>
+                                Application Date
+                            </TableCell>
                         </TableRow>
                     </TableHead>
                 </Table>
@@ -348,15 +355,15 @@ const ScheduleHoverTile = () => {
                     {/* LEFT SIDE: School Year, Semester, Building, Room, From Time, To Time */}
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>Branch</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                Branch
+                            </Typography>
                             <FormControl size="small" sx={{ minWidth: 150 }}>
                                 <Select
                                     value={selectedBranch}
-                                    onChange={(e) => {
-                                        setSelectedBranch(e.target.value);
-                                        setSelectedBuilding("");
-                                    }}
+                                    onChange={(e) => setSelectedBranch(e.target.value)}
                                 >
+                                    <MenuItem value="">All Branches</MenuItem>
                                     {branches.map((b) => (
                                         <MenuItem key={b.id} value={String(b.id)}>
                                             {b.branch}
@@ -365,23 +372,15 @@ const ScheduleHoverTile = () => {
                                 </Select>
                             </FormControl>
                         </Box>
-
                         {/* School Year */}
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>School Year</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                School Year
+                            </Typography>
                             <FormControl size="small" sx={{ minWidth: 150 }}>
                                 <Select
                                     value={selectedSchoolYear}
                                     onChange={handleSchoolYearChange}
-                                    MenuProps={{
-                                        PaperProps: {
-                                            sx: {
-                                                maxHeight: 200,
-                                                backgroundColor: "#fff",
-                                                marginTop: 1,
-                                            },
-                                        },
-                                    }}
                                 >
                                     {schoolYears.map((sy) => (
                                         <MenuItem value={sy.year_id} key={sy.year_id}>
@@ -394,19 +393,13 @@ const ScheduleHoverTile = () => {
 
                         {/* Semester */}
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>Semester</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                Semester
+                            </Typography>
                             <FormControl size="small" sx={{ minWidth: 150 }}>
                                 <Select
                                     value={selectedSchoolSemester}
                                     onChange={handleSchoolSemesterChange}
-                                    sx={{ width: 200 }}
-                                    MenuProps={{
-                                        PaperProps: {
-                                            sx: {
-                                                marginTop: 1,
-                                            }
-                                        }
-                                    }}
                                 >
                                     {schoolSemester.map((sem) => (
                                         <MenuItem value={sem.semester_id} key={sem.semester_id}>
@@ -419,24 +412,19 @@ const ScheduleHoverTile = () => {
 
                         {/* Building */}
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>Building</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                Building
+                            </Typography>
                             <FormControl size="small" sx={{ minWidth: 150 }}>
                                 <Select
                                     value={selectedBuilding}
                                     onChange={(e) => setSelectedBuilding(e.target.value)}
-                                    MenuProps={{
-                                        PaperProps: {
-                                            sx: {
-                                                maxHeight: 200,
-                                                backgroundColor: "#fff",
-                                                marginTop: 1,
-                                            },
-                                        },
-                                    }}
                                 >
                                     <MenuItem value="">All Buildings</MenuItem>
                                     {buildingList.map((bldg, i) => (
-                                        <MenuItem key={i} value={bldg}>{bldg}</MenuItem>
+                                        <MenuItem key={i} value={bldg}>
+                                            {bldg}
+                                        </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
@@ -444,27 +432,34 @@ const ScheduleHoverTile = () => {
 
                         {/* Room */}
 
-
                         {/* From Time */}
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>From Time</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                From Time
+                            </Typography>
                             <TextField
                                 type="time"
                                 size="small"
                                 value={person.fromTime}
-                                onChange={(e) => setPerson(prev => ({ ...prev, fromTime: e.target.value }))}
+                                onChange={(e) =>
+                                    setPerson((prev) => ({ ...prev, fromTime: e.target.value }))
+                                }
                                 sx={{ minWidth: 120 }}
                             />
                         </Box>
 
                         {/* To Time */}
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>To Time</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                To Time
+                            </Typography>
                             <TextField
                                 type="time"
                                 size="small"
                                 value={person.toTime}
-                                onChange={(e) => setPerson(prev => ({ ...prev, toTime: e.target.value }))}
+                                onChange={(e) =>
+                                    setPerson((prev) => ({ ...prev, toTime: e.target.value }))
+                                }
                                 sx={{ minWidth: 120 }}
                             />
                         </Box>
@@ -474,22 +469,30 @@ const ScheduleHoverTile = () => {
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                         {/* From Date */}
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>From Date</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                From Date
+                            </Typography>
                             <DateField
                                 size="small"
                                 value={person.fromDate}
-                                onChange={(e) => setPerson(prev => ({ ...prev, fromDate: e.target.value }))}
+                                onChange={(e) =>
+                                    setPerson((prev) => ({ ...prev, fromDate: e.target.value }))
+                                }
                                 sx={{ minWidth: 150 }}
                             />
                         </Box>
 
                         {/* To Date */}
                         <Box sx={{ display: "flex", flexDirection: "column" }}>
-                            <Typography fontSize={13} sx={{ mb: 1 }}>To Date</Typography>
+                            <Typography fontSize={13} sx={{ mb: 1 }}>
+                                To Date
+                            </Typography>
                             <DateField
                                 size="small"
                                 value={person.toDate}
-                                onChange={(e) => setPerson(prev => ({ ...prev, toDate: e.target.value }))}
+                                onChange={(e) =>
+                                    setPerson((prev) => ({ ...prev, toDate: e.target.value }))
+                                }
                                 sx={{ minWidth: 150 }}
                             />
                         </Box>
@@ -501,122 +504,140 @@ const ScheduleHoverTile = () => {
             <br />
             <br />
 
-            <Grid container spacing={3}>
+          <Grid container spacing={3}>
                 {filteredSchedules.length === 0 && (
-                    <Grid item xs={12}>
-                        <Box
-                            sx={{
-                                border: `2px dashed ${borderColor}`,
-                                borderRadius: 2,
-                                p: 3,
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                height: 250,
-                                backgroundColor: "#fafafa",
-                            }}
-                        >
-                            <Typography sx={{ color: "gray", fontSize: 18 }}>
-                                There is no schedule in this Academic School Year ({selectedYearLabel}, {" "}
-                                {selectedSemesterLabel}).
-                            </Typography>
-                        </Box>
-                    </Grid>
+                  <Grid item xs={12}>
+                    <Box
+                      sx={{
+                        border: `2px dashed ${borderColor}`,
+                        borderRadius: 2,
+                        p: 3,
+                        textAlign: "center",
+                        backgroundColor: "#fafafa",
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: "bold" }}>
+                        There is no schedule in this {selectedYearLabel} and{" "}
+                        {selectedSemesterLabel}.
+                      </Typography>
+                    </Box>
+                  </Grid>
                 )}
                 {filteredSchedules.map((schedule) => (
-                    <Grid item xs={12} sm={6} md={2.4} lg={2.4} key={schedule.schedule_id}>
-                        <Card
-                            onClick={() =>
-                                navigate(
-                                    `/proctor_applicant_list?proctor=${encodeURIComponent(
-                                        schedule.proctor
-                                    )}&schedule=${schedule.schedule_id}`
-                                )
-                            }
-                            sx={{
-                                cursor: "pointer",
-                                borderRadius: "16px",
-                                overflow: "hidden",
-                                boxShadow: 4,
-                                border: `1px solid ${borderColor}`,
-                                transition: "0.3s ease",
-                                "&:hover": {
-                                    transform: "translateY(-4px) scale(1.03)",
-                                    boxShadow: 6,
-                                },
-                            }}
+                  <Grid
+                    item
+                    xs={12}
+                    sm={6}
+                    md={2.4}
+                    lg={2.4}
+                    key={schedule.schedule_id}
+                  >
+                    <Card
+                      onClick={() =>
+                        navigate(
+                          `/proctor_applicant_list?proctor=${encodeURIComponent(
+                            schedule.proctor,
+                          )}&schedule=${schedule.schedule_id}`,
+                        )
+                      }
+                      sx={{
+                        cursor: "pointer",
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        boxShadow: 4,
+                        border: `1px solid ${borderColor}`,
+                        transition: "0.3s ease",
+                        "&:hover": {
+                          transform: "translateY(-4px) scale(1.03)",
+                          boxShadow: 6,
+                        },
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          backgroundColor: settings?.header_color || "#1976d2",
+                          color: "#fff",
+                          p: 1.5,
+                        }}
+                      >
+                        <Typography
+                          fontWeight="bold"
+                          fontSize="16px"
+                          sx={{ textAlign: "center" }}
                         >
-                            <Box
-                                sx={{
-                                    backgroundColor: settings?.header_color || "#1976d2",
-                                    color: "#fff",
-                                    p: 1.5,
-                                }}
-                            >
-                                <Typography fontWeight="bold" fontSize="16px" sx={{ textAlign: "center" }}>
-                                    Schedule #{schedule.schedule_id}
-                                </Typography>
-                            </Box>
-
-                            <CardContent>
-                                <Typography fontSize="14px" mb={0.5}>
-                                    <strong>Proctor:</strong> {schedule.proctor}
-                                </Typography>
-                                <Typography fontSize="14px" mb={0.5}>
-                                    <strong>Building:</strong> {schedule.building_description}
-                                </Typography>
-                                <Typography fontSize="14px" mb={0.5}>
-                                    <strong>Room:</strong> {schedule.room_description}
-                                </Typography>
-                                <Typography fontSize="14px" mb={0.5}>
-                                    <strong>Date:</strong>{" "}
-                                    {new Date(schedule.day_description).toLocaleDateString("en-US", {
-                                        weekday: "short",
-                                        year: "numeric",
-                                        month: "short",
-                                        day: "numeric",
-                                    })}
-                                </Typography>
-                                <Typography fontSize="14px" mb={1}>
-                                    <strong>Time:</strong> {formatTime12(schedule.start_time)} -{" "}
-                                    {formatTime12(schedule.end_time)}
-                                </Typography>
-
-                                <Typography fontSize="14px" mb={0.5} fontWeight="bold">
-                                    <strong>Applicants:</strong>{" "}
-                                    {getOfficialOccupancy(schedule)}/{schedule.room_quota}
-                                </Typography>
-
-                                <LinearProgress
-                                    variant="determinate"
-                                    value={(getOfficialOccupancy(schedule) / schedule.room_quota) * 100}
-                                    sx={{
-                                        height: 8,
-                                        borderRadius: 4,
-                                        backgroundColor: "#eee",
-                                        "& .MuiLinearProgress-bar": {
-                                            backgroundColor: getOccupancyColor(
-                                                getOfficialOccupancy(schedule),
-                                                schedule.room_quota
-                                            ),
-                                        },
-                                    }}
-                                />
-
-                                <Box sx={{ mt: 1 }}>
-                                    {getOfficialOccupancy(schedule) >= schedule.room_quota ? (
-                                        <Chip label="Full" color="error" size="small" />
-                                    ) : getOfficialOccupancy(schedule) / schedule.room_quota >= 0.7 ? (
-                                        <Chip label="Almost Full" color="warning" size="small" />
-                                    ) : (
-                                        <Chip label="Available" color="success" size="small" />
-                                    )}
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    </Grid>
+                          Schedule #{schedule.schedule_id}
+                        </Typography>
+                      </Box>
+        
+                      <CardContent>
+                        <Typography fontSize="14px" mb={0.5}>
+                          <strong>Proctor:</strong> {schedule.proctor}
+                        </Typography>
+                        <Typography fontSize="14px" mb={0.5}>
+                          <strong>Building:</strong> {schedule.building_description}
+                        </Typography>
+                        <Typography fontSize="14px" mb={0.5}>
+                          <strong>Room:</strong> {schedule.room_description}
+                        </Typography>
+                        <Typography fontSize="14px" mb={0.5}>
+                          <strong>Date:</strong>{" "}
+                          {new Date(schedule.schedule_date).toLocaleDateString(
+                            "en-US",
+                            {
+                              weekday: "short",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            },
+                          )}
+                        </Typography>
+                        <Typography fontSize="14px" mb={1}>
+                          <strong>Time:</strong> {formatTime12(schedule.start_time)} -{" "}
+                          {formatTime12(schedule.end_time)}
+                        </Typography>
+        
+                        <Typography fontSize="14px" mb={0.5} fontWeight="bold">
+                          <strong>Applicants:</strong> {schedule.current_occupancy}/
+                          {schedule.room_quota}
+                        </Typography>
+        
+                        <LinearProgress
+                          variant="determinate"
+                          value={
+                            (schedule.current_occupancy / schedule.room_quota) * 100
+                          }
+                          sx={{
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: "#eee",
+                            "& .MuiLinearProgress-bar": {
+                              backgroundColor: getOccupancyColor(
+                                schedule.current_occupancy,
+                                schedule.room_quota,
+                              ),
+                            },
+                          }}
+                        />
+        
+                        <Box sx={{ mt: 1 }}>
+                          {schedule.current_occupancy >= schedule.room_quota ? (
+                            <Chip label="Occupied" color="error" size="small" />
+                          ) : schedule.current_occupancy / schedule.room_quota >=
+                            0.7 ? (
+                            <Chip
+                              label="Almost Occupied"
+                              color="warning"
+                              size="small"
+                            />
+                          ) : (
+                            <Chip label="Available" color="success" size="small" />
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
                 ))}
-            </Grid>
+              </Grid>
         </Box>
     );
 };

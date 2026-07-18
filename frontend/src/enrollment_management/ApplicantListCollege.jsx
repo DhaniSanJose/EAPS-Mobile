@@ -158,27 +158,7 @@ const ApplicantList = () => {
   const queryParams = new URLSearchParams(location.search);
   const queryPersonId = (queryParams.get("person_id") || "").trim();
 
-  const handleRowClick = (applicant) => {
-    const personId = applicant?.person_id;
-    if (!personId) return;
-
-    const searchValue =
-      applicant?.applicant_number ||
-      `${applicant?.last_name ?? ""}, ${applicant?.first_name ?? ""}`.trim();
-
-    sessionStorage.setItem("admin_edit_person_id", String(personId));
-    sessionStorage.setItem("edit_person_id", String(personId));
-    sessionStorage.setItem("admin_edit_person_id_source", "applicant_list_college");
-    sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
-    sessionStorage.setItem("admin_edit_person_data", JSON.stringify(applicant));
-    if (searchValue) {
-      sessionStorage.setItem("admin_edit_search_query", String(searchValue));
-      sessionStorage.setItem("edit_applicant_number", String(searchValue));
-    }
-
-    navigate(`/applicant_college_personal_information?person_id=${personId}`);
-  };
-
+  const navigate = useNavigate();
   const tabs = [
     {
       label: "Applicant List",
@@ -213,7 +193,27 @@ const ApplicantList = () => {
 
   ];
 
-  const navigate = useNavigate();
+  const handleRowClick = (applicant) => {
+    const personId = applicant?.person_id;
+    if (!personId) return;
+
+    const searchValue =
+      applicant?.applicant_number ||
+      `${applicant?.last_name ?? ""}, ${applicant?.first_name ?? ""}`.trim();
+
+    sessionStorage.setItem("admin_edit_person_id", String(personId));
+    sessionStorage.setItem("edit_person_id", String(personId));
+    sessionStorage.setItem("admin_edit_person_id_source", "applicant_list_college");
+    sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
+    sessionStorage.setItem("admin_edit_person_data", JSON.stringify(applicant));
+    if (searchValue) {
+      sessionStorage.setItem("admin_edit_search_query", String(searchValue));
+      sessionStorage.setItem("edit_applicant_number", String(searchValue));
+    }
+
+    navigate(`/applicant_college_personal_information?person_id=${personId}`);
+  };
+
   const [activeStep, setActiveStep] = useState(0);
   const [clickedSteps, setClickedSteps] = useState(
     Array(tabs.length).fill(false),
@@ -223,7 +223,7 @@ const ApplicantList = () => {
     setActiveStep(index);
     const pid = sessionStorage.getItem("admin_edit_person_id");
 
-    if (pid && to !== "/applicant_list_college") {
+    if (pid && to !== "/applicant_list_registrar") {
       navigate(`${to}?person_id=${pid}`);
     } else {
       navigate(to);
@@ -382,11 +382,8 @@ const ApplicantList = () => {
 
   const pageId = 6;
 
-  const [employeeID, setEmployeeID] = useState("");
-
-  const getAuditHeaders = () => ({
-    headers: {
-      ...getFlatAuditHeaders(),
+  const getAuditHeaders = () =>
+    getAuditConfig({
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id":
@@ -395,8 +392,9 @@ const ApplicantList = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-    },
-  });
+    });
+
+  const [employeeID, setEmployeeID] = useState("");
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -521,6 +519,10 @@ const ApplicantList = () => {
     return () => socket.current.off("document_status_updated", handler);
   }, []);
 
+
+
+
+
   const [curriculumOptions, setCurriculumOptions] = useState([]);
   const [allCurriculums, setAllCurriculums] = useState([]);
   const scopeRevision = useRegistrarScopeRevision();
@@ -549,8 +551,10 @@ const ApplicantList = () => {
             axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
           ),
         );
+
+
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = restrictToRegistrarCurriculum(merged);
+        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
         setCurriculumOptions(restricted);
         setAllCurriculums(restricted);
       } catch (error) {
@@ -560,6 +564,16 @@ const ApplicantList = () => {
 
     fetchCurriculums();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
 
   const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
   const [sortBy, setSortBy] = useState("name");
@@ -1074,12 +1088,18 @@ const ApplicantList = () => {
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
   useEffect(() => {
-    if (department.length > 0 && !selectedDepartmentFilter) {
-      const firstDept = department[0].dprtmnt_name;
-      setSelectedDepartmentFilter(firstDept);
-      handleDepartmentChange(firstDept); // if you also want to trigger it
+    if (!department.length) return;
+
+    if (
+      selectedDepartmentFilter &&
+      !department.some(
+        (dep) => String(dep.dprtmnt_name) === String(selectedDepartmentFilter),
+      )
+    ) {
+      setSelectedDepartmentFilter("");
+      handleDepartmentChange("");
     }
-  }, [department, selectedDepartmentFilter]);
+  }, [department]);
 
   const handleDepartmentChange = (selectedDept) => {
     setSelectedDepartmentFilter(selectedDept);
@@ -1096,192 +1116,147 @@ const ApplicantList = () => {
   const [applicants, setApplicants] = useState([]);
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
+
+  const handleExportApplicantListPdf = async () => {
     const resolvedCampusAddress = campusAddress || "No address set in Settings";
 
-    // ✅ Dynamic logo and company name
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
-    // ✅ Split company name into two balanced lines
     const words = name.split(" ");
     const middleIndex = Math.ceil(words.length / 2);
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-    // ✅ Generate printable HTML
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-    newWin.document.write(`
-       <html>
-         <head>
-           <title>Applicant List</title>
-          <style>
-   @page { size: A4 landscape; margin: 5mm; }
- 
-   body {
-     font-family: Arial;
-     margin: 0;
-     padding: 0;
-   }
- 
-   .print-container {
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     text-align: center;
-     padding-left: 10px;
-     padding-right: 10px;
-   }
- 
- .print-header {
-   position: relative;
-   width: 100%;
-   text-align: center;
-   margin-top: 10px;
- }
- 
- .print-header img {
-   position: absolute;
-   left: 220px; /* adjust if needed */
-   top: -10px;
-   width: 120px;
-   height: 120px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-top {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   gap: 15px;
-   margin-left: 50px; /* ✅ your requested spacing */
- }
- 
- .header-top img {
-   width: 80px;
-   height: 80px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-text {
-   display: inline-block;
-   padding-left: 100px; /* ✅ VERY IMPORTANT (logo width + spacing) */
- }
- 
-   table {
-     border-collapse: collapse;
-     width: 100%;
-     margin-top: 20px;
-     border: 1.5px solid black; /* slightly thicker for landscape clarity */
-     table-layout: fixed;
-   }
- 
-   th, td {
-     border: 1.5px solid black;
-     padding: 6px 8px;
-     font-size: 13px; /* slightly bigger (more space in landscape) */
-     text-align: center;
-     word-wrap: break-word;
-   }
- 
-   table tr td:last-child,
-   table tr th:last-child {
-     border-right: 1.5px solid black !important;
-   }
- 
-   th {
-     background-color: lightgray;
-     color: black;
-     -webkit-print-color-adjust: exact;
-     print-color-adjust: exact;
-   }
- </style>
-         </head>
-         <body onload="window.print(); setTimeout(() => window.close(), 100);">
-           <div class="print-container">
-   
-             <!-- ✅ HEADER -->
-        <div class="print-header">
-   <img src="${logoSrc}" alt="School Logo" />
- 
-   <div class="header-text">
-                 <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-   
-                 <!-- ✅ Dynamic company name -->
-                 ${name
+    // ✅ Department label (left corner) — selectedDepartmentFilter already
+    // stores the dprtmnt_name string (see matchesDepartment filter logic),
+    // so no lookup needed, just fall back when nothing's selected.
+    const selectedDepartmentLabel = selectedDepartmentFilter || "All Departments";
+
+    // ✅ Program label (right corner) — selectedProgramFilter stores
+    // program_code, so look up the full description from curriculumOptions.
+    const selectedProgramLabel = selectedProgramFilter
+      ? curriculumOptions.find(
+        (p) => p.program_code === selectedProgramFilter,
+      )?.program_description || selectedProgramFilter
+      : "All Programs";
+
+    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
+    // no onload print script. The server wraps this with matching CSS.
+    const innerHtml = `
+    <div class="print-header">
+
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
+
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
+
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${name
         ? `
-                       <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                         ${firstLine}
-                       </b>
-                       ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                               <b>${secondLine}</b>
-                             </div>`
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                       <b>${secondLine}</b>
+                     </div>`
           : ""
         }
-                     `
+            `
         : ""
       }
-   
-                 <!-- ✅ Dynamic campus address -->
-                 <div style="font-size: 13px; font-family: Arial">${resolvedCampusAddress}</div>
-   
-                 <div style="margin-top: 30px;">
-                   <b style="font-size: 24px; letter-spacing: 1px;">Applicant List</b>
-                 </div>
-               </div>
-             </div>
-   
-             <!-- ✅ TABLE -->
-             <table>
-               <thead>
-                
-                 <tr>
-     <th style="width:10%">Applicant ID</th>
-     <th style="width:35%">Applicant Name</th>
-     <th style="width:15%">Program</th>
-     <th style="width:10%">SHS GWA</th>
-     <th style="width:10%">Date Applied</th>
-     <th style="width:20%">Status</th>
- 
-                 </tr>
-               </thead>
-               <tbody>
-                 ${filteredPersons
-        .map(
-          (person) => `
-                       <tr>
-                         <td style="width:10%">${person.applicant_number || ""}</td>
-                         <td style="width:40%">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                         <td style="width:15%">${allCurriculums.find(
+
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">Applicant List</b>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:9%">Applicant ID</th>
+          <th style="width:28%">Applicant Name</th>
+          <th style="width:16%">Department</th>
+          <th style="width:11%">Program</th>
+          <th style="width:8%">SHS GWA</th>
+          <th style="width:10%">Date Applied</th>
+          <th style="width:18%">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filteredPersons
+        .map((person) => {
+          const programInfo = allCurriculums.find(
             (item) =>
-              item.curriculum_id?.toString() ===
-              person.program?.toString(),
-          )?.program_code ?? "N/A"
-            }</td>                 
-                         <td style="width:10%">${person.generalAverage1 || ""}</td>
-                         <td style="width:10%">${new Date(
-              person.created_at.split("T")[0],
-            ).toLocaleDateString("en-PH", {
-              year: "numeric",
-              month: "short",
-              day: "2-digit",
-            })}</td>
-                         <td style="width:15%">${getApplicantStatus(person)}</td>
-                       </tr>
-                     `,
-        )
+              item.curriculum_id?.toString() === person.program?.toString(),
+          );
+          return `
+              <tr>
+                <td>${person.applicant_number || ""}</td>
+                <td class="applicant-name">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
+                <td>${programInfo?.dprtmnt_name ?? "N/A"}</td>
+                <td>${programInfo?.program_code ?? "N/A"}</td>
+                <td>${person.generalAverage1 || ""}</td>
+                <td>${new Date(
+            person.created_at.split("T")[0],
+          ).toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+          })}</td>
+                <td>${getApplicantStatus(person)}</td>
+              </tr>
+            `;
+        })
         .join("")}
-               </tbody>
-             </table>
-           </div>
-         </body>
-       </html>
-     `);
-    newWin.document.close();
+      </tbody>
+    </table>
+    </div>
+  `;
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-applicant-list-pdf`,
+        { html: innerHtml },
+        {
+          responseType: "blob",
+          headers: getFlatAuditHeaders({
+            "x-employee-id": employeeID,
+            "x-page-id": pageId,
+          }),
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Applicant List PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Applicant List PDF.",
+        severity: "error",
+      });
+    }
   };
 
   // Put this at the very bottom before the return
@@ -1491,8 +1466,9 @@ const ApplicantList = () => {
           {/* Right Side: Print Button + Dates (in one row) */}
           <Box display="flex" alignItems="flex-end" gap={2}>
             {/* Print Button */}
+
             <button
-              onClick={printDiv}
+              onClick={handleExportApplicantListPdf}
               style={{
                 padding: "5px 20px",
                 border: "2px solid black",
@@ -1522,7 +1498,7 @@ const ApplicantList = () => {
               type="button"
             >
               <FcPrint size={20} />
-              Print Applicant List
+              Download Applicant List
             </button>
 
             {/* To Date */}
@@ -1917,6 +1893,7 @@ const ApplicantList = () => {
                   }}
                   displayEmpty
                 >
+                  <MenuItem value="">All Departments</MenuItem>
                   {department.map((dep) => (
                     <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
                       {dep.dprtmnt_name} ({dep.dprtmnt_code})

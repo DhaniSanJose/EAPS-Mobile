@@ -512,6 +512,50 @@ const StudentRequirements = () => {
     }
   }, [person.applicant_number]);
 
+  const handleApplyingAsChange = async (event) => {
+    const newValue = event.target.value;
+    if (!newValue || newValue === person.applyingAs) return;
+
+    const personId = selectedPerson?.person_id || person?.person_id;
+    if (!personId) {
+      showSnackbar("Please select an applicant first.", "warning");
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/person/${personId}`,
+        withAuditActor({ applyingAs: newValue }),
+        { headers: getAuditHeaders({ "x-audit-change-section": "personal_information" }) }
+      );
+
+      setPerson((prev) => ({ ...prev, applyingAs: newValue }));
+
+      // ✅ keep selectedPerson in sync so the requirements-filter effect re-runs
+      setSelectedPerson((prev) =>
+        prev ? { ...prev, applyingAs: newValue } : prev
+      );
+
+      showSnackbar("✅ Applying As updated successfully.", "success");
+    } catch (err) {
+      console.error("Error updating applyingAs:", err);
+      showSnackbar("❌ Failed to update Applying As.", "error");
+    }
+  };
+
+  const effectiveApplyingAs = selectedPerson?.applyingAs ?? person?.applyingAs;
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/api/requirements`)
+      .then((res) => {
+        const allRequirements = res.data;
+        const filtered = allRequirements.filter(
+          (req) => Number(req.applicant_type) === Number(effectiveApplyingAs) || Number(req.applicant_type) === 0
+        );
+        setRequirements(filtered);
+      })
+      .catch((err) => console.error("Error loading requirements:", err));
+  }, [effectiveApplyingAs]);
 
   useEffect(() => {
     if (selectedPerson?.person_id) {
@@ -1352,17 +1396,16 @@ const StudentRequirements = () => {
                 Applying As:
               </Typography>
               <TextField
-                disabled
                 select
                 size="small"
                 name="applyingAs"
                 value={person.applyingAs || ""}
+                onChange={handleApplyingAsChange}
                 placeholder="Select applyingAs"
                 sx={{ width: "400px" }}
                 InputProps={{ sx: { height: 35 } }}
                 inputProps={{ style: { padding: "4px 8px", fontSize: "12px" } }}
               >
-
                 <MenuItem value="">
                   <em>Select Applying</em>
                 </MenuItem>
@@ -1763,13 +1806,7 @@ const StudentRequirements = () => {
               py: 2,
             }}
           >
-            {confirmAction === "upload"
-              ? "📤 Confirm Upload"
-              : confirmAction === "delete"
-                ? "🗑️ Confirm Deletion"
-                : confirmAction === "status"
-                  ? "🔄 Confirm Status Change"
-                  : "🔄 Confirm Document Status Change"}
+            {confirmAction === "upload" ? "📤 Confirm Upload" : "🗑️ Confirm Deletion"}
           </DialogTitle>
 
           <DialogContent sx={{ maxHeight: 400, overflowY: "auto", p: 3, mt: 2 }}>
@@ -1791,7 +1828,7 @@ const StudentRequirements = () => {
                   Added by:{" "}
                   <strong>{localStorage.getItem("username")}</strong>
                 </Typography>
-              ) : confirmAction === "delete" ? (
+              ) : (
                 <Typography>
                   Are you sure you want to delete{" "}
                   <strong>
@@ -1800,20 +1837,6 @@ const StudentRequirements = () => {
                   ?<br />
                   Deleted by:{" "}
                   <strong>{localStorage.getItem("username")}</strong>
-                </Typography>
-              ) : confirmAction === "status" ? (
-                <Typography>
-                  Are you sure you want to change{" "}
-                  <strong>{targetDoc?.label}</strong> from{" "}
-                  <strong>{getUploadStatusLabel(targetDoc?.currentStatus)}</strong> to{" "}
-                  <strong>{getUploadStatusLabel(targetDoc?.nextStatus)}</strong>?
-                </Typography>
-              ) : (
-                <Typography>
-                  Are you sure you want to change this applicant&apos;s document
-                  status from{" "}
-                  <strong>{targetDoc?.currentStatus}</strong> to{" "}
-                  <strong>{targetDoc?.nextStatus}</strong>?
                 </Typography>
               )}
             </Box>
