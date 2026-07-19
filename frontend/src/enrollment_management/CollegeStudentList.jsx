@@ -45,6 +45,27 @@ import {
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
+// ✅ FIX: dedupe by program_code + major (NOT curriculum_id).
+// Your data can have the SAME program (e.g. "BSCS") stored under multiple
+// curriculum_id rows (different curriculum revisions/years). Deduping by
+// curriculum_id never collapsed those — that's why "BSCS" showed up twice
+// in the Program dropdown. Keying on program_code+major treats those rows
+// as the same option while still keeping distinct majors (e.g. BSED-Math
+// vs BSED-Filipino) separate even if they happen to share a program_code.
+const programKey = (item) =>
+    `${String(item.program_code ?? "").trim().toLowerCase()}|${String(item.major ?? "").trim().toLowerCase()}`;
+
+const dedupeCurriculumOptions = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+        const key = programKey(item);
+        if (!seen.has(key)) {
+            seen.set(key, item);
+        }
+    }
+    return [...seen.values()];
+};
+
 const StudentListForEnrollment = () => {
     const socket = useRef(null);
     const settings = useContext(SettingsContext);
@@ -260,6 +281,9 @@ const StudentListForEnrollment = () => {
     const [sortBy, setSortBy] = useState("name");
     const [sortOrder, setSortOrder] = useState("asc");
     const [selectedRegistrarStatus, setSelectedRegistrarStatus] = useState("");
+    // ✅ Defaults to "" ("All Departments"). No auto-select-first-department
+    // effect below anymore (see removed effect) — matches Applicant List's
+    // default-to-all-departments behavior.
     const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState("");
     const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
     const scopeRevision = useRegistrarScopeRevision();
@@ -270,24 +294,57 @@ const StudentListForEnrollment = () => {
     const [semesters, setSchoolSemester] = useState([]);
     const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
     const [selectedSchoolSemester, setSelectedSchoolSemester] = useState('');
-    const [totalRecords, setTotalRecords] = useState(0);
-    const [totalPages, setTotalPages] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(100);
     const [activeTermReady, setActiveTermReady] = useState(false);
     const studentsFetchIdRef = useRef(0);
     const studentsAbortRef = useRef(null);
 
+    const MAX_LIMIT = 500; // matches backend's MAX_LIMIT clamp
+
+    const fetchDepartmentStudents = async (departmentId, yearId, semesterId, signal) => {
+        let page = 1;
+        let allRows = [];
+
+        // Backend still paginates per department, so page through it fully
+        // here — the client only sees "give me everyone", pagination for
+        // display happens later in filteredPersons.
+        while (true) {
+            const params = new URLSearchParams({
+                departmentId: String(departmentId),
+                yearId: String(yearId),
+                semesterId: String(semesterId),
+                page: String(page),
+                limit: String(MAX_LIMIT),
+            });
+
+            const listRes = await fetch(
+                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
+                { signal },
+            );
+
+            if (!listRes.ok) {
+                throw new Error(`Failed to fetch students for department ${departmentId}`);
+            }
+
+            const payload = await listRes.json();
+            const rows = Array.isArray(payload) ? payload : (payload.data || []);
+            allRows = allRows.concat(rows);
+
+            const totalPages = Math.max(1, Number(payload.totalPages ?? 1));
+            if (page >= totalPages) break;
+            page += 1;
+        }
+
+        return allRows;
+    };
+
     const fetchStudents = async ({
         departmentId = selectedDepartmentFilter,
         yearId = selectedSchoolYear,
         semesterId = selectedSchoolSemester,
-        page = currentPage,
-        limit = itemsPerPage,
     } = {}) => {
-        if (!departmentId || !yearId || !semesterId) {
+        if (!yearId || !semesterId) {
             setPersons([]);
-            setTotalRecords(0);
-            setTotalPages(1);
             return;
         }
 
@@ -300,36 +357,43 @@ const StudentListForEnrollment = () => {
 
         try {
             setStudentsLoading(true);
-            const params = new URLSearchParams({
-                departmentId: String(departmentId),
-                yearId: String(yearId),
-                semesterId: String(semesterId),
-                page: String(page),
-                limit: String(limit),
-            });
-            const listRes = await fetch(
-                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
-                { signal: controller.signal },
-            );
 
-            if (!listRes.ok) {
-                throw new Error("Failed to fetch student list");
+            let rows = [];
+            if (departmentId) {
+                // Specific department picked — one department's worth of calls.
+                rows = await fetchDepartmentStudents(
+                    departmentId,
+                    yearId,
+                    semesterId,
+                    controller.signal,
+                );
+            } else {
+                // "All Departments" — fetch every visible department and merge.
+                // ⚠️ This means N department calls (each possibly multi-page)
+                // instead of 1. Fine for a handful of departments; if your
+                // school has dozens of departments and this feels slow, say so
+                // and I'll add a loading-per-department indicator or look at
+                // batching differently.
+                const deptIds = department.map((d) => d.dprtmnt_id).filter(Boolean);
+                if (!deptIds.length) {
+                    setPersons([]);
+                    return;
+                }
+                const results = await Promise.all(
+                    deptIds.map((id) =>
+                        fetchDepartmentStudents(id, yearId, semesterId, controller.signal),
+                    ),
+                );
+                rows = results.flat();
             }
 
-            const payload = await listRes.json();
             if (fetchId !== studentsFetchIdRef.current) return;
-
-            const rows = Array.isArray(payload) ? payload : (payload.data || []);
             setPersons(rows.map((student) => ({ ...student, documents: [] })));
-            setTotalRecords(Number(payload.total ?? rows.length));
-            setTotalPages(Math.max(1, Number(payload.totalPages ?? 1)));
         } catch (err) {
             if (err?.name === "AbortError") return;
             console.error("Error fetching students:", err);
             if (fetchId !== studentsFetchIdRef.current) return;
             setPersons([]);
-            setTotalRecords(0);
-            setTotalPages(1);
         } finally {
             if (fetchId === studentsFetchIdRef.current) {
                 setStudentsLoading(false);
@@ -364,8 +428,12 @@ const StudentListForEnrollment = () => {
             .finally(() => setActiveTermReady(true));
     }, []);
 
+    // ✅ Only re-fetches when the school year/semester changes. Department
+    // and Program no longer trigger a re-fetch — they're applied client-side
+    // in filteredPersons, so switching departments/programs is instant.
     useEffect(() => {
         if (!activeTermReady) return;
+        if (!department.length) return; // wait for the department list to load first
         fetchStudents();
 
         return () => {
@@ -373,14 +441,7 @@ const StudentListForEnrollment = () => {
                 studentsAbortRef.current.abort();
             }
         };
-    }, [
-        activeTermReady,
-        selectedDepartmentFilter,
-        selectedSchoolYear,
-        selectedSchoolSemester,
-        currentPage,
-        itemsPerPage,
-    ]);
+    }, [activeTermReady, department, selectedDepartmentFilter, selectedSchoolYear, selectedSchoolSemester]);
 
     const handleSchoolYearChange = (event) => {
         setSelectedSchoolYear(event.target.value);
@@ -397,42 +458,6 @@ const StudentListForEnrollment = () => {
         setPreviewDialogOpen(true);
     };
 
-    const handleViewDocuments = async () => {
-        if (!selectedPerson?.person_id) {
-            setPreviewDialogOpen(false);
-            setViewDialogOpen(true);
-            return;
-        }
-
-        try {
-            const res = await fetch(
-                `${API_BASE_URL}/api/list_of_students/documents/${encodeURIComponent(selectedPerson.person_id)}`
-            );
-
-            if (!res.ok) {
-                throw new Error("Failed to fetch student documents");
-            }
-
-            const documents = await res.json();
-            setSelectedPerson((prev) => ({
-                ...prev,
-                documents: documents.map((doc) => ({
-                    id: doc.requirements_id,
-                    description: doc.description,
-                })),
-            }));
-            setPreviewDialogOpen(false);
-            setViewDialogOpen(true);
-        } catch (err) {
-            console.error("Error fetching student documents:", err);
-            setSnack({
-                open: true,
-                message: "Failed to fetch student documents",
-                severity: "error",
-            });
-        }
-    };
-
     const handleCloseDialog = () => {
         setPreviewDialogOpen(false);
         setViewDialogOpen(false);
@@ -440,6 +465,15 @@ const StudentListForEnrollment = () => {
     };
 
     const normalize = (s) => (s ?? "").toString().trim().toLowerCase();
+
+    // ✅ The selected Program option's program_code+major (not its raw
+    // curriculum_id). This is what filtering actually matches against below,
+    // so a student is included as long as they belong to the same program/
+    // major — regardless of which specific curriculum_id revision their row
+    // happens to carry.
+    const selectedProgramOption = curriculumOptions.find(
+        (opt) => String(opt.curriculum_id) === String(selectedProgramFilter),
+    );
 
     const filteredPersons = persons
         .filter((personData) => {
@@ -464,9 +498,20 @@ const StudentListForEnrollment = () => {
                 allCurriculums
             );
 
-            const matchesProgram = selectedProgramFilter === "" ||
-                String(personData.program ?? personData.curriculum_id ?? "") === String(selectedProgramFilter) ||
-                String(programInfo?.curriculum_id ?? "") === String(selectedProgramFilter);
+            // ✅ FIX: match by program_code + major instead of curriculum_id.
+            // Previously this compared personData's curriculum_id directly to
+            // selectedProgramFilter, so students whose row used a *different*
+            // curriculum_id for the same program (see dedupe comment above)
+            // were silently excluded — that was the "filtering doesn't work"
+            // bug. Now it resolves both sides to program_code+major and
+            // compares those.
+            const matchesProgram =
+                selectedProgramFilter === "" ||
+                (selectedProgramOption
+                    ? programInfo
+                        ? programKey(programInfo) === programKey(selectedProgramOption)
+                        : false
+                    : String(personData.program ?? personData.curriculum_id ?? "") === String(selectedProgramFilter));
 
             const matchesDepartment =
                 !selectedDepartmentFilter ||
@@ -507,7 +552,13 @@ const StudentListForEnrollment = () => {
         }
     };
 
-    const currentPersons = filteredPersons;
+    // ✅ Client-side pagination (like Applicant List) since fetchStudents
+    // pulls everything for the term up front.
+    const totalRecords = filteredPersons.length;
+    const totalPages = Math.max(1, Math.ceil(filteredPersons.length / itemsPerPage));
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentPersons = filteredPersons.slice(indexOfFirstItem, indexOfLastItem);
 
     const maxButtonsToShow = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
@@ -560,7 +611,14 @@ const StudentListForEnrollment = () => {
                     ),
                 );
                 const merged = responses.flatMap((response) => response.data || []);
-                const restrictedCurriculums = restrictToRegistrarCurriculum(merged);
+                // ✅ Dedupe by program_code+major (see programKey/
+                // dedupeCurriculumOptions above) — fixes duplicate program
+                // entries like the two "BSCS" rows in the dropdown, which
+                // were actually two different curriculum_id revisions of the
+                // same program.
+                const restrictedCurriculums = dedupeCurriculumOptions(
+                    restrictToRegistrarCurriculum(merged),
+                );
                 setAllCurriculums(restrictedCurriculums);
             } catch (error) {
                 console.error("Error fetching curriculum options:", error);
@@ -587,21 +645,33 @@ const StudentListForEnrollment = () => {
 
         axios.get(`${API_BASE_URL}/api/applied_program`)
             .then(res => {
-                const restrictedCurriculums = restrictToRegistrarCurriculum(res.data);
+                // ✅ Same program_code+major dedupe for the fallback
+                // ("all programs") path.
+                const restrictedCurriculums = dedupeCurriculumOptions(
+                    restrictToRegistrarCurriculum(res.data),
+                );
                 setAllCurriculums(restrictedCurriculums);
             })
             .catch(console.error);
     }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-    useEffect(() => {
-        if (department.length === 0 || selectedDepartmentFilter) return;
+    // ✅ Removed the old "auto-select first department for everyone" effect.
+    // Department now only auto-selects when the registrar's account is
+    // scoped/locked to a single department (isDeptLocked below) — since in
+    // that case the dropdown is disabled anyway and there's only one valid
+    // choice. Everyone else defaults to "" (All Departments).
+    const scopedDepartmentIds = getDepartmentIdsFromAdminData(adminData);
+    const isDeptLocked = scopedDepartmentIds.length === 1 && department.length === 1;
 
+    useEffect(() => {
+        if (!isDeptLocked) return;
+        if (selectedDepartmentFilter) return;
         handleDepartmentChange(String(department[0].dprtmnt_id));
-    }, [department, selectedDepartmentFilter]);
+    }, [isDeptLocked, department, selectedDepartmentFilter]);
 
     useEffect(() => {
         if (!selectedDepartmentFilter) {
-            setCurriculumOptions([]);
+            setCurriculumOptions(allCurriculums);
             return;
         }
 
@@ -616,7 +686,7 @@ const StudentListForEnrollment = () => {
         if (currentPage > totalPages) {
             setCurrentPage(totalPages || 1);
         }
-    }, [totalPages, currentPage]);
+    }, [filteredPersons.length, totalPages]);
 
     const [openDialog, setOpenDialog] = useState(false);
     const [activePerson, setActivePerson] = useState(null);
@@ -644,13 +714,14 @@ const StudentListForEnrollment = () => {
         }
     }, [curriculumOptions, isProgramLocked]);
 
+    // ✅ No longer clears persons/resets counts on department change — since
+    // all students are already loaded client-side, switching departments
+    // just re-filters instantly. Only resets the page number and (unless
+    // locked) the program filter.
     const handleDepartmentChange = (selectedDept) => {
         const nextDept = selectedDept === "" || selectedDept == null ? "" : String(selectedDept);
         setSelectedDepartmentFilter(nextDept);
         setCurrentPage(1);
-        setPersons([]);
-        setTotalRecords(0);
-        setTotalPages(1);
         if (!isProgramLocked) setSelectedProgramFilter("");
     };
 
@@ -659,190 +730,142 @@ const StudentListForEnrollment = () => {
 
 
 
-    const printDiv = () => {
-        const resolvedCampusAddress =
-            campusAddress || "No address set in Settings";
-
-        // ✅ Dynamic logo and company name
+    const handleExportStudentListPdf = async () => {
+        const resolvedCampusAddress = campusAddress || "No address set in Settings";
         const logoSrc = fetchedLogo || EaristLogo;
         const name = companyName?.trim() || "";
 
-        // ✅ Split company name into two balanced lines
         const words = name.split(" ");
         const middleIndex = Math.ceil(words.length / 2);
         const firstLine = words.slice(0, middleIndex).join(" ");
         const secondLine = words.slice(middleIndex).join(" ");
 
-        // ✅ Generate printable HTML
-        const newWin = window.open("", "Print-Window");
-        newWin.document.open();
-        newWin.document.write(`
-       <html>
-         <head>
-           <title>Student List</title>
-          <style>
-   @page { size: A4 landscape; margin: 5mm; }
- 
-   body {
-     font-family: Arial;
-     margin: 0;
-     padding: 0;
-   }
- 
-   .print-container {
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     text-align: center;
-     padding-left: 10px;
-     padding-right: 10px;
-   }
- 
- .print-header {
-   position: relative;
-   width: 100%;
-   text-align: center;
-   margin-top: 20px;
- }
- 
- .print-header img {
-   position: absolute;
-   left: 220px; /* adjust if needed */
-   top: -10px;
-   width: 120px;
-   height: 120px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-top {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   gap: 15px;
-   margin-left: 50px; /* ✅ your requested spacing */
- }
- 
- .header-top img {
-   width: 80px;
-   height: 80px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-text {
-   display: inline-block;
-   padding-left: 100px; /* ✅ VERY IMPORTANT (logo width + spacing) */
- }
- 
-   table {
-     border-collapse: collapse;
-     width: 100%;
-     margin-top: 20px;
-     border: 1.5px solid black; /* slightly thicker for landscape clarity */
-     table-layout: fixed;
-   }
- 
-   th, td {
-     border: 1.5px solid black;
-     padding: 6px 8px;
-     font-size: 13px; /* slightly bigger (more space in landscape) */
-     text-align: center;
-     word-wrap: break-word;
-   }
- 
-   table tr td:last-child,
-   table tr th:last-child {
-     border-right: 1.5px solid black !important;
-   }
- 
-   th {
-     background-color: lightgray;
-     color: black;
-     -webkit-print-color-adjust: exact;
-     print-color-adjust: exact;
-   }
- </style>
-         </head>
-         <body onload="window.print(); setTimeout(() => window.close(), 100);">
-           <div class="print-container">
-   
-             <!-- ✅ HEADER -->
-        <div class="print-header">
-   <img src="${logoSrc}" alt="School Logo" />
- 
-   <div class="header-text">
-                 <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-   
-                 <!-- ✅ Dynamic company name -->
-                 ${name
+        // ✅ Department label (left corner) — selectedDepartmentFilter stores
+        // dprtmnt_id, so look up the name from `department`.
+        const selectedDepartmentLabel = selectedDepartmentFilter
+            ? department.find(
+                (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
+            )?.dprtmnt_name || "All Departments"
+            : "All Departments";
+
+        // ✅ Program label (right corner) — resolves via the dedupe-aware
+        // selectedProgramOption so it always shows the right name even
+        // though the underlying curriculum_id is just a representative row.
+        const selectedProgramLabel = selectedProgramFilter
+            ? selectedProgramOption?.program_description || selectedProgramFilter
+            : "All Programs";
+
+        const innerHtml = `
+    <div class="print-header">
+
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
+
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
+
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${name
                 ? `
-                       <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                         ${firstLine}
-                       </b>
-                       ${secondLine
-                    ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                               <b>${secondLine}</b>
-                             </div>`
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+                    ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                       <b>${secondLine}</b>
+                     </div>`
                     : ""
                 }
-                     `
+            `
                 : ""
             }
-   
-                 <!-- ✅ Dynamic campus address -->
-                 <div style="font-size: 13px; font-family: Arial">${resolvedCampusAddress}</div>
-   
-                 <div style="margin-top: 30px;">
-                   <b style="font-size: 24px; letter-spacing: 1px;">Student List</b>
-                 </div>
-               </div>
-             </div>
-   
-             <!-- ✅ TABLE -->
-             <table>
-               <thead>
-                
-                 <tr>
-     <th style="width:10%">Student ID</th>
-     <th style="width:35%">Student Name</th>
-     <th style="width:15%">Program</th>
-     <th style="width:10%">SHS GWA</th>
-     <th style="width:10%">Date Applied</th>
 
-                 </tr>
-               </thead>
-               <tbody>
-                 ${filteredPersons
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">Student List</b>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:5%">#</th>
+            <th style="width:15%">Student Number</th>
+            <th style="width:25%">Name</th>
+            <th style="width:30%">Program</th>
+            <th style="width:10%">Year Level</th>
+            <th style="width:10%">Birth Date</th>
+            <th style="width:5%">Sex</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredPersons
                 .map(
-                    (person) => `
-                       <tr>
-                         <td style="width:10%">${person.student_number || ""}</td>
-                         <td style="width:40%">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                         <td style="width:15%">${person.program_code || ""}</td>                 
-                         <td style="width:10%">${person.generalAverage1 || ""}</td>
-                         <td style="width:10%">${new Date(
-                        person.created_at.split("T")[0],
-                    ).toLocaleDateString("en-PH", {
-                        year: "numeric",
-                        month: "short",
-                        day: "2-digit",
-                    })}</td>
-                    
-                       </tr>
-                     `,
+                    (p, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${p.student_number ?? "N/A"}</td>
+              <td class="student-name">${p.last_name}, ${p.first_name} ${p.middle_name ?? ""} ${p.extension ?? ""}</td>
+              <td>(${p.program_code ?? ""}) - ${p.program_description ?? ""}${p.major ? ` - ${p.major}` : ""}</td>
+              <td>${p.year_level_description ?? ""}</td>
+              <td>${p.birthOfDate ?? ""}</td>
+              <td>${p.gender === 0 ? "MALE" : p.gender === 1 ? "FEMALE" : ""}</td>
+            </tr>
+          `,
                 )
                 .join("")}
-               </tbody>
-             </table>
-           </div>
-         </body>
-       </html>
-     `);
-        newWin.document.close();
+        </tbody>
+      </table>
+    </div>
+  `;
+
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-student-list-pdf`,
+                { html: innerHtml },
+                {
+                    responseType: "blob",
+                    headers: {
+                        "x-employee-id": employeeID,
+                        "x-audit-actor-id": employeeID,
+                        "x-audit-actor-role": userRole,
+                    },
+                },
+            );
+
+            const blobUrl = window.URL.createObjectURL(
+                new Blob([response.data], { type: "application/pdf" }),
+            );
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.setAttribute(
+                "download",
+                `Student_List_${new Date().toISOString().slice(0, 10)}.pdf`,
+            );
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Failed to generate Student List PDF:", err);
+            setSnack({
+                open: true,
+                message: "Failed to generate Student List PDF.",
+                severity: "error",
+            });
+        }
     };
-
-
 
     if (accessLoading || hasAccess === null) {
         return null;
@@ -852,7 +875,7 @@ const StudentListForEnrollment = () => {
         return <Unauthorized />;
     }
 
-       // 🔒 Disable right-click
+    // 🔒 Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
     // 🔒 Block DevTools shortcuts + Ctrl+P silently
@@ -872,13 +895,11 @@ const StudentListForEnrollment = () => {
         }
     });
 
-    const scopedDepartmentIds = getDepartmentIdsFromAdminData(adminData);
-    const isDeptLocked = scopedDepartmentIds.length === 1 && department.length === 1;
     const selectedDepartmentFilterValue =
         selectedDepartmentFilter === "" ||
-        department.some(
-            (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
-        )
+            department.some(
+                (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+            )
             ? String(selectedDepartmentFilter || "")
             : "";
 
@@ -983,7 +1004,7 @@ const StudentListForEnrollment = () => {
                     {/* Right Side: Print Button */}
                     <Box display="flex" alignItems="flex-end" gap={2}>
                         <button
-                            onClick={printDiv}
+                            onClick={handleExportStudentListPdf}
                             style={{
                                 padding: "5px 20px",
                                 border: "2px solid black",
@@ -1000,14 +1021,14 @@ const StudentListForEnrollment = () => {
                                 gap: "8px",
                                 userSelect: "none",
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#d3d3d3"}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#f0f0f0"}
-                            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.95)"}
-                            onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+                            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
+                            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                             type="button"
                         >
                             <FcPrint size={20} />
-                            Print Student List
+                            Download Student List
                         </button>
                     </Box>
                 </Box>
@@ -1140,8 +1161,10 @@ const StudentListForEnrollment = () => {
                                             displayEmpty
                                             sx={isDeptLocked ? { backgroundColor: "#f5f5f5", cursor: "not-allowed" } : {}}
                                         >
+                                            {/* ✅ Always shows "All Departments" (unless locked to one) — this
+                                                is the default value on load now. */}
                                             {!isDeptLocked && (
-                                                <MenuItem value="">Select Department</MenuItem>
+                                                <MenuItem value="">All Departments</MenuItem>
                                             )}
                                             {department.map((dep) => (
                                                 <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
@@ -1166,6 +1189,7 @@ const StudentListForEnrollment = () => {
                                     {curriculumOptions.map((prog) => (
                                         <MenuItem key={prog.curriculum_id} value={prog.curriculum_id}>
                                             {prog.program_code} - {prog.program_description}
+                                            {prog.major ? ` (${prog.major})` : ""}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -1182,16 +1206,13 @@ const StudentListForEnrollment = () => {
                 <Table size="small">
                     <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
                         <TableRow>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "2%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>#</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "4%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Student's Documents</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "4%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Student Number</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "25%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Name</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Program</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "6%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Year Level</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Birth Date</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Sex</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Remarks</TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Action</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "5%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>#</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "15%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Student Number</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "20%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Name</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "30%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Program</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Year Level</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Birth Date</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Sex</TableCell>
                         </TableRow>
                     </TableHead>
 
@@ -1199,22 +1220,7 @@ const StudentListForEnrollment = () => {
                         {currentPersons.map((person, index) => (
                             <TableRow key={`${person.student_number ?? ""}-${person.year_id ?? ""}-${person.semester_id ?? ""}`}>
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    {index + 1}
-                                </TableCell>
-                                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    <Checkbox
-                                        readOnly
-                                        checked
-                                        sx={{
-                                            color: mainButtonColor,
-                                            "&.Mui-checked": { color: mainButtonColor },
-                                            width: 25,
-                                            height: 25,
-                                            padding: 0,
-                                            "& svg": { width: 25, height: 25 }, // ensures the check icon scales correctly
-                                        }}>
-
-                                    </Checkbox>
+                                    {indexOfFirstItem + index + 1}
                                 </TableCell>
                                 <TableCell
                                     sx={{ textAlign: "center", border: `1px solid ${borderColor}`, color: "blue", cursor: "pointer" }}
@@ -1229,9 +1235,7 @@ const StudentListForEnrollment = () => {
                                     {`${person.last_name}, ${person.first_name} ${person.middle_name ?? ""} ${person.extension ?? ""}`}
                                 </TableCell>
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    {person.program_description ||
-                                        (curriculumOptions.find(item => String(item.curriculum_id) === String(person.program ?? person.curriculum_id))?.program_code) ||
-                                        " "}
+                                    ({person.program_code}) - {person.program_description}{person.major ? ` - ${person.major}` : ""}
                                 </TableCell>
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                                     {person.year_level_description ?? ""}
@@ -1241,14 +1245,6 @@ const StudentListForEnrollment = () => {
                                 </TableCell>
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                                     {person.gender === 0 ? "MALE" : person.gender === 1 ? "FEMALE" : ""}
-                                </TableCell>
-                                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    {getRemarkText(person.en_remarks) ?? ""}
-                                </TableCell>
-                                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    <Button variant="contained" size="small" onClick={() => handleOpenPreview(person)}>
-                                        Preview
-                                    </Button>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -1270,7 +1266,7 @@ const StudentListForEnrollment = () => {
                 </Table>
             </TableContainer>
 
-               <TableContainer component={Paper} sx={{ width: '100%' }}>
+            <TableContainer component={Paper} sx={{ width: '100%' }}>
                 <Table size="small">
                     <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
                         <TableRow>
@@ -1320,42 +1316,6 @@ const StudentListForEnrollment = () => {
                 </Table>
             </TableContainer>
 
-            {/* Preview Dialog */}
-            <Dialog open={previewDialogOpen} onClose={handleCloseDialog}>
-                <DialogTitle>Preview Student Documents</DialogTitle>
-                <DialogContent>
-                    Do you wish to preview the student's documents?
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        color="error"
-                        variant="outlined"
-                        onClick={handleCloseDialog}>Cancel</Button>
-                    <Button onClick={handleViewDocuments} variant="contained">View</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* View Documents Dialog */}
-            <Dialog open={viewDialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-                <DialogTitle>STUDENT DOCUMENTS</DialogTitle>
-                <DialogContent sx={{ height: 400 }}>
-                    <Grid container spacing={2}>
-                        {(selectedPerson?.documents ?? []).map((doc) => (
-                            <Grid item xs={6} key={doc.id}>
-                                <Checkbox checked readOnly /> {doc.description}
-                            </Grid>
-                        ))}
-                        {(selectedPerson?.documents ?? []).length === 0 && (
-                            <Grid item xs={12}>
-                                <Typography color="text.secondary">No documents found.</Typography>
-                            </Grid>
-                        )}
-                    </Grid>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDialog}>Close</Button>
-                </DialogActions>
-            </Dialog>
             <Snackbar
                 open={snack.open}
                 autoHideDuration={4000}

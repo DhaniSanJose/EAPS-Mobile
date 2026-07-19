@@ -23,6 +23,7 @@ import {
     DialogActions,
     Checkbox,
     Grid,
+    Tooltip,
 } from '@mui/material';
 import API_BASE_URL from "../apiConfig";
 import { io } from "socket.io-client";
@@ -33,19 +34,47 @@ import EaristLogo from "../assets/EaristLogo.png";
 import Unauthorized from "../components/Unauthorized";
 import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import SearchIcon from "@mui/icons-material/Search";
-const StudentList = () => {
+import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
+import {
+    getDepartmentIdsFromAdminData,
+    isRegistrarCurriculumMatch,
+    isRegistrarProgramSelectionLocked,
+    isRegistrarStudentScopeMatch,
+    restrictDepartmentsToScope,
+    restrictToRegistrarCurriculum,
+    syncRegistrarScopeFromAdminData,
+} from "../utils/registrarCurriculumRestriction";
+
+// ✅ FIX: dedupe by program_code + major (NOT curriculum_id).
+// Your data can have the SAME program (e.g. "BSCS") stored under multiple
+// curriculum_id rows (different curriculum revisions/years). Deduping by
+// curriculum_id never collapsed those — that's why "BSCS" showed up twice
+// in the Program dropdown. Keying on program_code+major treats those rows
+// as the same option while still keeping distinct majors (e.g. BSED-Math
+// vs BSED-Filipino) separate even if they happen to share a program_code.
+const programKey = (item) =>
+    `${String(item.program_code ?? "").trim().toLowerCase()}|${String(item.major ?? "").trim().toLowerCase()}`;
+
+const dedupeCurriculumOptions = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+        const key = programKey(item);
+        if (!seen.has(key)) {
+            seen.set(key, item);
+        }
+    }
+    return [...seen.values()];
+};
+
+const StudentListForEnrollment = () => {
     const socket = useRef(null);
-
-
     const settings = useContext(SettingsContext);
-
     const [titleColor, setTitleColor] = useState("#000000");
     const [subtitleColor, setSubtitleColor] = useState("#555555");
     const [borderColor, setBorderColor] = useState("#000000");
     const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-    const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-    const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
-
+    const [subButtonColor, setSubButtonColor] = useState("#ffffff");
+    const [stepperColor, setStepperColor] = useState("#000000");
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
     const [shortTerm, setShortTerm] = useState("");
@@ -55,7 +84,6 @@ const StudentList = () => {
     useEffect(() => {
         if (!settings) return;
 
-        // 🎨 Colors
         if (settings.title_color) setTitleColor(settings.title_color);
         if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
         if (settings.border_color) setBorderColor(settings.border_color);
@@ -63,34 +91,28 @@ const StudentList = () => {
         if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
         if (settings.stepper_color) setStepperColor(settings.stepper_color);
 
-        // 🏫 Logo
         if (settings.logo_url) {
             setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
         } else {
             setFetchedLogo(EaristLogo);
         }
 
-        // 🏷️ School Info
         if (settings.company_name) setCompanyName(settings.company_name);
         if (settings.short_term) setShortTerm(settings.short_term);
         if (settings.campus_address) setCampusAddress(settings.campus_address);
 
-        // ✅ Branches (JSON stored in DB)
         if (settings?.branches) {
             try {
                 const parsed =
                     typeof settings.branches === "string"
                         ? JSON.parse(settings.branches)
                         : settings.branches;
-
                 setBranches(parsed);
             } catch (err) {
                 console.error("Failed to parse branches:", err);
                 setBranches([]);
             }
         }
-
-
     }, [settings]);
 
     useEffect(() => {
@@ -109,18 +131,15 @@ const StudentList = () => {
     const firstLine = words.slice(0, middle).join(" ");
     const secondLine = words.slice(middle).join(" ");
 
-
+    const navigate = useNavigate();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = (queryParams.get("person_id") || "").trim();
-    const navigate = useNavigate();
 
     const handleRowClick = (person) => {
         if (!person) return;
-
         sessionStorage.setItem("edit_person_id", person.person_id || "");
         sessionStorage.setItem("edit_student_number", person.student_number || "");
-
         navigate(
             person.person_id
                 ? `/student_registrar_personal_information?person_id=${person.person_id}`
@@ -135,17 +154,16 @@ const StudentList = () => {
 
     const [employeeID, setEmployeeID] = useState("");
 
-    useEffect(() => {
 
+    useEffect(() => {
         const storedUser = localStorage.getItem("email");
         const storedRole = localStorage.getItem("role");
         const storedID = localStorage.getItem("person_id");
         const storedEmployeeID = localStorage.getItem("employee_id");
 
         if (storedUser && storedRole && storedID) {
-            setUser(storedUser);
-            setUserRole(storedRole);
             setUserID(storedID);
+            setUserRole(storedRole);
             setEmployeeID(storedEmployeeID);
 
             if (storedRole === "registrar") {
@@ -162,19 +180,11 @@ const StudentList = () => {
         setAccessLoading(true);
         try {
             const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
-            if (response.data && response.data.page_privilege === 1) {
-                setHasAccess(true);
-            } else {
-                setHasAccess(false);
-            }
-        } catch (error) {
-            console.error('Error checking access:', error);
+            setHasAccess(response.data?.page_privilege === 1);
+        } catch (err) {
+            console.error("Error checking access:", err);
             setHasAccess(false);
-            if (error.response && error.response.data.message) {
-                console.log(error.response.data.message);
-            } else {
-                console.log("An unexpected error occurred.");
-            }
+            setSnack({ open: true, message: "Failed to check access", severity: "error" });
         } finally {
             setAccessLoading(false);
         }
@@ -182,7 +192,6 @@ const StudentList = () => {
 
 
     const [persons, setPersons] = useState([]);
-
     const [selectedPerson, setSelectedPerson] = useState(null);
     const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
     const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -190,7 +199,7 @@ const StudentList = () => {
     const [userID, setUserID] = useState("");
     const [user, setUser] = useState("");
     const [userRole, setUserRole] = useState("");
-    const [adminData, setAdminData] = useState({ dprtmnt_id: "" });
+    const [adminData, setAdminData] = useState({ dprtmnt_id: "", dprtmnt_ids: [] });
 
     useEffect(() => {
         const storedUser = localStorage.getItem("email");
@@ -220,7 +229,8 @@ const StudentList = () => {
     const fetchPersonData = async () => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/admin_data/${user}`);
-            setAdminData(res.data); // { dprtmnt_id: "..." }
+            setAdminData(res.data);
+            syncRegistrarScopeFromAdminData(res.data);
         } catch (err) {
             console.error("Error fetching admin data:", err);
         }
@@ -231,9 +241,6 @@ const StudentList = () => {
             fetchPersonData();
         }
     }, [user]);
-
-
-
 
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -275,78 +282,139 @@ const StudentList = () => {
     const [sortBy, setSortBy] = useState("name");
     const [sortOrder, setSortOrder] = useState("asc");
     const [selectedRegistrarStatus, setSelectedRegistrarStatus] = useState("");
+    // ✅ Defaults to "" ("All Departments"). No auto-select-first-department
+    // effect below anymore (see removed effect) — matches Applicant List's
+    // default-to-all-departments behavior.
     const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState("");
     const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
+    const scopeRevision = useRegistrarScopeRevision();
+    const isProgramLocked = isRegistrarProgramSelectionLocked();
     const [department, setDepartment] = useState([]);
     const [allCurriculums, setAllCurriculums] = useState([]);
     const [schoolYears, setSchoolYears] = useState([]);
     const [semesters, setSchoolSemester] = useState([]);
     const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
     const [selectedSchoolSemester, setSelectedSchoolSemester] = useState('');
-    const [totalRecords, setTotalRecords] = useState(0);
-    const [totalPages, setTotalPages] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(100);
     const [activeTermReady, setActiveTermReady] = useState(false);
+    const studentsFetchIdRef = useRef(0);
+    const studentsAbortRef = useRef(null);
 
-    const fetchStudents = async () => {
-        if (!selectedDepartmentFilter || !selectedSchoolYear || !selectedSchoolSemester) {
-            setPersons([]);
-            setTotalRecords(0);
-            setTotalPages(1);
-            return;
-        }
+    const MAX_LIMIT = 500; // matches backend's MAX_LIMIT clamp
 
-        try {
-            setStudentsLoading(true);
+    const fetchDepartmentStudents = async (departmentId, yearId, semesterId, signal) => {
+        let page = 1;
+        let allRows = [];
+
+        // Backend still paginates per department, so page through it fully
+        // here — the client only sees "give me everyone", pagination for
+        // display happens later in filteredPersons.
+        while (true) {
             const params = new URLSearchParams({
-                departmentId: String(selectedDepartmentFilter),
-                yearId: String(selectedSchoolYear),
-                semesterId: String(selectedSchoolSemester),
-                page: String(currentPage),
-                limit: String(itemsPerPage),
+                departmentId: String(departmentId),
+                yearId: String(yearId),
+                semesterId: String(semesterId),
+                page: String(page),
+                limit: String(MAX_LIMIT),
             });
+
             const listRes = await fetch(
-                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`
+                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
+                { signal },
             );
 
             if (!listRes.ok) {
-                throw new Error("Failed to fetch student list");
+                throw new Error(`Failed to fetch students for department ${departmentId}`);
             }
 
             const payload = await listRes.json();
             const rows = Array.isArray(payload) ? payload : (payload.data || []);
-            setPersons(rows.map((student) => ({ ...student, documents: [] })));
-            setTotalRecords(Number(payload.total ?? rows.length));
-            setTotalPages(Math.max(1, Number(payload.totalPages ?? 1)));
-        } catch (err) {
-            console.error("Error fetching students:", err);
-            setPersons([]);
-            setTotalRecords(0);
-            setTotalPages(1);
-        } finally {
-            setStudentsLoading(false);
+            allRows = allRows.concat(rows);
+
+            const totalPages = Math.max(1, Number(payload.totalPages ?? 1));
+            if (page >= totalPages) break;
+            page += 1;
         }
+
+        return allRows;
     };
 
-    useEffect(() => {
-        if (department.length === 0 || selectedDepartmentFilter) return;
+    const fetchStudents = async ({
+        departmentId = selectedDepartmentFilter,
+        yearId = selectedSchoolYear,
+        semesterId = selectedSchoolSemester,
+    } = {}) => {
+        if (!yearId || !semesterId) {
+            setPersons([]);
+            return;
+        }
 
-        handleDepartmentChange(String(department[0].dprtmnt_id));
-    }, [department, selectedDepartmentFilter]);
+        if (studentsAbortRef.current) {
+            studentsAbortRef.current.abort();
+        }
+        const controller = new AbortController();
+        studentsAbortRef.current = controller;
+        const fetchId = ++studentsFetchIdRef.current;
+
+        try {
+            setStudentsLoading(true);
+
+            let rows = [];
+            if (departmentId) {
+                // Specific department picked — one department's worth of calls.
+                rows = await fetchDepartmentStudents(
+                    departmentId,
+                    yearId,
+                    semesterId,
+                    controller.signal,
+                );
+            } else {
+                // "All Departments" — fetch every visible department and merge.
+                // ⚠️ This means N department calls (each possibly multi-page)
+                // instead of 1. Fine for a handful of departments; if your
+                // school has dozens of departments and this feels slow, say so
+                // and I'll add a loading-per-department indicator or look at
+                // batching differently.
+                const deptIds = department.map((d) => d.dprtmnt_id).filter(Boolean);
+                if (!deptIds.length) {
+                    setPersons([]);
+                    return;
+                }
+                const results = await Promise.all(
+                    deptIds.map((id) =>
+                        fetchDepartmentStudents(id, yearId, semesterId, controller.signal),
+                    ),
+                );
+                rows = results.flat();
+            }
+
+            if (fetchId !== studentsFetchIdRef.current) return;
+            setPersons(rows.map((student) => ({ ...student, documents: [] })));
+        } catch (err) {
+            if (err?.name === "AbortError") return;
+            console.error("Error fetching students:", err);
+            if (fetchId !== studentsFetchIdRef.current) return;
+            setPersons([]);
+        } finally {
+            if (fetchId === studentsFetchIdRef.current) {
+                setStudentsLoading(false);
+            }
+        }
+    };
 
     useEffect(() => {
         axios
             .get(`${API_BASE_URL}/api/get_school_year/`)
             .then((res) => setSchoolYears(res.data))
             .catch((err) => console.error(err));
-    }, [])
+    }, []);
 
     useEffect(() => {
         axios
             .get(`${API_BASE_URL}/api/get_school_semester/`)
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
-    }, [])
+    }, []);
 
     useEffect(() => {
         axios
@@ -361,17 +429,20 @@ const StudentList = () => {
             .finally(() => setActiveTermReady(true));
     }, []);
 
+    // ✅ Only re-fetches when the school year/semester changes. Department
+    // and Program no longer trigger a re-fetch — they're applied client-side
+    // in filteredPersons, so switching departments/programs is instant.
     useEffect(() => {
         if (!activeTermReady) return;
+        if (!department.length) return; // wait for the department list to load first
         fetchStudents();
-    }, [
-        activeTermReady,
-        selectedDepartmentFilter,
-        selectedSchoolYear,
-        selectedSchoolSemester,
-        currentPage,
-        itemsPerPage,
-    ]);
+
+        return () => {
+            if (studentsAbortRef.current) {
+                studentsAbortRef.current.abort();
+            }
+        };
+    }, [activeTermReady, department, selectedDepartmentFilter, selectedSchoolYear, selectedSchoolSemester]);
 
     const handleSchoolYearChange = (event) => {
         setSelectedSchoolYear(event.target.value);
@@ -388,50 +459,23 @@ const StudentList = () => {
         setPreviewDialogOpen(true);
     };
 
-    const handleViewDocuments = async () => {
-        if (!selectedPerson?.person_id) {
-            setPreviewDialogOpen(false);
-            setViewDialogOpen(true);
-            return;
-        }
-
-        try {
-            const res = await fetch(
-                `${API_BASE_URL}/api/list_of_students/documents/${encodeURIComponent(selectedPerson.person_id)}`
-            );
-
-            if (!res.ok) {
-                throw new Error("Failed to fetch student documents");
-            }
-
-            const documents = await res.json();
-            setSelectedPerson((prev) => ({
-                ...prev,
-                documents: documents.map((doc) => ({
-                    id: doc.requirements_id,
-                    description: doc.description,
-                })),
-            }));
-            setPreviewDialogOpen(false);
-            setViewDialogOpen(true);
-        } catch (err) {
-            console.error("Error fetching student documents:", err);
-            setSnack({
-                open: true,
-                message: "Failed to fetch student documents",
-                severity: "error",
-            });
-        }
-    };
-
     const handleCloseDialog = () => {
         setPreviewDialogOpen(false);
         setViewDialogOpen(false);
         setSelectedPerson(null);
     };
 
-    // helper to make string comparisons robust
     const normalize = (s) => (s ?? "").toString().trim().toLowerCase();
+
+    // ✅ The selected Program option's program_code+major (not its raw
+    // curriculum_id). This is what filtering actually matches against below,
+    // so a student is included as long as they belong to the same program/
+    // major — regardless of which specific curriculum_id revision their row
+    // happens to carry.
+    const selectedProgramOption = curriculumOptions.find(
+        (opt) => String(opt.curriculum_id) === String(selectedProgramFilter),
+    );
+
     const filteredPersons = persons
         .filter((personData) => {
             const fullText = `
@@ -444,22 +488,42 @@ const StudentList = () => {
             `.toLowerCase();
             const matchesSearch = fullText.includes(searchQuery.toLowerCase());
 
-            // /* 🏫 CAMPUS */
             const matchesCampus =
-                !person.campus || personData.campus === person.campus
+                !person.campus || personData.campus === person.campus;
 
             const programInfo = allCurriculums.find(
                 (opt) => opt.curriculum_id?.toString() === personData.curriculum_id?.toString()
             );
+            const matchesRegistrarScope = isRegistrarStudentScopeMatch(
+                personData,
+                allCurriculums
+            );
 
-            const matchesProgram = selectedProgramFilter === "" ||
-                String(programInfo?.program_id ?? "") === String(selectedProgramFilter) ||
-                String(personData.program_id ?? "") === String(selectedProgramFilter);
+            // ✅ FIX: match by program_code + major instead of curriculum_id.
+            // Previously this compared personData's curriculum_id directly to
+            // selectedProgramFilter, so students whose row used a *different*
+            // curriculum_id for the same program (see dedupe comment above)
+            // were silently excluded — that was the "filtering doesn't work"
+            // bug. Now it resolves both sides to program_code+major and
+            // compares those.
+            const matchesProgram =
+                selectedProgramFilter === "" ||
+                (selectedProgramOption
+                    ? programInfo
+                        ? programKey(programInfo) === programKey(selectedProgramOption)
+                        : false
+                    : String(personData.program ?? personData.curriculum_id ?? "") === String(selectedProgramFilter));
+
+            const matchesDepartment =
+                !selectedDepartmentFilter ||
+                String(personData.dprtmnt_id ?? "") === String(selectedDepartmentFilter);
 
             return (
                 matchesSearch &&
                 matchesCampus &&
-                matchesProgram
+                matchesRegistrarScope &&
+                matchesProgram &&
+                matchesDepartment
             );
         })
         .sort((a, b) => {
@@ -480,42 +544,98 @@ const StudentList = () => {
 
     const getRemarkText = (en_remarks) => {
         switch (en_remarks) {
-            case 0:
-                return "Ongoing";
-            case 1:
-                return "Passed";
-            case 2:
-                return "Failed";
-            case 3:
-                return "Incomplete";
-            case 4:
-                return "Dropped";
-            default:
-                return "Unknown";
+            case 0: return "Ongoing";
+            case 1: return "Passed";
+            case 2: return "Failed";
+            case 3: return "Incomplete";
+            case 4: return "Dropped";
+            default: return "Unknown";
         }
     };
 
-    const currentPersons = filteredPersons;
+    // ✅ Client-side pagination (like Applicant List) since fetchStudents
+    // pulls everything for the term up front.
+    const totalRecords = filteredPersons.length;
+    const totalPages = Math.max(1, Math.ceil(filteredPersons.length / itemsPerPage));
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentPersons = filteredPersons.slice(indexOfFirstItem, indexOfLastItem);
 
     const maxButtonsToShow = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
     let endPage = Math.min(totalPages, startPage + maxButtonsToShow - 1);
-
     if (endPage - startPage < maxButtonsToShow - 1) {
         startPage = Math.max(1, endPage - maxButtonsToShow + 1);
     }
-
     const visiblePages = [];
     for (let i = startPage; i <= endPage; i++) {
         visiblePages.push(i);
     }
 
-
-
     useEffect(() => {
+        const departmentIds = getDepartmentIdsFromAdminData(adminData);
+        if (!departmentIds.length) return;
+
         const fetchDepartments = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/departments`); // ✅ Update if needed
+                const responses = await Promise.all(
+                    departmentIds.map((departmentId) =>
+                        axios.get(`${API_BASE_URL}/api/departments/${departmentId}`),
+                    ),
+                );
+                const mergedDepartments = restrictDepartmentsToScope(
+                    responses.flatMap((response) => response.data || []),
+                );
+                const uniqueDepartments = [
+                    ...new Map(
+                        mergedDepartments.map((dep) => [String(dep.dprtmnt_id), dep]),
+                    ).values(),
+                ];
+                setDepartment(uniqueDepartments);
+            } catch (error) {
+                console.error("Error fetching departments:", error);
+            }
+        };
+
+        fetchDepartments();
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+    useEffect(() => {
+        const departmentIds = getDepartmentIdsFromAdminData(adminData);
+        if (!departmentIds.length) return;
+
+        const fetchCurriculums = async () => {
+            try {
+                const responses = await Promise.all(
+                    departmentIds.map((departmentId) =>
+                        axios.get(`${API_BASE_URL}/api/applied_program/${departmentId}`),
+                    ),
+                );
+                const merged = responses.flatMap((response) => response.data || []);
+                // ✅ Dedupe by program_code+major (see programKey/
+                // dedupeCurriculumOptions above) — fixes duplicate program
+                // entries like the two "BSCS" rows in the dropdown, which
+                // were actually two different curriculum_id revisions of the
+                // same program.
+                const restrictedCurriculums = dedupeCurriculumOptions(
+                    restrictToRegistrarCurriculum(merged),
+                );
+                setAllCurriculums(restrictedCurriculums);
+            } catch (error) {
+                console.error("Error fetching curriculum options:", error);
+            }
+        };
+
+        fetchCurriculums();
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+    useEffect(() => {
+        const departmentIds = getDepartmentIdsFromAdminData(adminData);
+        if (departmentIds.length) return;
+
+        const fetchDepartments = async () => {
+            try {
+                const response = await axios.get(`${API_BASE_URL}/api/departments`);
                 setDepartment(response.data);
             } catch (error) {
                 console.error("Error fetching departments:", error);
@@ -523,39 +643,32 @@ const StudentList = () => {
         };
 
         fetchDepartments();
-    }, []);
 
-
-    useEffect(() => {
-        if (currentPage > totalPages) {
-            setCurrentPage(totalPages || 1);
-        }
-    }, [totalPages, currentPage]);
-
-
-    const [openDialog, setOpenDialog] = useState(false);
-    const [activePerson, setActivePerson] = useState(null);
-    const [selected, setSelected] = useState([]);
-
-
-    useEffect(() => {
-        if (activePerson?.missing_documents) {
-            try {
-                setSelected(activePerson.missing_documents || []);
-            } catch {
-                setSelected([]);
-            }
-        } else {
-            setSelected([]);
-        }
-    }, [activePerson]);
-
-    useEffect(() => {
         axios.get(`${API_BASE_URL}/api/applied_program`)
             .then(res => {
-                setAllCurriculums(res.data);
-            });
-    }, []);
+                // ✅ Same program_code+major dedupe for the fallback
+                // ("all programs") path.
+                const restrictedCurriculums = dedupeCurriculumOptions(
+                    restrictToRegistrarCurriculum(res.data),
+                );
+                setAllCurriculums(restrictedCurriculums);
+            })
+            .catch(console.error);
+    }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
+
+    // ✅ Removed the old "auto-select first department for everyone" effect.
+    // Department now only auto-selects when the registrar's account is
+    // scoped/locked to a single department (isDeptLocked below) — since in
+    // that case the dropdown is disabled anyway and there's only one valid
+    // choice. Everyone else defaults to "" (All Departments).
+    const scopedDepartmentIds = getDepartmentIdsFromAdminData(adminData);
+    const isDeptLocked = scopedDepartmentIds.length === 1 && department.length === 1;
+
+    useEffect(() => {
+        if (!isDeptLocked) return;
+        if (selectedDepartmentFilter) return;
+        handleDepartmentChange(String(department[0].dprtmnt_id));
+    }, [isDeptLocked, department, selectedDepartmentFilter]);
 
     useEffect(() => {
         if (!selectedDepartmentFilter) {
@@ -570,237 +683,226 @@ const StudentList = () => {
         );
     }, [selectedDepartmentFilter, allCurriculums]);
 
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages || 1);
+        }
+    }, [filteredPersons.length, totalPages]);
+
+    const [openDialog, setOpenDialog] = useState(false);
+    const [activePerson, setActivePerson] = useState(null);
+    const [selected, setSelected] = useState([]);
+
+    useEffect(() => {
+        if (activePerson?.missing_documents) {
+            try {
+                setSelected(activePerson.missing_documents || []);
+            } catch {
+                setSelected([]);
+            }
+        } else {
+            setSelected([]);
+        }
+    }, [activePerson]);
+
+    useEffect(() => {
+        if (!isProgramLocked) return;
+        const assignedCurriculum = curriculumOptions.find((prog) =>
+            isRegistrarCurriculumMatch(prog.curriculum_id, curriculumOptions)
+        );
+        if (assignedCurriculum?.curriculum_id) {
+            setSelectedProgramFilter(assignedCurriculum.curriculum_id);
+        }
+    }, [curriculumOptions, isProgramLocked]);
+
+    // ✅ No longer clears persons/resets counts on department change — since
+    // all students are already loaded client-side, switching departments
+    // just re-filters instantly. Only resets the page number and (unless
+    // locked) the program filter.
     const handleDepartmentChange = (selectedDept) => {
         const nextDept = selectedDept === "" || selectedDept == null ? "" : String(selectedDept);
         setSelectedDepartmentFilter(nextDept);
         setCurrentPage(1);
-        setPersons([]);
-        setTotalRecords(0);
-        setTotalPages(1);
-        setSelectedProgramFilter("");
+        if (!isProgramLocked) setSelectedProgramFilter("");
     };
 
-
-    // applicants state deprecated for StudentList - using `persons` instead
     const divToPrintRef = useRef();
     const getPersonKey = (p) => p?.person_id ?? p?.student_number ?? null;
 
 
-    const printDiv = () => {
-        const resolvedCampusAddress =
-            campusAddress || "No address set in Settings";
 
-        // ✅ Dynamic logo and company name
+    const handleExportStudentListPdf = async () => {
+        const resolvedCampusAddress = campusAddress || "No address set in Settings";
         const logoSrc = fetchedLogo || EaristLogo;
         const name = companyName?.trim() || "";
 
-        // ✅ Split company name into two balanced lines
         const words = name.split(" ");
         const middleIndex = Math.ceil(words.length / 2);
         const firstLine = words.slice(0, middleIndex).join(" ");
         const secondLine = words.slice(middleIndex).join(" ");
 
-        // ✅ Generate printable HTML
-        const newWin = window.open("", "Print-Window");
-        newWin.document.open();
-        newWin.document.write(`
-       <html>
-         <head>
-           <title>Student List</title>
-          <style>
-   @page { size: A4 landscape; margin: 5mm; }
- 
-   body {
-     font-family: Arial;
-     margin: 0;
-     padding: 0;
-   }
- 
-   .print-container {
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     text-align: center;
-     padding-left: 10px;
-     padding-right: 10px;
-   }
- 
- .print-header {
-   position: relative;
-   width: 100%;
-   text-align: center;
-   margin-top: 20px;
- }
- 
- .print-header img {
-   position: absolute;
-   left: 220px; /* adjust if needed */
-   top: -10px;
-   width: 120px;
-   height: 120px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-top {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   gap: 15px;
-   margin-left: 50px; /* ✅ your requested spacing */
- }
- 
- .header-top img {
-   width: 80px;
-   height: 80px;
-   border-radius: 50%;
-   object-fit: cover;
- }
- 
- .header-text {
-   display: inline-block;
-   padding-left: 100px; /* ✅ VERY IMPORTANT (logo width + spacing) */
- }
- 
-   table {
-     border-collapse: collapse;
-     width: 100%;
-     margin-top: 20px;
-     border: 1.5px solid black; /* slightly thicker for landscape clarity */
-     table-layout: fixed;
-   }
- 
-   th, td {
-     border: 1.5px solid black;
-     padding: 6px 8px;
-     font-size: 13px; /* slightly bigger (more space in landscape) */
-     text-align: center;
-     word-wrap: break-word;
-   }
- 
-   table tr td:last-child,
-   table tr th:last-child {
-     border-right: 1.5px solid black !important;
-   }
- 
-   th {
-     background-color: lightgray;
-     color: black;
-     -webkit-print-color-adjust: exact;
-     print-color-adjust: exact;
-   }
- </style>
-         </head>
-         <body onload="window.print(); setTimeout(() => window.close(), 100);">
-           <div class="print-container">
-   
-             <!-- ✅ HEADER -->
-        <div class="print-header">
-   <img src="${logoSrc}" alt="School Logo" />
- 
-   <div class="header-text">
-                 <div style="font-size: 13px; font-family: Arial">Republic of the Philippines</div>
-   
-                 <!-- ✅ Dynamic company name -->
-                 ${name
+        // ✅ Department label (left corner) — selectedDepartmentFilter stores
+        // dprtmnt_id, so look up the name from `department`.
+        const selectedDepartmentLabel = selectedDepartmentFilter
+            ? department.find(
+                (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
+            )?.dprtmnt_name || "All Departments"
+            : "All Departments";
+
+        // ✅ Program label (right corner) — resolves via the dedupe-aware
+        // selectedProgramOption so it always shows the right name even
+        // though the underlying curriculum_id is just a representative row.
+        const selectedProgramLabel = selectedProgramFilter
+            ? selectedProgramOption?.program_description || selectedProgramFilter
+            : "All Programs";
+
+        const innerHtml = `
+    <div class="print-header">
+
+      <div class="print-corner-label left">
+        Department:<br/>${selectedDepartmentLabel}
+      </div>
+
+      <div class="print-corner-label right">
+        Program:<br/>${selectedProgramLabel}
+      </div>
+
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${name
                 ? `
-                       <b style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                         ${firstLine}
-                       </b>
-                       ${secondLine
-                    ? `<div style="letter-spacing: 1px; font-size: 20px; font-family: Arial, sans-serif;">
-                               <b>${secondLine}</b>
-                             </div>`
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+                    ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                       <b>${secondLine}</b>
+                     </div>`
                     : ""
                 }
-                     `
+            `
                 : ""
             }
-   
-                 <!-- ✅ Dynamic campus address -->
-                 <div style="font-size: 13px; font-family: Arial">${resolvedCampusAddress}</div>
-   
-                 <div style="margin-top: 30px;">
-                   <b style="font-size: 24px; letter-spacing: 1px;">Student List</b>
-                 </div>
-               </div>
-             </div>
-   
-             <!-- ✅ TABLE -->
-             <table>
-               <thead>
-                
-                 <tr>
-     <th style="width:10%">Student ID</th>
-     <th style="width:35%">Student Name</th>
-     <th style="width:15%">Program</th>
-     <th style="width:10%">SHS GWA</th>
-     <th style="width:10%">Date Applied</th>
 
-                 </tr>
-               </thead>
-               <tbody>
-                 ${filteredPersons
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">Student List</b>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:5%">#</th>
+            <th style="width:15%">Student Number</th>
+            <th style="width:25%">Name</th>
+            <th style="width:30%">Program</th>
+            <th style="width:10%">Year Level</th>
+            <th style="width:10%">Birth Date</th>
+            <th style="width:5%">Sex</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredPersons
                 .map(
-                    (person) => `
-                       <tr>
-                         <td style="width:10%">${person.student_number || ""}</td>
-                         <td style="width:40%">${person.last_name}, ${person.first_name} ${person.middle_name || ""} ${person.extension || ""}</td>
-                         <td style="width:15%">${person.program_code || ""}</td>                 
-                         <td style="width:10%">${person.generalAverage1 || ""}</td>
-                         <td style="width:10%">${person.created_at
-                            ? new Date(person.created_at.split("T")[0]).toLocaleDateString("en-PH", {
-                                year: "numeric",
-                                month: "short",
-                                day: "2-digit",
-                            })
-                            : ""
-                        }</td>
-                    
-                       </tr>
-                     `,
+                    (p, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${p.student_number ?? "N/A"}</td>
+              <td class="student-name">${p.last_name}, ${p.first_name} ${p.middle_name ?? ""} ${p.extension ?? ""}</td>
+              <td>(${p.program_code ?? ""}) - ${p.program_description ?? ""}${p.major ? ` - ${p.major}` : ""}</td>
+              <td>${p.year_level_description ?? ""}</td>
+              <td>${p.birthOfDate ?? ""}</td>
+              <td>${p.gender === 0 ? "MALE" : p.gender === 1 ? "FEMALE" : ""}</td>
+            </tr>
+          `,
                 )
                 .join("")}
-               </tbody>
-             </table>
-           </div>
-         </body>
-       </html>
-     `);
-        newWin.document.close();
+        </tbody>
+      </table>
+    </div>
+  `;
+
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-student-list-pdf`,
+                { html: innerHtml },
+                {
+                    responseType: "blob",
+                    headers: {
+                        "x-employee-id": employeeID,
+                        "x-audit-actor-id": employeeID,
+                        "x-audit-actor-role": userRole,
+                    },
+                },
+            );
+
+            const blobUrl = window.URL.createObjectURL(
+                new Blob([response.data], { type: "application/pdf" }),
+            );
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.setAttribute(
+                "download",
+                `Student_List_${new Date().toISOString().slice(0, 10)}.pdf`,
+            );
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Failed to generate Student List PDF:", err);
+            setSnack({
+                open: true,
+                message: "Failed to generate Student List PDF.",
+                severity: "error",
+            });
+        }
     };
 
-   // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
-
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
-
-    // Put this at the very bottom before the return 
     if (accessLoading || hasAccess === null) {
         return null;
     }
 
     if (!hasAccess) {
-        return (
-            <Unauthorized />
-        );
+        return <Unauthorized />;
     }
 
+    // 🔒 Disable right-click
+    // document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    // document.addEventListener("keydown", (e) => {
+    //     const isBlockedKey =
+    //         e.key === "F12" ||
+    //         e.key === "F11" ||
+    //         (e.ctrlKey &&
+    //             e.shiftKey &&
+    //             (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "u") ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "p");
+
+    //     if (isBlockedKey) {
+    //         e.preventDefault();
+    //         e.stopPropagation();
+    //     }
+    // });
+
+    const selectedDepartmentFilterValue =
+        selectedDepartmentFilter === "" ||
+            department.some(
+                (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+            )
+            ? String(selectedDepartmentFilter || "")
+            : "";
 
     return (
         <Box
@@ -834,25 +936,22 @@ const StudentList = () => {
                     variant="outlined"
                     placeholder="Search Student Name / Email / Student"
                     size="small"
-
                     value={searchQuery}
                     onChange={(e) => {
                         setSearchQuery(e.target.value);
-                        setCurrentPage(1); // Corrected
+                        setCurrentPage(1);
                     }}
-
                     sx={{
                         width: 450,
                         backgroundColor: "#fff",
                         borderRadius: 1,
-                        "& .MuiOutlinedInput-root": {
-                            borderRadius: "10px",
-                        },
+                        "& .MuiOutlinedInput-root": { borderRadius: "10px" },
                     }}
                     InputProps={{
                         startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
                     }}
                 />
+
 
             </Box>
 
@@ -866,10 +965,9 @@ const StudentList = () => {
             <br />
             <br />
 
-
-            <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, }}>
+            <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}` }}>
                 <Table>
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", }}>
+                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
                         <TableRow>
                             <TableCell sx={{ color: 'white', textAlign: "Center", height: "60px" }}></TableCell>
                         </TableRow>
@@ -879,8 +977,6 @@ const StudentList = () => {
 
             <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, p: 2 }}>
                 <Box display="flex" justifyContent="space-between" flexWrap="wrap" rowGap={2}>
-
-
                     {/* Left Side: Campus Dropdown */}
                     <Box display="flex" flexDirection="column" gap={1} sx={{ minWidth: 200 }}>
                         <Typography fontSize={13}>Campus:</Typography>
@@ -897,7 +993,6 @@ const StudentList = () => {
                                 }}
                             >
                                 <MenuItem value=""><em>All Campuses</em></MenuItem>
-
                                 {branches.map((branch) => (
                                     <MenuItem key={branch.id} value={branch.id}>
                                         {branch.branch}
@@ -907,13 +1002,10 @@ const StudentList = () => {
                         </FormControl>
                     </Box>
 
-
-                    {/* Right Side: Print Button + Dates (in one row) */}
+                    {/* Right Side: Print Button */}
                     <Box display="flex" alignItems="flex-end" gap={2}>
-
-                        {/* Print Button */}
                         <button
-                            onClick={printDiv}
+                            onClick={handleExportStudentListPdf}
                             style={{
                                 padding: "5px 20px",
                                 border: "2px solid black",
@@ -930,180 +1022,60 @@ const StudentList = () => {
                                 gap: "8px",
                                 userSelect: "none",
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#d3d3d3"}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#f0f0f0"}
-                            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.95)"}
-                            onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+                            onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
+                            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
                             type="button"
                         >
                             <FcPrint size={20} />
-                            Print Student List
+                            Download Student List
                         </button>
                     </Box>
-
                 </Box>
             </TableContainer>
 
-            <TableContainer component={Paper} sx={{ width: '100%', }}>
+            {/* Pagination Header */}
+            <TableContainer component={Paper} sx={{ width: '100%' }}>
                 <Table size="small">
                     <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
                         <TableRow>
                             <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
-                                    {/* Left: Total Count */}
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
                                         Total Student's Records: {totalRecords}
                                     </Typography>
-
-                                    {/* Right: Pagination Controls */}
                                     <Box display="flex" alignItems="center" gap={1}>
-                                        {/* First & Prev */}
-                                        <Button
-                                            onClick={() => setCurrentPage(1)}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             First
                                         </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             Prev
                                         </Button>
-
-
-                                        {/* Page Dropdown */}
                                         <FormControl size="small" sx={{ minWidth: 80 }}>
                                             <Select
                                                 value={currentPage}
                                                 onChange={(e) => setCurrentPage(Number(e.target.value))}
                                                 displayEmpty
-                                                sx={{
-                                                    fontSize: '12px',
-                                                    height: 36,
-                                                    color: 'white',
-                                                    border: '1px solid white',
-                                                    backgroundColor: 'transparent',
-                                                    '.MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '& svg': {
-                                                        color: 'white', // dropdown arrow icon color
-                                                    }
-                                                }}
-                                                MenuProps={{
-                                                    PaperProps: {
-                                                        sx: {
-                                                            maxHeight: 200,
-                                                            backgroundColor: '#fff', // dropdown background
-                                                        }
-                                                    }
-                                                }}
+                                                sx={{ fontSize: '12px', height: 36, color: 'white', border: '1px solid white', backgroundColor: 'transparent', '.MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '& svg': { color: 'white' } }}
+                                                MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: '#fff' } } }}
                                             >
                                                 {Array.from({ length: totalPages }, (_, i) => (
-                                                    <MenuItem key={i + 1} value={i + 1}>
-                                                        Page {i + 1}
-                                                    </MenuItem>
+                                                    <MenuItem key={i + 1} value={i + 1}>Page {i + 1}</MenuItem>
                                                 ))}
                                             </Select>
                                         </FormControl>
-
                                         <Typography fontSize="11px" color="white">
                                             of {totalPages} page{totalPages > 1 ? 's' : ''}
                                         </Typography>
-
-
-                                        {/* Next & Last */}
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             Next
                                         </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(totalPages)}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             Last
                                         </Button>
                                     </Box>
@@ -1114,18 +1086,12 @@ const StudentList = () => {
                 </Table>
             </TableContainer>
 
-
-
-
-
-
+            {/* Filters Panel */}
             <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, p: 2 }}>
                 <Box display="flex" justifyContent="space-between" flexWrap="wrap" rowGap={3} columnGap={5}>
 
-                    {/* LEFT COLUMN: Sorting & Status Filters */}
+                    {/* LEFT: Sort */}
                     <Box display="flex" flexDirection="column" gap={2}>
-
-                        {/* Sort By */}
                         <Box display="flex" alignItems="center" gap={1}>
                             <Typography fontSize={13} sx={{ minWidth: "10px" }}>Sort Order:</Typography>
                             <FormControl size="small" sx={{ width: "200px" }}>
@@ -1136,24 +1102,15 @@ const StudentList = () => {
                                 </Select>
                             </FormControl>
                         </Box>
-
-
-                        {/* Placeholder filter removed (unused checkbox) */}
                     </Box>
 
-                    {/* MIDDLE COLUMN: SY & Semester */}
+                    {/* MIDDLE: School Year & Semester */}
                     <Box display="flex" flexDirection="column" gap={2}>
                         <Box display="flex" alignItems="center" gap={1}>
                             <Typography fontSize={13} sx={{ minWidth: "100px" }}>School Year:</Typography>
                             <FormControl size="small" sx={{ width: "200px" }}>
                                 <InputLabel id="school-year-label">School Years</InputLabel>
-                                <Select
-                                    labelId="school-year-label"
-                                    label="School Years"
-                                    value={selectedSchoolYear}
-                                    onChange={handleSchoolYearChange}
-                                    displayEmpty
-                                >
+                                <Select labelId="school-year-label" label="School Years" value={selectedSchoolYear} onChange={handleSchoolYearChange} displayEmpty>
                                     {schoolYears.length > 0 ? (
                                         schoolYears.map((sy) => (
                                             <MenuItem value={sy.year_id} key={sy.year_id}>
@@ -1166,17 +1123,11 @@ const StudentList = () => {
                                 </Select>
                             </FormControl>
                         </Box>
-
                         <Box display="flex" alignItems="center" gap={1}>
                             <Typography fontSize={13} sx={{ minWidth: "100px" }}>Semester:</Typography>
                             <FormControl size="small" sx={{ width: "200px" }}>
                                 <InputLabel>School Semester</InputLabel>
-                                <Select
-                                    label="School Semester"
-                                    value={selectedSchoolSemester}
-                                    onChange={handleSchoolSemesterChange}
-                                    displayEmpty
-                                >
+                                <Select label="School Semester" value={selectedSchoolSemester} onChange={handleSchoolSemesterChange} displayEmpty>
                                     {semesters.length > 0 ? (
                                         semesters.map((sem) => (
                                             <MenuItem value={sem.semester_id} key={sem.semester_id}>
@@ -1191,205 +1142,123 @@ const StudentList = () => {
                         </Box>
                     </Box>
 
-                    {/* RIGHT COLUMN: Department & Program */}
+                    {/* RIGHT: Department & Program */}
                     <Box display="flex" flexDirection="column" gap={2}>
                         <Box display="flex" alignItems="center" gap={1}>
                             <Typography fontSize={13} sx={{ minWidth: "100px" }}>Department:</Typography>
-                            <FormControl size="small" sx={{ width: "400px" }}>
-                                <Select
-                                    value={selectedDepartmentFilter}
-                                    onChange={(e) => handleDepartmentChange(e.target.value)}
-                                    displayEmpty
-                                >
-                                    {department.map((dep) => (
-                                        <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
-                                            {dep.dprtmnt_name} ({dep.dprtmnt_code})
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <Tooltip
+                                title={isDeptLocked ? "Your account is assigned to a single department." : ""}
+                                placement="top"
+                                disableHoverListener={!isDeptLocked}
+                            >
+                                <span style={{ display: "inline-block" }}>
+                                    <FormControl size="small" sx={{ width: "400px" }} disabled={isDeptLocked}>
+                                        <Select
+                                            value={selectedDepartmentFilterValue}
+                                            onChange={(e) => {
+                                                if (isDeptLocked) return;
+                                                handleDepartmentChange(e.target.value);
+                                            }}
+                                            displayEmpty
+                                            sx={isDeptLocked ? { backgroundColor: "#f5f5f5", cursor: "not-allowed" } : {}}
+                                        >
+                                            {/* ✅ Always shows "All Departments" (unless locked to one) — this
+                                                is the default value on load now. */}
+                                            {!isDeptLocked && (
+                                                <MenuItem value="">All Departments</MenuItem>
+                                            )}
+                                            {department.map((dep) => (
+                                                <MenuItem key={dep.dprtmnt_id} value={String(dep.dprtmnt_id)}>
+                                                    {dep.dprtmnt_name} ({dep.dprtmnt_code})
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </span>
+                            </Tooltip>
                         </Box>
-
                         <Box display="flex" alignItems="center" gap={1}>
                             <Typography fontSize={13} sx={{ minWidth: "100px" }}>Program:</Typography>
                             <FormControl size="small" sx={{ width: "350px" }}>
                                 <Select
                                     value={selectedProgramFilter}
                                     onChange={(e) => setSelectedProgramFilter(e.target.value)}
+                                    disabled={isProgramLocked}
                                     displayEmpty
                                 >
-                                    <MenuItem value="">All Programs</MenuItem>
+                                    {!isProgramLocked && <MenuItem value="">All Programs</MenuItem>}
                                     {curriculumOptions.map((prog) => (
-                                        <MenuItem key={prog.curriculum_id} value={prog.program_id}>
+                                        <MenuItem key={prog.curriculum_id} value={prog.curriculum_id}>
                                             {prog.program_code} - {prog.program_description}
+                                            {prog.major ? ` (${prog.major})` : ""}
                                         </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
-
                         </Box>
                     </Box>
                 </Box>
             </TableContainer>
 
-            <div ref={divToPrintRef}>
+            <div ref={divToPrintRef}></div>
 
-            </div>
-
-
+            {/* Main Table */}
             <TableContainer component={Paper} sx={{ width: "100%" }}>
                 <Table size="small">
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", }}>
+                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
                         <TableRow>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "2%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                #
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "4%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Student's Documents
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "4%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Student Number
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "25%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Name
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Program
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "6%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Year Level
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Birth Date
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Sex
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Remarks
-                            </TableCell>
-                            <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>
-                                Action
-                            </TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "5%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>#</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "15%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Student Number</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "20%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Name</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "30%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Program</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Year Level</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Birth Date</TableCell>
+                            <TableCell sx={{ color: "white", textAlign: "center", width: "10%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Sex</TableCell>
                         </TableRow>
                     </TableHead>
-                    {/* --- Confirmation Dialog --- */}
-                    {/* Dialog and confirmation for medical toggle removed */}
 
                     <TableBody>
                         {currentPersons.map((person, index) => (
-                            <TableRow
-                                key={`${person.student_number ?? ""}-${person.year_id ?? ""}-${person.semester_id ?? ""}`}
-                            >
-                                {/* # */}
+                            <TableRow key={`${person.student_number ?? ""}-${person.year_id ?? ""}-${person.semester_id ?? ""}`}>
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    {index + 1}
+                                    {indexOfFirstItem + index + 1}
                                 </TableCell>
-
-                                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    <Checkbox
-                                        readOnly
-                                        checked
-                                        sx={{
-                                            color: mainButtonColor,
-                                            "&.Mui-checked": { color: mainButtonColor },
-                                            width: 25,
-                                            height: 25,
-                                            padding: 0,
-                                            "& svg": { width: 25, height: 25 }, // ensures the check icon scales correctly
-                                        }}>
-
-                                    </Checkbox>
-                                </TableCell>
-
-                                {/* Applicant Number */}
                                 <TableCell
-                                    sx={{
-                                        textAlign: "center",
-                                        border: `1px solid ${borderColor}`,
-                                        color: "blue",
-                                        cursor: "pointer",
-                                    }}
+                                    sx={{ textAlign: "center", border: `1px solid ${borderColor}`, color: "blue", cursor: "pointer" }}
                                     onClick={() => handleRowClick(person)}
                                 >
                                     {person.student_number ?? "N/A"}
                                 </TableCell>
-
-                                {/* Applicant Name */}
                                 <TableCell
-                                    sx={{
-                                        textAlign: "left",
-                                        border: `1px solid ${borderColor}`,
-                                        color: "blue",
-                                        cursor: "pointer",
-                                    }}
+                                    sx={{ textAlign: "left", border: `1px solid ${borderColor}`, color: "blue", cursor: "pointer" }}
                                     onClick={() => handleRowClick(person)}
                                 >
                                     {`${person.last_name}, ${person.first_name} ${person.middle_name ?? ""} ${person.extension ?? ""}`}
                                 </TableCell>
-
-
-                                {/* Program */}
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    {person.program_description ||
-                                        (curriculumOptions.find(item => String(item.curriculum_id) === String(person.program ?? person.curriculum_id))?.program_code) ||
-                                        " "}
+                                    ({person.program_code}) - {person.program_description}{person.major ? ` - ${person.major}` : ""}
                                 </TableCell>
-
-                                {/* Year Level */}
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                                     {person.year_level_description ?? ""}
                                 </TableCell>
-
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                                     {person.birthOfDate}
                                 </TableCell>
-
                                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                                     {person.gender === 0 ? "MALE" : person.gender === 1 ? "FEMALE" : ""}
-                                </TableCell>
-
-                                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    {getRemarkText(person.en_remarks) ?? ""}
-                                </TableCell>
-
-                                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                                    <Button
-                                        variant="contained"
-                                        size="small"
-                                        onClick={() => handleOpenPreview(person)}
-                                    >
-                                        Preview
-                                    </Button>
                                 </TableCell>
                             </TableRow>
                         ))}
                         {studentsLoading && (
                             <TableRow>
-                                <TableCell
-                                    colSpan={10}
-                                    sx={{
-                                        textAlign: "center",
-                                        border: `1px solid ${borderColor}`,
-                                        color: "#777",
-                                        py: 3,
-                                    }}
-                                >
+                                <TableCell colSpan={10} sx={{ textAlign: "center", border: `1px solid ${borderColor}`, color: "#777", py: 3 }}>
                                     Loading students...
                                 </TableCell>
                             </TableRow>
                         )}
                         {!studentsLoading && currentPersons.length === 0 && (
                             <TableRow>
-                                <TableCell
-                                    colSpan={10}
-                                    sx={{
-                                        textAlign: "center",
-                                        border: `1px solid ${borderColor}`,
-                                        color: "#777",
-                                        py: 3,
-                                    }}
-                                >
+                                <TableCell colSpan={10} sx={{ textAlign: "center", border: `1px solid ${borderColor}`, color: "#777", py: 3 }}>
                                     No students found for the selected filters.
                                 </TableCell>
                             </TableRow>
@@ -1398,167 +1267,46 @@ const StudentList = () => {
                 </Table>
             </TableContainer>
 
-
-            <TableContainer component={Paper} sx={{ width: '100%', }}>
+            <TableContainer component={Paper} sx={{ width: '100%' }}>
                 <Table size="small">
                     <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
                         <TableRow>
                             <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
-                                    {/* Left: Total Count */}
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
                                         Total Student's Records: {totalRecords}
                                     </Typography>
-
-                                    {/* Right: Pagination Controls */}
                                     <Box display="flex" alignItems="center" gap={1}>
-                                        {/* First & Prev */}
-                                        <Button
-                                            onClick={() => setCurrentPage(1)}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             First
                                         </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             Prev
                                         </Button>
-
-
-                                        {/* Page Dropdown */}
                                         <FormControl size="small" sx={{ minWidth: 80 }}>
                                             <Select
                                                 value={currentPage}
                                                 onChange={(e) => setCurrentPage(Number(e.target.value))}
                                                 displayEmpty
-                                                sx={{
-                                                    fontSize: '12px',
-                                                    height: 36,
-                                                    color: 'white',
-                                                    border: '1px solid white',
-                                                    backgroundColor: 'transparent',
-                                                    '.MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '& svg': {
-                                                        color: 'white', // dropdown arrow icon color
-                                                    }
-                                                }}
-                                                MenuProps={{
-                                                    PaperProps: {
-                                                        sx: {
-                                                            maxHeight: 200,
-                                                            backgroundColor: '#fff', // dropdown background
-                                                        }
-                                                    }
-                                                }}
+                                                sx={{ fontSize: '12px', height: 36, color: 'white', border: '1px solid white', backgroundColor: 'transparent', '.MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' }, '& svg': { color: 'white' } }}
+                                                MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: '#fff' } } }}
                                             >
                                                 {Array.from({ length: totalPages }, (_, i) => (
-                                                    <MenuItem key={i + 1} value={i + 1}>
-                                                        Page {i + 1}
-                                                    </MenuItem>
+                                                    <MenuItem key={i + 1} value={i + 1}>Page {i + 1}</MenuItem>
                                                 ))}
                                             </Select>
                                         </FormControl>
-
                                         <Typography fontSize="11px" color="white">
                                             of {totalPages} page{totalPages > 1 ? 's' : ''}
                                         </Typography>
-
-
-                                        {/* Next & Last */}
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             Next
                                         </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(totalPages)}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
+                                        <Button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} variant="outlined" size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", '&:hover': { borderColor: 'white', backgroundColor: 'rgba(255,255,255,0.1)' }, '&.Mui-disabled': { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}>
                                             Last
                                         </Button>
                                     </Box>
@@ -1568,59 +1316,23 @@ const StudentList = () => {
                     </TableHead>
                 </Table>
             </TableContainer>
-            <Dialog open={previewDialogOpen} onClose={handleCloseDialog}>
-                <DialogTitle>Preview Student Documents</DialogTitle>
-                <DialogContent>
-                    Do you wish to preview the student's documents?
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        color="error"
-                        variant="outlined"
-
-                        onClick={handleCloseDialog}>Cancel</Button>
-                    <Button onClick={handleViewDocuments} variant="contained">View</Button>
-                </DialogActions>
-            </Dialog>
-
-            <Dialog open={viewDialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-                <DialogTitle>STUDENT DOCUMENTS</DialogTitle>
-                <DialogContent sx={{ height: 400 }}>
-                    <Grid container spacing={2}>
-                        {(selectedPerson?.documents ?? []).map((doc) => (
-                            <Grid item xs={6} key={doc.id}>
-                                <Checkbox checked readOnly /> {doc.description}
-                            </Grid>
-                        ))}
-                        {(selectedPerson?.documents ?? []).length === 0 && (
-                            <Grid item xs={12}>
-                                <Typography color="text.secondary">No documents found.</Typography>
-                            </Grid>
-                        )}
-                    </Grid>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDialog}>Close</Button>
-                </DialogActions>
-            </Dialog>
 
             <Snackbar
                 open={snack.open}
                 autoHideDuration={4000}
                 onClose={() => setSnack((prev) => ({ ...prev, open: false }))}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
             >
                 <Alert
                     onClose={() => setSnack((prev) => ({ ...prev, open: false }))}
                     severity={snack.severity}
-                    sx={{ width: '100%' }}
+                    sx={{ width: "100%" }}
                 >
                     {snack.message}
                 </Alert>
             </Snackbar>
-
         </Box>
     );
 };
 
-export default StudentList;
+export default StudentListForEnrollment;

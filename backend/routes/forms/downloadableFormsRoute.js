@@ -1863,4 +1863,201 @@ router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
   }
 });
 
+// ─── 9. Student List (College Enrollment) ──────────────────────────────────
+// ─── 9. Student List (College Enrollment) ──────────────────────────────────
+router.post("/generate-student-list-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Portrait A4 @ 96dpi, matches @page { size: A4 portrait; margin: 8mm; }
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Mirrors the corner-label header style used by the Applicant List /
+    // Entrance Examination Scores export (Department left / Program right,
+    // centered logo + school name block), applied to the Student List.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      background: #ffffff;
+    }
+
+    .print-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .print-header {
+      position: relative;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .header-content img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      margin-top: 50px;
+    }
+
+    .header-text {
+      text-align: center;
+      margin-top: 50px;
+    }
+
+    .print-corner-label {
+      position: absolute;
+      top: 0;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .print-corner-label.left {
+      left: 0;
+      text-align: left;
+    }
+
+    .print-corner-label.right {
+      right: 0;
+      text-align: right;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1.5px solid black;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1.5px solid black;
+      padding: 4px 3px;
+      font-size: 9px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    th {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    td.student-name {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fileName = `Student_List_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Student List",
+      legacyAction: "STUDENT_LIST_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Student List PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Student List PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 module.exports = router;

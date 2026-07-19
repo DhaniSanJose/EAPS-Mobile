@@ -44,7 +44,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.42:5173",
+  "http://192.168.1.10:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -1642,6 +1642,7 @@ app.get("/api/list_of_students/details", async (req, res) => {
         pgt.program_id,
         pgt.program_description,
         pgt.program_code,
+        pgt.major,  
         dpt.dprtmnt_id,
         dpt.dprtmnt_name,
         dpt.dprtmnt_code,
@@ -1704,6 +1705,7 @@ app.get("/api/list_of_students/data/:studentNumber/:activeSchoolYearId", async (
         pgt.program_id,
         pgt.program_description,
         pgt.program_code,
+        pgt.major,   
         dpt.dprtmnt_id,
         dpt.dprtmnt_name,
         dpt.dprtmnt_code,

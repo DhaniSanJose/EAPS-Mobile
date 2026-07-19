@@ -8,6 +8,7 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SettingsContext } from "../App";
+import GradingIcon from "@mui/icons-material/Grading";
 
 export const COLLEGE_ENROLLMENT_TABS = [
   {
@@ -34,6 +35,11 @@ export const COLLEGE_ENROLLMENT_TABS = [
     label: "Search COR",
     to: "/college_search_certification_of_registration",
     iconKey: "menuBook",
+  },
+  {
+    label: "Student Grade File",
+    to: "/college_student_grade_file",
+    iconKey: "grading",
   },
   {
     label: "Class List",
@@ -67,6 +73,7 @@ const TAB_ICONS = {
   assignment: <AssignmentIcon fontSize="large" />,
   upload: <UploadFileIcon fontSize="large" />,
   menuBook: <MenuBookIcon fontSize="large" />,
+  grading: <GradingIcon fontSize="large" />,
   personSearch: <PersonSearchIcon fontSize="large" />,
 };
 

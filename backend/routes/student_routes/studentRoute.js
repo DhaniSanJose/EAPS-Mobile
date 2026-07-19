@@ -40,100 +40,227 @@ const GWA_EXCLUSION_SQL = `
 `;
 const upload = multer({ storage: multer.memoryStorage() });
 
+// ==========================================
+// REGISTRAR SCOPE HELPERS
+// Restricts which students a registrar / enrollment officer can see,
+// based on registrar_scope_table (employee_id, dprtmnt_id, program_id).
+// A registrar with no rows in that table sees nothing (fail closed),
+// rather than defaulting to "see everyone".
+// ==========================================
+
+// Every student's "current" program/department, derived the same way the
+// rest of this file already does it: latest enrolled_subject term ->
+// curriculum_table.program_id + dprtmnt_curriculum_table.dprtmnt_id.
+const STUDENT_CURRENT_PROGRAM_SQL = `
+  SELECT
+    ranked.student_number,
+    ranked.dprtmnt_id,
+    ranked.program_id
+  FROM (
+    SELECT
+      es.student_number,
+      dct.dprtmnt_id,
+      cct.program_id,
+      ROW_NUMBER() OVER (
+        PARTITION BY es.student_number
+        ORDER BY sy.year_id DESC, sy.semester_id DESC, es.id DESC
+      ) AS rn
+    FROM enrolled_subject es
+    INNER JOIN active_school_year_table sy ON sy.id = es.active_school_year_id
+    INNER JOIN curriculum_table cct ON cct.curriculum_id = es.curriculum_id
+    INNER JOIN dprtmnt_curriculum_table dct ON dct.curriculum_id = cct.curriculum_id
+  ) ranked
+  WHERE ranked.rn = 1
+`;
+
+
+async function getRegistrarScope(employee_id) {
+  const [rows] = await db3.query(
+    `SELECT dprtmnt_id, program_id FROM registrar_scope_table WHERE employee_id = ?`,
+    [employee_id],
+  );
+  return rows;
+}
+
+// Filters enrolled_subject down to ONE student before ranking, so the
+// window function only ever ranks a handful of rows instead of the
+// whole enrolled_subject table.
+async function isStudentInRegistrarScope(student_number, employee_id) {
+  const [[row]] = await db3.query(
+    `
+    SELECT 1 AS in_scope
+    FROM (
+      SELECT
+        dct.dprtmnt_id,
+        cct.program_id,
+        ROW_NUMBER() OVER (
+          ORDER BY sy.year_id DESC, sy.semester_id DESC, es.id DESC
+        ) AS rn
+      FROM enrolled_subject es
+      INNER JOIN active_school_year_table sy ON sy.id = es.active_school_year_id
+      INNER JOIN curriculum_table cct ON cct.curriculum_id = es.curriculum_id
+      INNER JOIN dprtmnt_curriculum_table dct ON dct.curriculum_id = cct.curriculum_id
+      WHERE es.student_number = ?
+    ) ranked
+    WHERE ranked.rn = 1
+      AND EXISTS (
+        SELECT 1 FROM registrar_scope_table rst
+        WHERE rst.employee_id = ?
+          AND rst.dprtmnt_id = ranked.dprtmnt_id
+          AND rst.program_id = ranked.program_id
+      )
+    LIMIT 1
+    `,
+    [student_number, employee_id],
+  );
+  return Boolean(row);
+}
+
+// Runs the scope check ONCE and returns a reusable result, so callers that
+// need both the scope list and the in-scope boolean don't hit the DB twice.
+async function checkRegistrarAccess(student_number, employee_id) {
+  const scope = await getRegistrarScope(employee_id);
+  if (scope.length === 0) {
+    return { ok: false, status: 403, error: "No program/department access has been assigned to this account." };
+  }
+
+  const inScope = await isStudentInRegistrarScope(student_number, employee_id);
+  if (!inScope) {
+    return { ok: false, status: 403, error: "You do not have access to this student's records." };
+  }
+
+  return { ok: true };
+}
+
 router.get("/student-info", async (req, res) => {
-  const { searchQuery } = req.query;
+  const { searchQuery, employee_id } = req.query;
 
   try {
-    const keyword = `%${searchQuery}%`;
-
-    const [searchStudentNumber] = await db3.query(
-      `
-      SELECT snt.student_number
-      FROM student_numbering_table snt
-      INNER JOIN person_table pt ON snt.person_id = pt.person_id
-      WHERE 
-        pt.emailAddress = ?
-        OR pt.first_name LIKE ?
-        OR pt.last_name LIKE ?
-        OR pt.middle_name LIKE ?
-        OR snt.student_number = ?
-      `,
-      [searchQuery, keyword, keyword, keyword, searchQuery]
-    );
-
-    console.log("LOG #1: ", searchStudentNumber);
-
-    if (searchStudentNumber.length === 0) {
-      return res.status(400).json({ error: "student is not found" });
+    if (!employee_id) {
+      return res.status(400).json({ error: "employee_id is required" });
+    }
+    if (!searchQuery) {
+      return res.status(400).json({ error: "searchQuery is required" });
     }
 
-    const student_number = searchStudentNumber[0].student_number;
+    // Fast path: searchQuery is already an exact student number (this is
+    // the common case — it's called right after the autocomplete selects
+    // a student). Avoids the unindexable LIKE '%...%' scan below.
+    let student_number = null;
+
+    const [exactMatch] = await db3.query(
+      `SELECT student_number FROM student_numbering_table WHERE student_number = ? LIMIT 1`,
+      [searchQuery],
+    );
+
+    if (exactMatch.length > 0) {
+      student_number = exactMatch[0].student_number;
+    } else {
+      // Fallback: fuzzy search by name/email.
+      const keyword = `%${searchQuery}%`;
+      const [searchStudentNumber] = await db3.query(
+        `
+        SELECT snt.student_number
+        FROM student_numbering_table snt
+        INNER JOIN person_table pt ON snt.person_id = pt.person_id
+        WHERE 
+          pt.emailAddress = ?
+          OR pt.first_name LIKE ?
+          OR pt.last_name LIKE ?
+          OR pt.middle_name LIKE ?
+        LIMIT 1
+        `,
+        [searchQuery, keyword, keyword, keyword],
+      );
+
+      if (searchStudentNumber.length === 0) {
+        return res.status(400).json({ error: "student is not found" });
+      }
+      student_number = searchStudentNumber[0].student_number;
+    }
+
+    const access = await checkRegistrarAccess(student_number, employee_id);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.error });
+    }
 
     const [rows] = await db3.query(
       `
         SELECT
-  pst.first_name,
-  pst.middle_name,
-  pst.last_name, 
-  pst.presentStreet,
-  pst.emailAddress,
-  pst.cellphoneNumber,
-  pst.campus,
-  pst.presentBarangay,
-  pst.presentZipCode,
-  pst.presentMunicipality,
-  pgt.program_description, 
-  yrt_cur.year_description, 
-  yrt_sy.year_description AS current_year, 
-  smt.semester_description,
-  snt.student_number,
-  sst.year_level_id,
-  ylt.year_level_description
-FROM student_numbering_table snt
-INNER JOIN enrolled_subject es 
-    ON es.student_number = snt.student_number
-INNER JOIN person_table pst 
-    ON pst.person_id = snt.person_id
-INNER JOIN student_status_table sst 
-    ON sst.student_number = snt.student_number 
-    AND sst.active_school_year_id = es.active_school_year_id
-INNER JOIN curriculum_table cct 
-    ON cct.curriculum_id = es.curriculum_id
-INNER JOIN program_table pgt 
-    ON pgt.program_id = cct.program_id
-INNER JOIN active_school_year_table sy 
-    ON sy.id = es.active_school_year_id
-INNER JOIN year_table yrt_cur 
-    ON yrt_cur.year_id = cct.year_id
-INNER JOIN year_table yrt_sy 
-    ON yrt_sy.year_id = sy.year_id
-INNER JOIN year_level_table ylt 
-    ON ylt.year_level_id = sst.year_level_id
-INNER JOIN semester_table smt 
-    ON smt.semester_id = sy.semester_id
-WHERE snt.student_number = ?
-ORDER BY 
-  sy.year_id DESC,
-  sst.year_level_id DESC
-LIMIT 1;
-      `, [student_number]
-    )
+          pst.first_name,
+          pst.middle_name,
+          pst.last_name, 
+          pst.presentStreet,
+          pst.emailAddress,
+          pst.cellphoneNumber,
+          pst.campus,
+          pst.presentBarangay,
+          pst.presentZipCode,
+          pst.presentMunicipality,
+          pgt.program_description, 
+          yrt_cur.year_description, 
+          yrt_sy.year_description AS current_year, 
+          smt.semester_description,
+          snt.student_number,
+          sst.year_level_id,
+          ylt.year_level_description
+        FROM student_numbering_table snt
+        INNER JOIN enrolled_subject es 
+            ON es.student_number = snt.student_number
+        INNER JOIN person_table pst 
+            ON pst.person_id = snt.person_id
+        INNER JOIN student_status_table sst 
+            ON sst.student_number = snt.student_number 
+            AND sst.active_school_year_id = es.active_school_year_id
+        INNER JOIN curriculum_table cct 
+            ON cct.curriculum_id = es.curriculum_id
+        INNER JOIN program_table pgt 
+            ON pgt.program_id = cct.program_id
+        INNER JOIN active_school_year_table sy 
+            ON sy.id = es.active_school_year_id
+        INNER JOIN year_table yrt_cur 
+            ON yrt_cur.year_id = cct.year_id
+        INNER JOIN year_table yrt_sy 
+            ON yrt_sy.year_id = sy.year_id
+        INNER JOIN year_level_table ylt 
+            ON ylt.year_level_id = sst.year_level_id
+        INNER JOIN semester_table smt 
+            ON smt.semester_id = sy.semester_id
+        WHERE snt.student_number = ?
+        ORDER BY 
+          sy.year_id DESC,
+          sst.year_level_id DESC
+        LIMIT 1;
+      `,
+      [student_number],
+    );
 
     if (rows.length === 0) {
       return res.status(400).json({ error: "student record is not found" });
     }
 
-    res.json(rows)
+    res.json(rows);
   } catch (err) {
     console.error("Failed to get student record:", err);
     res.status(500).send("Failed to get student record.");
   }
-})
+});
+
 
 router.get("/student-info/:student_number", async (req, res) => {
   const { student_number } = req.params;
+  const { employee_id } = req.query;
 
   try {
+    if (!employee_id) {
+      return res.status(400).json({ error: "employee_id is required" });
+    }
+
+    const access = await checkRegistrarAccess(student_number, employee_id);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.error });
+    }
+
     const [rows] = await db3.query(
       `
         SELECT DISTINCT
@@ -150,7 +277,7 @@ router.get("/student-info/:student_number", async (req, res) => {
           IFNULL(es.en_remarks, 0) as en_remarks,
           ylt.year_level_description, 
           cst.course_id,
-		      cst.course_code,
+          cst.course_code,
           cst.course_description,
           cst.course_unit,
           es.is_regular,
@@ -169,22 +296,20 @@ router.get("/student-info/:student_number", async (req, res) => {
           INNER JOIN semester_table smt ON sy.semester_id = smt.semester_id
           INNER JOIN course_table cst ON es.course_id = cst.course_id
           WHERE es.student_number = ? ORDER BY ylt.year_level_id, es.id;
-      `, [student_number]
-    )
-
-    console.log("Inserted Data: ", rows);
+      `,
+      [student_number],
+    );
 
     if (rows.length === 0) {
       return res.status(400).json({ error: "student record is not found" });
     }
 
-    res.json(rows)
+    res.json(rows);
   } catch (err) {
     console.error("Failed to get student record:", err);
     res.status(500).send("Failed to get student record.");
   }
-})
-
+});
 router.put("/update_student_year_level", async (req, res) => {
   const { new_year_level_id, id } = req.body;
 
@@ -351,7 +476,6 @@ router.get("/student_grade/:id", async (req, res) => {
           ELSE 0
         END AS is_migrated,
 
-        -- ✅ SCHEDULE
         GROUP_CONCAT(
           DISTINCT CONCAT(
             IFNULL(rdt.description, ''), ' ',
@@ -392,7 +516,6 @@ router.get("/student_grade/:id", async (req, res) => {
           LIMIT 1
         )
 
-      -- ✅ Schedule join
       LEFT JOIN time_table AS tt2
         ON tt2.course_id = es.course_id
         AND tt2.department_section_id = es.department_section_id
@@ -506,8 +629,6 @@ router.get("/student_grade/:id", async (req, res) => {
   }
 });
 
-// GET /student/latin-honor-standing/:id
-// Evaluates the student's overall posted GWA using configured Latin honors rules.
 router.get("/student/latin-honor-standing/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -853,7 +974,6 @@ router.put("/student/update_person/:person_id", async (req, res) => {
   const updatedData = req.body;
 
   try {
-    // â— OPTIONAL: Prevent updating fields students should NOT touch
     const allowed = [
       "profile_img",
       "campus",
@@ -1004,7 +1124,6 @@ router.put("/student/update_person/:person_id", async (req, res) => {
       "current_step",
     ];
 
-    // Remove all fields NOT allowed
     const cleanPayload = {};
     for (const key of Object.keys(updatedData)) {
       if (allowed.includes(key)) {
@@ -1032,7 +1151,6 @@ router.put("/student/update_person/:person_id", async (req, res) => {
         .json({ message: "Person not found in ENROLLMENT DB" });
     }
 
-    // Keep student account email in sync when it changes.
     if (nextEmailRaw !== undefined) {
       if (!nextEmail) {
         return res.status(400).json({ message: "emailAddress cannot be empty." });
@@ -1063,7 +1181,7 @@ router.put("/student/update_person/:person_id", async (req, res) => {
       message: "Student information updated successfully (DB3)",
     });
   } catch (err) {
-    console.error("âŒ Error updating student (DB3):", err);
+    console.error("Error updating student (DB3):", err);
     res.status(500).json({ error: "Failed to update student record" });
   }
 });
@@ -1286,7 +1404,6 @@ router.post("/student/upload", upload.single("file"), async (req, res) => {
   }
 
   try {
-    //  Applicant info
     const [[appInfo]] = await db3.query(
       `
       SELECT snt.student_number, pt.last_name, pt.first_name, pt.middle_name
@@ -1300,7 +1417,6 @@ router.post("/student/upload", upload.single("file"), async (req, res) => {
     const student_number = appInfo?.student_number || "Unknown";
     const fullName = `${appInfo?.last_name || ""}, ${appInfo?.first_name || ""} ${appInfo?.middle_name?.charAt(0) || ""}.`;
 
-    //  Requirement description + short label
     const [descRows] = await db3.query(
       "SELECT description, short_label FROM requirements_table WHERE id = ?",
       [requirements_id],
@@ -1311,20 +1427,17 @@ router.post("/student/upload", upload.single("file"), async (req, res) => {
 
     const { description, short_label } = descRows[0];
 
-    //  Use the short_label directly from DB
     const shortLabel = short_label || "Unknown";
 
     const year = new Date().getFullYear();
     const ext = path.extname(req.file.originalname).toLowerCase();
 
-    //  Construct filename
     const filename = `${applicant_number}_${shortLabel}_${year}${ext}`;
     const uploadDir = path.join(__dirname, "uploads");
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
     const finalPath = path.join(uploadDir, filename);
 
-    //  Delete any existing file for the same applicant + requirement
     const [existingFiles] = await db3.query(
       `SELECT upload_id, file_path FROM requirement_uploads
        WHERE person_id = ? AND requirements_id = ?`,
@@ -1346,7 +1459,6 @@ router.post("/student/upload", upload.single("file"), async (req, res) => {
       ]);
     }
 
-    //  Save new file
     await fs.promises.writeFile(finalPath, req.file.buffer);
 
     await db3.query(
@@ -1440,7 +1552,18 @@ ORDER BY dt.dprtmnt_code, pgt.program_code, pt.last_name;
 });
 
 router.get("/student_enrollment", async (req, res) => {
+  const { employee_id } = req.query;
+
   try {
+    if (!employee_id) {
+      return res.status(400).json({ error: "employee_id is required" });
+    }
+
+    const scope = await getRegistrarScope(employee_id);
+    if (scope.length === 0) {
+      return res.json([]);
+    }
+
     const [rows] = await db3.query(
       `
         SELECT DISTINCT
@@ -1450,8 +1573,34 @@ router.get("/student_enrollment", async (req, res) => {
           pt.last_name
         FROM student_numbering_table snt
         LEFT JOIN person_table pt ON snt.person_id = pt.person_id
+        INNER JOIN (
+          SELECT
+            ranked.student_number,
+            ranked.dprtmnt_id,
+            ranked.program_id
+          FROM (
+            SELECT
+              es.student_number,
+              dct.dprtmnt_id,
+              cct.program_id,
+              ROW_NUMBER() OVER (
+                PARTITION BY es.student_number
+                ORDER BY sy.year_id DESC, sy.semester_id DESC, es.id DESC
+              ) AS rn
+            FROM enrolled_subject es
+            INNER JOIN active_school_year_table sy ON sy.id = es.active_school_year_id
+            INNER JOIN curriculum_table cct ON cct.curriculum_id = es.curriculum_id
+            INNER JOIN dprtmnt_curriculum_table dct ON dct.curriculum_id = cct.curriculum_id
+            INNER JOIN registrar_scope_table rst
+              ON rst.employee_id = ?
+              AND rst.dprtmnt_id = dct.dprtmnt_id
+              AND rst.program_id = cct.program_id
+          ) ranked
+          WHERE ranked.rn = 1
+        ) cur ON cur.student_number = snt.student_number
         ORDER BY snt.student_number ASC
       `,
+      [employee_id],
     );
 
     res.json(rows);
@@ -1460,7 +1609,6 @@ router.get("/student_enrollment", async (req, res) => {
     res.status(500).json({ error: "Failed fetching students" });
   }
 });
-
 router.get("/student-info-for-enrollment/:student_number", async (req, res) => {
   const { student_number } = req.params;
 
@@ -1670,20 +1818,17 @@ router.get("/student/:person_id/curriculum-subjects", async (req, res) => {
   FROM person_table pt
   JOIN student_numbering_table snt ON pt.person_id = snt.person_id
 
-  -- ✅ Get the curriculum the student is enrolled in (just to know curriculum_id)
   JOIN enrolled_subject base_es ON base_es.student_number = snt.student_number
 
   JOIN curriculum_table ct ON ct.curriculum_id = base_es.curriculum_id
   JOIN program_table p ON p.program_id = ct.program_id
   JOIN year_table y ON y.year_id = ct.year_id
 
-  -- ✅ Show ALL subjects in the curriculum (all year levels)
   JOIN program_tagging_table ptg ON ptg.curriculum_id = base_es.curriculum_id
   JOIN course_table co ON co.course_id = ptg.course_id
   JOIN year_level_table yl ON yl.year_level_id = ptg.year_level_id
   JOIN semester_table s ON s.semester_id = ptg.semester_id
 
-  -- ✅ LEFT JOIN enrollment for THIS specific course (may not exist for future subjects)
   LEFT JOIN enrolled_subject es
     ON es.student_number = snt.student_number
     AND es.course_id = co.course_id
@@ -1726,7 +1871,7 @@ router.get("/student-documents/:studentNumber", async (req, res) => {
   console.log("studentNumber: ", studentNumber);
 
   try {
-    console.log("📥 Fetching documents for:", studentNumber);
+    console.log("Fetching documents for:", studentNumber);
 
     const [rows] = await db3.execute(
       `
@@ -1801,7 +1946,6 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
   }
 
   try {
-    // ✅ Get student info (instead of applicant)
     const [[studentInfo]] = await db3.query(
       `
       SELECT snt.student_number, pt.last_name, pt.first_name, pt.middle_name
@@ -1814,7 +1958,6 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
 
     const student_number = studentInfo?.student_number || "Unknown";
 
-    // ✅ Get requirement info
     const [descRows] = await db3.query(
       "SELECT description, short_label FROM requirements_table WHERE id = ?",
       [requirements_id]
@@ -1829,10 +1972,8 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
     const year = new Date().getFullYear();
     const ext = path.extname(req.file.originalname).toLowerCase();
 
-    // ✅ Filename
     const filename = `${student_number}_${short_label}_${year}${ext}`;
 
-    // ✅ New folder
     const uploadDir = path.join(
       __dirname,
       "..",
@@ -1847,7 +1988,6 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
 
     const finalPath = path.join(uploadDir, filename);
 
-    // ✅ Delete old file (same logic as main API)
     const [existingFiles] = await db3.query(
       `SELECT upload_id, file_path FROM requirement_uploads
        WHERE person_id = ? AND requirements_id = ?`,
@@ -1878,10 +2018,8 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
       );
     }
 
-    // ✅ Save file
     await fs.promises.writeFile(finalPath, req.file.buffer);
 
-    // ✅ Insert DB
     await db3.query(
       `INSERT INTO requirement_uploads
         (requirements_id, person_id, file_path, original_name, status, remarks)
@@ -1910,7 +2048,6 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
   const { uploadId } = req.params;
 
   try {
-    // 1. Get file info + person_id
     const [rows] = await db3.query(
       "SELECT file_path, person_id FROM requirement_uploads WHERE upload_id = ?",
       [uploadId]
@@ -1920,9 +2057,8 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
       return res.status(404).json({ message: "File not found" });
     }
 
-    const { filePath, person_id } = rows[0]; // ✅ also grab person_id
+    const { filePath, person_id } = rows[0];
 
-    // 2. Correct folder (StudentOnlineDocuments)
     const fullPath = path.join(
       __dirname,
       "..",
@@ -1932,7 +2068,6 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
       rows[0].file_path
     );
 
-    // 3. Delete file
     try {
       await fs.promises.unlink(fullPath);
     } catch (err) {
@@ -1941,13 +2076,11 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
       }
     }
 
-    // 4. Delete DB record
     await db3.query(
       "DELETE FROM requirement_uploads WHERE upload_id = ?",
       [uploadId]
     );
 
-    // ✅ 5. Reset requirements status so modal can re-trigger
     await db3.query(
       "UPDATE person_status_table SET requirements = 0 WHERE person_id = ?",
       [rows[0].person_id]
@@ -1969,7 +2102,6 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
 });
 
 
-// GET /student-status/:person_id
 router.get("/student-status/:person_id", async (req, res) => {
   const { person_id } = req.params;
   try {
@@ -1984,7 +2116,6 @@ router.get("/student-status/:person_id", async (req, res) => {
   }
 });
 
-// POST /student-submit-requirements
 router.post("/student-submit-requirements", async (req, res) => {
   const { person_id } = req.body;
   if (!person_id) return res.status(400).json({ error: "Missing person_id" });

@@ -10,7 +10,7 @@ import {
     MeetingRoom, MenuBook, Numbers, PersonAdd, Psychology, School, Score,
     Search, Security, SupervisorAccount, TableChart, Timeline, Apartment,
     Business, LibraryBooks, People, LogoutOutlined, Settings, ExpandMore,
-    ExpandLess, Menu,
+    ExpandLess, Menu, Grading
 } from "@mui/icons-material";
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PaymentIcon from "@mui/icons-material/Payment";
@@ -723,6 +723,7 @@ const SideBar = ({
             { title: "Course Tagging For Summer", link: "/college_course_tagging_summer", icon: Class, page_id: 141 },
             { title: "Search Certificate of Registration", link: "/college_search_certification_of_registration", icon: Search, page_id: 125 },
             { title: "College Class List", link: "/college_class_list", icon: Class, page_id: 152 },
+            { title: "Student Grade File", link: "/college_student_grade_file", icon: Grading, page_id: 170 },
             { title: "Qualifying / Interview Room Assignment", link: "/college_qualifying_interview_room_assignment", icon: AccessTimeIcon, page_id: 10 },
             { title: "Qualfying / Interviewer Applicant List", link: "/qualifying_interview_room_assignment", icon: People, page_id: 36 },
         ]

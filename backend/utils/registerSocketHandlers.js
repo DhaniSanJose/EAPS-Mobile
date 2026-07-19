@@ -4791,7 +4791,7 @@ Click the link below to log in:
         p.*,
         st.student_number,
         ct.curriculum_id,
-        pt.program_description AS program
+        pt.program_description AS program,
         pt.major AS major
       FROM person_table AS p
       LEFT JOIN student_numbering_table AS st ON st.person_id = p.person_id

@@ -36,6 +36,8 @@ import StudentAccounts from "./account_management/StudentAccounts";
 import ApplicationProcessAdmin from "./admission/ApplicationProcessAdmin";
 import CollegeCourseTaggingSummer from "./enrollment_management/CollegeCourseTaggingSummer";
 import CollegeStudentList from "./enrollment_management/CollegeStudentList";
+import CollegeStudentGradeFile from "./enrollment_management/CollegeStudentGradeFile"; 
+
 import GradeConversionAdmin from "./system_management/GradeConversionAdmin";
 import HonorsReport from "./system_management/HonorsReport";
 
@@ -744,7 +746,6 @@ function App() {
                       <Route path="/college_student_numbering" element={<ProtectedRoute><CollegeStudentNumbering /></ProtectedRoute>} />
                       <Route path="/registrar_course_tagging" element={<ProtectedRoute><RegistrarCourseTagging /></ProtectedRoute>} />
                       <Route path="/registrar_course_tagging_summer" element={<ProtectedRoute><RegistrarCourseTaggingSummer /></ProtectedRoute>} />
-
                       <Route path="/college_course_tagging" element={<ProtectedRoute><CollegeCourseTagging /></ProtectedRoute>} />
                       <Route path="/college_course_tagging_summer" element={<ProtectedRoute><CollegeCourseTaggingSummer /></ProtectedRoute>} />                      <Route path="/nstp_tagging" element={<ProtectedRoute><NSTPTagging /></ProtectedRoute>} />
                       <Route path="/department_section_tagging" element={<ProtectedRoute><DepartmentSectionTagging /></ProtectedRoute>} />
@@ -772,6 +773,7 @@ function App() {
                       <Route path="/grading_sheet" element={<ProtectedRoute><GradingSheet /></ProtectedRoute>} />
                       <Route path="/registrar_student_list" element={<ProtectedRoute><RegistrarStudentList /></ProtectedRoute>} />
                       <Route path="/college_student_list" element={<ProtectedRoute><CollegeStudentList /></ProtectedRoute>} />
+                      <Route path="/college_student_grade_file" element={<ProtectedRoute><CollegeStudentGradeFile /></ProtectedRoute>} />
                       <Route path="/faculty_workload" element={<ProtectedRoute><FacultyWorkload /></ProtectedRoute>} />
                       <Route path="/faculty_evaluation" element={<ProtectedRoute><FacultyEvaluation /></ProtectedRoute>} />
                       <Route path="/faculty_masterlist" element={<ProtectedRoute><FacultyMasterList /></ProtectedRoute>} />
