@@ -296,7 +296,6 @@ const QualifyingExamScoreReadOnly = () => {
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const loggedInPersonId = localStorage.getItem("person_id");
-    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
 
     if (!storedUser || !storedRole || !loggedInPersonId) {
       window.location.href = "/login";
@@ -307,42 +306,21 @@ const QualifyingExamScoreReadOnly = () => {
     setUserRole(storedRole);
 
     const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (allowedRoles.includes(storedRole)) {
-      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-      sessionStorage.setItem("admin_edit_person_id", targetId);
-      setUserID(targetId);
+    if (!allowedRoles.includes(storedRole)) {
+      window.location.href = "/login";
       return;
     }
 
-    window.location.href = "/login";
-  }, [queryPersonId]);
+    // Do not auto-load/search an applicant on this screen
+    setUserID("");
+  }, []);
 
   useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const personIdFromUrl = queryParams.get("person_id");
-
-    if (!personIdFromUrl) return;
-
-    // fetch info of that person
-    axios
-      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
-      .then((res) => {
-        if (res.data?.applicant_number) {
-          // AUTO-INSERT applicant_number into search bar
-          setSearchQuery(res.data.applicant_number);
-
-          // If you have a fetchUploads() or fetchExamScore() — call it
-          if (typeof fetchUploadsByApplicantNumber === "function") {
-            fetchUploadsByApplicantNumber(res.data.applicant_number);
-          }
-
-          if (typeof fetchApplicants === "function") {
-            fetchApplicants();
-          }
-        }
-      })
-      .catch((err) => console.error("Auto search failed:", err));
-  }, [location.search]);
+    if (location.search.includes("person_id")) {
+      navigate("/registrar_qualifying_interview_score", { replace: true });
+      return;
+    }
+  }, [location.search, navigate]);
 
   const [hasAccess, setHasAccess] = useState(null);
 

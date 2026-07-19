@@ -34,6 +34,7 @@ import {
   syncRegistrarScopeFromAdminData,
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
+import { filterSchoolYearsFromActive } from "../utils/schoolYearOptions";
 
 const ClassRoster = () => {
   const settings = useContext(SettingsContext);
@@ -69,8 +70,8 @@ const ClassRoster = () => {
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("");
   const isProgramLocked = isRegistrarProgramSelectionLocked();
   const scopeRevision = useRegistrarScopeRevision();
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState("Regular");
-  const [selectedRemarkFilter, setSelectedRemarkFilter] = useState("Ongoing");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState("");
+  const [selectedRemarkFilter, setSelectedRemarkFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("asc");
 
   // ─── Pagination ───────────────────────────────────────────────────────────────
@@ -200,21 +201,25 @@ const ClassRoster = () => {
   // STEP 5 — Fetch supporting data (departments, programs, years, semesters)
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/get_school_year/`)
-      .then(res => setSchoolYears(res.data))
+    Promise.all([
+      axios.get(`${API_BASE_URL}/api/get_school_year/`),
+      axios.get(`${API_BASE_URL}/api/active_school_year`),
+    ])
+      .then(([yearsRes, activeRes]) => {
+        const active =
+          Array.isArray(activeRes.data) && activeRes.data.length > 0
+            ? activeRes.data[0]
+            : null;
+        setSchoolYears(filterSchoolYearsFromActive(yearsRes.data || [], active));
+        if (active) {
+          setSelectedSchoolYear(active.year_id);
+          setSelectedSchoolSemester(active.semester_id);
+        }
+      })
       .catch(console.error);
 
     axios.get(`${API_BASE_URL}/api/get_school_semester/`)
       .then(res => setSemesters(res.data))
-      .catch(console.error);
-
-    axios.get(`${API_BASE_URL}/api/active_school_year`)
-      .then(res => {
-        if (res.data.length > 0) {
-          setSelectedSchoolYear(res.data[0].year_id);
-          setSelectedSchoolSemester(res.data[0].semester_id);
-        }
-      })
       .catch(console.error);
   }, []);
 

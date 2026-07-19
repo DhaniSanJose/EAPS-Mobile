@@ -1,5 +1,10 @@
 import { useEffect } from "react";
-import { fetchAndStoreUserMacAddress } from "./userMacAddress";
+import {
+  ensureUserMacAddressSetup,
+  fetchAndStoreUserMacAddress,
+} from "./userMacAddress";
+
+ensureUserMacAddressSetup();
 
 const useAuditMac = () => {
   useEffect(() => {

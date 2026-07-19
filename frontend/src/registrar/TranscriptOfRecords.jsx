@@ -252,44 +252,11 @@ const TOR = () => {
   ]);
 
   useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const personIdFromUrl = queryParams.get("person_id");
-
-    if (!personIdFromUrl) return;
-
-    // fetch info of that person
-    axios
-      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
-      .then((res) => {
-        if (res.data?.applicant_number) {
-          // AUTO-INSERT applicant_number into search bar
-          setSearchQuery(res.data.applicant_number);
-
-          // If you have a fetchUploads() or fetchExamScore() — call it
-          if (typeof fetchUploadsByApplicantNumber === "function") {
-            fetchUploadsByApplicantNumber(res.data.applicant_number);
-          }
-
-          if (typeof fetchApplicants === "function") {
-            fetchApplicants();
-          }
-        }
-      })
-      .catch((err) => console.error("Auto search failed:", err));
-  }, [location.search]);
-
-  useEffect(() => {
-    const storedId = localStorage.getItem("admin_edit_person_id");
-
-    if (
-      storedId &&
-      storedId !== "undefined" &&
-      storedId !== "null" &&
-      storedId.length >= 9
-    ) {
-      setSearchQuery(storedId);
+    // Do not auto-load/search a student from URL or sticky storage on this screen
+    if (location.search.includes("person_id") || location.search.includes("student_number")) {
+      window.history.replaceState({}, "", "/transcript_of_records");
     }
-  }, []);
+  }, [location.search]);
 
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);

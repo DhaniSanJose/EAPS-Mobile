@@ -44,6 +44,7 @@ import {
     restrictToRegistrarCurriculum,
     syncRegistrarScopeFromAdminData,
 } from "../utils/registrarCurriculumRestriction";
+import { filterSchoolYearsFromActive } from "../utils/schoolYearOptions";
 
 // ✅ FIX: dedupe by program_code + major (NOT curriculum_id).
 // Your data can have the SAME program (e.g. "BSCS") stored under multiple
@@ -140,6 +141,11 @@ const StudentListForEnrollment = () => {
         if (!person) return;
         sessionStorage.setItem("edit_person_id", person.person_id || "");
         sessionStorage.setItem("edit_student_number", person.student_number || "");
+        if (person.person_id) {
+            sessionStorage.setItem("admin_edit_person_id", String(person.person_id));
+            sessionStorage.setItem("admin_edit_person_id_source", "registrar_student_list");
+            sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
+        }
         navigate(
             person.person_id
                 ? `/student_registrar_personal_information?person_id=${person.person_id}`
@@ -162,13 +168,15 @@ const StudentListForEnrollment = () => {
         const storedEmployeeID = localStorage.getItem("employee_id");
 
         if (storedUser && storedRole && storedID) {
-            setUserID(storedID);
+            if (storedRole === "applicant") {
+                setUserID(storedID);
+            }
             setUserRole(storedRole);
             setEmployeeID(storedEmployeeID);
 
             if (storedRole === "registrar") {
                 checkAccess(storedEmployeeID);
-            } else {
+            } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
                 window.location.href = "/login";
             }
         } else {
@@ -205,7 +213,6 @@ const StudentListForEnrollment = () => {
         const storedUser = localStorage.getItem("email");
         const storedRole = localStorage.getItem("role");
         const loggedInPersonId = localStorage.getItem("person_id");
-        const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
 
         if (!storedUser || !storedRole || !loggedInPersonId) {
             window.location.href = "/login";
@@ -216,14 +223,27 @@ const StudentListForEnrollment = () => {
         setUserRole(storedRole);
 
         const allowedRoles = ["registrar", "applicant", "superadmin"];
-        if (allowedRoles.includes(storedRole)) {
-            const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-            sessionStorage.setItem("admin_edit_person_id", targetId);
-            setUserID(targetId);
+        if (!allowedRoles.includes(storedRole)) {
+            window.location.href = "/login";
             return;
         }
 
-        window.location.href = "/login";
+        // Staff: visiting the list clears sticky selection so other tabs do not auto-load.
+        // Selection is set only when a row is clicked (handleRowClick).
+        if (storedRole !== "applicant") {
+            sessionStorage.removeItem("edit_person_id");
+            sessionStorage.removeItem("edit_student_number");
+            sessionStorage.removeItem("admin_edit_person_id");
+            sessionStorage.removeItem("admin_edit_person_id_source");
+            sessionStorage.removeItem("admin_edit_person_id_ts");
+            sessionStorage.removeItem("admin_edit_search_query");
+            sessionStorage.removeItem("admin_edit_person_data");
+            sessionStorage.removeItem("student_edit_person_id");
+            setUserID("");
+            return;
+        }
+
+        setUserID(loggedInPersonId);
     }, [queryPersonId]);
 
     const fetchPersonData = async () => {
@@ -403,10 +423,37 @@ const StudentListForEnrollment = () => {
     };
 
     useEffect(() => {
-        axios
-            .get(`${API_BASE_URL}/api/get_school_year/`)
-            .then((res) => setSchoolYears(res.data))
-            .catch((err) => console.error(err));
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const [yearsRes, activeRes] = await Promise.all([
+                    axios.get(`${API_BASE_URL}/api/get_school_year/`),
+                    axios.get(`${API_BASE_URL}/api/active_school_year`),
+                ]);
+                if (cancelled) return;
+
+                const active =
+                    Array.isArray(activeRes.data) && activeRes.data.length > 0
+                        ? activeRes.data[0]
+                        : null;
+                setSchoolYears(
+                    filterSchoolYearsFromActive(yearsRes.data || [], active),
+                );
+                if (active) {
+                    setSelectedSchoolYear(active.year_id);
+                    setSelectedSchoolSemester(active.semester_id);
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                if (!cancelled) setActiveTermReady(true);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     useEffect(() => {
@@ -414,19 +461,6 @@ const StudentListForEnrollment = () => {
             .get(`${API_BASE_URL}/api/get_school_semester/`)
             .then((res) => setSchoolSemester(res.data))
             .catch((err) => console.error(err));
-    }, []);
-
-    useEffect(() => {
-        axios
-            .get(`${API_BASE_URL}/api/active_school_year`)
-            .then((res) => {
-                if (res.data.length > 0) {
-                    setSelectedSchoolYear(res.data[0].year_id);
-                    setSelectedSchoolSemester(res.data[0].semester_id);
-                }
-            })
-            .catch((err) => console.error(err))
-            .finally(() => setActiveTermReady(true));
     }, []);
 
     // ✅ Only re-fetches when the school year/semester changes. Department

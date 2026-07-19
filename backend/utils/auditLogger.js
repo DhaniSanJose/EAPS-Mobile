@@ -1,5 +1,9 @@
+const { AsyncLocalStorage } = require("async_hooks");
 const { db, db3 } = require("../routes/database/database");
 const webtoken = require("jsonwebtoken");
+const { resolveUserMacAddress } = require("./macAddress");
+
+const auditRequestStore = new AsyncLocalStorage();
 
 const DEFAULT_ACTION = "AUTH";
 const ACCESS_DESCRIPTION_EXCLUDED_ROLES = new Set([
@@ -200,6 +204,12 @@ const insertAuditLog = async ({
       finalRole,
     });
 
+    const req = auditRequestStore.getStore();
+    const resolvedMac =
+      userMacAddress ||
+      (req ? await resolveUserMacAddress(req) : null) ||
+      null;
+
     await auditDb.query(
       `INSERT INTO audit_logs
         (actor_id, role, action, message, severity, user_mac_address)
@@ -210,7 +220,7 @@ const insertAuditLog = async ({
         action,
         normalizedMessage,
         severity || getAuthSeverity({ outcome }),
-        userMacAddress || null,
+        resolvedMac,
       ],
     );
   } catch (err) {
@@ -238,6 +248,7 @@ const insertAuditLogBoth = async (payload) => {
 };
 
 module.exports = {
+  auditRequestStore,
   buildAuthAuditMessage,
   formatAuditTimestamp,
   insertAuditLogAdmission,

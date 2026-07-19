@@ -1,6 +1,11 @@
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
-import { getStoredUserMacAddress } from "./userMacAddress";
+import {
+  ensureUserMacAddressSetup,
+  getStoredUserMacAddress,
+} from "./userMacAddress";
+
+ensureUserMacAddressSetup();
 
 const accessDescriptionExcludedRoles = new Set([
   "student",

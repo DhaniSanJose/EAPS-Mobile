@@ -205,42 +205,10 @@ const ApplicantScoringReadOnly = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const queryParams = new URLSearchParams(location.search);
-        const personIdFromUrl = queryParams.get("person_id");
-
-        if (!personIdFromUrl) return;
-
-        // fetch info of that person
-        axios
-            .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
-            .then((res) => {
-                if (res.data?.applicant_number) {
-
-                    // AUTO-INSERT applicant_number into search bar
-                    setSearchQuery(res.data.applicant_number);
-
-                    // If you have a fetchUploads() or fetchExamScore() — call it
-                    if (typeof fetchUploadsByApplicantNumber === "function") {
-                        fetchUploadsByApplicantNumber(res.data.applicant_number);
-                    }
-
-                    if (typeof fetchApplicants === "function") {
-                        fetchApplicants();
-                    }
-                }
-            })
-            .catch((err) => console.error("Auto search failed:", err));
-    }, [location.search]);
-
-
-    useEffect(() => {
         if (location.search.includes("person_id")) {
             navigate("/registrar_entrance_examination_score", { replace: true });
         }
     }, [location, navigate]);
-
-
-
 
     const [persons, setPersons] = useState([]);
 
@@ -293,45 +261,9 @@ const ApplicantScoringReadOnly = () => {
             return;
         }
 
-        const lastSelected = sessionStorage.getItem("admin_edit_person_id");
-
-        // ⭐ CASE 1: URL HAS ?person_id=
-        if (queryPersonId !== "") {
-            sessionStorage.setItem("admin_edit_person_id", queryPersonId);
-            setUserID(queryPersonId);
-            return;
-        }
-
-
-
-        // ⭐ CASE 3: No URL ID and no last selected → start blank
+        // Do not auto-load/search an applicant on this screen
         setUserID("");
-    }, [queryPersonId]);
-
-    useEffect(() => {
-        const storedUser = localStorage.getItem("email");
-        const storedRole = localStorage.getItem("role");
-        const loggedInPersonId = localStorage.getItem("person_id");
-        const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
-
-        if (!storedUser || !storedRole || !loggedInPersonId) {
-            window.location.href = "/login";
-            return;
-        }
-
-        setUser(storedUser);
-        setUserRole(storedRole);
-
-        const allowedRoles = ["registrar", "applicant", "superadmin"];
-        if (allowedRoles.includes(storedRole)) {
-            const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-            sessionStorage.setItem("admin_edit_person_id", targetId);
-            setUserID(targetId);
-            return;
-        }
-
-        window.location.href = "/login";
-    }, [queryPersonId]);
+    }, []);
 
 
     const [error, setError] = useState('');

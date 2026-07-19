@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
+import { useLocation } from "react-router-dom";
 import {
   Box,
   Button,
@@ -47,6 +48,7 @@ const PAGE_ID = 170;
 
 const CollegeStudentGradeFile = () => {
   const settings = useContext(SettingsContext);
+  const location = useLocation();
 
   // Colors State
   const [titleColor, setTitleColor] = useState("#000000");
@@ -420,6 +422,49 @@ const CollegeStudentGradeFile = () => {
     setGlobalSearch(student.student_number);
     setSearchStatus(`Selected ${student.student_number}`);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const studentNumberFromUrl = params.get("student_number")?.trim();
+    const personIdFromUrl = params.get("person_id")?.trim();
+
+    if (studentNumberFromUrl) {
+      setSelectedStudentNumber(studentNumberFromUrl);
+      setGlobalSearch(studentNumberFromUrl);
+      setSearchStatus(`Selected ${studentNumberFromUrl}`);
+      sessionStorage.setItem("edit_student_number", studentNumberFromUrl);
+      return;
+    }
+
+    if (!personIdFromUrl) return;
+
+    axios
+      .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`)
+      .then((res) => {
+        const resolvedStudentNumber = res.data?.student_number;
+        if (resolvedStudentNumber) {
+          setSelectedStudentNumber(resolvedStudentNumber);
+          setGlobalSearch(resolvedStudentNumber);
+          setSearchStatus(`Selected ${resolvedStudentNumber}`);
+          sessionStorage.setItem("edit_person_id", personIdFromUrl);
+          sessionStorage.setItem("edit_student_number", resolvedStudentNumber);
+        } else {
+          setSnackbar({
+            open: true,
+            message: "No student number found for the selected person.",
+            severity: "warning",
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Auto grade-file search failed:", err);
+        setSnackbar({
+          open: true,
+          message: "Unable to load student for the selected person.",
+          severity: "error",
+        });
+      });
+  }, [location.search]);
 
   const handleOpenViewMenu = (event) => {
     setViewMenuAnchorEl(event.currentTarget);

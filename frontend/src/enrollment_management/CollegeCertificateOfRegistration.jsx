@@ -47,7 +47,7 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
 const CertificateOfRegistrationForCollege = forwardRef(
 
-  ({ student_number, dprtmnt_id, onNotify, preload }, divToPrintRef) => {
+  ({ student_number, dprtmnt_id, onNotify, preload, activeSchoolYearId }, divToPrintRef) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
     const [fetchedLogo, setFetchedLogo] = useState(null);
@@ -443,11 +443,15 @@ const CertificateOfRegistrationForCollege = forwardRef(
     useEffect(() => {
       if (userId && currId) {
         axios
-          .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`)
+          .get(`${API_BASE_URL}/api/enrolled_courses/${userId}/${currId}`, {
+            params: activeSchoolYearId
+              ? { activeSchoolYearId }
+              : undefined,
+          })
           .then((res) => setEnrolled(res.data))
           .catch((err) => console.error(err));
       }
-    }, [userId, currId]);
+    }, [userId, currId, activeSchoolYearId]);
 
     const [activeSchoolYear, setActiveSchoolYear] = useState([]);
 
@@ -459,11 +463,22 @@ const CertificateOfRegistrationForCollege = forwardRef(
     }, [userRole, employeeID]);
 
     useEffect(() => {
+      if (activeSchoolYearId) {
+        axios
+          .get(`${API_BASE_URL}/api/active_school_year_by_id/${activeSchoolYearId}`)
+          .then((res) => setActiveSchoolYear(Array.isArray(res.data) ? res.data : []))
+          .catch((err) => {
+            console.error(err);
+            setActiveSchoolYear([]);
+          });
+        return;
+      }
+
       axios
         .get(`${API_BASE_URL}/api/get_active_school_years`)
         .then((res) => setActiveSchoolYear(res.data))
         .catch((err) => console.error(err));
-    }, []);
+    }, [activeSchoolYearId]);
 
     useEffect(() => {
       if (!user) {
@@ -591,7 +606,13 @@ const CertificateOfRegistrationForCollege = forwardRef(
           if (!tagged) {
             const response = await axios.post(
               `${API_BASE_URL}/api/student-tagging/dprtmnt`,
-              { studentNumber: student_number, dprtmntId: dprtmnt_id },
+              {
+                studentNumber: student_number,
+                dprtmntId: dprtmnt_id,
+                ...(activeSchoolYearId
+                  ? { active_school_year_id: activeSchoolYearId }
+                  : {}),
+              },
               { headers: { "Content-Type": "application/json" } },
             );
             tagged = response.data;
@@ -714,15 +735,26 @@ const CertificateOfRegistrationForCollege = forwardRef(
       };
 
       fetchStudent();
-    }, [student_number, dprtmnt_id, preload, curriculumOptions, scopeReady]);
+    }, [student_number, dprtmnt_id, preload, curriculumOptions, scopeReady, activeSchoolYearId]);
 
     useEffect(() => {
-      if (!student_number || !student_number.trim()) return;
+      if (!student_number || !student_number.trim()) {
+        setSavedUnifast(false);
+        setSavedMatriculation(false);
+        return;
+      }
 
       const fetchPaymentStatus = async () => {
         try {
+          setSavedUnifast(false);
+          setSavedMatriculation(false);
           const res = await axios.get(
             `${API_BASE_URL}/api/payment-status/${student_number}`,
+            {
+              params: activeSchoolYearId
+                ? { active_school_year_id: activeSchoolYearId }
+                : undefined,
+            },
           );
           if (res.data?.success) {
             setSavedUnifast(!!res.data.saved_unifast);
@@ -730,11 +762,13 @@ const CertificateOfRegistrationForCollege = forwardRef(
           }
         } catch (error) {
           console.error("Failed to fetch payment status:", error);
+          setSavedUnifast(false);
+          setSavedMatriculation(false);
         }
       };
 
       fetchPaymentStatus();
-    }, [student_number]);
+    }, [student_number, activeSchoolYearId]);
 
     const toWholeUnit = (value) => {
       const num = Number(value);
@@ -902,9 +936,24 @@ const CertificateOfRegistrationForCollege = forwardRef(
         school_id_fees: schoolIdFee,
         total_tosf: totalTotalTOSF,
         remark: "",
-        active_school_year_id: activeSchoolYear[0]?.id || null,
+        active_school_year_id:
+          activeSchoolYearId || activeSchoolYear[0]?.id || null,
       });
-    }, [data, tosf, enrolled, totalLabFees, totalLecFees, branches, person?.campus]);
+    }, [
+      data,
+      tosf,
+      enrolled,
+      totalLabFees,
+      totalLecFees,
+      branches,
+      person?.campus,
+      activeSchoolYear,
+      activeSchoolYearId,
+      isHaveNSTP,
+      isHaveComputerFees,
+      isHaveLaboratory,
+      year_Level_Description,
+    ]);
 
     const toNumber = (value) => {
       if (typeof value === "string") {

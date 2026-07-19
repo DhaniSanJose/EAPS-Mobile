@@ -264,12 +264,14 @@ const MedicalRequirements = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {

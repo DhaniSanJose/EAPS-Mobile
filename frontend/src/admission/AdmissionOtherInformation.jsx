@@ -173,12 +173,14 @@ const AdminDashboard5 = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {
@@ -234,6 +236,11 @@ const AdminDashboard5 = () => {
       return;
     }
 
+    if (storedRole === "applicant") {
+      setUserID(loggedInPersonId);
+      return;
+    }
+
     // ⭐ CASE 2: URL has NO ID but we have a last selected student
     if (lastSelected) {
       setUserID(lastSelected);
@@ -262,7 +269,9 @@ const AdminDashboard5 = () => {
       const tsStr = sessionStorage.getItem("admin_edit_person_id_ts");
       const id = sessionStorage.getItem("admin_edit_person_id");
       const ts = tsStr ? parseInt(tsStr, 10) : 0;
-      const isFresh = source === "applicant_list" && Date.now() - ts < 5 * 60 * 1000;
+      const isFresh =
+        ["applicant_list", "admission_applicant_list"].includes(source) &&
+        Date.now() - ts < 5 * 60 * 1000;
 
       if (id && isFresh) {
         await fetchByPersonId(id);

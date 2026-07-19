@@ -14,6 +14,10 @@ import {
     Snackbar,
     Alert,
     Chip,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import '../styles/Print.css'
 import CertificateOfRegistrationForCollege from "./CollegeCertificateOfRegistration";
@@ -36,6 +40,7 @@ import {
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import { postAuditEvent } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+import { filterSchoolYearsFromActive } from "../utils/schoolYearOptions";
 
 const cleanAuditValue = (value) => {
     if (value === null || value === undefined) return "";
@@ -115,7 +120,11 @@ const SearchCorForCollege = () => {
     const [dprtmntID, setDepartmentID] = useState("");
     const [departments, setDepartments] = useState([]);
     const [departmentLoading, setDepartmentLoading] = useState(true);
-    const [activeSchoolYearId, setActiveSchoolYearId] = useState(null);
+    const [schoolYears, setSchoolYears] = useState([]);
+    const [schoolSemesters, setSchoolSemesters] = useState([]);
+    const [selectedSchoolYear, setSelectedSchoolYear] = useState("");
+    const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
+    const [selectedActiveSchoolYear, setSelectedActiveSchoolYear] = useState("");
     const scopeRevision = useRegistrarScopeRevision();
 
     useEffect(() => {
@@ -126,15 +135,57 @@ const SearchCorForCollege = () => {
     }, [userRole, employeeID]);
 
     useEffect(() => {
-        axios
-            .get(`${API_BASE_URL}/api/get_active_school_years`)
-            .then((res) => {
-                if (Array.isArray(res.data) && res.data.length > 0) {
-                    setActiveSchoolYearId(res.data[0].id);
+        Promise.all([
+            axios.get(`${API_BASE_URL}/api/get_school_year/`),
+            axios.get(`${API_BASE_URL}/api/active_school_year`),
+        ])
+            .then(([yearsRes, activeRes]) => {
+                const active =
+                    Array.isArray(activeRes.data) && activeRes.data.length > 0
+                        ? activeRes.data[0]
+                        : null;
+                setSchoolYears(
+                    filterSchoolYearsFromActive(yearsRes.data || [], active),
+                );
+                if (active) {
+                    setSelectedSchoolYear(active.year_id);
+                    setSelectedSchoolSemester(active.semester_id);
                 }
             })
             .catch((err) => console.error(err));
+
+        axios
+            .get(`${API_BASE_URL}/api/get_school_semester/`)
+            .then((res) => setSchoolSemesters(res.data || []))
+            .catch((err) => console.error(err));
     }, []);
+
+    useEffect(() => {
+        if (!selectedSchoolYear || !selectedSchoolSemester) {
+            setSelectedActiveSchoolYear("");
+            return;
+        }
+
+        axios
+            .get(
+                `${API_BASE_URL}/api/get_selecterd_year/${selectedSchoolYear}/${selectedSchoolSemester}`,
+            )
+            .then((res) => {
+                if (Array.isArray(res.data) && res.data.length > 0) {
+                    setSelectedActiveSchoolYear(res.data[0].school_year_id);
+                } else {
+                    setSelectedActiveSchoolYear("");
+                    showSnackbar(
+                        "No academic term found for the selected year/semester.",
+                        "warning",
+                    );
+                }
+            })
+            .catch((err) => {
+                console.error(err);
+                setSelectedActiveSchoolYear("");
+            });
+    }, [selectedSchoolYear, selectedSchoolSemester]);
 
     useEffect(() => {
         const storedUser = localStorage.getItem("email");
@@ -249,39 +300,89 @@ const SearchCorForCollege = () => {
         const studentNumberFromUrl = params.get("student_number")?.trim();
         const personIdFromUrl = params.get("person_id")?.trim();
 
-        if (studentNumberFromUrl) {
-            setStudentNumber(studentNumberFromUrl);
-            sessionStorage.setItem(COLLEGE_COR_SEARCH_KEY, studentNumberFromUrl);
-            sessionStorage.setItem("edit_student_number", studentNumberFromUrl);
-            return;
-        }
+        if (!studentNumberFromUrl && !personIdFromUrl) return;
 
-        if (!personIdFromUrl) return;
+        let cancelled = false;
 
-        setStudentNumber("");
-        setDebouncedStudentNumber("");
-        setSelectedStudent(null);
-        setStudentData([]);
-        setStudentDetails([]);
-        setCorPreload(null);
+        const applyStudentNumber = (resolvedStudentNumber) => {
+            if (cancelled || !resolvedStudentNumber) return;
+            setStudentNumber(resolvedStudentNumber);
+            sessionStorage.setItem(COLLEGE_COR_SEARCH_KEY, resolvedStudentNumber);
+            sessionStorage.setItem("edit_student_number", resolvedStudentNumber);
+        };
 
-        axios
-            .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`)
-            .then((res) => {
+        const skipAutoSearchForInactiveTerm = async () => {
+            const listYearId = sessionStorage.getItem("edit_list_year_id");
+            const listSemesterId = sessionStorage.getItem("edit_list_semester_id");
+
+            // Only gate auto-search when the student was picked under a specific list term.
+            if (!listYearId || !listSemesterId) return false;
+
+            try {
+                const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+                const active =
+                    Array.isArray(res.data) && res.data.length > 0 ? res.data[0] : null;
+                if (!active) return false;
+
+                const sameYear = String(active.year_id) === String(listYearId);
+                const sameSemester = String(active.semester_id) === String(listSemesterId);
+                if (sameYear && sameSemester) return false;
+
+                setStudentNumber("");
+                setDebouncedStudentNumber("");
+                setSelectedStudent(null);
+                setStudentData([]);
+                setStudentDetails([]);
+                setCorPreload(null);
+                showSnackbar(
+                    "Selected student is from a different school year/semester than the active term. Search manually if needed.",
+                    "info",
+                );
+                return true;
+            } catch (err) {
+                console.error("Failed to verify active school year for auto-search:", err);
+                return false;
+            }
+        };
+
+        const runAutoSearch = async () => {
+            const shouldSkip = await skipAutoSearchForInactiveTerm();
+            if (cancelled || shouldSkip) return;
+
+            if (studentNumberFromUrl) {
+                applyStudentNumber(studentNumberFromUrl);
+                return;
+            }
+
+            setStudentNumber("");
+            setDebouncedStudentNumber("");
+            setSelectedStudent(null);
+            setStudentData([]);
+            setStudentDetails([]);
+            setCorPreload(null);
+
+            try {
+                const res = await axios.get(
+                    `${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`,
+                );
+                if (cancelled) return;
                 const resolvedStudentNumber = res.data?.student_number;
                 if (resolvedStudentNumber) {
-                    setStudentNumber(resolvedStudentNumber);
+                    applyStudentNumber(resolvedStudentNumber);
                     sessionStorage.setItem("edit_person_id", personIdFromUrl);
-                    sessionStorage.setItem("edit_student_number", resolvedStudentNumber);
-                    sessionStorage.setItem(COLLEGE_COR_SEARCH_KEY, resolvedStudentNumber);
                 } else {
                     showSnackbar("No student number found for the selected person.", "warning");
                 }
-            })
-            .catch((err) => {
+            } catch (err) {
                 console.error("Auto COR search failed:", err);
                 showSnackbar("Unable to load student number for the selected person.", "error");
-            });
+            }
+        };
+
+        runAutoSearch();
+        return () => {
+            cancelled = true;
+        };
     }, [location.search]);
 
     const handleCloseSnackbar = (_, reason) => {
@@ -302,14 +403,20 @@ const SearchCorForCollege = () => {
             return;
         }
 
+        if (!selectedActiveSchoolYear) {
+            setCorPreload(null);
+            return;
+        }
+
         const fetchStudent = async () => {
             try {
+                setCorPreload(null);
                 setCorPreloadLoading(true);
 
                 const [evalRes, scopeResult] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/program_evaluation/${debouncedStudentNumber}`),
                     resolveStudentRegistrarScope(debouncedStudentNumber, {
-                        activeSchoolYearId: activeSchoolYearId || undefined,
+                        activeSchoolYearId: selectedActiveSchoolYear || undefined,
                     }),
                 ]);
 
@@ -379,7 +486,7 @@ const SearchCorForCollege = () => {
         };
 
         fetchStudent();
-    }, [debouncedStudentNumber, departmentLoading, activeSchoolYearId]);
+    }, [debouncedStudentNumber, departmentLoading, selectedActiveSchoolYear]);
 
     const divToPrintRef = useRef();
     const [pdfLoading, setPdfLoading] = useState(false);
@@ -603,9 +710,60 @@ const SearchCorForCollege = () => {
             <br />
             <CollegeEnrollmentTabs />
             <br />
+
+            <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, mb: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 4, p: 2, flexWrap: "wrap" }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <Typography fontSize={13} sx={{ minWidth: "90px" }}>
+                            School Year:
+                        </Typography>
+                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                            <InputLabel>School Year</InputLabel>
+                            <Select
+                                value={selectedSchoolYear}
+                                label="School Year"
+                                onChange={(e) => setSelectedSchoolYear(e.target.value)}
+                            >
+                                {schoolYears.length > 0 ? (
+                                    schoolYears.map((sy) => (
+                                        <MenuItem value={sy.year_id} key={sy.year_id}>
+                                            {sy.current_year} - {sy.next_year}
+                                        </MenuItem>
+                                    ))
+                                ) : (
+                                    <MenuItem disabled>No school years found</MenuItem>
+                                )}
+                            </Select>
+                        </FormControl>
+                    </Box>
+
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <Typography fontSize={13} sx={{ minWidth: "80px" }}>
+                            Semester:
+                        </Typography>
+                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                            <InputLabel>Semester</InputLabel>
+                            <Select
+                                value={selectedSchoolSemester}
+                                label="Semester"
+                                onChange={(e) => setSelectedSchoolSemester(e.target.value)}
+                            >
+                                {schoolSemesters.length > 0 ? (
+                                    schoolSemesters.map((sem) => (
+                                        <MenuItem value={sem.semester_id} key={sem.semester_id}>
+                                            {sem.semester_description}
+                                        </MenuItem>
+                                    ))
+                                ) : (
+                                    <MenuItem disabled>No semesters found</MenuItem>
+                                )}
+                            </Select>
+                        </FormControl>
+                    </Box>
+                </Box>
+            </TableContainer>
+
             <br />
-
-
             <TableContainer component={Paper} sx={{ width: '100%' }}>
                 <Table>
                     <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
@@ -670,8 +828,14 @@ const SearchCorForCollege = () => {
                 }}
             >
                 <CertificateOfRegistrationForCollege
-                    student_number={debouncedStudentNumber}
+                    key={`${debouncedStudentNumber}-${selectedActiveSchoolYear || "none"}`}
+                    student_number={
+                        selectedActiveSchoolYear && (corPreload || !corPreloadLoading)
+                            ? debouncedStudentNumber
+                            : ""
+                    }
                     dprtmnt_id={dprtmntID}
+                    activeSchoolYearId={selectedActiveSchoolYear || undefined}
                     preload={corPreload}
                     onNotify={({ message, severity }) => showSnackbar(message, severity)}
                 />

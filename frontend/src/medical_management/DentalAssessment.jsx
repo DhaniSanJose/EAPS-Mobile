@@ -325,8 +325,6 @@ const DentalAssessment = () => {
             return;
         }
 
-        const lastSelected = sessionStorage.getItem("admin_edit_person_id");
-
         // ⭐ CASE 1: URL HAS ?person_id=
         if (queryPersonId !== "") {
             sessionStorage.setItem("admin_edit_person_id", queryPersonId);
@@ -334,9 +332,13 @@ const DentalAssessment = () => {
             return;
         }
 
+        // Applicant self-service: use their own id when no URL param
+        if (storedRole === "applicant") {
+            setUserID(loggedInPersonId);
+            return;
+        }
 
-
-        // ⭐ CASE 3: No URL ID and no last selected → start blank
+        // ⭐ CASE 3: Staff with no URL ID → start blank
         setUserID("");
     }, [queryPersonId]);
 
@@ -359,7 +361,9 @@ const DentalAssessment = () => {
             const tsStr = sessionStorage.getItem("admin_edit_person_id_ts");
             const id = sessionStorage.getItem("admin_edit_person_id");
             const ts = tsStr ? parseInt(tsStr, 10) : 0;
-            const isFresh = source === "applicant_list" && Date.now() - ts < 5 * 60 * 1000;
+            const isFresh =
+                ["applicant_list", "medical_student_list"].includes(source) &&
+                Date.now() - ts < 5 * 60 * 1000;
 
             if (id && isFresh) {
                 await fetchByPersonId(id);
@@ -516,14 +520,6 @@ const DentalAssessment = () => {
             .catch((err) => console.error("Auto search failed:", err));
         */
     }, [location.search]);
-
-    useEffect(() => {
-        const storedId = sessionStorage.getItem("edit_student_number");
-
-        if (storedId) {
-            setStudentNumber(storedId);
-        }
-    }, []);
 
     // 🔍 Auto search when studentNumber changes
     useEffect(() => {

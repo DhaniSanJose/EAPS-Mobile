@@ -275,12 +275,14 @@ const RegistrarDashboard1 = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {
@@ -341,7 +343,12 @@ const RegistrarDashboard1 = () => {
       return;
     }
 
-    // ⭐ CASE 3: No URL ID and no last selected → start blank
+    if (storedRole === "applicant") {
+      setUserID(loggedInPersonId);
+      return;
+    }
+
+    // ⭐ CASE 3: Staff with no URL ID → start blank
     setUserID("");
   }, [queryPersonId]);
 
@@ -362,7 +369,8 @@ const RegistrarDashboard1 = () => {
       const id = sessionStorage.getItem("admin_edit_person_id");
       const ts = tsStr ? parseInt(tsStr, 10) : 0;
       const isFresh =
-        source === "applicant_list_college" && Date.now() - ts < 5 * 60 * 1000;
+        ["applicant_list_college", "applicant_list"].includes(source) &&
+        Date.now() - ts < 5 * 60 * 1000;
 
       if (id && isFresh) {
         await fetchByPersonId(id);

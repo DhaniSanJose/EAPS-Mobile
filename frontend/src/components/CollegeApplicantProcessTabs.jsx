@@ -84,10 +84,37 @@ const CollegeApplicantProcessTabs = () => {
 
   const activeStep = getCollegeApplicantProcessActiveStep(location.pathname);
 
-  const handleStepClick = (to) => {
-    const pid = sessionStorage.getItem("admin_edit_person_id");
+  const ROUTES_WITHOUT_PERSON_ID = new Set([
+    "/college_entrance_examination_score",
+    "/college_qualifying_interview_schedule_management",
+    "/college_qualifying_interview_score",
+  ]);
 
-    if (pid && to !== "/applicant_list_college") {
+  const clearStickyApplicantSelection = () => {
+    sessionStorage.removeItem("admin_edit_person_id");
+    sessionStorage.removeItem("admin_edit_person_id_source");
+    sessionStorage.removeItem("admin_edit_person_id_ts");
+    sessionStorage.removeItem("admin_edit_search_query");
+    sessionStorage.removeItem("admin_edit_person_data");
+    sessionStorage.removeItem("edit_person_id");
+    sessionStorage.removeItem("edit_applicant_number");
+  };
+
+  const handleStepClick = (to) => {
+    if (to === "/applicant_list_college") {
+      clearStickyApplicantSelection();
+      navigate(to);
+      return;
+    }
+
+    // Score/schedule screens should always open blank (no sticky applicant search)
+    if (ROUTES_WITHOUT_PERSON_ID.has(to)) {
+      navigate(to);
+      return;
+    }
+
+    const pid = sessionStorage.getItem("admin_edit_person_id");
+    if (pid) {
       navigate(`${to}?person_id=${pid}`);
     } else {
       navigate(to);

@@ -1351,36 +1351,97 @@ const CourseTaggingForCollege = () => {
     const params = new URLSearchParams(location.search);
     const studentNumberFromUrl = params.get("student_number")?.trim();
     const personIdFromUrl = params.get("person_id")?.trim();
-    if (studentNumberFromUrl) {
-      setStudentNumber(studentNumberFromUrl);
-      sessionStorage.setItem("edit_student_number", studentNumberFromUrl);
-      return;
-    }
-    if (!personIdFromUrl) return;
-    setStudentNumber("");
-    setUserId(null);
-    setCurr(null);
-    setCourses([]);
-    setOtherDeptTaggedCourses([]);
-    setOtherDeptSections([]);
-    setEnrolled([]);
-    setIsEnrolled(false);
-    axios
-      .get(`${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`)
-      .then((res) => {
+
+    if (!studentNumberFromUrl && !personIdFromUrl) return;
+
+    let cancelled = false;
+
+    const applyStudentNumber = (resolvedStudentNumber) => {
+      if (cancelled || !resolvedStudentNumber) return;
+      setStudentNumber(resolvedStudentNumber);
+      sessionStorage.setItem("edit_student_number", resolvedStudentNumber);
+    };
+
+    const skipAutoSearchForInactiveTerm = async () => {
+      const listYearId = sessionStorage.getItem("edit_list_year_id");
+      const listSemesterId = sessionStorage.getItem("edit_list_semester_id");
+
+      // Only gate auto-search when the student was picked under a specific list term.
+      if (!listYearId || !listSemesterId) return false;
+
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+        const active = Array.isArray(res.data) && res.data.length > 0 ? res.data[0] : null;
+        if (!active) return false;
+
+        const sameYear = String(active.year_id) === String(listYearId);
+        const sameSemester = String(active.semester_id) === String(listSemesterId);
+        if (sameYear && sameSemester) return false;
+
+        setStudentNumber("");
+        setUserId(null);
+        setCurr(null);
+        setCourses([]);
+        setOtherDeptTaggedCourses([]);
+        setOtherDeptSections([]);
+        setEnrolled([]);
+        setIsEnrolled(false);
+        setSnack({
+          open: true,
+          message:
+            "Selected student is from a different school year/semester than the active term. Search manually if needed.",
+          severity: "info",
+        });
+        return true;
+      } catch (err) {
+        console.error("Failed to verify active school year for auto-search:", err);
+        return false;
+      }
+    };
+
+    const runAutoSearch = async () => {
+      const shouldSkip = await skipAutoSearchForInactiveTerm();
+      if (cancelled || shouldSkip) return;
+
+      if (studentNumberFromUrl) {
+        applyStudentNumber(studentNumberFromUrl);
+        return;
+      }
+
+      setStudentNumber("");
+      setUserId(null);
+      setCurr(null);
+      setCourses([]);
+      setOtherDeptTaggedCourses([]);
+      setOtherDeptSections([]);
+      setEnrolled([]);
+      setIsEnrolled(false);
+
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/student-person-data/${personIdFromUrl}`,
+        );
+        if (cancelled) return;
         const resolvedStudentNumber = res.data?.student_number;
         if (resolvedStudentNumber) {
-          setStudentNumber(resolvedStudentNumber);
+          applyStudentNumber(resolvedStudentNumber);
           sessionStorage.setItem("edit_person_id", personIdFromUrl);
-          sessionStorage.setItem("edit_student_number", resolvedStudentNumber);
-        } else
+        } else {
           setSnack({
             open: true,
             message: "No student number found for the selected person.",
             severity: "warning",
           });
-      })
-      .catch((err) => console.error("Auto search failed:", err));
+        }
+      } catch (err) {
+        console.error("Auto search failed:", err);
+      }
+    };
+
+    runAutoSearch();
+    return () => {
+      cancelled = true;
+    };
   }, [location.search]);
 
   const [selectedFile, setSelectedFile] = useState(null);
@@ -1845,14 +1906,10 @@ const CourseTaggingForCollege = () => {
                   direction="row"
                   useFlexGap
                   sx={{
-                    flexWrap: {
-                      xs: "wrap",
-                      sm: "wrap",
-                      md: "nowrap",
-                    },
-                    gap: 2,
+                    flexWrap: "wrap",
+                    gap: 1,
+                    justifyContent: "flex-start",
                   }}
-
                 >
                   {otherDepartmentList.map((dep) => (
                     <Typography
@@ -1862,14 +1919,16 @@ const CourseTaggingForCollege = () => {
                           : handleOpenConfirmationDeptDataDialog(dep)
                       }
                       sx={{
-                        width: "100%",
-                        padding: "4px 9px",
+                        flex: "0 0 auto",
+                        minWidth: 120,
+                        padding: "4px 10px",
                         background: dep.accessType === "own" ? "maroon" : "#163600",
                         color: "#fff",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         cursor: "pointer",
+                        whiteSpace: "nowrap",
                       }}
                       key={dep.dprtmnt_id}
                     >

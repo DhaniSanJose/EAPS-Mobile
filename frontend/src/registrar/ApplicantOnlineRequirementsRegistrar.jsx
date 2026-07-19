@@ -263,12 +263,14 @@ const RegistrarRequirements = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {
@@ -311,19 +313,20 @@ const RegistrarRequirements = () => {
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const storedID = localStorage.getItem("person_id");
-    setUserID(storedID);
 
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         if (storedID !== "undefined") {
         } else {
           console.warn("Stored person_id is invalid:", storedID);
         }
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {
@@ -353,8 +356,6 @@ const RegistrarRequirements = () => {
       return;
     }
 
-    const lastSelected = sessionStorage.getItem("admin_edit_person_id");
-
     // ⭐ CASE 1: URL HAS ?person_id=
     if (queryPersonId !== "") {
       sessionStorage.setItem("admin_edit_person_id", queryPersonId);
@@ -362,7 +363,13 @@ const RegistrarRequirements = () => {
       return;
     }
 
-    // ⭐ CASE 3: No URL ID and no last selected → start blank
+    // Applicant self-service: use their own id when no URL param
+    if (storedRole === "applicant") {
+      setUserID(loggedInPersonId);
+      return;
+    }
+
+    // ⭐ CASE 3: Staff with no URL ID → start blank
     setUserID("");
   }, [queryPersonId]);
 
@@ -383,7 +390,8 @@ const RegistrarRequirements = () => {
       const id = sessionStorage.getItem("admin_edit_person_id");
       const ts = tsStr ? parseInt(tsStr, 10) : 0;
       const isFresh =
-        source === "applicant_list" && Date.now() - ts < 5 * 60 * 1000;
+        ["applicant_list_registrar", "applicant_list", "super_admin_applicant_list"].includes(source) &&
+        Date.now() - ts < 5 * 60 * 1000;
 
       if (id && isFresh) {
         await fetchByPersonId(id);

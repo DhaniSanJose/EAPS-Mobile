@@ -160,8 +160,6 @@ const MedicalDashboard5 = () => {
       return;
     }
 
-    const lastSelected = sessionStorage.getItem("admin_edit_person_id");
-
     // ⭐ CASE 1: URL HAS ?person_id=
     if (queryPersonId !== "") {
       sessionStorage.setItem("admin_edit_person_id", queryPersonId);
@@ -169,13 +167,13 @@ const MedicalDashboard5 = () => {
       return;
     }
 
-    // ⭐ CASE 2: URL has NO ID but we have a last selected student
-    if (lastSelected) {
-      setUserID(lastSelected);
+    // Applicant self-service: use their own id when no URL param
+    if (storedRole === "applicant") {
+      setUserID(loggedInPersonId);
       return;
     }
 
-    // ⭐ CASE 3: No URL ID and no last selected → start blank
+    // ⭐ CASE 3: Staff with no URL ID → start blank
     setUserID("");
   }, [queryPersonId]);
 
@@ -248,7 +246,9 @@ const MedicalDashboard5 = () => {
 
   const handleStepClick = (index, to) => {
     setActiveStep(index);
-    const pid = sessionStorage.getItem("edit_person_id");
+    const pid =
+      sessionStorage.getItem("admin_edit_person_id") ||
+      sessionStorage.getItem("edit_person_id");
     const sn = sessionStorage.getItem("edit_student_number");
 
     if (pid) {
@@ -259,16 +259,6 @@ const MedicalDashboard5 = () => {
       navigate(to); // no id → open without query
     }
   };
-
-  useEffect(() => {
-    const storedId = sessionStorage.getItem("edit_student_number");
-
-    if (storedId) {
-      setSearchQuery(storedId);
-    }
-  }, []);
-
-
 
   // Do not alter
   const handleUpdate = async () => {

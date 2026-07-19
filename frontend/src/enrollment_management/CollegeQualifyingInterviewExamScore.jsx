@@ -314,7 +314,6 @@ const QualifyingExamScore = () => {
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const loggedInPersonId = localStorage.getItem("person_id");
-    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
 
     if (!storedUser || !storedRole || !loggedInPersonId) {
       window.location.href = "/login";
@@ -325,42 +324,14 @@ const QualifyingExamScore = () => {
     setUserRole(storedRole);
 
     const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (allowedRoles.includes(storedRole)) {
-      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-      sessionStorage.setItem("admin_edit_person_id", targetId);
-      setUserID(targetId);
+    if (!allowedRoles.includes(storedRole)) {
+      window.location.href = "/login";
       return;
     }
 
-    window.location.href = "/login";
-  }, [queryPersonId]);
-
-  useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const personIdFromUrl = queryParams.get("person_id");
-
-    if (!personIdFromUrl) return;
-
-    // fetch info of that person
-    axios
-      .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromUrl}`)
-      .then((res) => {
-        if (res.data?.applicant_number) {
-          // AUTO-INSERT applicant_number into search bar
-          setSearchQuery(res.data.applicant_number);
-
-          // If you have a fetchUploads() or fetchExamScore() — call it
-          if (typeof fetchUploadsByApplicantNumber === "function") {
-            fetchUploadsByApplicantNumber(res.data.applicant_number);
-          }
-
-          if (typeof fetchApplicants === "function") {
-            fetchApplicants();
-          }
-        }
-      })
-      .catch((err) => console.error("Auto search failed:", err));
-  }, [location.search]);
+    // Do not auto-load/search an applicant on this screen
+    setUserID("");
+  }, []);
 
   const [hasAccess, setHasAccess] = useState(null);
 
@@ -377,12 +348,14 @@ const QualifyingExamScore = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {
@@ -888,37 +861,12 @@ const QualifyingExamScore = () => {
   const [applicants, setApplicants] = useState([]);
 
   useEffect(() => {
-    const personIdFromQuery = queryParams.get("person_id");
-
-    // ✅ If specific applicant → fetch single
-    if (personIdFromQuery) {
-      axios
-        .get(`${API_BASE_URL}/api/person_with_applicant/${personIdFromQuery}`)
-        .then((res) => {
-          const fixed = {
-            ...res.data,
-            qualifying_exam_score: res.data.qualifying_exam_score ?? 0,
-            qualifying_interview_score:
-              res.data.qualifying_interview_score ?? 0,
-            final_rating: res.data.final_rating ?? 0,
-            college_approval_status: Number(
-              res.data.college_approval_status ?? 0,
-            ),
-            qualifying_status: res.data.qualifying_status ?? null,
-            interview_status_result: res.data.interview_status_result ?? null,
-          };
-
-          setPersons([fixed]); // ✅ correct
-        })
-        .catch((err) => {
-          console.error("❌ Error fetching single applicant:", err);
-          setPersons([]);
-        });
-    } else {
-      // ✅ USE YOUR EXISTING FUNCTION (IMPORTANT)
-      fetchApplicants();
+    if (location.search.includes("person_id")) {
+      navigate("/college_qualifying_interview_score", { replace: true });
+      return;
     }
-  }, [queryPersonId]);
+    fetchApplicants();
+  }, [location.search]);
 
   const handleStatusChange = async (applicantId, newStatus) => {
     const nextStatus = Number(newStatus);

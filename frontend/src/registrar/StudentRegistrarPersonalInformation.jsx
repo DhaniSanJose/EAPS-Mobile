@@ -244,12 +244,14 @@ const ReadmissionDashboard1 = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {
@@ -313,7 +315,12 @@ const ReadmissionDashboard1 = () => {
       return;
     }
 
-    // ⭐ CASE 3: No URL ID and no last selected → start blank
+    if (storedRole === "applicant") {
+      setUserID(loggedInPersonId);
+      return;
+    }
+
+    // ⭐ CASE 3: Staff with no URL ID → start blank
     setUserID("");
   }, [queryPersonId]);
 

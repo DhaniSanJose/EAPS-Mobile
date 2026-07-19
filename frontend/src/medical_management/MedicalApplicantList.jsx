@@ -117,10 +117,18 @@ const MedicalStudentList = () => {
   const queryPersonId = (queryParams.get("person_id") || "").trim();
 
   const handleRowClick = (person) => {
-    if (!person) return;
+    if (!person?.person_id && !person?.student_number) return;
 
-    sessionStorage.setItem("edit_person_id", person.person_id || "");
-    sessionStorage.setItem("edit_student_number", person.student_number || "");
+    if (person.person_id) {
+      sessionStorage.setItem("admin_edit_person_id", String(person.person_id));
+      sessionStorage.setItem("edit_person_id", String(person.person_id));
+      sessionStorage.setItem("admin_edit_person_id_source", "medical_student_list");
+      sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
+      sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+    }
+    if (person.student_number) {
+      sessionStorage.setItem("edit_student_number", String(person.student_number));
+    }
 
     navigate(
       person.person_id
@@ -130,96 +138,6 @@ const MedicalStudentList = () => {
   };
 
   const [userID, setUserID] = useState("");
-  useEffect(() => {
-    const storedUser = localStorage.getItem("email");
-    const storedRole = localStorage.getItem("role");
-    const loggedInPersonId = localStorage.getItem("person_id");
-
-    if (!storedUser || !storedRole || !loggedInPersonId) {
-      window.location.href = "/login";
-      return;
-    }
-
-    setUser(storedUser);
-    setUserRole(storedRole);
-
-    const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (!allowedRoles.includes(storedRole)) {
-      window.location.href = "/login";
-      return;
-    }
-
-    const lastSelected = sessionStorage.getItem("admin_edit_person_id");
-
-    // ⭐ CASE 1: URL HAS ?person_id=
-    if (queryPersonId !== "") {
-      sessionStorage.setItem("admin_edit_person_id", queryPersonId);
-      setUserID(queryPersonId);
-      return;
-    }
-
-    // ⭐ CASE 3: No URL ID and no last selected → start blank
-    setUserID("");
-  }, [queryPersonId]);
-
-  useEffect(() => {
-    let consumedFlag = false;
-
-    const tryLoad = async () => {
-      if (queryPersonId) {
-        await fetchByPersonId(queryPersonId);
-        setExplicitSelection(true);
-        consumedFlag = true;
-        return;
-      }
-
-      // fallback only if it's a fresh selection from Applicant List
-      const source = sessionStorage.getItem("admin_edit_person_id_source");
-      const tsStr = sessionStorage.getItem("admin_edit_person_id_ts");
-      const id = sessionStorage.getItem("admin_edit_person_id");
-      const ts = tsStr ? parseInt(tsStr, 10) : 0;
-      const isFresh =
-        source === "medical_student_list" && Date.now() - ts < 5 * 60 * 1000;
-
-      if (id && isFresh) {
-        await fetchByPersonId(id);
-        setExplicitSelection(true);
-        consumedFlag = true;
-      }
-    };
-
-    tryLoad().finally(() => {
-      // consume the freshness so it won't auto-load again later
-      if (consumedFlag) {
-        sessionStorage.removeItem("admin_edit_person_id_source");
-        sessionStorage.removeItem("admin_edit_person_id_ts");
-      }
-    });
-  }, [queryPersonId]);
-
-  // Fetch person by ID (when navigating with ?person_id=... or sessionStorage)
-  useEffect(() => {
-    const fetchPersonById = async () => {
-      if (!userID) return;
-
-      try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/person_with_applicant/${userID}`,
-        );
-        if (res.data) {
-          setPerson(res.data);
-          setSelectedPerson(res.data);
-        } else {
-          console.warn("⚠️ No person found for ID:", userID);
-        }
-      } catch (err) {
-        console.error("❌ Failed to fetch person by ID:", err);
-      }
-    };
-
-    fetchPersonById();
-  }, [userID]);
-
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -242,7 +160,7 @@ const MedicalStudentList = () => {
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const loggedInPersonId = localStorage.getItem("person_id");
-    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
+    const storedEmployeeID = localStorage.getItem("employee_id");
 
     if (!storedUser || !storedRole || !loggedInPersonId) {
       window.location.href = "/login";
@@ -251,39 +169,40 @@ const MedicalStudentList = () => {
 
     setUser(storedUser);
     setUserRole(storedRole);
+    setEmployeeID(storedEmployeeID);
 
     const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (allowedRoles.includes(storedRole)) {
-      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-      sessionStorage.setItem("admin_edit_person_id", targetId);
-      setUserID(targetId);
+    if (!allowedRoles.includes(storedRole)) {
+      window.location.href = "/login";
       return;
     }
 
-    window.location.href = "/login";
-  }, [queryPersonId]);
+    // Staff: visiting the list clears sticky selection so other tabs do not auto-load.
+    // Selection is set only when a row is clicked (handleRowClick).
+    if (storedRole !== "applicant") {
+      sessionStorage.removeItem("edit_person_id");
+      sessionStorage.removeItem("edit_student_number");
+      sessionStorage.removeItem("admin_edit_person_id");
+      sessionStorage.removeItem("admin_edit_person_id_source");
+      sessionStorage.removeItem("admin_edit_person_id_ts");
+      sessionStorage.removeItem("admin_edit_search_query");
+      sessionStorage.removeItem("admin_edit_person_data");
+      sessionStorage.removeItem("student_edit_person_id");
+      setUserID("");
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("email");
-    const storedRole = localStorage.getItem("role");
-    const storedID = localStorage.getItem("person_id");
-    const storedEmployeeID = localStorage.getItem("employee_id");
-
-    if (storedUser && storedRole && storedID) {
-      setUser(storedUser);
-      setUserRole(storedRole);
-      setUserID(storedID);
-      setEmployeeID(storedEmployeeID);
-
-      if (storedRole === "registrar") {
+      if (storedRole === "registrar" && storedEmployeeID) {
         checkAccess(storedEmployeeID);
+      } else if (storedRole === "superadmin") {
+        setHasAccess(true);
       } else {
         window.location.href = "/login";
       }
-    } else {
-      window.location.href = "/login";
+      return;
     }
-  }, []);
+
+    setUserID(loggedInPersonId);
+    setHasAccess(true);
+  }, [queryPersonId]);
 
   const checkAccess = async (employeeID) => {
     try {

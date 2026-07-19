@@ -84,14 +84,28 @@ const MedicalProcessTabs = () => {
 
   const activeStep = getMedicalProcessActiveStep(location.pathname);
 
-  const handleStepClick = (to) => {
-    const pid = sessionStorage.getItem("edit_person_id");
-    const sn = sessionStorage.getItem("edit_student_number");
+  const clearStickyStudentSelection = () => {
+    sessionStorage.removeItem("edit_person_id");
+    sessionStorage.removeItem("edit_student_number");
+    sessionStorage.removeItem("admin_edit_person_id");
+    sessionStorage.removeItem("admin_edit_person_id_source");
+    sessionStorage.removeItem("admin_edit_person_id_ts");
+    sessionStorage.removeItem("admin_edit_search_query");
+    sessionStorage.removeItem("admin_edit_person_data");
+    sessionStorage.removeItem("student_edit_person_id");
+  };
 
+  const handleStepClick = (to) => {
     if (to === "/medical_student_list") {
+      clearStickyStudentSelection();
       navigate(to);
       return;
     }
+
+    const pid =
+      sessionStorage.getItem("admin_edit_person_id") ||
+      sessionStorage.getItem("edit_person_id");
+    const sn = sessionStorage.getItem("edit_student_number");
 
     if (pid) {
       navigate(`${to}?person_id=${pid}`);

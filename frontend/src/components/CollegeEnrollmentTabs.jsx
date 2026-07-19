@@ -91,7 +91,36 @@ const CollegeEnrollmentTabs = () => {
 
   const activeStep = getCollegeEnrollmentActiveStep(location.pathname);
 
+  const ROUTES_WITHOUT_PERSON_ID = new Set([
+    "/college_class_list",
+  ]);
+
+  const clearStickyStudentSelection = () => {
+    sessionStorage.removeItem("edit_person_id");
+    sessionStorage.removeItem("edit_student_number");
+    sessionStorage.removeItem("edit_list_year_id");
+    sessionStorage.removeItem("edit_list_semester_id");
+    sessionStorage.removeItem("admin_edit_person_id");
+    sessionStorage.removeItem("admin_edit_person_id_source");
+    sessionStorage.removeItem("admin_edit_person_id_ts");
+    sessionStorage.removeItem("admin_edit_search_query");
+    sessionStorage.removeItem("admin_edit_person_data");
+    sessionStorage.removeItem("student_edit_person_id");
+  };
+
   const handleStepClick = (to) => {
+    if (to === "/college_student_list") {
+      clearStickyStudentSelection();
+      navigate(to);
+      return;
+    }
+
+    // These screens should always open blank (no sticky student search)
+    if (ROUTES_WITHOUT_PERSON_ID.has(to)) {
+      navigate(to);
+      return;
+    }
+
     const pid = sessionStorage.getItem("edit_person_id");
     const sn = sessionStorage.getItem("edit_student_number");
 

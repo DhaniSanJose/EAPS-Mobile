@@ -197,7 +197,6 @@ const ApplicantListRegistrar = () => {
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const loggedInPersonId = localStorage.getItem("person_id");
-    const searchedPersonId = sessionStorage.getItem("admin_edit_person_id");
 
     if (!storedUser || !storedRole || !loggedInPersonId) {
       window.location.href = "/login";
@@ -208,14 +207,26 @@ const ApplicantListRegistrar = () => {
     setUserRole(storedRole);
 
     const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (allowedRoles.includes(storedRole)) {
-      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
-      sessionStorage.setItem("admin_edit_person_id", targetId);
-      setUserID(targetId);
+    if (!allowedRoles.includes(storedRole)) {
+      window.location.href = "/login";
       return;
     }
 
-    window.location.href = "/login";
+    // Staff: visiting the list clears sticky selection so other tabs do not auto-load.
+    // Selection is set only when a row is clicked (handleRowClick).
+    if (storedRole !== "applicant") {
+      sessionStorage.removeItem("admin_edit_person_id");
+      sessionStorage.removeItem("admin_edit_person_id_source");
+      sessionStorage.removeItem("admin_edit_person_id_ts");
+      sessionStorage.removeItem("admin_edit_search_query");
+      sessionStorage.removeItem("admin_edit_person_data");
+      sessionStorage.removeItem("edit_person_id");
+      sessionStorage.removeItem("edit_applicant_number");
+      setUserID("");
+      return;
+    }
+
+    setUserID(loggedInPersonId);
   }, [queryPersonId]);
 
   const fetchPersonData = async () => {

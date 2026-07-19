@@ -34,6 +34,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import CertificateOfRegistration from "../components/CertificateOfRegistration";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+import { filterSchoolYearsFromActive } from "../utils/schoolYearOptions";
 
 const CORExportingModule = () => {
   useAuditMac();
@@ -213,9 +214,21 @@ const CORExportingModule = () => {
   }, [programs, selectedProgram]);
 
   useEffect(() => {
-    axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
-      .then((res) => setSchoolYears(res.data))
+    Promise.all([
+      axios.get(`${API_BASE_URL}/api/get_school_year/`),
+      axios.get(`${API_BASE_URL}/api/active_school_year`),
+    ])
+      .then(([yearsRes, activeRes]) => {
+        const active =
+          Array.isArray(activeRes.data) && activeRes.data.length > 0
+            ? activeRes.data[0]
+            : null;
+        setSchoolYears(filterSchoolYearsFromActive(yearsRes.data || [], active));
+        if (active) {
+          setYearId(active.year_id);
+          setSemesterId(active.semester_id);
+        }
+      })
       .catch((err) => console.error(err));
   }, []);
 
@@ -224,10 +237,6 @@ const CORExportingModule = () => {
       .get(`${API_BASE_URL}/api/get_school_semester/`)
       .then((res) => setSchoolSemester(res.data))
       .catch((err) => console.error(err));
-  }, []);
-
-  useEffect(() => {
-    fetchActiveSchoolYear();
   }, []);
 
   useEffect(() => {
@@ -295,20 +304,6 @@ const CORExportingModule = () => {
     } catch (err) {
       console.error("❌ Department fetch error:", err);
       setErrorMessage("Failed to load department list");
-    }
-  };
-
-  const fetchActiveSchoolYear = async () => {
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
-
-      if (res.data.length > 0) {
-        const active = res.data[0];
-        setYearId(active.year_id);
-        setSemesterId(active.semester_id);
-      }
-    } catch (err) {
-      console.error(err);
     }
   };
 

@@ -15,6 +15,7 @@ const {
   getStoredNumericGrade,
 } = require("./utils/gradeConversion");
 const {
+  auditRequestStore,
   insertAuditLogAdmission,
   insertAuditLogEnrollment,
 } = require("./utils/auditLogger");
@@ -36,6 +37,10 @@ const { db, db3 } = require("./routes/database/database");
 const { initSocket } = require("./utils/socket");
 const registerSocketHandlers = require("./utils/registerSocketHandlers");
 
+app.use((req, res, next) => {
+  auditRequestStore.run(req, next);
+});
+
 app.use(express.json({ limit: "50mb" }));
 app.use(bodyparser.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -44,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.10:5173",
+  "http://192.168.1.42:5173",
   "http://192.168.1.9:5173",
 ];
 

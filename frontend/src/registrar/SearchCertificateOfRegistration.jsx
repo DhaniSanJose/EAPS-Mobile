@@ -31,6 +31,7 @@ import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 import { postAuditEvent } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import EaristLogo from "../assets/EaristLogo.png";
+import { filterSchoolYearsFromActive } from "../utils/schoolYearOptions";
 
 const cleanAuditValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -155,7 +156,11 @@ const SearchCertificateOfRegistration = () => {
   const REGISTRAR_COR_SEARCH_KEY = "registrar_cor_search_student_number";
 
   const [studentNumber, setStudentNumber] = useState(() => {
-    return sessionStorage.getItem(REGISTRAR_COR_SEARCH_KEY) || localStorage.getItem("studentNumberForCOR") || "";
+    return (
+      sessionStorage.getItem(REGISTRAR_COR_SEARCH_KEY) ||
+      localStorage.getItem("studentNumberForCOR") ||
+      ""
+    );
   });
   const [debouncedStudentNumber, setDebouncedStudentNumber] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -182,24 +187,26 @@ const SearchCertificateOfRegistration = () => {
   };
 
   useEffect(() => {
-    axios
-      .get(`${API_BASE_URL}/api/get_school_year/`)
-      .then((res) => setSchoolYears(res.data || []))
+    Promise.all([
+      axios.get(`${API_BASE_URL}/api/get_school_year/`),
+      axios.get(`${API_BASE_URL}/api/active_school_year`),
+    ])
+      .then(([yearsRes, activeRes]) => {
+        const active =
+          Array.isArray(activeRes.data) && activeRes.data.length > 0
+            ? activeRes.data[0]
+            : null;
+        setSchoolYears(filterSchoolYearsFromActive(yearsRes.data || [], active));
+        if (active) {
+          setSelectedSchoolYear(active.year_id);
+          setSelectedSchoolSemester(active.semester_id);
+        }
+      })
       .catch((err) => console.error(err));
 
     axios
       .get(`${API_BASE_URL}/api/get_school_semester/`)
       .then((res) => setSchoolSemesters(res.data || []))
-      .catch((err) => console.error(err));
-
-    axios
-      .get(`${API_BASE_URL}/api/active_school_year`)
-      .then((res) => {
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          setSelectedSchoolYear(res.data[0].year_id);
-          setSelectedSchoolSemester(res.data[0].semester_id);
-        }
-      })
       .catch((err) => console.error(err));
   }, []);
 

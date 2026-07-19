@@ -114,9 +114,6 @@ const AssignScheduleToApplicants = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const queryParams = new URLSearchParams(location.search);
-  const queryPersonId = queryParams.get("person_id")?.trim() || "";
-
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
@@ -136,18 +133,9 @@ const AssignScheduleToApplicants = () => {
       return;
     }
 
-    const lastSelected = sessionStorage.getItem("admin_edit_person_id");
-
-    // ⭐ CASE 1: URL HAS ?person_id=
-    if (queryPersonId !== "") {
-      sessionStorage.setItem("admin_edit_person_id", queryPersonId);
-      setUserID(queryPersonId);
-      return;
-    }
-
-    // ⭐ CASE 3: No URL ID and no last selected → start blank
+    // Do not auto-load/search an applicant on this screen
     setUserID("");
-  }, [queryPersonId]);
+  }, []);
 
   const [applicants, setApplicants] = useState([]);
   const [selectedSchedule, setSelectedSchedule] = useState("");

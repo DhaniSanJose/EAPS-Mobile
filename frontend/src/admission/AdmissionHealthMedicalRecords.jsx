@@ -238,12 +238,14 @@ const AdminDashboard4 = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
-      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
+      if (storedRole === "applicant") {
+        setUserID(storedID);
+      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else {
+      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
         window.location.href = "/login";
       }
     } else {
@@ -281,21 +283,35 @@ const AdminDashboard4 = () => {
     setUser(storedUser);
     setUserRole(storedRole);
 
-    // Roles that can access
     const allowedRoles = ["registrar", "applicant", "superadmin"];
-    if (allowedRoles.includes(storedRole)) {
-      // ✅ Always take URL param first
-      const targetId = queryPersonId || searchedPersonId || loggedInPersonId;
+    if (!allowedRoles.includes(storedRole)) {
+      window.location.href = "/login";
+      return;
+    }
 
-      // Save it so other pages (ECAT, forms) can use it
+    if (storedRole === "applicant") {
+      const targetId = queryPersonId || loggedInPersonId;
       sessionStorage.setItem("admin_edit_person_id", targetId);
-
       setUserID(targetId);
       fetchPersonData(targetId);
       return;
     }
 
-    window.location.href = "/login";
+    // Staff: never fall back to the logged-in user's person_id
+    if (queryPersonId) {
+      sessionStorage.setItem("admin_edit_person_id", queryPersonId);
+      setUserID(queryPersonId);
+      fetchPersonData(queryPersonId);
+      return;
+    }
+
+    if (searchedPersonId) {
+      setUserID(searchedPersonId);
+      fetchPersonData(searchedPersonId);
+      return;
+    }
+
+    setUserID("");
   }, [queryPersonId]);
 
   useEffect(() => {
@@ -314,7 +330,9 @@ const AdminDashboard4 = () => {
       const tsStr = sessionStorage.getItem("admin_edit_person_id_ts");
       const id = sessionStorage.getItem("admin_edit_person_id");
       const ts = tsStr ? parseInt(tsStr, 10) : 0;
-      const isFresh = source === "applicant_list" && Date.now() - ts < 5 * 60 * 1000;
+      const isFresh =
+        ["applicant_list", "admission_applicant_list"].includes(source) &&
+        Date.now() - ts < 5 * 60 * 1000;
 
       if (id && isFresh) {
         await fetchByPersonId(id);

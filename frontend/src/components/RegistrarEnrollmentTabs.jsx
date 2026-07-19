@@ -84,21 +84,38 @@ const RegistrarEnrollmentTabs = () => {
 
   const activeStep = getRegistrarEnrollmentActiveStep(location.pathname);
 
-  const handleStepClick = (to) => {
-    const pid = sessionStorage.getItem("edit_person_id");
-    const sn = sessionStorage.getItem("edit_student_number");
+  const ROUTES_WITHOUT_PERSON_ID = new Set([
+    "/report_of_grades",
+    "/transcript_of_records",
+  ]);
 
-    if (
-      to === "/registrar_student_list" ||
-      to === "/registrar_search_certificate_of_registration"
-    ) {
-      if (to === "/registrar_search_certificate_of_registration" && sn) {
-        navigate(`${to}?student_number=${sn}`);
-        return;
-      }
+  const clearStickyStudentSelection = () => {
+    sessionStorage.removeItem("edit_person_id");
+    sessionStorage.removeItem("edit_student_number");
+    sessionStorage.removeItem("admin_edit_person_id");
+    sessionStorage.removeItem("admin_edit_person_id_source");
+    sessionStorage.removeItem("admin_edit_person_id_ts");
+    sessionStorage.removeItem("admin_edit_search_query");
+    sessionStorage.removeItem("admin_edit_person_data");
+    sessionStorage.removeItem("student_edit_person_id");
+    sessionStorage.removeItem("registrar_cor_search_student_number");
+  };
+
+  const handleStepClick = (to) => {
+    if (to === "/registrar_student_list") {
+      clearStickyStudentSelection();
       navigate(to);
       return;
     }
+
+    // These screens should always open blank (no sticky student search)
+    if (ROUTES_WITHOUT_PERSON_ID.has(to)) {
+      navigate(to);
+      return;
+    }
+
+    const pid = sessionStorage.getItem("edit_person_id");
+    const sn = sessionStorage.getItem("edit_student_number");
 
     if (pid) {
       navigate(`${to}?person_id=${pid}`);
