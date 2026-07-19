@@ -1550,12 +1550,30 @@ app.get("/api/list_of_students", async (req, res) => {
 });
 
 app.get("/api/list_of_students/details", async (req, res) => {
-  const { departmentId, dprtmnt_id, yearId, semesterId, page: pageRaw, limit: limitRaw } =
-    req.query;
-  const selectedDepartmentId = departmentId || dprtmnt_id;
+  const {
+    departmentId,
+    dprtmnt_id,
+    departmentIds: departmentIdsRaw,
+    yearId,
+    semesterId,
+    search: searchRaw,
+    campus,
+    programCode,
+    major,
+    page: pageRaw,
+    limit: limitRaw,
+  } = req.query;
 
-  if (!selectedDepartmentId) {
-    return res.status(400).json({ message: "Department ID is required" });
+  const selectedDepartmentId = departmentId || dprtmnt_id;
+  const departmentIds = String(departmentIdsRaw || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (!selectedDepartmentId && departmentIds.length === 0) {
+    return res.status(400).json({
+      message: "Department ID or departmentIds is required",
+    });
   }
 
   if (!yearId || !semesterId) {
@@ -1572,6 +1590,17 @@ app.get("/api/list_of_students/details", async (req, res) => {
     Math.max(1, parseInt(limitRaw, 10) || DEFAULT_LIMIT),
   );
   const offset = (page - 1) * limit;
+  const search = String(searchRaw || "").trim();
+  const campusFilter = String(campus || "").trim();
+  const programCodeFilter = String(programCode || "").trim();
+  const majorFilter = String(major || "").trim();
+
+  const deptPlaceholders = selectedDepartmentId
+    ? "?"
+    : departmentIds.map(() => "?").join(", ");
+  const deptParams = selectedDepartmentId
+    ? [selectedDepartmentId]
+    : departmentIds;
 
   const baseFromSql = `
       FROM (
@@ -1585,7 +1614,7 @@ app.get("/api/list_of_students/details", async (req, res) => {
           ON es.curriculum_id = dct.curriculum_id
         INNER JOIN active_school_year_table asyt_filter
           ON es.active_school_year_id = asyt_filter.id
-        WHERE dct.dprtmnt_id = ?
+        WHERE dct.dprtmnt_id IN (${deptPlaceholders})
           AND asyt_filter.year_id = ?
           AND asyt_filter.semester_id = ?
         GROUP BY es.student_number, es.active_school_year_id
@@ -1600,7 +1629,7 @@ app.get("/api/list_of_students/details", async (req, res) => {
         ON ct.program_id = pgt.program_id
       INNER JOIN dprtmnt_curriculum_table dct
         ON es.curriculum_id = dct.curriculum_id
-       AND dct.dprtmnt_id = ?
+       AND dct.dprtmnt_id IN (${deptPlaceholders})
       INNER JOIN dprtmnt_table dpt
         ON dct.dprtmnt_id = dpt.dprtmnt_id
       INNER JOIN student_status_table sst
@@ -1616,15 +1645,53 @@ app.get("/api/list_of_students/details", async (req, res) => {
         ON asyt.semester_id = smt.semester_id
   `;
 
-  const filterParams = [selectedDepartmentId, yearId, semesterId, selectedDepartmentId];
+  const whereParts = [];
+  const filterParams = [
+    ...deptParams,
+    yearId,
+    semesterId,
+    ...deptParams,
+  ];
+
+  if (search) {
+    whereParts.push(`(
+      CAST(snt.student_number AS CHAR) LIKE ?
+      OR pt.first_name LIKE ?
+      OR pt.middle_name LIKE ?
+      OR pt.last_name LIKE ?
+      OR CONCAT_WS(' ', pt.first_name, pt.middle_name, pt.last_name) LIKE ?
+      OR pgt.program_description LIKE ?
+      OR dpt.dprtmnt_code LIKE ?
+    )`);
+    const like = `%${search}%`;
+    filterParams.push(like, like, like, like, like, like, like);
+  }
+
+  if (campusFilter) {
+    whereParts.push(`CAST(pt.campus AS CHAR) = ?`);
+    filterParams.push(campusFilter);
+  }
+
+  if (programCodeFilter) {
+    whereParts.push(`pgt.program_code = ?`);
+    filterParams.push(programCodeFilter);
+    if (majorFilter) {
+      whereParts.push(`IFNULL(pgt.major, '') = ?`);
+      filterParams.push(majorFilter);
+    } else {
+      whereParts.push(`(pgt.major IS NULL OR pgt.major = '')`);
+    }
+  }
+
+  const whereSql = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
 
   try {
     const [countRows] = await db3.query(
-      `SELECT COUNT(*) AS total ${baseFromSql}`,
+      `SELECT COUNT(*) AS total ${baseFromSql}${whereSql}`,
       filterParams,
     );
     const total = Number(countRows[0]?.total || 0);
-    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const totalPages = Math.max(1, Math.ceil(total / limit) || 1);
 
     const [rows] = await db3.query(
       `
@@ -1657,7 +1724,7 @@ app.get("/api/list_of_students/details", async (req, res) => {
         es.en_remarks AS en_remarks,
         es.en_remarks AS remark_summary,
         ylt.year_level_description
-      ${baseFromSql}
+      ${baseFromSql}${whereSql}
       ORDER BY asyt.year_id ASC, asyt.semester_id ASC, snt.student_number ASC
       LIMIT ? OFFSET ?
       `,

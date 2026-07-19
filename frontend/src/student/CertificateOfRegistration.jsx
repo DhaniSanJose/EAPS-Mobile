@@ -699,8 +699,25 @@ const CertificateOfRegistration = forwardRef(
       const num = Number(value);
       return Number.isFinite(num) ? Math.round(num) : 0;
     };
-    const subjectCellContentOffset = {
-      transform: "translateY(-5px)",
+    // Keep subject cells transform-free so html2canvas / PDF capture stays vertically centered
+    const subjectCellContentStyle = {
+      width: "100%",
+      height: "26px",
+      lineHeight: "26px",
+      border: "none",
+      background: "none",
+      padding: "0 3px",
+      margin: 0,
+      boxSizing: "border-box",
+      verticalAlign: "middle",
+      display: "block",
+    };
+    const subjectCellTdStyle = {
+      borderRight: "1px solid black",
+      borderBottom: "1px solid black",
+      verticalAlign: "middle",
+      height: "28px",
+      padding: 0,
     };
 
     const totalCourseUnits = enrolled.reduce(
@@ -885,12 +902,29 @@ const CertificateOfRegistration = forwardRef(
       display: inline-block;
     }
 
-    .cor-content-offset,
-    .cor-subject-header-row td > div,
+    .cor-subject-header-row td > div {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      margin: 0;
+      transform: none;
+    }
+
     .cor-subject-subheader-row .cor-content-offset,
     .cor-subject-total-row .cor-content-offset {
-      transform: translateY(-5px);
       display: inline-block;
+      transform: none;
+      line-height: 1.2;
+      vertical-align: middle;
+    }
+
+    .cor-subject-data-row td {
+      vertical-align: middle !important;
+    }
+
+    .cor-subject-data-row input {
+      transform: none !important;
     }
 
     .cor-lower-extra input,
@@ -2197,70 +2231,33 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                     </tr>
                     {enrolled.map((item, index) => (
-                      <tr key={index}>
-                        <td
-                          colSpan={5.5}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                            verticalAlign: "middle",
-                            padding: 0,
-                          }}
-                        >
-                          <div
+                      <tr key={index} className="cor-subject-data-row">
+                        <td colSpan={5.5} style={subjectCellTdStyle}>
+                          <input
+                            type="text"
+                            value={item.course_code || ""}
+                            readOnly
                             style={{
-                              width: "100%",
-                              minHeight: "22px",
-                              boxSizing: "border-box",
-                              color: "black",
+                              ...subjectCellContentStyle,
                               textAlign: "center",
-                              padding: "2px 3px",
                               fontSize: "12px",
-                              lineHeight: "1.15",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
                             }}
-                          >
-                            <span style={{ marginTop: "-13px" }}>{item.course_code || ""}</span>
-                          </div>
+                          />
                         </td>
-                        <td
-                          colSpan={11}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                            verticalAlign: "middle",
-                            padding: 0,
-                          }}
-                        >
-                          <div
+                        <td colSpan={11} style={subjectCellTdStyle}>
+                          <input
+                            type="text"
+                            value={item.course_description || ""}
+                            readOnly
                             style={{
-                              width: "100%",
-                              minHeight: "22px",
-                              boxSizing: "border-box",
-                              color: "black",
+                              ...subjectCellContentStyle,
                               textAlign: "left",
-                              padding: "2px 5px",
                               fontSize: "11px",
-                              lineHeight: "1.15",
-                              whiteSpace: "normal",
-                              overflowWrap: "break-word",
-                              wordBreak: "normal",
-                              display: "flex",
-                              alignItems: "center",
+                              padding: "0 5px",
                             }}
-                          >
-                            <span style={{ marginTop: "-13px" }}>{item.course_description || ""}</span>
-                          </div>
+                          />
                         </td>
-                        <td
-                          colSpan={1}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                          }}
-                        >
+                        <td colSpan={1} style={subjectCellTdStyle}>
                           <input
                             type="text"
                             value={
@@ -2270,22 +2267,13 @@ const CertificateOfRegistration = forwardRef(
                             }
                             readOnly
                             style={{
-                              ...subjectCellContentOffset,
-                              width: "98%",
-                              border: "none",
-                              background: "none",
+                              ...subjectCellContentStyle,
                               textAlign: "center",
                               fontSize: "12px",
                             }}
                           />
                         </td>
-                        <td
-                          colSpan={1}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                          }}
-                        >
+                        <td colSpan={1} style={subjectCellTdStyle}>
                           <input
                             type="text"
                             value={
@@ -2295,143 +2283,74 @@ const CertificateOfRegistration = forwardRef(
                             }
                             readOnly
                             style={{
-                              ...subjectCellContentOffset,
-                              width: "98%",
-                              border: "none",
-                              background: "none",
+                              ...subjectCellContentStyle,
                               textAlign: "center",
                               fontSize: "12px",
                             }}
                           />
                         </td>
-                        <td
-                          colSpan={2}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                          }}
-                        >
+                        <td colSpan={2} style={subjectCellTdStyle}>
                           <input
                             type="text"
                             value={
                               toWholeUnit(item.course_unit) +
                               toWholeUnit(item.lab_unit)
                             }
+                            readOnly
                             style={{
-                              ...subjectCellContentOffset,
-                              width: "98%",
-                              border: "none",
-                              background: "none",
+                              ...subjectCellContentStyle,
                               textAlign: "center",
                               fontSize: "12px",
                             }}
-                            readOnly
                           />
                         </td>
-
-                        <td
-                          colSpan={2}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                          }}
-                        >
+                        <td colSpan={2} style={subjectCellTdStyle}>
                           <input
                             type="text"
                             value={
                               toWholeUnit(item.course_unit) +
                               toWholeUnit(item.lab_unit)
                             }
+                            readOnly
                             style={{
-                              ...subjectCellContentOffset,
-                              width: "98%",
-                              border: "none",
-                              background: "none",
+                              ...subjectCellContentStyle,
                               textAlign: "center",
                               fontSize: "12px",
                             }}
-                            readOnly
                           />
                         </td>
-                        <td
-                          colSpan={4}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                            verticalAlign: "middle",
-                            padding: 0,
-                          }}
-                        >
-                          <div
+                        <td colSpan={4} style={subjectCellTdStyle}>
+                          <input
+                            type="text"
+                            value={item.description || ""}
+                            readOnly
                             style={{
-                              width: "100%",
-                              minHeight: "22px",
-                              boxSizing: "border-box",
-                              color: "black",
+                              ...subjectCellContentStyle,
                               textAlign: "center",
-                              padding: "2px 3px",
                               fontSize: "10px",
-                              lineHeight: "1.15",
-                              whiteSpace: "normal",
-                              overflowWrap: "break-word",
-                              wordBreak: "normal",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
                             }}
-                          >
-                            <span>{item.description || ""}</span>
-                          </div>
+                          />
                         </td>
-                        <td
-                          colSpan={8}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                            verticalAlign: "middle",
-                            padding: 0,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "100%",
-                              minHeight: "22px",
-                              boxSizing: "border-box",
-                              color: "black",
-                              textAlign: "center",
-                              padding: "2px 4px",
-                              fontSize: "8px",
-                              lineHeight: "1.15",
-                              whiteSpace: "normal",
-                              overflowWrap: "break-word",
-                              wordBreak: "normal",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <span>
-                              {`${item.day_description || ""} ${item.school_time_start || ""
-                                }-${item.school_time_end || ""}`.trim()}
-                            </span>
-                          </div>
-                        </td>
-                        <td
-                          colSpan={8}
-                          style={{
-                            borderRight: "1px solid black",
-                            borderBottom: "1px solid black",
-                          }}
-                        >
+                        <td colSpan={8} style={subjectCellTdStyle}>
                           <input
                             type="text"
-                            value={`Prof. ${item.lname}`}
+                            value={`${item.day_description || ""} ${item.school_time_start || ""
+                              }-${item.school_time_end || ""}`.trim()}
                             readOnly
                             style={{
-                              ...subjectCellContentOffset,
-                              width: "98%",
-                              border: "none",
-                              background: "none",
+                              ...subjectCellContentStyle,
+                              textAlign: "center",
+                              fontSize: "8px",
+                            }}
+                          />
+                        </td>
+                        <td colSpan={8} style={subjectCellTdStyle}>
+                          <input
+                            type="text"
+                            value={`Prof. ${item.lname || "TBA"}`}
+                            readOnly
+                            style={{
+                              ...subjectCellContentStyle,
                               textAlign: "center",
                               fontSize: "8px",
                             }}
@@ -2446,10 +2365,12 @@ const CertificateOfRegistration = forwardRef(
                       <td
                         colSpan={10}
                         style={{
-                          height: "0.1in",
+                          height: "0.22in",
                           fontSize: "45%",
                           color: "black",
                           textAlign: "left",
+                          verticalAlign: "middle",
+                          padding: "0 4px",
                         }}
                       >
                         <span className="cor-content-offset">
@@ -2459,9 +2380,11 @@ const CertificateOfRegistration = forwardRef(
                       <td
                         colSpan={6}
                         style={{
+                          height: "0.22in",
                           fontSize: "50%",
                           color: "black",
-                          textAlign: "CENTER",
+                          textAlign: "center",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span className="cor-content-offset">
@@ -2471,10 +2394,12 @@ const CertificateOfRegistration = forwardRef(
                       <td
                         colSpan={1}
                         style={{
+                          height: "0.22in",
                           fontSize: "12px",
                           color: "black",
                           fontFamily: "Arial",
                           textAlign: "center",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span className="cor-content-offset">
@@ -2484,10 +2409,12 @@ const CertificateOfRegistration = forwardRef(
                       <td
                         colSpan={1}
                         style={{
+                          height: "0.22in",
                           fontSize: "12px",
                           color: "black",
                           fontFamily: "Arial",
                           textAlign: "center",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span className="cor-content-offset">
@@ -2497,10 +2424,12 @@ const CertificateOfRegistration = forwardRef(
                       <td
                         colSpan={2}
                         style={{
+                          height: "0.22in",
                           fontSize: "12px",
                           color: "black",
                           fontFamily: "Arial",
                           textAlign: "center",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span className="cor-content-offset">
@@ -2510,10 +2439,12 @@ const CertificateOfRegistration = forwardRef(
                       <td
                         colSpan={2}
                         style={{
+                          height: "0.22in",
                           fontSize: "12px",
                           color: "black",
                           fontFamily: "Arial",
                           textAlign: "center",
+                          verticalAlign: "middle",
                         }}
                       >
                         <span className="cor-content-offset">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { SettingsContext } from "../App";
 import axios from 'axios';
 import {
@@ -141,6 +141,18 @@ const StudentListForEnrollment = () => {
         if (!person) return;
         sessionStorage.setItem("edit_person_id", person.person_id || "");
         sessionStorage.setItem("edit_student_number", person.student_number || "");
+        // Remember which list term this student was selected under so Report of Grades /
+        // COR can skip auto-search when it is not the active school year/semester.
+        if (selectedSchoolYear) {
+            sessionStorage.setItem("edit_list_year_id", String(selectedSchoolYear));
+        } else {
+            sessionStorage.removeItem("edit_list_year_id");
+        }
+        if (selectedSchoolSemester) {
+            sessionStorage.setItem("edit_list_semester_id", String(selectedSchoolSemester));
+        } else {
+            sessionStorage.removeItem("edit_list_semester_id");
+        }
         if (person.person_id) {
             sessionStorage.setItem("admin_edit_person_id", String(person.person_id));
             sessionStorage.setItem("admin_edit_person_id_source", "registrar_student_list");
@@ -233,6 +245,8 @@ const StudentListForEnrollment = () => {
         if (storedRole !== "applicant") {
             sessionStorage.removeItem("edit_person_id");
             sessionStorage.removeItem("edit_student_number");
+            sessionStorage.removeItem("edit_list_year_id");
+            sessionStorage.removeItem("edit_list_semester_id");
             sessionStorage.removeItem("admin_edit_person_id");
             sessionStorage.removeItem("admin_edit_person_id_source");
             sessionStorage.removeItem("admin_edit_person_id_ts");
@@ -317,55 +331,89 @@ const StudentListForEnrollment = () => {
     const [selectedSchoolSemester, setSelectedSchoolSemester] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(100);
     const [activeTermReady, setActiveTermReady] = useState(false);
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+    const [serverTotal, setServerTotal] = useState(0);
+    const [serverTotalPages, setServerTotalPages] = useState(1);
     const studentsFetchIdRef = useRef(0);
     const studentsAbortRef = useRef(null);
 
     const MAX_LIMIT = 500; // matches backend's MAX_LIMIT clamp
 
-    const fetchDepartmentStudents = async (departmentId, yearId, semesterId, signal) => {
-        let page = 1;
-        let allRows = [];
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery.trim());
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
-        // Backend still paginates per department, so page through it fully
-        // here — the client only sees "give me everyone", pagination for
-        // display happens later in filteredPersons.
-        while (true) {
-            const params = new URLSearchParams({
-                departmentId: String(departmentId),
-                yearId: String(yearId),
-                semesterId: String(semesterId),
-                page: String(page),
-                limit: String(MAX_LIMIT),
-            });
+    const selectedProgramOption = useMemo(
+        () =>
+            curriculumOptions.find(
+                (opt) => String(opt.curriculum_id) === String(selectedProgramFilter),
+            ),
+        [curriculumOptions, selectedProgramFilter],
+    );
 
-            const listRes = await fetch(
-                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
-                { signal },
-            );
+    const buildStudentListParams = ({
+        departmentId = selectedDepartmentFilter,
+        yearId = selectedSchoolYear,
+        semesterId = selectedSchoolSemester,
+        page = currentPage,
+        limit = itemsPerPage,
+        search = debouncedSearchQuery,
+        campus = person.campus,
+        programOption = selectedProgramOption,
+    } = {}) => {
+        const params = new URLSearchParams({
+            yearId: String(yearId),
+            semesterId: String(semesterId),
+            page: String(page),
+            limit: String(limit),
+        });
 
-            if (!listRes.ok) {
-                throw new Error(`Failed to fetch students for department ${departmentId}`);
+        if (departmentId) {
+            params.set("departmentId", String(departmentId));
+        } else {
+            const deptIds = department.map((d) => d.dprtmnt_id).filter(Boolean);
+            if (deptIds.length) {
+                params.set("departmentIds", deptIds.join(","));
             }
-
-            const payload = await listRes.json();
-            const rows = Array.isArray(payload) ? payload : (payload.data || []);
-            allRows = allRows.concat(rows);
-
-            const totalPages = Math.max(1, Number(payload.totalPages ?? 1));
-            if (page >= totalPages) break;
-            page += 1;
         }
 
-        return allRows;
+        if (search) params.set("search", search);
+        if (campus) params.set("campus", String(campus));
+        if (programOption?.program_code) {
+            params.set("programCode", String(programOption.program_code));
+            params.set("major", String(programOption.major || ""));
+        }
+
+        return params;
     };
 
     const fetchStudents = async ({
         departmentId = selectedDepartmentFilter,
         yearId = selectedSchoolYear,
         semesterId = selectedSchoolSemester,
+        page = currentPage,
+        limit = itemsPerPage,
+        search = debouncedSearchQuery,
+        campus = person.campus,
+        programOption = selectedProgramOption,
     } = {}) => {
         if (!yearId || !semesterId) {
             setPersons([]);
+            setServerTotal(0);
+            setServerTotalPages(1);
+            return;
+        }
+
+        const deptIds = departmentId
+            ? [departmentId]
+            : department.map((d) => d.dprtmnt_id).filter(Boolean);
+        if (!deptIds.length) {
+            setPersons([]);
+            setServerTotal(0);
+            setServerTotalPages(1);
             return;
         }
 
@@ -379,47 +427,88 @@ const StudentListForEnrollment = () => {
         try {
             setStudentsLoading(true);
 
-            let rows = [];
-            if (departmentId) {
-                // Specific department picked — one department's worth of calls.
-                rows = await fetchDepartmentStudents(
-                    departmentId,
-                    yearId,
-                    semesterId,
-                    controller.signal,
-                );
-            } else {
-                // "All Departments" — fetch every visible department and merge.
-                // ⚠️ This means N department calls (each possibly multi-page)
-                // instead of 1. Fine for a handful of departments; if your
-                // school has dozens of departments and this feels slow, say so
-                // and I'll add a loading-per-department indicator or look at
-                // batching differently.
-                const deptIds = department.map((d) => d.dprtmnt_id).filter(Boolean);
-                if (!deptIds.length) {
-                    setPersons([]);
-                    return;
-                }
-                const results = await Promise.all(
-                    deptIds.map((id) =>
-                        fetchDepartmentStudents(id, yearId, semesterId, controller.signal),
-                    ),
-                );
-                rows = results.flat();
+            const params = buildStudentListParams({
+                departmentId,
+                yearId,
+                semesterId,
+                page,
+                limit,
+                search,
+                campus,
+                programOption,
+            });
+
+            const listRes = await fetch(
+                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
+                { signal: controller.signal },
+            );
+
+            if (!listRes.ok) {
+                throw new Error("Failed to fetch student list");
             }
 
+            const payload = await listRes.json();
+            const rows = Array.isArray(payload) ? payload : (payload.data || []);
+
             if (fetchId !== studentsFetchIdRef.current) return;
-            setPersons(rows.map((student) => ({ ...student, documents: [] })));
+
+            // Keep a light client-side scope guard for registrar program locks.
+            const scopedRows = rows.filter((student) =>
+                isRegistrarStudentScopeMatch(student, allCurriculums),
+            );
+
+            setPersons(scopedRows.map((student) => ({ ...student, documents: [] })));
+            setServerTotal(Number(payload.total ?? scopedRows.length) || 0);
+            setServerTotalPages(
+                Math.max(1, Number(payload.totalPages ?? 1) || 1),
+            );
         } catch (err) {
             if (err?.name === "AbortError") return;
             console.error("Error fetching students:", err);
             if (fetchId !== studentsFetchIdRef.current) return;
             setPersons([]);
+            setServerTotal(0);
+            setServerTotalPages(1);
         } finally {
             if (fetchId === studentsFetchIdRef.current) {
                 setStudentsLoading(false);
             }
         }
+    };
+
+    const fetchAllStudentsForExport = async () => {
+        if (!selectedSchoolYear || !selectedSchoolSemester) return [];
+
+        const deptIds = selectedDepartmentFilter
+            ? [selectedDepartmentFilter]
+            : department.map((d) => d.dprtmnt_id).filter(Boolean);
+        if (!deptIds.length) return [];
+
+        let page = 1;
+        let allRows = [];
+        let totalPages = 1;
+
+        while (page <= totalPages) {
+            const params = buildStudentListParams({
+                page,
+                limit: MAX_LIMIT,
+            });
+            const listRes = await fetch(
+                `${API_BASE_URL}/api/list_of_students/details?${params.toString()}`,
+            );
+            if (!listRes.ok) throw new Error("Failed to fetch students for export");
+            const payload = await listRes.json();
+            const rows = Array.isArray(payload) ? payload : (payload.data || []);
+            allRows = allRows.concat(
+                rows.filter((student) =>
+                    isRegistrarStudentScopeMatch(student, allCurriculums),
+                ),
+            );
+            totalPages = Math.max(1, Number(payload.totalPages ?? 1) || 1);
+            page += 1;
+        }
+
+        return allRows;
     };
 
     useEffect(() => {
@@ -463,12 +552,11 @@ const StudentListForEnrollment = () => {
             .catch((err) => console.error(err));
     }, []);
 
-    // ✅ Only re-fetches when the school year/semester changes. Department
-    // and Program no longer trigger a re-fetch — they're applied client-side
-    // in filteredPersons, so switching departments/programs is instant.
+    // Server-paginated fetch: one page at a time (search is debounced).
     useEffect(() => {
         if (!activeTermReady) return;
-        if (!department.length) return; // wait for the department list to load first
+        if (!department.length) return;
+
         fetchStudents();
 
         return () => {
@@ -476,7 +564,20 @@ const StudentListForEnrollment = () => {
                 studentsAbortRef.current.abort();
             }
         };
-    }, [activeTermReady, department, selectedDepartmentFilter, selectedSchoolYear, selectedSchoolSemester]);
+    }, [
+        activeTermReady,
+        department,
+        selectedDepartmentFilter,
+        selectedSchoolYear,
+        selectedSchoolSemester,
+        selectedProgramFilter,
+        selectedProgramOption,
+        debouncedSearchQuery,
+        person.campus,
+        currentPage,
+        itemsPerPage,
+        allCurriculums,
+    ]);
 
     const handleSchoolYearChange = (event) => {
         setSelectedSchoolYear(event.target.value);
@@ -501,80 +602,23 @@ const StudentListForEnrollment = () => {
 
     const normalize = (s) => (s ?? "").toString().trim().toLowerCase();
 
-    // ✅ The selected Program option's program_code+major (not its raw
-    // curriculum_id). This is what filtering actually matches against below,
-    // so a student is included as long as they belong to the same program/
-    // major — regardless of which specific curriculum_id revision their row
-    // happens to carry.
-    const selectedProgramOption = curriculumOptions.find(
-        (opt) => String(opt.curriculum_id) === String(selectedProgramFilter),
-    );
-
-    const filteredPersons = persons
-        .filter((personData) => {
-            const fullText = `
-            ${personData.first_name}
-            ${personData.middle_name}
-            ${personData.last_name}
-            ${personData.student_number}
-            ${personData.program_description}
-            ${personData.dprtmnt_code}
-            `.toLowerCase();
-            const matchesSearch = fullText.includes(searchQuery.toLowerCase());
-
-            const matchesCampus =
-                !person.campus || personData.campus === person.campus;
-
-            const programInfo = allCurriculums.find(
-                (opt) => opt.curriculum_id?.toString() === personData.curriculum_id?.toString()
-            );
-            const matchesRegistrarScope = isRegistrarStudentScopeMatch(
-                personData,
-                allCurriculums
-            );
-
-            // ✅ FIX: match by program_code + major instead of curriculum_id.
-            // Previously this compared personData's curriculum_id directly to
-            // selectedProgramFilter, so students whose row used a *different*
-            // curriculum_id for the same program (see dedupe comment above)
-            // were silently excluded — that was the "filtering doesn't work"
-            // bug. Now it resolves both sides to program_code+major and
-            // compares those.
-            const matchesProgram =
-                selectedProgramFilter === "" ||
-                (selectedProgramOption
-                    ? programInfo
-                        ? programKey(programInfo) === programKey(selectedProgramOption)
-                        : false
-                    : String(personData.program ?? personData.curriculum_id ?? "") === String(selectedProgramFilter));
-
-            const matchesDepartment =
-                !selectedDepartmentFilter ||
-                String(personData.dprtmnt_id ?? "") === String(selectedDepartmentFilter);
-
-            return (
-                matchesSearch &&
-                matchesCampus &&
-                matchesRegistrarScope &&
-                matchesProgram &&
-                matchesDepartment
-            );
-        })
-        .sort((a, b) => {
-            let fieldA, fieldB;
-            if (sortBy === "name") {
-                fieldA = `${a.last_name || ''} ${a.first_name || ''} ${a.middle_name || ''}`.toLowerCase();
-                fieldB = `${b.last_name || ''} ${b.first_name || ''} ${b.middle_name || ''}`.toLowerCase();
-            } else if (sortBy === "id") {
-                fieldA = a.student_number || "";
-                fieldB = b.student_number || "";
-            } else {
-                return 0;
-            }
-            if (fieldA < fieldB) return sortOrder === "asc" ? -1 : 1;
-            if (fieldA > fieldB) return sortOrder === "asc" ? 1 : -1;
+    // Server already filtered/paginated; keep a light sort for display only.
+    const filteredPersons = [...persons].sort((a, b) => {
+        let fieldA;
+        let fieldB;
+        if (sortBy === "name") {
+            fieldA = `${a.last_name || ""} ${a.first_name || ""} ${a.middle_name || ""}`.toLowerCase();
+            fieldB = `${b.last_name || ""} ${b.first_name || ""} ${b.middle_name || ""}`.toLowerCase();
+        } else if (sortBy === "id") {
+            fieldA = a.student_number || "";
+            fieldB = b.student_number || "";
+        } else {
             return 0;
-        });
+        }
+        if (fieldA < fieldB) return sortOrder === "asc" ? -1 : 1;
+        if (fieldA > fieldB) return sortOrder === "asc" ? 1 : -1;
+        return 0;
+    });
 
     const getRemarkText = (en_remarks) => {
         switch (en_remarks) {
@@ -587,13 +631,10 @@ const StudentListForEnrollment = () => {
         }
     };
 
-    // ✅ Client-side pagination (like Applicant List) since fetchStudents
-    // pulls everything for the term up front.
-    const totalRecords = filteredPersons.length;
-    const totalPages = Math.max(1, Math.ceil(filteredPersons.length / itemsPerPage));
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentPersons = filteredPersons.slice(indexOfFirstItem, indexOfLastItem);
+    const totalRecords = serverTotal;
+    const totalPages = serverTotalPages;
+    const currentPersons = filteredPersons;
+    const indexOfFirstItem = (currentPage - 1) * itemsPerPage;
 
     const maxButtonsToShow = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
@@ -721,7 +762,7 @@ const StudentListForEnrollment = () => {
         if (currentPage > totalPages) {
             setCurrentPage(totalPages || 1);
         }
-    }, [filteredPersons.length, totalPages]);
+    }, [serverTotal, totalPages, currentPage]);
 
     const [openDialog, setOpenDialog] = useState(false);
     const [activePerson, setActivePerson] = useState(null);
@@ -790,6 +831,23 @@ const StudentListForEnrollment = () => {
             ? selectedProgramOption?.program_description || selectedProgramFilter
             : "All Programs";
 
+        let exportRows = [];
+        try {
+            setStudentsLoading(true);
+            exportRows = await fetchAllStudentsForExport();
+        } catch (err) {
+            console.error("Failed to fetch students for export:", err);
+            setSnack({
+                open: true,
+                message: "Failed to load students for PDF export.",
+                severity: "error",
+            });
+            setStudentsLoading(false);
+            return;
+        } finally {
+            setStudentsLoading(false);
+        }
+
         const innerHtml = `
     <div class="print-header">
 
@@ -845,7 +903,7 @@ const StudentListForEnrollment = () => {
           </tr>
         </thead>
         <tbody>
-          ${filteredPersons
+          ${exportRows
                 .map(
                     (p, index) => `
             <tr>
@@ -1216,7 +1274,10 @@ const StudentListForEnrollment = () => {
                             <FormControl size="small" sx={{ width: "350px" }}>
                                 <Select
                                     value={selectedProgramFilter}
-                                    onChange={(e) => setSelectedProgramFilter(e.target.value)}
+                                    onChange={(e) => {
+                                        setSelectedProgramFilter(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
                                     disabled={isProgramLocked}
                                     displayEmpty
                                 >

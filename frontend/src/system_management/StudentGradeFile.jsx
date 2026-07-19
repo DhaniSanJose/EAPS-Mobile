@@ -3,7 +3,8 @@ import React, {
   useEffect,
   useContext,
   useMemo,
-  useDeferredValue,
+  useRef,
+  memo,
 } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
@@ -51,6 +52,103 @@ const bodyStyle = {
   color: "#333",
 };
 
+const GRADE_OPTIONS = [
+  ...Array.from({ length: 41 }, (_, i) => (100 - i).toString()),
+  "INC",
+  "DRP",
+];
+
+const validateGradeInput = (rawValue) => {
+  if (rawValue === null || rawValue === undefined) return "";
+
+  let value = String(rawValue).trim().toUpperCase();
+
+  if (/^INC/.test(value)) return "INC";
+  if (/^DRP|^DROP/.test(value)) return "DRP";
+
+  if (/^[A-Z]+$/.test(value)) return "60";
+  if (!/^\d{1,3}$/.test(value)) return "60";
+
+  let num = Number(value);
+  if (Number.isNaN(num)) return "60";
+
+  if (num > 100) num = 100;
+  if (num < 60) num = 60;
+
+  return String(num);
+};
+
+const GradeSelect = memo(function GradeSelect({
+  value,
+  onChange,
+  placeholder = "",
+}) {
+  const [inputValue, setInputValue] = useState(value ?? "");
+
+  useEffect(() => {
+    setInputValue(value ?? "");
+  }, [value]);
+
+  return (
+    <Autocomplete
+      freeSolo
+      disableClearable
+      options={GRADE_OPTIONS}
+      inputValue={inputValue}
+      value={inputValue}
+      onInputChange={(event, newInputValue, reason) => {
+        if (reason === "input") {
+          setInputValue(newInputValue.toUpperCase());
+        }
+      }}
+      onChange={(event, newValue) => {
+        if (newValue !== null) {
+          const validated = validateGradeInput(newValue);
+          setInputValue(validated);
+          onChange(validated);
+        }
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          placeholder={placeholder}
+          size="small"
+          variant="outlined"
+          onBlur={() => {
+            const validated = validateGradeInput(inputValue);
+            setInputValue(validated);
+            onChange(validated);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const validated = validateGradeInput(inputValue);
+              setInputValue(validated);
+              onChange(validated);
+            }
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              px: 0.5,
+            },
+            "& input": {
+              textAlign: "center",
+              fontWeight: "bold",
+              py: 0.5,
+            },
+          }}
+        />
+      )}
+      sx={{
+        minWidth: 90,
+        "& .MuiAutocomplete-inputRoot": {
+          py: 0,
+        },
+      }}
+    />
+  );
+});
+
 const StudentGradeFile = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
@@ -90,7 +188,7 @@ const StudentGradeFile = () => {
 
   // Selected State
   const [selectedYearLevel, setSelectedYearLevel] = useState(null);
-  const deferredGlobalSearch = useDeferredValue(globalSearch);
+  const studentSearchAbortRef = useRef(null);
 
   // 👤 Auth & Loading
   const [userID, setUserID] = useState("");
@@ -334,31 +432,7 @@ const StudentGradeFile = () => {
     "CERTIFICATE OF COMPLETE ACADEMIC REPORTS",
   ];
 
-  const gradeOptions = [
-    ...Array.from({ length: 41 }, (_, i) => (100 - i).toString()),
-    "INC",
-    "DRP",
-  ];
-
-  const validateGradeInput = (rawValue) => {
-    if (rawValue === null || rawValue === undefined) return "";
-
-    let value = String(rawValue).trim().toUpperCase();
-
-    if (/^INC/.test(value)) return "INC";
-    if (/^DRP|^DROP/.test(value)) return "DRP";
-
-    if (/^[A-Z]+$/.test(value)) return "60";
-    if (!/^\d{1,3}$/.test(value)) return "60";
-
-    let num = Number(value);
-    if (Number.isNaN(num)) return "60";
-
-    if (num > 100) num = 100;
-    if (num < 60) num = 60;
-
-    return String(num);
-  };
+  const gradeOptions = GRADE_OPTIONS;
 
   // Dynamic helpers replace hardcoded grade ranges with grade_conversion records.
   const convertRawToRating = (value) =>
@@ -428,86 +502,54 @@ const StudentGradeFile = () => {
     return convertRawToRating(storedFinalGrade) || String(storedFinalGrade);
   };
 
-  const GradeSelect = ({ value, onChange, placeholder = "" }) => {
-    const [inputValue, setInputValue] = useState(value ?? "");
-
-    useEffect(() => {
-      setInputValue(value ?? "");
-    }, [value]);
-
-    return (
-      <Autocomplete
-        freeSolo
-        disableClearable
-        options={gradeOptions}
-        inputValue={inputValue}
-        value={inputValue}
-        onInputChange={(event, newInputValue, reason) => {
-          if (reason === "input") {
-            setInputValue(newInputValue.toUpperCase());
-          }
-        }}
-        onChange={(event, newValue) => {
-          if (newValue !== null) {
-            const validated = validateGradeInput(newValue);
-            setInputValue(validated);
-            onChange(validated);
-          }
-        }}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            placeholder={placeholder}
-            size="small"
-            variant="outlined"
-            onBlur={() => {
-              const validated = validateGradeInput(inputValue);
-              setInputValue(validated);
-              onChange(validated);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                const validated = validateGradeInput(inputValue);
-                setInputValue(validated);
-                onChange(validated);
-              }
-            }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                px: 0.5,
-              },
-              "& input": {
-                textAlign: "center",
-                fontWeight: "bold",
-                py: 0.5,
-              },
-            }}
-          />
-        )}
-        sx={{
-          minWidth: 90,
-          "& .MuiAutocomplete-inputRoot": {
-            py: 0,
-          },
-        }}
-      />
-    );
-  };
-
   // ==========================================
   // API CALLS
   // ==========================================
 
-  const fetchAllStudents = async () => {
+  const searchStudents = async (query) => {
+    const trimmedQuery = String(query || "").trim();
+    if (trimmedQuery.length < 2) {
+      setAllStudents([]);
+      return;
+    }
+
+    const empId = employeeID || localStorage.getItem("employee_id") || "";
+    if (!empId) {
+      setAllStudents([]);
+      setSearchStatus("Missing employee id for student search");
+      return;
+    }
+
+    if (studentSearchAbortRef.current) {
+      studentSearchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    studentSearchAbortRef.current = controller;
+
     try {
       setIsLoadingStudentDirectory(true);
-      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`);
-      setAllStudents(Array.isArray(res.data) ? res.data : []);
+      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, {
+        params: {
+          employee_id: empId,
+          q: trimmedQuery,
+          limit: 10,
+        },
+        signal: controller.signal,
+      });
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setAllStudents(rows);
+      setSearchStatus(
+        rows.length
+          ? `Showing ${rows.length} matching student${rows.length > 1 ? "s" : ""}`
+          : "No students found",
+      );
     } catch (err) {
-      console.error("Error preloading students:", err);
+      if (axios.isCancel?.(err) || err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
+        return;
+      }
+      console.error("Error searching students:", err);
       setAllStudents([]);
-      setSearchStatus("Failed to preload student directory");
+      setSearchStatus("Failed to search students");
     } finally {
       setIsLoadingStudentDirectory(false);
     }
@@ -520,8 +562,12 @@ const StudentGradeFile = () => {
     }
 
     try {
+      const empId = employeeID || localStorage.getItem("employee_id") || "";
       const res = await axios.get(`${API_BASE_URL}/api/student-info`, {
-        params: { searchQuery: student_number },
+        params: {
+          searchQuery: student_number,
+          ...(empId ? { employee_id: empId } : {}),
+        },
       });
       setStudentInfo(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -537,8 +583,12 @@ const StudentGradeFile = () => {
 
   const fetchStudentGrade = async (student_number) => {
     try {
+      const empId = employeeID || localStorage.getItem("employee_id") || "";
       const res = await axios.get(
         `${API_BASE_URL}/api/student-info/${student_number}`,
+        {
+          params: empId ? { employee_id: empId } : undefined,
+        },
       );
       setStudentGradeList(res.data);
     } catch {
@@ -592,47 +642,43 @@ const StudentGradeFile = () => {
     loadStudentRecord();
   }, [selectedStudentNumber]);
 
-  const filteredStudents = useMemo(() => {
-    const trimmedQuery = deferredGlobalSearch.trim().toLowerCase();
-
-    if (trimmedQuery.length < 2) return [];
-
-    return allStudents
-      .filter((student) => {
-        const fullName =
-          `${student.first_name || ""} ${student.middle_name || ""} ${student.last_name || ""}`
-            .replace(/\s+/g, " ")
-            .trim()
-            .toLowerCase();
-
-        return (
-          String(student.student_number || "")
-            .toLowerCase()
-            .includes(trimmedQuery) || fullName.includes(trimmedQuery)
-        );
-      })
-      .slice(0, 10);
-  }, [allStudents, deferredGlobalSearch]);
-
+  // Debounced server-side student search (no full directory preload).
   useEffect(() => {
-    const trimmedQuery = deferredGlobalSearch.trim();
+    const trimmedQuery = globalSearch.trim();
 
     if (trimmedQuery.length === 0) {
+      setAllStudents([]);
       setSearchStatus("");
-      return;
+      return undefined;
     }
 
     if (trimmedQuery.length < 2) {
+      setAllStudents([]);
       setSearchStatus("Type at least 2 characters to search");
-      return;
+      return undefined;
     }
 
-    setSearchStatus(
-      filteredStudents.length
-        ? `Showing ${filteredStudents.length} matching student${filteredStudents.length > 1 ? "s" : ""}`
-        : "No students found",
-    );
-  }, [filteredStudents, deferredGlobalSearch]);
+    // Skip search while a student number is already selected and matches input.
+    if (
+      selectedStudentNumber &&
+      String(trimmedQuery) === String(selectedStudentNumber)
+    ) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      searchStudents(trimmedQuery);
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+      if (studentSearchAbortRef.current) {
+        studentSearchAbortRef.current.abort();
+      }
+    };
+  }, [globalSearch, selectedStudentNumber, employeeID]);
+
+  const filteredStudents = allStudents;
 
   // ==========================================
   // HANDLERS
@@ -993,27 +1039,15 @@ const StudentGradeFile = () => {
             loading={isLoadingStudentDirectory}
             value={selectedStudent}
             inputValue={globalSearch}
-            onOpen={() => {
-              if (!allStudents.length && !isLoadingStudentDirectory) {
-                fetchAllStudents();
-              }
-            }}
             onChange={(_, student) => handleSelectStudent(student)}
             onInputChange={(_, value, reason) => {
               setGlobalSearch(value);
-
-              if (
-                value.trim().length >= 2 &&
-                !allStudents.length &&
-                !isLoadingStudentDirectory
-              ) {
-                fetchAllStudents();
-              }
 
               if (reason === "clear" || value.trim().length === 0) {
                 setSelectedStudentNumber("");
                 setStudentInfo(null);
                 setStudentGradeList([]);
+                setAllStudents([]);
               }
             }}
             getOptionLabel={(option) => {

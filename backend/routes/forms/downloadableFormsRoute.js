@@ -2060,4 +2060,674 @@ router.post("/generate-student-list-pdf", async (req, res) => {
   }
 });
 
+
+router.post("/generate-report-of-grades-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, student_number, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 794,   // 210mm @ 96dpi
+      height: 1123, // 297mm @ 96dpi
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Mirrors the on-screen scaling math from ReportOfGrade.jsx EXACTLY:
+    // the report is authored at a fixed design width of 1280px
+    // (REPORT_DESIGN_WIDTH) and shrunk with a CSS transform so it fits an
+    // A4 sheet with EXACTLY 1.5rem of margin on the left/right/top
+    // (PRINT_MARGIN_REM). Same geometry, reproduced server-side:
+    //   a4WidthPx      = 210mm * (96/25.4)             ≈ 793.7px
+    //   printMarginPx  = 1.5rem * 16px                  = 24px
+    //   contentWidthPx = a4WidthPx - printMarginPx * 2  ≈ 745.7px
+    //   scale          = contentWidthPx / 1280          ≈ 0.5825
+    const REPORT_DESIGN_WIDTH = 1280;
+    const PRINT_MARGIN_REM = 1.5;
+    const PX_PER_REM = 16;
+    const PX_PER_MM = 96 / 25.4;
+    const A4_WIDTH_MM = 210;
+    const printMarginPx = PRINT_MARGIN_REM * PX_PER_REM;
+    const a4WidthPx = A4_WIDTH_MM * PX_PER_MM;
+    const printContentWidthPx = a4WidthPx - printMarginPx * 2;
+    const PRINT_SCALE = printContentWidthPx / REPORT_DESIGN_WIDTH;
+
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 210mm;
+      background: #ffffff;
+      font-family: "Poppins", Arial, sans-serif;
+    }
+
+    .rog-page {
+      margin-top: ${PRINT_MARGIN_REM}rem;
+      margin-left: ${PRINT_MARGIN_REM}rem;
+    }
+
+    .rog-content {
+      width: ${REPORT_DESIGN_WIDTH}px;
+      transform: scale(${PRINT_SCALE});
+      transform-origin: top left;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    img {
+      max-width: 100%;
+    }
+
+    button {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="rog-page">
+    <div class="rog-content">
+      ${html}
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const numberSuffix = student_number ? `_${student_number}` : "";
+    const fileName = `Report_Of_Grades_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Report of Grades",
+      legacyAction: "REPORT_OF_GRADES_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Report of Grades PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Report of Grades PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+// ─── 11. Transcript of Records (Registrar) ─────────────────────────────────
+router.post("/generate-tor-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, student_number, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // TOR uses Philippine "long" bond paper: 8.5in x 13in
+    // (215.9mm x 330.2mm), NOT 8.5in x 14in (legal/folio). Matches the
+    // .page-card min-width/min-height in TOR.jsx's on-screen CSS and the
+    // @page { size: 215.9mm 330.2mm; } print rule.
+    await page.setViewport({
+      width: 816,   // 215.9mm @ 96dpi
+      height: 1248, // 330.2mm @ 96dpi
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+ const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page {
+      size: 215.9mm 330.2mm;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+    }
+
+    .tor-page {
+      width: 215.9mm;
+      height: 330.2mm;
+      padding: 10mm 12mm;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .tor-page:not(:last-of-type) {
+      page-break-after: always;
+      break-after: page;
+    }
+
+    /*
+     * buildTorPageHtml() lays out content at ~80rem (1280px @ 16px root)
+     * because it was authored for the on-screen "page-card" preview.
+     * The actual PDF page is only 215.9mm (~816px) wide, so without
+     * scaling, everything past ~64% of the width gets clipped by
+     * .tor-page's overflow:hidden — that's the missing-data bug.
+     *
+     * zoom (not transform) shrinks BOTH the visual size AND each
+     * element's contribution to layout flow, so the header/info/table/
+     * footer blocks still stack correctly at the smaller size.
+     *
+     * 725px available width / 1280px natural width ≈ 0.566
+     * Nudge this up/down slightly if text wraps oddly or margins look off.
+     */
+    .tor-page > * {
+      zoom: 0.566;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    img {
+      max-width: 100%;
+    }
+
+    button {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  ${html}
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      width: "215.9mm",
+      height: "330.2mm",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const numberSuffix = student_number ? `_${student_number}` : "";
+    const fileName = `TOR_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Transcript of Records",
+      legacyAction: "TOR_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Transcript of Records PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("TOR PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+// ─── Class List (Registrar Class Roster) ───────────────────────────────────
+router.post("/generate-class-list-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Portrait A4 @ 96dpi, matches @page { size: A4 portrait; margin: 8mm; }
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Same corner-label header style used by the Applicant List / Entrance
+    // Examination Scores exports (Department left / Program right, centered
+    // logo + school name block), applied to the registrar Class List.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      background: #ffffff;
+    }
+
+    .print-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .print-header {
+      position: relative;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .header-content img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      margin-top: 50px;
+    }
+
+    .header-text {
+      text-align: center;
+      margin-top: 50px;
+    }
+
+    .print-corner-label {
+      position: absolute;
+      top: 0;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .print-corner-label.left {
+      left: 0;
+      text-align: left;
+    }
+
+    .print-corner-label.right {
+      right: 0;
+      text-align: right;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1.5px solid black;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1.5px solid black;
+      padding: 4px 3px;
+      font-size: 9px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    th {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    td.student-name {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fileName = `Class_List_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Class List",
+      legacyAction: "CLASS_LIST_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Class List PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Class List PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+router.post("/generate-medical-certificate-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, student_number, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 794,   // 210mm @ 96dpi
+      height: 1123, // 297mm @ 96dpi
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Mirrors printDiv()'s CSS in MedicalCertificate.jsx EXACTLY —
+    // the 110% width + scale(0.90) top-left trick, NOT the Personal
+    // Data Form's zoom variant. Don't swap these, the offsets differ.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 210mm;
+      height: 297mm;
+      font-family: Arial;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .print-container {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      transform: scale(0.90);
+      transform-origin: top left;
+    }
+
+    .student-table {
+      margin-top: 20px !important;
+    }
+
+    input[type="checkbox"] {
+      width: 12px;
+      height: 12px;
+      transform: scale(1);
+      margin: 2px;
+    }
+
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    button {
+      display: none;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    img {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "0.25in", bottom: "0.25in", left: "0.25in", right: "0.25in" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const numberSuffix = student_number ? `_${student_number}` : "";
+    const fileName = `Medical_Certificate_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Medical Certificate",
+      legacyAction: "MEDICAL_CERTIFICATE_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Medical Certificate PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Medical Certificate PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 module.exports = router;

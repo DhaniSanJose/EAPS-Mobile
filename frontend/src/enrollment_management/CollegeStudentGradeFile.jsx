@@ -3,7 +3,7 @@ import React, {
   useEffect,
   useContext,
   useMemo,
-  useDeferredValue,
+  useRef,
 } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
@@ -68,8 +68,7 @@ const CollegeStudentGradeFile = () => {
   const [studentInfo, setStudentInfo] = useState(null);
   const [studentGradeList, setStudentGradeList] = useState([]);
   const [gradeConversions, setGradeConversions] = useState([]);
-
-  const deferredGlobalSearch = useDeferredValue(globalSearch);
+  const studentSearchAbortRef = useRef(null);
 
   // Auth & Loading
   const [userID, setUserID] = useState("");
@@ -303,15 +302,50 @@ const CollegeStudentGradeFile = () => {
   // API CALLS (read-only — GET requests only)
   // ==========================================
 
-  const fetchAllStudents = async () => {
+  const searchStudents = async (query) => {
+    const trimmedQuery = String(query || "").trim();
+    if (trimmedQuery.length < 2) {
+      setAllStudents([]);
+      return;
+    }
+
+    const empId = employeeID || localStorage.getItem("employee_id") || "";
+    if (!empId) {
+      setAllStudents([]);
+      setSearchStatus("Missing employee id for student search");
+      return;
+    }
+
+    if (studentSearchAbortRef.current) {
+      studentSearchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    studentSearchAbortRef.current = controller;
+
     try {
       setIsLoadingStudentDirectory(true);
-      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`);
-      setAllStudents(Array.isArray(res.data) ? res.data : []);
+      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, {
+        params: {
+          employee_id: empId,
+          q: trimmedQuery,
+          limit: 10,
+        },
+        signal: controller.signal,
+      });
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setAllStudents(rows);
+      setSearchStatus(
+        rows.length
+          ? `Showing ${rows.length} matching student${rows.length > 1 ? "s" : ""}`
+          : "No students found",
+      );
     } catch (err) {
-      console.error("Error preloading students:", err);
+      if (err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
+        return;
+      }
+      console.error("Error searching students:", err);
       setAllStudents([]);
-      setSearchStatus("Failed to preload student directory");
+      setSearchStatus("Failed to search students");
     } finally {
       setIsLoadingStudentDirectory(false);
     }
@@ -324,8 +358,12 @@ const CollegeStudentGradeFile = () => {
     }
 
     try {
+      const empId = employeeID || localStorage.getItem("employee_id") || "";
       const res = await axios.get(`${API_BASE_URL}/api/student-info`, {
-        params: { searchQuery: student_number },
+        params: {
+          searchQuery: student_number,
+          ...(empId ? { employee_id: empId } : {}),
+        },
       });
       setStudentInfo(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -341,8 +379,12 @@ const CollegeStudentGradeFile = () => {
 
   const fetchStudentGrade = async (student_number) => {
     try {
+      const empId = employeeID || localStorage.getItem("employee_id") || "";
       const res = await axios.get(
         `${API_BASE_URL}/api/student-info/${student_number}`,
+        {
+          params: empId ? { employee_id: empId } : undefined,
+        },
       );
       setStudentGradeList(res.data);
     } catch {
@@ -369,47 +411,41 @@ const CollegeStudentGradeFile = () => {
     loadStudentRecord();
   }, [selectedStudentNumber]);
 
-  const filteredStudents = useMemo(() => {
-    const trimmedQuery = deferredGlobalSearch.trim().toLowerCase();
-
-    if (trimmedQuery.length < 2) return [];
-
-    return allStudents
-      .filter((student) => {
-        const fullName =
-          `${student.first_name || ""} ${student.middle_name || ""} ${student.last_name || ""}`
-            .replace(/\s+/g, " ")
-            .trim()
-            .toLowerCase();
-
-        return (
-          String(student.student_number || "")
-            .toLowerCase()
-            .includes(trimmedQuery) || fullName.includes(trimmedQuery)
-        );
-      })
-      .slice(0, 10);
-  }, [allStudents, deferredGlobalSearch]);
-
   useEffect(() => {
-    const trimmedQuery = deferredGlobalSearch.trim();
+    const trimmedQuery = globalSearch.trim();
 
     if (trimmedQuery.length === 0) {
+      setAllStudents([]);
       setSearchStatus("");
-      return;
+      return undefined;
     }
 
     if (trimmedQuery.length < 2) {
+      setAllStudents([]);
       setSearchStatus("Type at least 2 characters to search");
-      return;
+      return undefined;
     }
 
-    setSearchStatus(
-      filteredStudents.length
-        ? `Showing ${filteredStudents.length} matching student${filteredStudents.length > 1 ? "s" : ""}`
-        : "No students found",
-    );
-  }, [filteredStudents, deferredGlobalSearch]);
+    if (
+      selectedStudentNumber &&
+      String(trimmedQuery) === String(selectedStudentNumber)
+    ) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      searchStudents(trimmedQuery);
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+      if (studentSearchAbortRef.current) {
+        studentSearchAbortRef.current.abort();
+      }
+    };
+  }, [globalSearch, selectedStudentNumber, employeeID]);
+
+  const filteredStudents = allStudents;
 
   // ==========================================
   // HANDLERS (view-only)
@@ -548,27 +584,15 @@ const CollegeStudentGradeFile = () => {
             loading={isLoadingStudentDirectory}
             value={selectedStudent}
             inputValue={globalSearch}
-            onOpen={() => {
-              if (!allStudents.length && !isLoadingStudentDirectory) {
-                fetchAllStudents();
-              }
-            }}
             onChange={(_, student) => handleSelectStudent(student)}
             onInputChange={(_, value, reason) => {
               setGlobalSearch(value);
-
-              if (
-                value.trim().length >= 2 &&
-                !allStudents.length &&
-                !isLoadingStudentDirectory
-              ) {
-                fetchAllStudents();
-              }
 
               if (reason === "clear" || value.trim().length === 0) {
                 setSelectedStudentNumber("");
                 setStudentInfo(null);
                 setStudentGradeList([]);
+                setAllStudents([]);
               }
             }}
             getOptionLabel={(option) => {

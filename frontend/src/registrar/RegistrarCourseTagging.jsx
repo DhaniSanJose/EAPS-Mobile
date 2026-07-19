@@ -327,6 +327,13 @@ const CourseTagging = () => {
 
   const handleStepClick = (index, to) => {
     setActiveStep(index);
+
+    // Class list should always open blank (no sticky student / person_id)
+    if (to === "/registrar_class_list") {
+      navigate(to);
+      return;
+    }
+
     const pid =
       personID ||
       sessionStorage.getItem("edit_person_id") ||

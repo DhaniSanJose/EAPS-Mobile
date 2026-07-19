@@ -84,14 +84,11 @@ const RegistrarEnrollmentTabs = () => {
 
   const activeStep = getRegistrarEnrollmentActiveStep(location.pathname);
 
-  const ROUTES_WITHOUT_PERSON_ID = new Set([
-    "/report_of_grades",
-    "/transcript_of_records",
-  ]);
-
   const clearStickyStudentSelection = () => {
     sessionStorage.removeItem("edit_person_id");
     sessionStorage.removeItem("edit_student_number");
+    sessionStorage.removeItem("edit_list_year_id");
+    sessionStorage.removeItem("edit_list_semester_id");
     sessionStorage.removeItem("admin_edit_person_id");
     sessionStorage.removeItem("admin_edit_person_id_source");
     sessionStorage.removeItem("admin_edit_person_id_ts");
@@ -104,12 +101,6 @@ const RegistrarEnrollmentTabs = () => {
   const handleStepClick = (to) => {
     if (to === "/registrar_student_list") {
       clearStickyStudentSelection();
-      navigate(to);
-      return;
-    }
-
-    // These screens should always open blank (no sticky student search)
-    if (ROUTES_WITHOUT_PERSON_ID.has(to)) {
       navigate(to);
       return;
     }

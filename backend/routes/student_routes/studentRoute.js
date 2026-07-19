@@ -1552,11 +1552,25 @@ ORDER BY dt.dprtmnt_code, pgt.program_code, pt.last_name;
 });
 
 router.get("/student_enrollment", async (req, res) => {
-  const { employee_id } = req.query;
+  const employee_id =
+    req.query.employee_id ||
+    req.headers["x-employee-id"] ||
+    req.headers["x-audit-actor-id"];
+  const q = String(req.query.q || req.query.search || "").trim();
+  const limit = Math.min(
+    50,
+    Math.max(1, parseInt(req.query.limit, 10) || 10),
+  );
 
   try {
     if (!employee_id) {
       return res.status(400).json({ error: "employee_id is required" });
+    }
+
+    // Search mode: require at least 2 characters and return a small page.
+    // Avoids dumping the full enrollment directory into the browser.
+    if (q.length < 2) {
+      return res.json([]);
     }
 
     const scope = await getRegistrarScope(employee_id);
@@ -1564,6 +1578,7 @@ router.get("/student_enrollment", async (req, res) => {
       return res.json([]);
     }
 
+    const like = `%${q}%`;
     const [rows] = await db3.query(
       `
         SELECT DISTINCT
@@ -1598,9 +1613,17 @@ router.get("/student_enrollment", async (req, res) => {
           ) ranked
           WHERE ranked.rn = 1
         ) cur ON cur.student_number = snt.student_number
+        WHERE (
+          CAST(snt.student_number AS CHAR) LIKE ?
+          OR pt.first_name LIKE ?
+          OR pt.middle_name LIKE ?
+          OR pt.last_name LIKE ?
+          OR CONCAT_WS(' ', pt.first_name, pt.middle_name, pt.last_name) LIKE ?
+        )
         ORDER BY snt.student_number ASC
+        LIMIT ?
       `,
-      [employee_id],
+      [employee_id, like, like, like, like, like, limit],
     );
 
     res.json(rows);

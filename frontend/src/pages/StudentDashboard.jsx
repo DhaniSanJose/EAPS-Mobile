@@ -398,16 +398,20 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       const computedStyle = window.getComputedStyle(sourceField);
       const bounds = sourceField.getBoundingClientRect();
       const width = sourceField.offsetWidth || bounds.width;
-      const height = sourceField.offsetHeight || bounds.height;
+      const height = Math.max(
+        20,
+        Math.ceil(sourceField.offsetHeight || bounds.height || 26),
+      );
+      const textAlign = computedStyle.textAlign || "left";
       const textNode = document.createElement("span");
-      textNode.style.cssText = sourceField.getAttribute("style") || "";
+
       textNode.style.display =
         computedStyle.display === "none" ? "none" : "inline-block";
       textNode.style.boxSizing = "border-box";
       textNode.style.verticalAlign = "middle";
       textNode.style.whiteSpace = "nowrap";
-      textNode.style.overflow = "visible";
-      textNode.style.textOverflow = "clip";
+      textNode.style.overflow = "hidden";
+      textNode.style.textOverflow = "ellipsis";
       textNode.style.visibility = "visible";
       textNode.style.opacity = "1";
       textNode.style.color = "#000";
@@ -415,17 +419,18 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       textNode.style.fontFamily = computedStyle.fontFamily || "Arial";
       textNode.style.fontSize = computedStyle.fontSize || "12px";
       textNode.style.fontWeight = computedStyle.fontWeight || "normal";
-      textNode.style.textAlign = computedStyle.textAlign || "left";
-      textNode.style.lineHeight =
-        computedStyle.lineHeight === "normal" ? "1.15" : computedStyle.lineHeight;
+      textNode.style.textAlign = textAlign;
+      // Match height + line-height so single-line text is vertically centered in html2canvas
+      textNode.style.lineHeight = `${height}px`;
       textNode.style.background = "transparent";
       textNode.style.border = "none";
       textNode.style.outline = "none";
-      textNode.style.padding = sourceField.style.padding || "0";
-      textNode.style.margin = sourceField.style.margin || "0";
+      textNode.style.padding = "0 3px";
+      textNode.style.margin = "0";
+      textNode.style.transform = "none";
       textNode.style.width = width ? `${Math.ceil(width)}px` : "100%";
-      textNode.style.minHeight = height ? `${Math.ceil(height)}px` : "auto";
-      textNode.style.height = height ? `${Math.ceil(height)}px` : "auto";
+      textNode.style.minHeight = `${height}px`;
+      textNode.style.height = `${height}px`;
 
       if (sourceField.tagName === "SELECT") {
         textNode.textContent =
@@ -454,6 +459,15 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       node.style.opacity = node.classList.contains("certificate-watermark")
         ? node.style.opacity
         : "1";
+    });
+
+    // Force subject-row cells to middle-align in the captured PDF
+    clone.querySelectorAll(".cor-subject-data-row td").forEach((td) => {
+      td.style.verticalAlign = "middle";
+    });
+    clone.querySelectorAll(".cor-subject-data-row span").forEach((span) => {
+      span.style.transform = "none";
+      span.style.marginTop = "0";
     });
 
     clone.querySelectorAll("img").forEach((img) => {

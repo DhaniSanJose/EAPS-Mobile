@@ -48,7 +48,7 @@ const MedicalCertificate = () => {
 
     }, [settings]);
 
-   
+
 
     useEffect(() => {
         if (settings) {
@@ -185,82 +185,175 @@ const MedicalCertificate = () => {
     }, []);
 
     const divToPrintRef = useRef();
-    const printDiv = () => {
-        const divToPrint = divToPrintRef.current;
-        if (divToPrint) {
-            // Clone to preserve React bindings
-            const clonedDiv = divToPrint.cloneNode(true);
 
-            // Manually add 'checked' attribute to checked checkboxes
-            const checkboxes = clonedDiv.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach((checkbox) => {
-                if (checkbox.checked) {
-                    checkbox.setAttribute("checked", "checked");
-                } else {
-                    checkbox.removeAttribute("checked");
-                }
-            });
 
-            const newWin = window.open('', 'Print-Window');
-            newWin.document.open();
-            newWin.document.write(`
-      <html>
-        <head>
-          <title>Print</title>
-          <style>
-            @page {
-              size: A4;
-              margin: 0;
-            }
+    const handleExportMedicalCertificatePdf = async () => {
+        const logoSrc = fetchedLogo; // EaristLogo isn't imported here — remove or import it if you need a fallback
 
-            html, body {
-              margin: 0;
-              padding: 0;
-              width: 210mm;
-              height: 297mm;
-              font-family: Arial;
-              overflow: hidden;
-            }
-
-            .print-container {
-              width: 110%;
-              height: 100%;
-              box-sizing: border-box;
-              transform: scale(0.90);
-              transform-origin: top left;
-            }
-
-            .student-table {
-              margin-top: 20px !important;
-            }
-
-            input[type="checkbox"] {
-              width: 12px;
-              height: 12px;
-              transform: scale(1);
-              margin: 2px;
-            }
-
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-
-            button {
-              display: none;
-            }
-          </style>
-        </head>
-        <body onload="window.print(); setTimeout(() => window.close(), 100);">
-          <div class="print-container">
-            ${clonedDiv.innerHTML}
+        const buildCertificateBlock = () => `
+    <div
+      class="student-table"
+      style="display:flex; align-items:center; justify-content:center; padding:10px 10px; width:100%; box-sizing:border-box;"
+    >
+      <div style="display:flex; align-items:center;">
+        <div style="flex-shrink:0; margin-right:20px;">
+          <img
+            src="${logoSrc}"
+            alt="School Logo"
+            style="width:120px; height:120px; border-radius:50%; object-fit:cover; margin-top:-30px;"
+          />
+        </div>
+        <div>
+          <div style="font-size:13px; font-family:Arial; text-align:left; margin-bottom:5px;">
+            Republic of the Philippines
           </div>
-        </body>
-      </html>
-    `);
-            newWin.document.close();
-        } else {
-            console.error("divToPrintRef is not set.");
+          <div style="font-size:25px; font-weight:bold; color:black; font-family:Arial; margin-bottom:5px;">
+            ${companyName}
+          </div>
+          <div style="display:flex; justify-content:center; margin-bottom:5px;">
+            <hr style="width:100%; max-width:700px; border:1px solid #000; margin:0;" />
+          </div>
+          <br />
+          <div style="text-align:center; font-size:16px; font-weight:bold; font-family:Arial; margin-left:-95px; margin-top:-20px;">
+            HEALTH SERVICE DIVISION
+          </div>
+          <div style="text-align:center; font-size:16px; font-weight:bold; font-family:Arial; margin-left:-100px; margin-top:30px;">
+            MEDICAL CERTIFICATE
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <table style="border-collapse:collapse; width:8in; margin:0 auto; font-family:Arial; font-size:16px; line-height:1.3;">
+      <tbody>
+        <tr>
+          <td colspan="40" style="text-align:left; padding-bottom:5px; font-weight:bold;">
+            TO WHOM IT MAY CONCERN:
+          </td>
+        </tr>
+
+        <tr>
+          <td colspan="40" style="text-align:justify; padding-bottom:10px; width:100%; white-space:nowrap; vertical-align:top;">
+            This is to certify that&nbsp;
+            <span style="display:inline-flex; flex-direction:column; align-items:center; width:50%; border-bottom:1px solid black; text-align:center;">
+              <span>${(person.last_name || "").toUpperCase()}, ${(person.first_name || "").toUpperCase()} ${(person.middle_name || "").toUpperCase()}</span>
+            </span>
+            &nbsp;
+            <span style="display:inline-flex; flex-direction:column; align-items:center; width:10%; border-bottom:1px solid black; text-align:center; margin-left:5px; margin-right:5px;">
+              <span>${person.age || ""}</span>
+            </span>
+            &nbsp;years old,&nbsp;
+            <span style="display:inline-flex; flex-direction:column; align-items:center; width:15%; border-bottom:1px solid black; text-align:center;">
+              <span>${person.gender === 0 ? "MALE" : person.gender === 1 ? "FEMALE" : ""}</span>
+            </span>
+            <div style="display:flex; justify-content:space-between; margin-left:140px;">
+              <span style="width:15%; text-align:center; margin-left:150px;">(Name)</span>
+              <span style="width:20%; text-align:center; margin-left:30px;">(Age)</span>
+              <span style="width:10%; text-align:center; margin-right:10px;">(Sex)</span>
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td colspan="40" style="text-align:justify; padding-bottom:3px; width:100%; white-space:nowrap;">
+            <span style="display:inline-block; text-align:center; width:10%; vertical-align:top;">
+              <div style="border-bottom:1px solid black; width:100%; text-align:center;">${person.civilStatus || ""}</div>
+              <div style="font-size:13px; text-align:center;">(Civil Status)</div>
+            </span>
+            &nbsp;A resident of&nbsp;
+            <span style="display:inline-block; text-align:center; width:50%; vertical-align:top;">
+              <div style="border-bottom:1px solid black; width:100%; text-align:center;">
+                ${person.permanentStreet || ""} ${person.permanentBarangay || ""} ${person.permanentMunicipality || ""}
+              </div>
+              <div style="font-size:13px; text-align:center;">(Address)</div>
+            </span>
+            &nbsp;was examined on&nbsp;
+            <span style="display:inline-block; text-align:center; width:16%; vertical-align:bottom; white-space:nowrap;">
+              <div style="border-bottom:1px solid black; text-align:center; width:100%; line-height:16px;"></div>
+              <div style="font-size:13px; text-align:center; margin-top:1px; line-height:14px;">(Date)</div>
+            </span>
+          </td>
+        </tr>
+
+        <tr>
+          <td colspan="40" style="text-align:left; padding-top:6px; width:100%;">
+            <div style="display:flex; align-items:center; justify-content:flex-start; width:101.5%;">
+              <span style="min-width:60px;">Due to:</span>
+              <span style="flex-grow:1; border-bottom:1px solid black; display:inline-block; margin-left:5px;"></span>
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td colspan="40" style="text-align:left; padding-top:5px; width:100%; font-size:14px; line-height:1.8;">
+            And found:
+            <br />
+            <div style="margin-left:50px; margin-top:-20px;">
+              <br />
+              ( ) Physically and mentally fit.
+              <br />
+              ( ) With the impression of
+              <span style="display:inline-block; border-bottom:1px solid black; width:300px; margin-left:5px;"></span>
+              <br />
+              And was advised to
+              <span style="display:inline-block; border-bottom:1px solid black; width:335px; margin-left:5px;"></span>
+              <br />
+              <br />
+              This certificate is issued upon request for medical purposes only.
+            </div>
+            <br />
+            Official Receipt No.:
+            <span style="display:inline-block; border-bottom:1px solid black; width:200px; margin-left:5px;"></span>
+            <br />
+            Date Issued:
+            <span style="display:inline-block; border-bottom:1px solid black; width:245px; margin-left:5px;"></span>
+            <br />
+            MC No.:
+            <span style="display:inline-block; border-bottom:1px solid black; width:265px; margin-left:5px;"></span>
+            <br />
+            <div style="text-align:center; margin-top:15px; margin-bottom:10px;">
+              <span style="display:inline-block; border-bottom:1px solid black; width:300px; margin-left:250px;"></span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+
+        const innerHtml = `
+    ${buildCertificateBlock()}
+    <hr style="border:2px solid black; width:100%;" />
+    ${buildCertificateBlock()}
+  `;
+
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-medical-certificate-pdf`,
+                {
+                    html: innerHtml,
+                    student_number: userID,
+                    last_name: person.last_name,
+                    first_name: person.first_name,
+                },
+                {
+                    responseType: "blob",
+                },
+            );
+
+            const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.setAttribute(
+                "download",
+                `Medical_Certificate_${(person.last_name || "Student").replace(/\s+/g, "_")}.pdf`,
+            );
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Failed to generate Medical Certificate PDF:", err);
+            alert("Failed to generate Medical Certificate PDF.");
         }
     };
 
@@ -356,7 +449,7 @@ const MedicalCertificate = () => {
         return () => clearTimeout(delayDebounce);
     }, [searchQuery]);
 
-   // 🔒 Disable right-click
+    // 🔒 Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
     // 🔒 Block DevTools shortcuts + Ctrl+P silently
@@ -379,7 +472,7 @@ const MedicalCertificate = () => {
 
 
     return (
-         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>     {/* Header with Search aligned right */}
+        <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>     {/* Header with Search aligned right */}
             <Box
                 sx={{
                     display: 'flex',
@@ -434,29 +527,37 @@ const MedicalCertificate = () => {
 
 
             <button
-                onClick={printDiv}
+                onClick={handleExportMedicalCertificatePdf}
                 style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
+                    padding: "5px 20px",
                     border: "2px solid black",
                     backgroundColor: "#f0f0f0",
                     color: "black",
                     borderRadius: "5px",
-                    marginTop: "20px",
                     cursor: "pointer",
-                    fontSize: "16px",
+                    fontSize: "14px",
                     fontWeight: "bold",
                     transition: "background-color 0.3s, transform 0.2s",
+                    height: "40px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    userSelect: "none",
                 }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+                onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#d3d3d3")
+                }
+                onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#f0f0f0")
+                }
+                onMouseDown={(e) =>
+                    (e.currentTarget.style.transform = "scale(0.95)")
+                }
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                type="button"
             >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FcPrint size={20} />
-                    Print Medical Certificate
-                </span>
+                <FcPrint size={20} />
+                Download Medical Certificate
             </button>
 
             <Container>
@@ -981,7 +1082,7 @@ const MedicalCertificate = () => {
                                         fontSize: "16px",
                                         fontWeight: "bold",
                                         fontFamily: "Arial",
-                                      marginLeft: "-100px",
+                                        marginLeft: "-100px",
 
                                         marginTop: "30px"
                                     }}>
