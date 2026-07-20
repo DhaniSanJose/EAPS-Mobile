@@ -6,12 +6,13 @@ const fs = require("fs");
 const { db, db3 } = require("../database/database");
 const { insertAuditLogAdmission } = require("../../utils/auditLogger");
 
-const applicantDocsDir = path.join(
+const uploadDir = path.join(
   __dirname,
+  "..",
+  "..",
   "uploads",
-  "applicant_documents"
+  "ApplicantOnlineDocuments"
 );
-
 
 const getRequirementUploadAuditInfo = async (uploadId) => {
   const [rows] = await db.query(
@@ -545,7 +546,7 @@ router.delete("/admin/uploads/:uploadId", async (req, res) => {
 
     // 4¸ Delete physical file
     if (filePath) {
-      const fullPath = path.join(applicantDocsDir, filePath);
+      const fullPath = path.join(uploadDir, filePath);
 
       try {
         await fs.promises.unlink(fullPath);

@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.42:5173",
+  "http://192.168.50.52:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -90,7 +90,7 @@ app.use("/assets", express.static(path.join(__dirname, "assets")));
 const applicantDocsDir = path.join(
   __dirname,
   "uploads",
-  "applicant_documents"
+  "ApplicantOnlineDocuments"
 );
 
 const io = initSocket(http, allowedOrigins);
@@ -3376,20 +3376,58 @@ const insertRequirementAuditLog = async ({
 //  PUT update person details by person_id (SAFE VERSION)
 app.put("/api/person/:id", async (req, res) => {
   const { id } = req.params;
+  console.log("🔍 PUT /api/person/:id hit — id:", id, "body:", req.body);
 
   try {
     if (!req.body || Object.keys(req.body).length === 0) {
       return res.status(400).json({ error: "No fields provided for update" });
     }
 
-    //  Clean + FILTER only allowed columns
     const cleanedEntries = Object.entries(req.body)
-      .filter(([key, value]) => allowedFields.has(key)) // — ignores applicant_number
+      .filter(([key, value]) => allowedFields.has(key))
       .filter(([_, value]) => value !== undefined)
       .map(([key, value]) => [key, value === "" ? null : value]);
 
     if (cleanedEntries.length === 0) {
       return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    // ── Delete the old Applicant1by1 photo file if profile_img is being
+    // cleared or replaced, so removed/changed photos don't orphan on disk.
+    const profileImgEntry = cleanedEntries.find(([key]) => key === "profile_img");
+    console.log("🔍 profileImgEntry:", profileImgEntry);
+
+    if (profileImgEntry) {
+      const nextValue = profileImgEntry[1];
+      const [[personBeforePhoto]] = await db.query(
+        "SELECT profile_img FROM person_table WHERE person_id = ? LIMIT 1",
+        [id],
+      );
+      const oldProfileImg = personBeforePhoto?.profile_img;
+      console.log("🔍 oldProfileImg:", oldProfileImg, "nextValue:", nextValue);
+
+      if (oldProfileImg && oldProfileImg !== nextValue) {
+        const oldPhotoPath = path.join(
+          __dirname,
+          "uploads",
+          "Applicant1by1",
+          oldProfileImg,
+        );
+        console.log("🔍 Attempting to delete:", oldPhotoPath);
+
+        try {
+          await fs.promises.unlink(oldPhotoPath);
+          console.log("✅ Old applicant photo deleted:", oldPhotoPath);
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            console.warn("⚠️ Old applicant photo already missing:", oldPhotoPath);
+          } else {
+            console.error("❌ Failed to delete old applicant photo:", err);
+          }
+        }
+      } else {
+        console.log("🔍 Skipped deletion — oldProfileImg or nextValue condition not met.");
+      }
     }
 
     const courseUpdateFields = cleanedEntries

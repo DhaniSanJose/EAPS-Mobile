@@ -180,7 +180,7 @@ const FacultyWorkload = lazy(() => import("./faculty/FacultyWorkload"));
 const GradingSheet = lazy(() => import("./faculty/GradingSheet"));
 const DentalAssessment = lazy(() => import("./medical_management/DentalAssessment"));
 const HealthRecord = lazy(() => import("./medical_management/HealthRecord"));
-const MedicalApplicantList = lazy(() => import("./medical_management/MedicalApplicantList"));
+const MedicalStudentList = lazy(() => import("./medical_management/MedicalStudentList"));
 const MedicalCertificate = lazy(() => import("./medical_management/MedicalCertificate"));
 const MedicalPersonalInformation = lazy(() => import("./medical_management/MedicalPersonalInformation"));
 const MedicalFamilyBackground = lazy(() => import("./medical_management/MedicalFamilyBackground"));
@@ -760,7 +760,6 @@ function App() {
                       <Route path="/college_schedule_plotting" element={<ProtectedRoute><CollegeScheduleChecker /></ProtectedRoute>} />
                       <Route path="/entrance_exam_room_assignment" element={<ProtectedRoute><EntranceExamRoomAssignment /></ProtectedRoute>} />
                       <Route path="/entrance_exam_schedule_management" element={<ProtectedRoute><EntranceExamScheduleManagement /></ProtectedRoute>} />
-
                       <Route path="/admission_schedule_room_list" element={<ProtectedRoute><AdmissionScheduleTile /></ProtectedRoute>} />
                       <Route path="/qualifying_interview_room_assignment" element={<ProtectedRoute><QualifyingInterviewRoomAssignment /></ProtectedRoute>} />
                       <Route path="/applicant_entrance_exam_score" element={<ProtectedRoute><ApplicantEntranceExamScore /></ProtectedRoute>} />
@@ -788,7 +787,7 @@ function App() {
                       <Route path="/applicant_list_college" element={<ProtectedRoute><ApplicantListCollege /></ProtectedRoute>} />
                       <Route path="/college_entrance_examination_score" element={<ProtectedRoute><CollegeEntranceExamScore /></ProtectedRoute>} />
                       <Route path="/registrar_entrance_examination_score" element={<ProtectedRoute><RegistrarEntranceExamScore /></ProtectedRoute>} />
-                      <Route path="/medical_student_list" element={<ProtectedRoute><MedicalApplicantList /></ProtectedRoute>} />
+                      <Route path="/medical_student_list" element={<ProtectedRoute><MedicalStudentList /></ProtectedRoute>} />
                       <Route path="/admission_applicant_list" element={<ProtectedRoute><AdmissionApplicantList /></ProtectedRoute>} />
                       <Route path="/applicant_list_registrar" element={<ProtectedRoute><ApplicantListRegistrar /></ProtectedRoute>} />
                       <Route path="/application_process_admin" element={<ProtectedRoute><ApplicationProcessAdmin /></ProtectedRoute>} />

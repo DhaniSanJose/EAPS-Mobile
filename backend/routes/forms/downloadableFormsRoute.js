@@ -1673,30 +1673,30 @@ router.post("/generate-schedule-applicant-list-pdf", async (req, res) => {
 
 router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
   let browser;
- 
+
   try {
     const { html } = req.body;
- 
+
     if (!html || typeof html !== "string") {
       return res.status(400).json({ message: "No HTML received" });
     }
- 
+
     browser = await launchBrowser();
     const page = await browser.newPage();
- 
+
     // Portrait A4 @ 96dpi, matches @page { size: A4 portrait; margin: 8mm; }
     await page.setViewport({
       width: 794,
       height: 1123,
       deviceScaleFactor: 2,
     });
- 
+
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
       console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
     );
- 
+
     await page.setRequestInterception(true);
     page.on("request", (request) => {
       if (request.resourceType() === "media") {
@@ -1705,7 +1705,7 @@ router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
         request.continue();
       }
     });
- 
+
     const wrappedHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1815,15 +1815,15 @@ router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
 </body>
 </html>
     `.trim();
- 
+
     await page.setContent(wrappedHtml, {
       waitUntil: "networkidle0",
       timeout: 60000,
     });
- 
+
     await waitForImages(page);
     await new Promise((resolve) => setTimeout(resolve, 400));
- 
+
     const pdfBuffer = await page.pdf({
       format: "A4",
       landscape: false,
@@ -1831,25 +1831,25 @@ router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
       preferCSSPageSize: false,
       margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
     });
- 
+
     if (!pdfBuffer || pdfBuffer.length === 0) {
       throw new Error("Generated PDF buffer is empty");
     }
- 
+
     const timestamp = new Date().toISOString().slice(0, 10);
     const fileName = `Qualifying_Interview_Score_${timestamp}.pdf`;
- 
+
     await insertPdfExportAudit(req, {
       documentLabel: "Qualifying / Interview Score",
       legacyAction: "QUALIFYING_INTERVIEW_SCORE_PDF_EXPORT",
       legacyMessage: ({ roleLabel, actorId }) =>
         `${roleLabel} (${actorId}) exported the Qualifying / Interview Score PDF.`,
     });
- 
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
     res.setHeader("Content-Length", pdfBuffer.length);
- 
+
     return res.end(pdfBuffer);
   } catch (err) {
     console.error("Qualifying/Interview Score PDF ERROR:", err);
@@ -2260,7 +2260,7 @@ router.post("/generate-tor-pdf", async (req, res) => {
       }
     });
 
- const wrappedHtml = `
+    const wrappedHtml = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2622,31 +2622,23 @@ router.post("/generate-medical-certificate-pdf", async (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <style>
-    @page {
-      size: A4;
-      margin: 0;
-    }
-
     html, body {
       margin: 0;
       padding: 0;
-      width: 210mm;
-      height: 297mm;
       font-family: Arial;
-      overflow: hidden;
+      width: auto;
+      height: auto;
+      overflow: visible;
       background: #ffffff;
     }
 
     .print-container {
       width: 100%;
-      height: 100%;
       box-sizing: border-box;
-      transform: scale(0.90);
-      transform-origin: top left;
     }
 
     .student-table {
-      margin-top: 20px !important;
+      margin-top: 0 !important;
     }
 
     input[type="checkbox"] {
@@ -2661,17 +2653,9 @@ router.post("/generate-medical-certificate-pdf", async (req, res) => {
       print-color-adjust: exact !important;
     }
 
-    button {
-      display: none;
-    }
-
-    table {
-      border-collapse: collapse;
-    }
-
-    img {
-      max-width: 100%;
-    }
+    button { display: none; }
+    table { border-collapse: collapse; }
+    img { max-width: 100%; }
   </style>
 </head>
 <body>
@@ -2680,7 +2664,7 @@ router.post("/generate-medical-certificate-pdf", async (req, res) => {
   </div>
 </body>
 </html>
-    `.trim();
+`.trim();
 
     await page.setContent(wrappedHtml, {
       waitUntil: "networkidle0",
@@ -2725,6 +2709,88 @@ router.post("/generate-medical-certificate-pdf", async (req, res) => {
       error: err.message,
       stack: err.stack,
     });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+router.post("/generate-health-record-pdf", async (req, res) => {
+  let browser;
+  try {
+    const { html, student_number, last_name, first_name } = req.body;
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") request.abort();
+      else request.continue();
+    });
+
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      background: #ffffff;
+    }
+    .print-container { width: 100%; box-sizing: border-box; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    button { display: none; }
+    table { border-collapse: collapse; }
+    img { max-width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="print-container">${html}</div>
+</body>
+</html>`.trim();
+
+    await page.setContent(wrappedHtml, { waitUntil: "networkidle0", timeout: 60000 });
+    await waitForImages(page);
+    await new Promise((r) => setTimeout(r, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "2mm", bottom: "10mm", left: "10mm", right: "10mm" },
+    });
+
+    if (!pdfBuffer?.length) throw new Error("Generated PDF buffer is empty");
+
+    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const numberSuffix = student_number ? `_${student_number}` : "";
+    const fileName = `Health_Record_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Student Health Record",
+      legacyAction: "HEALTH_RECORD_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Health Record PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Health Record PDF ERROR:", err);
+    return res.status(500).json({ message: "PDF generation failed", error: err.message, stack: err.stack });
   } finally {
     if (browser) await browser.close();
   }

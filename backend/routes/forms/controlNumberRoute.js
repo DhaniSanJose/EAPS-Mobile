@@ -2,8 +2,10 @@
 const express = require("express");
 const router = express.Router();
 
-const { db3 } = require("../database/database");
+const { db, db3 } = require("../database/database");
 const { generateFormControlNumber } = require("../../utils/formControlNumber");
+const { generatePermitControlNumber } = require("../../utils/permitControlNumber");
+
 
 router.post("/generate-control-number", async (req, res) => {
   try {
@@ -27,6 +29,26 @@ router.post("/generate-control-number", async (req, res) => {
       message: "Failed to generate control number",
       error: err.message,
     });
+  }
+});
+
+router.post("/generate-permit-number", async (req, res) => {
+  try {
+    const { person_id, applicant_number } = req.body;
+    if (!person_id) return res.status(400).json({ message: "person_id is required" });
+
+    const controlNumber = await generatePermitControlNumber(db, db3, {
+      personId: person_id,
+      applicantNumber: applicant_number,
+    });
+
+    return res.json({ control_number: controlNumber });
+  } catch (err) {
+    if (err.code === "NOT_VERIFIED") {
+      return res.status(409).json({ message: err.message });
+    }
+    console.error("Permit number generation failed:", err);
+    return res.status(500).json({ message: "Failed to generate permit number", error: err.message });
   }
 });
 

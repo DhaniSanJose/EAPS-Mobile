@@ -7,7 +7,7 @@ import { SettingsContext } from "../App";
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
 
-const HealthRecord = () => {
+const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
 
     const settings = useContext(SettingsContext);
 
@@ -146,12 +146,25 @@ const HealthRecord = () => {
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = queryParams.get("person_id");
+    const queryStudentNumber = queryParams.get("student_number");
 
     useEffect(() => {
+        // Headless mode: mounted off-screen by another page with a prop.
+        // Just fetch and render — no auth check, no redirect.
+        if (studentNumberProp) {
+            fetchPersonBySearch(studentNumberProp);
+            return;
+        }
+
         const storedUser = localStorage.getItem("email");
         const storedRole = localStorage.getItem("role");
         const storedID = localStorage.getItem("person_id");
         const storedStudentNumber = localStorage.getItem("student_number");
+
+        if (queryStudentNumber) {
+            fetchPersonBySearch(queryStudentNumber);
+            return;
+        }
 
         if (storedUser && storedRole && (storedStudentNumber || storedID)) {
             setUser(storedUser);
@@ -159,18 +172,14 @@ const HealthRecord = () => {
             setUserID(storedStudentNumber || storedID);
 
             if (storedRole === "applicant" || storedRole === "registrar") {
-                if (storedStudentNumber) {
-                    fetchPersonBySearch(storedStudentNumber);
-                } else {
-                    fetchPersonBySearch(storedID);
-                }
+                fetchPersonBySearch(storedStudentNumber || storedID);
             } else {
                 window.location.href = "/login";
             }
         } else {
             window.location.href = "/login";
         }
-    }, []);
+    }, [studentNumberProp]);
 
     const [shortDate, setShortDate] = useState("");
 
@@ -183,29 +192,30 @@ const HealthRecord = () => {
     }, []);
 
     const divToPrintRef = useRef();
-    const printDiv = () => {
-        const divToPrint = divToPrintRef.current;
-        if (divToPrint) {
-            const newWin = window.open("", "Print-Window");
-            newWin.document.open();
-            newWin.document.write(`
-        <html>
-          <head>
-            <title>Print</title>
-            <style>
-              @page { size: A4; margin: 10mm; }
-              html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-              .print-container { width: 100%; }
-              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-              button { display: none; }
-            </style>
-          </head>
-          <body onload="window.print(); setTimeout(() => window.close(), 100);">
-            <div class="print-container">${divToPrint.innerHTML}</div>
-          </body>
-        </html>
-      `);
-            newWin.document.close();
+    const handleExportHealthRecordPdf = async () => {
+        if (!divToPrintRef.current) return;
+        try {
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-health-record-pdf`,
+                {
+                    html: divToPrintRef.current.innerHTML,
+                    student_number: person?.student_number,
+                    last_name: person?.last_name,
+                    first_name: person?.first_name,
+                },
+                { responseType: "blob" }
+            );
+            const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.setAttribute("download", `Health_Record_${(person?.last_name || "Student").replace(/\s+/g, "_")}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Failed to generate Health Record PDF:", err);
+            alert("Failed to generate Health Record PDF.");
         }
     };
 
@@ -227,8 +237,137 @@ const HealthRecord = () => {
         }
     }, []);
 
+    const [dataReady, setDataReady] = useState(false);
+
+    const incomingStudentNumber = queryParams.get("student_number");
+    const autoDownload = queryParams.get("auto") === "1";
+
+    useEffect(() => {
+        if (studentNumberProp) {
+            setUserID(studentNumberProp);
+            fetchPersonBySearch(studentNumberProp);
+            return;
+        }
+
+        const storedUser = localStorage.getItem("email");
+        const storedRole = localStorage.getItem("role");
+        const storedID = localStorage.getItem("person_id");
+        const storedStudentNumber = localStorage.getItem("student_number");
+
+        if (storedUser && storedRole && (storedStudentNumber || storedID)) {
+            setUser(storedUser);
+            setUserRole(storedRole);
+            setUserID(storedStudentNumber || storedID);
+
+            if (storedRole === "applicant" || storedRole === "registrar") {
+                fetchPersonBySearch(storedStudentNumber || storedID);
+            } else {
+                window.location.href = "/login";
+            }
+        } else {
+            window.location.href = "/login";
+        }
+    }, [studentNumberProp]);
+
+
+    useEffect(() => {
+        if (autoDownload && dataReady) {
+            // small delay so React has painted the table before we read innerHTML
+            const t = setTimeout(handleExportHealthRecordPdf, 300);
+            return () => clearTimeout(t);
+        }
+    }, [autoDownload, dataReady]);
+
     const [searchQuery, setSearchQuery] = useState("");
     const [personResults, setPersonResults] = useState([]);
+
+
+
+    const [dental, setDental] = useState({});
+    const [neuroData, setNeuroData] = useState(null);
+
+    useEffect(() => {
+        if (person?.last_name) {
+            setDataReady(true);
+        }
+    }, [person, dental, neuroData, medicalData]);
+
+    const fetchDentalData = async (studentNumber) => {
+        try {
+            const res = await axios.get(
+                `${API_BASE_URL}/api/dental-assessment/${studentNumber}`
+            );
+
+            const parsed = {
+                ...res.data,
+                dental_upper_right: parseTeeth(res.data.dental_upper_right),
+                dental_upper_left: parseTeeth(res.data.dental_upper_left),
+                dental_lower_right: parseTeeth(res.data.dental_lower_right),
+                dental_lower_left: parseTeeth(res.data.dental_lower_left),
+            };
+
+            setDental(parsed);
+
+
+            console.log("✅ Dental loaded:", res.data);
+        } catch (err) {
+            console.warn("ℹ️ No dental record found");
+            setDental(null);
+        }
+    };
+
+
+
+
+    const fetchNeuroData = async (studentNumber) => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/physical-neuro/${studentNumber}`);
+            setNeuroData(res.data);
+        } catch (err) {
+            console.warn("No neuro record found");
+            setNeuroData(null);
+        }
+    };
+
+
+    const fetchMedicalData = async (studentNumber) => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${studentNumber}`);
+            setMedicalData(res.data);
+        } catch (err) {
+            console.warn("No medical record found");
+            setMedicalData(null);
+        }
+    };
+
+
+
+    const isChecked = (key) => {
+        return Number(dental?.[key]) === 1;
+    };
+
+    const isProblem = (val) => {
+        if (!val) return false;
+        return val !== "Normal";
+    };
+
+    const parseTeeth = (val) => {
+        if (!val) return [];
+
+        // If already array, return
+        if (Array.isArray(val)) return val;
+
+        // If string, try parse JSON
+        if (typeof val === "string") {
+            try {
+                return JSON.parse(val);
+            } catch {
+                return [];
+            }
+        }
+
+        return [];
+    };
 
     const fetchPersonBySearch = async (query) => {
         try {
@@ -299,190 +438,38 @@ const HealthRecord = () => {
     }, [searchQuery]);
 
 
-    const [dental, setDental] = useState({});
+    // 🔒 Disable right-click
+    // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    const fetchDentalData = async (studentNumber) => {
-        try {
-            const res = await axios.get(
-                `${API_BASE_URL}/api/dental-assessment/${studentNumber}`
-            );
+    // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    // document.addEventListener("keydown", (e) => {
+    //     const isBlockedKey =
+    //         e.key === "F12" ||
+    //         e.key === "F11" ||
+    //         (e.ctrlKey &&
+    //             e.shiftKey &&
+    //             (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "u") ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "p");
 
-            const parsed = {
-                ...res.data,
-                dental_upper_right: parseTeeth(res.data.dental_upper_right),
-                dental_upper_left: parseTeeth(res.data.dental_upper_left),
-                dental_lower_right: parseTeeth(res.data.dental_lower_right),
-                dental_lower_left: parseTeeth(res.data.dental_lower_left),
-            };
-
-            setDental(parsed);
-
-
-            console.log("✅ Dental loaded:", res.data);
-        } catch (err) {
-            console.warn("ℹ️ No dental record found");
-            setDental(null);
-        }
-    };
-
-
-    const [neuroData, setNeuroData] = useState(null);
-
-    const fetchNeuroData = async (studentNumber) => {
-        try {
-            const res = await axios.get(`${API_BASE_URL}/api/physical-neuro/${studentNumber}`);
-            setNeuroData(res.data);
-        } catch (err) {
-            console.warn("No neuro record found");
-            setNeuroData(null);
-        }
-    };
-
-
-    const fetchMedicalData = async (studentNumber) => {
-        try {
-            const res = await axios.get(`${API_BASE_URL}/api/medical-requirements/${studentNumber}`);
-            setMedicalData(res.data);
-        } catch (err) {
-            console.warn("No medical record found");
-            setMedicalData(null);
-        }
-    };
-
-    const isChecked = (key) => {
-        return Number(dental?.[key]) === 1;
-    };
-
-    const isProblem = (val) => {
-        if (!val) return false;
-        return val !== "Normal";
-    };
-
-    const parseTeeth = (val) => {
-        if (!val) return [];
-
-        // If already array, return
-        if (Array.isArray(val)) return val;
-
-        // If string, try parse JSON
-        if (typeof val === "string") {
-            try {
-                return JSON.parse(val);
-            } catch {
-                return [];
-            }
-        }
-
-        return [];
-    };
-
-
-       // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
-
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    //     if (isBlockedKey) {
+    //         e.preventDefault();
+    //         e.stopPropagation();
+    //     }
+    // });
 
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>{/* Header with Search aligned right */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-
-                    mb: 2,
-
-                }}
-            >
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: "bold",
-                        color: titleColor,
-                        fontSize: "36px",
-                    }}
-                >
-                    HEALTH RECORDS
-                </Typography>
-
-                <TextField
-                    size="small"
-                    placeholder="Search by Student Number / Name / Email"
-                    value={searchQuery}
-
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter") fetchPersonBySearch(searchQuery);
-                    }}
-                    sx={{
-                        width: 450,
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": {
-                            borderRadius: "10px",
-                        },
-                    }}
-                    InputProps={{
-                        startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-                    }}
-                />
-
-            </Box>
 
 
-            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
-
-            <br />
-
-            <button
-                onClick={printDiv}
-                style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
-                    border: "2px solid black",
-                    backgroundColor: "#f0f0f0",
-                    color: "black",
-                    borderRadius: "5px",
-                    marginTop: "20px",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    transition: "background-color 0.3s, transform 0.2s",
-                }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-            >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FcPrint size={20} />
-                    Print Health Record
-                </span>
-            </button>
 
 
 
 
             <div ref={divToPrintRef}>
                 <table
-                    className="student-table"
+
                     style={{
                         borderCollapse: "collapse",
                         fontFamily: "Arial",
@@ -966,7 +953,7 @@ const HealthRecord = () => {
                                     style={{
                                         display: "inline-block",
                                         borderBottom: "1px solid black",
-                                        width: "66%",
+                                        width: "100%",
                                         verticalAlign: "bottom",
                                     }}
                                 >
@@ -1391,7 +1378,7 @@ const HealthRecord = () => {
                                         marginTop: "5px",
                                         textAlign: "right", // since we’ll use margin for positioning
                                         marginRight: "-48%", // adjust until text sits between columns 6–8
-                                        marginBottom: "70px"
+                                        marginBottom: "110px"
                                     }}
                                 >
                                     Page 1 of 2
@@ -1421,9 +1408,7 @@ const HealthRecord = () => {
                         <tr>
                             <td colSpan={40} style={{ borderTop: "1px solid black" }} />
                         </tr>
-                        <tr>
-                            <td colSpan={40} style={{ height: "10px" }} />
-                        </tr>
+
                         <tr>
                             <td colSpan={40} style={{
                                 textAlign: "left",

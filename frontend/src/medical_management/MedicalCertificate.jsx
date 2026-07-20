@@ -8,7 +8,8 @@ import Search from '@mui/icons-material/Search';
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
 
-const MedicalCertificate = () => {
+const MedicalCertificate = ({ studentNumber: studentNumberProp } = {}) => {
+
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -128,8 +129,16 @@ const MedicalCertificate = () => {
     const queryParams = new URLSearchParams(location.search);
     const queryPersonId = queryParams.get("person_id");
 
-    // do not alter
+    const incomingStudentNumber = queryParams.get("student_number");
+    const autoDownload = queryParams.get("auto") === "1";
+
     useEffect(() => {
+        if (studentNumberProp) {
+            setUserID(studentNumberProp);
+            fetchPersonBySearch(studentNumberProp);
+            return;
+        }
+
         const storedUser = localStorage.getItem("email");
         const storedRole = localStorage.getItem("role");
         const storedID = localStorage.getItem("person_id");
@@ -141,18 +150,21 @@ const MedicalCertificate = () => {
             setUserID(storedStudentNumber || storedID);
 
             if (storedRole === "applicant" || storedRole === "registrar") {
-                if (storedStudentNumber) {
-                    fetchPersonBySearch(storedStudentNumber);
-                } else {
-                    fetchPersonBySearch(storedID);
-                }
+                fetchPersonBySearch(storedStudentNumber || storedID);
             } else {
                 window.location.href = "/login";
             }
         } else {
             window.location.href = "/login";
         }
-    }, []);
+    }, [studentNumberProp]);
+
+    // Auto-fire the export once the person record has actually loaded
+    useEffect(() => {
+        if (autoDownload && person?.last_name) {
+            handleExportMedicalCertificatePdf();
+        }
+    }, [autoDownload, person]);
 
     const [shortDate, setShortDate] = useState("");
     const [longDate, setLongDate] = useState("");
@@ -204,27 +216,27 @@ const MedicalCertificate = () => {
           />
         </div>
         <div>
-          <div style="font-size:13px; font-family:Arial; text-align:left; margin-bottom:5px;">
+          <div style="font-size:12px; font-family:Arial; text-align:left; margin-bottom:5px;">
             Republic of the Philippines
           </div>
-          <div style="font-size:25px; font-weight:bold; color:black; font-family:Arial; margin-bottom:5px;">
+          <div style="font-size:18px; font-weight:bold; color:black; font-family:Arial; margin-bottom:5px;">
             ${companyName}
           </div>
           <div style="display:flex; justify-content:center; margin-bottom:5px;">
             <hr style="width:100%; max-width:700px; border:1px solid #000; margin:0;" />
           </div>
           <br />
-          <div style="text-align:center; font-size:16px; font-weight:bold; font-family:Arial; margin-left:-95px; margin-top:-20px;">
+          <div style="text-align:center; font-size:12px; font-weight:bold; font-family:Arial; margin-left:-95px; margin-top:-20px;">
             HEALTH SERVICE DIVISION
           </div>
-          <div style="text-align:center; font-size:16px; font-weight:bold; font-family:Arial; margin-left:-100px; margin-top:30px;">
+          <div style="text-align:center; font-size:12px; font-weight:bold; font-family:Arial; margin-left:-100px; margin-top:30px;">
             MEDICAL CERTIFICATE
           </div>
         </div>
       </div>
     </div>
 
-    <table style="border-collapse:collapse; width:8in; margin:0 auto; font-family:Arial; font-size:16px; line-height:1.3;">
+    <table style="border-collapse:collapse; width:8in; margin:0 auto; font-family:Arial; font-size:12px; line-height:1.3;">
       <tbody>
         <tr>
           <td colspan="40" style="text-align:left; padding-bottom:5px; font-weight:bold;">
@@ -258,19 +270,19 @@ const MedicalCertificate = () => {
           <td colspan="40" style="text-align:justify; padding-bottom:3px; width:100%; white-space:nowrap;">
             <span style="display:inline-block; text-align:center; width:10%; vertical-align:top;">
               <div style="border-bottom:1px solid black; width:100%; text-align:center;">${person.civilStatus || ""}</div>
-              <div style="font-size:13px; text-align:center;">(Civil Status)</div>
+              <div style="font-size:12px; text-align:center;">(Civil Status)</div>
             </span>
             &nbsp;A resident of&nbsp;
             <span style="display:inline-block; text-align:center; width:50%; vertical-align:top;">
               <div style="border-bottom:1px solid black; width:100%; text-align:center;">
                 ${person.permanentStreet || ""} ${person.permanentBarangay || ""} ${person.permanentMunicipality || ""}
               </div>
-              <div style="font-size:13px; text-align:center;">(Address)</div>
+              <div style="font-size:12px; text-align:center;">(Address)</div>
             </span>
             &nbsp;was examined on&nbsp;
             <span style="display:inline-block; text-align:center; width:16%; vertical-align:bottom; white-space:nowrap;">
-              <div style="border-bottom:1px solid black; text-align:center; width:100%; line-height:16px;"></div>
-              <div style="font-size:13px; text-align:center; margin-top:1px; line-height:14px;">(Date)</div>
+              <div style="border-bottom:1px solid black; text-align:center; width:100%; line-height:12px;"></div>
+              <div style="font-size:12px; text-align:center; margin-top:1px; line-height:12px;">(Date)</div>
             </span>
           </td>
         </tr>
@@ -285,7 +297,7 @@ const MedicalCertificate = () => {
         </tr>
 
         <tr>
-          <td colspan="40" style="text-align:left; padding-top:5px; width:100%; font-size:14px; line-height:1.8;">
+          <td colspan="40" style="text-align:left; padding-top:5px; width:100%; font-size:12px; line-height:1.8;">
             And found:
             <br />
             <div style="margin-left:50px; margin-top:-20px;">
@@ -311,7 +323,7 @@ const MedicalCertificate = () => {
             MC No.:
             <span style="display:inline-block; border-bottom:1px solid black; width:265px; margin-left:5px;"></span>
             <br />
-            <div style="text-align:center; margin-top:15px; margin-bottom:10px;">
+            <div style="text-align:center; margin-top:12px; margin-bottom:10px;">
               <span style="display:inline-block; border-bottom:1px solid black; width:300px; margin-left:250px;"></span>
             </div>
           </td>
@@ -391,10 +403,10 @@ const MedicalCertificate = () => {
                 params: { query }
             });
 
-            setPersonResults(res.data);
-            if (res.data.length === 1) {
-                setPerson(res.data[0]);
-                fetchMedicalData(res.data[0].student_number);
+            setPersonResults(res.data ? [res.data] : []);
+            if (res.data && res.data.student_number) {
+                setPerson(res.data);
+                fetchMedicalData(res.data.student_number);
             }
             console.log("✅ Person search results:", res.data);
         } catch (error) {
@@ -402,6 +414,7 @@ const MedicalCertificate = () => {
             setPersonResults([]);
         }
     };
+
 
     const fetchMedicalData = async (studentNumber) => {
         try {
@@ -418,36 +431,6 @@ const MedicalCertificate = () => {
         }
     };
 
-    useEffect(() => {
-        const delayDebounce = setTimeout(async () => {
-            if (searchQuery.trim() === "") return;
-
-            try {
-                const res = await axios.get(`${API_BASE_URL}/api/search-person-student`, {
-                    params: { query: searchQuery }
-                });
-
-                console.log("Search result data:", res.data);
-                setPerson(res.data);
-
-                const idToStore = res.data.person_id || res.data.id;
-                if (!idToStore) {
-                    setSearchError("Invalid search result");
-                    return;
-                }
-
-                sessionStorage.setItem("admin_edit_person_id", idToStore);
-                sessionStorage.setItem("admin_edit_person_data", JSON.stringify(res.data));
-                setUserID(idToStore);
-                setSearchError("");
-            } catch (err) {
-                console.error("Search failed:", err);
-                setSearchError("Applicant not found");
-            }
-        }, 500);
-
-        return () => clearTimeout(delayDebounce);
-    }, [searchQuery]);
 
     // 🔒 Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -473,92 +456,7 @@ const MedicalCertificate = () => {
 
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>     {/* Header with Search aligned right */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
 
-                    mb: 2,
-
-                }}
-            >
-                <Typography
-                    variant="h4"
-                    sx={{
-                        fontWeight: "bold",
-                        color: titleColor,
-                        fontSize: "36px",
-                    }}
-                >
-                    MEDICAL CERTIFICATE
-                </Typography>
-
-                <TextField
-                    size="small"
-                    placeholder="Search by Student Number / Name / Email"
-                    value={searchQuery}
-
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter") fetchPersonBySearch(searchQuery);
-                    }}
-                    sx={{
-                        width: 450,
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": {
-                            borderRadius: "10px",
-                        },
-                    }}
-                    InputProps={{
-                        startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-                    }}
-                />
-
-            </Box>
-
-
-            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-
-
-            <br />
-
-
-            <button
-                onClick={handleExportMedicalCertificatePdf}
-                style={{
-                    padding: "5px 20px",
-                    border: "2px solid black",
-                    backgroundColor: "#f0f0f0",
-                    color: "black",
-                    borderRadius: "5px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: "bold",
-                    transition: "background-color 0.3s, transform 0.2s",
-                    height: "40px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    userSelect: "none",
-                }}
-                onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#d3d3d3")
-                }
-                onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#f0f0f0")
-                }
-                onMouseDown={(e) =>
-                    (e.currentTarget.style.transform = "scale(0.95)")
-                }
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                type="button"
-            >
-                <FcPrint size={20} />
-                Download Medical Certificate
-            </button>
 
             <Container>
                 <div ref={divToPrintRef}>
@@ -615,10 +513,11 @@ const MedicalCertificate = () => {
                                 <div>
                                     {/* Top Line: Republic */}
                                     <div style={{
-                                        fontSize: "13px",
+                                        fontSize: "12px",
                                         fontFamily: "Arial",
                                         textAlign: "left",
-                                        marginBottom: "5px"
+                                        marginBottom: "5px",
+                                        marginTop: "15px",
                                     }}>
                                         Republic of the Philippines
                                     </div>
@@ -626,7 +525,7 @@ const MedicalCertificate = () => {
                                     {/* Institute Name */}
                                     <div
                                         style={{
-                                            fontSize: "25px",
+                                            fontSize: "18px",
                                             fontWeight: "bold",
                                             color: "black",
                                             fontFamily: "Arial",
@@ -644,7 +543,7 @@ const MedicalCertificate = () => {
                                     {/* Office Name */}
                                     <div style={{
                                         textAlign: "center",
-                                        fontSize: "16px",
+                                        fontSize: "12px",
                                         fontWeight: "bold",
                                         fontFamily: "Arial",
                                         marginLeft: "-95px",
@@ -656,7 +555,7 @@ const MedicalCertificate = () => {
 
                                     <div style={{
                                         textAlign: "center",
-                                        fontSize: "16px",
+                                        fontSize: "12px",
                                         fontWeight: "bold",
                                         fontFamily: "Arial",
                                         marginLeft: "-100px",
@@ -676,7 +575,7 @@ const MedicalCertificate = () => {
                                 width: "8in",
                                 margin: "0 auto",
                                 fontFamily: "Arial",
-                                fontSize: "16px",
+                                fontSize: "12px",
                                 lineHeight: "1.3",
                             }}
                         >
@@ -803,7 +702,7 @@ const MedicalCertificate = () => {
                                             >
                                                 {person.civilStatus}
                                             </div>
-                                            <div style={{ fontSize: "13px", textAlign: "center" }}>(Civil Status)</div>
+                                            <div style={{ fontSize: "12px", textAlign: "center" }}>(Civil Status)</div>
                                         </span>
 
                                         &nbsp;A resident of&nbsp;
@@ -827,7 +726,7 @@ const MedicalCertificate = () => {
                                                 {person.permanentStreet} {person.permanentBarangay}{" "}
                                                 {person.permanentMunicipality}
                                             </div>
-                                            <div style={{ fontSize: "13px", textAlign: "center" }}>(Address)</div>
+                                            <div style={{ fontSize: "12px", textAlign: "center" }}>(Address)</div>
                                         </span>
 
                                         &nbsp;was examined on&nbsp;
@@ -847,17 +746,17 @@ const MedicalCertificate = () => {
                                                     borderBottom: "1px solid black",
                                                     textAlign: "center",
                                                     width: "100%",
-                                                    lineHeight: "16px",
+                                                    lineHeight: "12px",
                                                 }}
                                             >
                                                 {/* Insert date here */}
                                             </div>
                                             <div
                                                 style={{
-                                                    fontSize: "13px",
+                                                    fontSize: "12px",
                                                     textAlign: "center",
                                                     marginTop: "1px",
-                                                    lineHeight: "14px",
+                                                    lineHeight: "12px",
                                                 }}
                                             >
                                                 (Date)
@@ -905,7 +804,7 @@ const MedicalCertificate = () => {
                                             textAlign: "left",
                                             paddingTop: "5px",
                                             width: "100%",
-                                            fontSize: "14px",
+                                            fontSize: "12px",
                                             lineHeight: "1.8",
                                         }}
                                     >
@@ -974,7 +873,7 @@ const MedicalCertificate = () => {
                                         <div
                                             style={{
                                                 textAlign: "center",
-                                                marginTop: "15px",
+                                                marginTop: "12px",
                                                 marginBottom: "10px"
                                             }}
                                         >
@@ -995,10 +894,9 @@ const MedicalCertificate = () => {
                         </table>
                     </Container>
 
-                    <hr style={{ border: "2px solid black", width: "100%" }} />
+                    <hr style={{ border: "1px solid black", width: "100%" }} />
 
                     <Container>
-
 
                         <div
                             className="student-table"
@@ -1009,7 +907,7 @@ const MedicalCertificate = () => {
                                 justifyContent: "center", // Center horizontally
                                 padding: "10px 10px",
                                 width: "100%",
-
+                                marginTop: "30px",
                                 boxSizing: "border-box"
                             }}>
                             {/* Wrapper to contain logo and text side by side without stretching */}
@@ -1028,20 +926,20 @@ const MedicalCertificate = () => {
                                             height: "120px",  // ✅ hardcoded height
                                             borderRadius: "50%", // optional (use for circular look)
                                             objectFit: "cover",
-                                            marginTop: "-30px",
+                                            marginTop: "5px",
                                         }}
                                     />
                                 </div>
 
 
-
                                 <div>
                                     {/* Top Line: Republic */}
                                     <div style={{
-                                        fontSize: "13px",
+                                        fontSize: "12px",
                                         fontFamily: "Arial",
                                         textAlign: "left",
-                                        marginBottom: "5px"
+                                        marginBottom: "5px",
+                                        marginTop: "15px",
                                     }}>
                                         Republic of the Philippines
                                     </div>
@@ -1049,7 +947,7 @@ const MedicalCertificate = () => {
                                     {/* Institute Name */}
                                     <div
                                         style={{
-                                            fontSize: "25px",
+                                            fontSize: "18px",
                                             fontWeight: "bold",
                                             color: "black",
                                             fontFamily: "Arial",
@@ -1067,10 +965,10 @@ const MedicalCertificate = () => {
                                     {/* Office Name */}
                                     <div style={{
                                         textAlign: "center",
-                                        fontSize: "16px",
+                                        fontSize: "12px",
                                         fontWeight: "bold",
                                         fontFamily: "Arial",
-                                        marginLeft: "-85px",
+                                        marginLeft: "-95px",
                                         marginTop: "-20px"
                                     }}>
                                         HEALTH SERVICE DIVISION
@@ -1079,7 +977,7 @@ const MedicalCertificate = () => {
 
                                     <div style={{
                                         textAlign: "center",
-                                        fontSize: "16px",
+                                        fontSize: "12px",
                                         fontWeight: "bold",
                                         fontFamily: "Arial",
                                         marginLeft: "-100px",
@@ -1092,14 +990,14 @@ const MedicalCertificate = () => {
                                 </div>
                             </div>
                         </div>
-                        <br />
+
                         <table
                             style={{
                                 borderCollapse: "collapse",
                                 width: "8in",
                                 margin: "0 auto",
                                 fontFamily: "Arial",
-                                fontSize: "16px",
+                                fontSize: "12px",
                                 lineHeight: "1.3",
                             }}
                         >
@@ -1226,7 +1124,7 @@ const MedicalCertificate = () => {
                                             >
                                                 {person.civilStatus}
                                             </div>
-                                            <div style={{ fontSize: "13px", textAlign: "center" }}>(Civil Status)</div>
+                                            <div style={{ fontSize: "12px", textAlign: "center" }}>(Civil Status)</div>
                                         </span>
 
                                         &nbsp;A resident of&nbsp;
@@ -1250,7 +1148,7 @@ const MedicalCertificate = () => {
                                                 {person.permanentStreet} {person.permanentBarangay}{" "}
                                                 {person.permanentMunicipality}
                                             </div>
-                                            <div style={{ fontSize: "13px", textAlign: "center" }}>(Address)</div>
+                                            <div style={{ fontSize: "12px", textAlign: "center" }}>(Address)</div>
                                         </span>
 
                                         &nbsp;was examined on&nbsp;
@@ -1270,17 +1168,17 @@ const MedicalCertificate = () => {
                                                     borderBottom: "1px solid black",
                                                     textAlign: "center",
                                                     width: "100%",
-                                                    lineHeight: "16px",
+                                                    lineHeight: "12px",
                                                 }}
                                             >
                                                 {/* Insert date here */}
                                             </div>
                                             <div
                                                 style={{
-                                                    fontSize: "13px",
+                                                    fontSize: "12px",
                                                     textAlign: "center",
                                                     marginTop: "1px",
-                                                    lineHeight: "14px",
+                                                    lineHeight: "12px",
                                                 }}
                                             >
                                                 (Date)
@@ -1320,7 +1218,6 @@ const MedicalCertificate = () => {
                                     </td>
                                 </tr>
 
-
                                 {/* --- Findings and Footer Section --- */}
                                 <tr>
                                     <td
@@ -1329,7 +1226,7 @@ const MedicalCertificate = () => {
                                             textAlign: "left",
                                             paddingTop: "5px",
                                             width: "100%",
-                                            fontSize: "14px",
+                                            fontSize: "12px",
                                             lineHeight: "1.8",
                                         }}
                                     >
@@ -1398,7 +1295,7 @@ const MedicalCertificate = () => {
                                         <div
                                             style={{
                                                 textAlign: "center",
-                                                marginTop: "15px",
+                                                marginTop: "12px",
                                                 marginBottom: "10px"
                                             }}
                                         >

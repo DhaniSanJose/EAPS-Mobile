@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
-import { SettingsContext } from "../App";
 import axios from "axios";
 import {
     Box,
@@ -18,7 +17,11 @@ import {
     Container,
     Paper,
     Table,
+    CircularProgress,
 } from "@mui/material";
+import HealthRecord from "./HealthRecord";
+import { SettingsContext } from "../App";
+import MedicalCertificate from "./MedicalCertificate";
 import SearchIcon from "@mui/icons-material/Search";
 import { useNavigate, useLocation } from "react-router-dom";
 import SaveIcon from '@mui/icons-material/Save';
@@ -31,6 +34,12 @@ import API_BASE_URL from "../apiConfig";
 import { Snackbar, Alert } from "@mui/material";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+
+// NOTE: `EaristLogo` was referenced below as a fallback logo but was never imported
+// in the original file. Add the correct import for your project, e.g.:
+// import EaristLogo from "../assets/EaristLogo.png";
+// Until then it falls back to null so the app doesn't crash on a missing reference.
+const EaristLogo = null;
 
 const DentalAssessment = () => {
     useAuditMac();
@@ -467,6 +476,86 @@ const DentalAssessment = () => {
         }
     };
 
+    const links = [
+        { key: "healthRecord", label: "Student Health Record", onClick: () => generateFormPdf("healthRecord") },
+        { key: "medicalCertificate", label: "Medical Certificate", onClick: () => generateFormPdf("medicalCertificate") },
+    ];
+
+    const [generatingKey, setGeneratingKey] = useState(null); // "healthRecord" | "medicalCertificate"
+    const hiddenFormRef = useRef();
+
+    const FORM_CONFIGS = {
+        healthRecord: {
+            label: "Student Health Record",
+            endpoint: "/api/generate-health-record-pdf",
+            filenamePrefix: "Health_Record",
+            Component: HealthRecord,
+        },
+        medicalCertificate: {
+            label: "Medical Certificate",
+            endpoint: "/api/generate-medical-certificate-pdf",
+            filenamePrefix: "Medical_Certificate",
+            Component: MedicalCertificate,
+        },
+    };
+
+    const generateFormPdf = async (key) => {
+        const config = FORM_CONFIGS[key];
+        if (!config || generatingKey) return;
+
+        if (!studentNumber) {
+            setSnack({
+                open: true,
+                message: "Please search and select a student first.",
+                severity: "warning",
+            });
+            return;
+        }
+
+        setGeneratingKey(key);
+
+        try {
+            // give the hidden component time to mount + finish its own fetch
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            const node = hiddenFormRef.current;
+            if (!node) throw new Error(`${config.label} did not render in time.`);
+
+            const response = await axios.post(
+                `${API_BASE_URL}${config.endpoint}`,
+                {
+                    html: node.innerHTML,
+                    student_number: studentNumber,
+                    last_name: person?.last_name || "",
+                    first_name: person?.first_name || "",
+                },
+                { responseType: "blob" },
+            );
+
+            const blob = new Blob([response.data], { type: "application/pdf" });
+            const url = window.URL.createObjectURL(blob);
+            const safeLast = (person?.last_name || "Student").replace(/\s+/g, "_");
+            const fileName = `${config.filenamePrefix}_${safeLast}.pdf`;
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(`Error generating ${config.label} PDF:`, err);
+            setSnack({
+                open: true,
+                message: `Unable to generate ${config.label} PDF right now.`,
+                severity: "error",
+            });
+        } finally {
+            setGeneratingKey(null);
+        }
+    };
+
     const toothOptions = [
         "Normal",
         "With Caries",
@@ -552,27 +641,11 @@ const DentalAssessment = () => {
         return () => clearTimeout(delayDebounce);
     }, [studentNumber]);
 
-    // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
-
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
-
-
+    // 🦷 Renders one quadrant's row of tooth selectors and RETURNS the JSX
+    // (previously this function's body was cut short and its JSX was
+    // accidentally pasted outside of it as a stray top-level `return`,
+    // which broke the whole component)
     const renderToothRow = (title, quadrant) => {
         // 🧩 Always ensure we have an array
         let teethArray = form[quadrant];
@@ -677,6 +750,26 @@ const DentalAssessment = () => {
     };
 
 
+    // 🔒 Disable right-click
+    // document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    // document.addEventListener("keydown", (e) => {
+    //     const isBlockedKey =
+    //         e.key === "F12" ||
+    //         e.key === "F11" ||
+    //         (e.ctrlKey &&
+    //             e.shiftKey &&
+    //             (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "u") ||
+    //         (e.ctrlKey && e.key.toLowerCase() === "p");
+
+    //     if (isBlockedKey) {
+    //         e.preventDefault();
+    //         e.stopPropagation();
+    //     }
+    // });
+
 
 
     return (
@@ -690,6 +783,12 @@ const DentalAssessment = () => {
                 padding: 2,
             }}
         >
+            {generatingKey && FORM_CONFIGS[generatingKey] && (
+                <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+                    {React.createElement(FORM_CONFIGS[generatingKey].Component, { studentNumber })}
+                </div>
+            )}
+
             <Box
                 display="flex"
                 justifyContent="space-between"
@@ -781,108 +880,95 @@ const DentalAssessment = () => {
                 <Box
                     sx={{
                         display: "flex",
+                        flexWrap: "wrap",
                         gap: 2,
-
+                        mt: 2,
                         pb: 2,
-                        justifyContent: "flex-end", // ✅ aligns to right
-                        pr: 1, // optional padding from right edge
+                        justifyContent: "flex-end",
+                        pr: 1,
                     }}
                 >
-                    {/* Student Health Record */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4 }}
-                    >
-                        <Card
-                            sx={{
-                                height: 60,
-                                width: 260, // ✅ same fixed width
-                                borderRadius: 2,
-                                border: `1px solid ${borderColor}`,
-                                backgroundColor: "#fff",
-                                display: "flex",
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                textAlign: "center",
-                                p: 1.5,
-                                cursor: "pointer",
-                                transition: "all 0.3s ease-in-out",
-                                "&:hover": {
-                                    transform: "scale(1.05)",
-                                    backgroundColor: settings?.header_color || "#1976d2",
-                                    "& .card-text": { color: "#fff" },
-                                    "& .card-icon": { color: "#fff" },
-                                },
-                            }}
-                            onClick={() => navigate("/health_record")}
-                        >
-                            <PictureAsPdfIcon
-                                className="card-icon"
-                                sx={{ fontSize: 35, color: "#6D2323", mr: 1.5 }}
-                            />
-                            <Typography
-                                className="card-text"
-                                sx={{
-                                    color: "#6D2323",
-                                    fontFamily: "Poppins, sans-serif",
-                                    fontWeight: "bold",
-                                    fontSize: "0.9rem",
-                                }}
-                            >
-                                Student Health Record
-                            </Typography>
-                        </Card>
-                    </motion.div>
+                    {links.map((lnk, i) => {
+                        const isGenerating = generatingKey === lnk.key;
+                        const disabled = generatingKey !== null;
 
-                    {/* Medical Certificate */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1, duration: 0.4 }}
-                    >
-                        <Card
-                            sx={{
-                                height: 60,
-                                width: 260, // ✅ same fixed width as above
-                                borderRadius: 2,
-                                border: `1px solid ${borderColor}`,
-                                backgroundColor: "#fff",
-                                display: "flex",
-                                flexDirection: "row",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                textAlign: "center",
-                                p: 1.5,
-                                cursor: "pointer",
-                                transition: "all 0.3s ease-in-out",
-                                "&:hover": {
-                                    transform: "scale(1.05)",
-                                    backgroundColor: settings?.header_color || "#1976d2",
-                                    "& .card-text": { color: "#fff" },
-                                    "& .card-icon": { color: "#fff" },
-                                },
-                            }}
-                            onClick={() => navigate("/medical_certificate")}
-                        >
-                            <PictureAsPdfIcon
-                                className="card-icon"
-                                sx={{ fontSize: 35, color: "#6D2323", mr: 1.5 }}
-                            />
-                            <Typography
-                                className="card-text"
-                                sx={{
-                                    color: "#6D2323",
-                                    fontFamily: "Poppins, sans-serif",
-                                    fontWeight: "bold",
-                                    fontSize: "0.9rem",
-                                }}
+                        return (
+                            <motion.div
+                                key={lnk.key}
+                                style={{ flex: "0 0 260px" }}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.1, duration: 0.4 }}
                             >
-                                Medical Certificate
-                            </Typography>
-                        </Card>
-                    </motion.div>
+                                <Card
+                                    sx={{
+                                        minHeight: 60,
+                                        borderRadius: 2,
+                                        border: `1px solid ${borderColor}`,
+                                        backgroundColor: "#fff",
+                                        display: "flex",
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        textAlign: "center",
+                                        p: 1.5,
+                                        cursor: disabled ? "default" : "pointer",
+                                        opacity: disabled && !isGenerating ? 0.5 : 1,
+                                        pointerEvents: disabled ? "none" : "auto",
+                                        transition: "all 0.3s ease-in-out",
+                                        "&:hover": {
+                                            transform: disabled ? "none" : "scale(1.05)",
+                                            backgroundColor: disabled
+                                                ? "#fff"
+                                                : settings?.header_color || "#1976d2",
+
+                                            "& .card-text": {
+                                                color: disabled ? mainButtonColor : "#fff",
+                                            },
+                                            "& .card-icon": {
+                                                color: disabled ? mainButtonColor : "#fff",
+                                            },
+                                        },
+                                    }}
+                                    onClick={() => {
+                                        if (disabled) return;
+
+                                        if (lnk.onClick) {
+                                            lnk.onClick();
+                                        } else if (lnk.to) {
+                                            navigate(lnk.to);
+                                        }
+                                    }}
+                                >
+                                    {/* Icon / Loading */}
+                                    {isGenerating ? (
+                                        <CircularProgress
+                                            size={26}
+                                            sx={{ color: mainButtonColor, mr: 1.5 }}
+                                        />
+                                    ) : (
+                                        <PictureAsPdfIcon
+                                            className="card-icon"
+                                            sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
+                                        />
+                                    )}
+
+                                    {/* Label */}
+                                    <Typography
+                                        className="card-text"
+                                        sx={{
+                                            color: mainButtonColor,
+                                            fontFamily: "Poppins, sans-serif",
+                                            fontWeight: "bold",
+                                            fontSize: "0.85rem",
+                                        }}
+                                    >
+                                        {isGenerating ? "Generating PDF..." : lnk.label}
+                                    </Typography>
+                                </Card>
+                            </motion.div>
+                        );
+                    })}
                 </Box>
 
                 <Grid container spacing={3}>
@@ -993,7 +1079,7 @@ const DentalAssessment = () => {
                         startIcon={<SaveIcon />}
                         onClick={handleSave}
                         sx={{
-                            backgroundColor: '#primary', // maroon color
+                            backgroundColor: '#6D2323', // maroon color
                             '&:hover': {
                                 backgroundColor: '#660000', // darker maroon on hover
                             },

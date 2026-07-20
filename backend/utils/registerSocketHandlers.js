@@ -6911,10 +6911,11 @@ Click the link below to log in:
       if (document_status === "Documents Verified & ECAT") {
         await db.query(
           `UPDATE requirement_uploads
-         SET status = 1,
-             document_status = ?,
-             last_updated_by = ?
-         WHERE person_id = ?`,
+     SET status = 1,
+         document_status = ?,
+         last_updated_by = ?,
+         verified_at = COALESCE(verified_at, NOW())
+     WHERE person_id = ?`,
           [document_status, user_id, person_id],
         );
       }
@@ -8451,7 +8452,7 @@ Click the link below to log in:
 
           fs.renameSync(tempPath, newPath);
         }
-        
+
         const sql = `
       UPDATE person_table SET profile_img = ? WHERE person_id = ?
     `;

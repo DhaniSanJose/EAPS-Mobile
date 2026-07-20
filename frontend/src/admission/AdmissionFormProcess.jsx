@@ -435,7 +435,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 <div style={{ flexShrink: 0 }}>
                   <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
                   {controlNumber && (
-                    <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+                    <div style={{ fontSize: "13px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
                       Document No.: {controlNumber}
                     </div>
                   )}
@@ -1599,7 +1599,7 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
                 <div style={{ flexShrink: 0 }}>
                   <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
                   {controlNumber && (
-                    <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
                       Document No.: {controlNumber}
                     </div>
                   )}

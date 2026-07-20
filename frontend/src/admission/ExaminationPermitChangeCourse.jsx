@@ -406,7 +406,7 @@ const ExaminationProfile = () => {
       const applicantName = source?.last_name
         ? `${source.last_name}, ${source.first_name || ""}${middleInitial}`.trim()
         : [source?.first_name, source?.middle_name].filter(Boolean).join(" ") ||
-          "Unknown Applicant";
+        "Unknown Applicant";
 
       await postAuditEvent(DOWNLOAD_EXAM_PDF_ACTION, {
         document_label: documentLabel,
@@ -508,6 +508,26 @@ const ExaminationProfile = () => {
     fetchSignatures();
   }, []);
 
+
+  const [permitNumber, setPermitNumber] = useState("");
+
+  useEffect(() => {
+    if (!selectedPerson?.person_id || !isVerified) {
+      setPermitNumber("");
+      return;
+    }
+    axios
+      .post(`${API_BASE_URL}/api/generate-permit-number`, {
+        person_id: selectedPerson.person_id,
+        applicant_number: selectedPerson.applicant_number,
+      })
+      .then((res) => setPermitNumber(res.data?.control_number || ""))
+      .catch((err) => {
+        console.error("Failed to generate permit number:", err);
+        setPermitNumber("");
+      });
+  }, [selectedPerson, isVerified]);
+
   const paginatedSignatures = signatures.slice(
     signaturePage * SIGNATURES_PER_PAGE,
     signaturePage * SIGNATURES_PER_PAGE + SIGNATURES_PER_PAGE
@@ -552,7 +572,7 @@ const ExaminationProfile = () => {
                   <td style={{ width: "20%", textAlign: "center" }}>
                     <img src={fetchedLogo} alt="School Logo" style={{ marginLeft: "-10px", width: "120px", height: "120px", borderRadius: "50%", objectFit: "cover" }} />
                     {controlNumbers.permit && (
-                      <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", marginTop: "4px" }}>
+                      <div style={{ fontSize: "11.5px", fontWeight: "bold", color: "#8B0000", marginTop: "4px" }}>
                         Document No.: {controlNumbers.permit}
                       </div>
                     )}
@@ -593,7 +613,7 @@ const ExaminationProfile = () => {
         <div style={{ flexShrink: 0 }}>
           <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
           {controlNumbers[selectedForm] && (
-            <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+            <div style={{ fontSize: "11.5px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
               Document No.: {controlNumbers[selectedForm]}
             </div>
           )}
@@ -624,7 +644,7 @@ const ExaminationProfile = () => {
         <div style={{ position: "absolute", left: 0 }}>
           <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
           {controlNumbers[selectedForm] && (
-            <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+            <div style={{ fontSize: "11.5px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
               Document No.: {controlNumbers[selectedForm]}
             </div>
           )}
@@ -997,7 +1017,9 @@ const ExaminationProfile = () => {
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Permit No.:</label>
-                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", textAlign: "left" }}>{selectedPerson?.applicant_number}</span>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", textAlign: "left" }}>
+                    {permitNumber || ""}
+                  </span>
                 </div>
               </td>
             </tr>
@@ -1017,7 +1039,7 @@ const ExaminationProfile = () => {
                       alignItems: "center",
                       paddingRight: "5px",
                       overflowWrap: "break-word",
-                
+
                     }}
                   >
                     {curriculumOptions.length > 0
@@ -1041,7 +1063,7 @@ const ExaminationProfile = () => {
                       display: "flex",
                       alignItems: "center",
                       paddingRight: "5px",
-                  
+
                     }}
                   >
                     {curriculumOptions.length > 0
