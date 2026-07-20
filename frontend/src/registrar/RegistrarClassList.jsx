@@ -36,6 +36,12 @@ import {
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import { filterSchoolYearsFromActive } from "../utils/schoolYearOptions";
+import {
+  buildRegistrarClassListPrintHtml,
+  CLASS_LIST_PRINT_CSS,
+  mapStudentToPrintRow,
+  resolveLogoDataUrl,
+} from "../utils/classListPrintLayout";
 
 // ✅ Ported from StudentListForEnrollment: dedupe by program_code + major
 // (NOT curriculum_id). The same program (e.g. "BSCS") can be stored under
@@ -481,25 +487,11 @@ const ClassRoster = () => {
   // Export (Download Class List PDF)
   // ─────────────────────────────────────────────────────────────────────────────
   const handleExportClassListPdf = async () => {
-    const resolvedAddress = campusAddress?.trim() || "No address set in Settings";
-    const logoSrc = fetchedLogo || EaristLogo;
-    const name = companyName?.trim() || "";
-
-    const words = name.split(" ");
-    const middleIndex = Math.ceil(words.length / 2);
-    const firstLine = words.slice(0, middleIndex).join(" ");
-    const secondLine = words.slice(middleIndex).join(" ");
-
-    // Department label (left corner) — look up the human-readable name,
-    // since selectedDepartmentFilter stores dprtmnt_id.
     const selectedDepartmentLabel =
       department.find(
         (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
       )?.dprtmnt_name || "All Departments";
 
-    // Program label (right corner) — ✅ resolves via the dedupe-aware
-    // selectedProgramOption so it always shows the right name even though
-    // the underlying curriculum_id is just a representative row.
     const selectedProgramLabel = selectedProgramFilter
       ? selectedProgramOption?.program_description || selectedProgramFilter
       : "All Programs";
@@ -508,7 +500,7 @@ const ClassRoster = () => {
       (sy) => String(sy.year_id) === String(selectedSchoolYear),
     );
     const yearLabel = selectedYear
-      ? `${selectedYear.current_year} - ${selectedYear.next_year}`
+      ? `${selectedYear.current_year}-${selectedYear.next_year}`
       : "N/A";
 
     const selectedSemesterLabel =
@@ -516,105 +508,48 @@ const ClassRoster = () => {
         (sm) => String(sm.semester_id) === String(selectedSchoolSemester),
       )?.semester_description || "N/A";
 
-    // Only the .print-container's INNER markup — the server wraps this
-    // with matching CSS (same pattern as the Applicant List export).
+    const printTimestamp = new Date().toLocaleString("en-PH", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+
+    const logoDataUrl = await resolveLogoDataUrl(
+      fetchedLogo || EaristLogo || "",
+    );
+
+    const footerCenter =
+      selectedProgramLabel && selectedProgramLabel !== "All Programs"
+        ? selectedProgramLabel
+        : "Class List";
+
     const innerHtml = `
-    <div class="print-header">
-
-      <div class="print-corner-label left">
-        Department:<br/>${selectedDepartmentLabel}
-      </div>
-
-      <div class="print-corner-label right">
-        Program:<br/>${selectedProgramLabel}
-      </div>
-
-      <div class="header-content">
-        <img src="${logoSrc}" alt="School Logo" />
-
-        <div class="header-text">
-          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
-
-          ${name
-        ? `
-              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
-                ${firstLine}
-              </b>
-              ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
-                       <b>${secondLine}</b>
-                     </div>`
-          : ""
-        }
-            `
-        : ""
-      }
-
-          <div style="font-size: 12px; font-family: Arial">${resolvedAddress}</div>
-        </div>
-      </div>
-
-      <div style="margin-top: 12px; font-size: 12px;">
-        S.Y. ${yearLabel} &nbsp;|&nbsp; ${selectedSemesterLabel}
-      </div>
-
-      <div style="margin-top: 8px; text-align: center;">
-        <b style="font-size: 20px; letter-spacing: 1px;">CLASS LIST</b>
-      </div>
-    </div>
-
-    <div class="table-wrapper">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:4%">#</th>
-          <th style="width:14%">Student Number</th>
-          <th style="width:22%">Name</th>
-          <th style="width:12%">Program Code</th>
-          <th style="width:10%">Year Level</th>
-          <th style="width:10%">Semester</th>
-          <th style="width:10%">Remarks</th>
-          <th style="width:10%">Date Enrolled</th>
-          <th style="width:8%">Student Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${filteredStudents
-        .map((s, i) => {
-          // ✅ Look up program info from allCurriculums (not the deduped
-          // curriculumOptions list) so students whose curriculum_id wasn't
-          // kept as the dedupe representative still resolve their
-          // program_code correctly.
-          const prog = allCurriculums.find(
-            (c) => String(c.curriculum_id) === String(s.curriculum_id),
-          );
-          const sem = semesters.find(
-            (sm) => String(sm.semester_id) === String(s.semester_id),
-          );
-          return `
-              <tr>
-                <td>${i + 1}</td>
-                <td>${s.student_number ?? "N/A"}</td>
-                <td class="student-name">${s.last_name}, ${s.first_name} ${s.middle_name ?? ""} ${s.extension ?? ""}</td>
-                <td>${prog?.program_code ?? "N/A"}</td>
-                <td>${s.year_level_description ?? "N/A"}</td>
-                <td>${sem?.semester_description ?? "N/A"}</td>
-                <td>${remarksMap[s.en_remarks] ?? "N/A"}</td>
-                <td>${s.created_at ? new Date(s.created_at).toLocaleDateString("en-PH") : "N/A"}</td>
-                <td>${getStudentRegularLabel(s)}</td>
-              </tr>
-            `;
-        })
-        .join("")}
-      </tbody>
-    </table>
-    </div>
-  `;
+      <style>${CLASS_LIST_PRINT_CSS}</style>
+      ${buildRegistrarClassListPrintHtml({
+        companyName: companyName?.trim() || "",
+        campusAddress: campusAddress?.trim() || "Nagtahan Sampaloc Manila",
+        logoUrl: logoDataUrl,
+        departmentTitle: selectedDepartmentLabel,
+        programTitle: selectedProgramLabel,
+        academicYearLabel: yearLabel,
+        semesterLabel: selectedSemesterLabel,
+        students: filteredStudents.map(mapStudentToPrintRow),
+        printInfoLabel: printTimestamp,
+      })}
+    `;
 
     try {
       const response = await axios.post(
         `${API_BASE_URL}/api/generate-class-list-pdf`,
-        { html: innerHtml },
+        {
+          html: innerHtml,
+          footerLeft: printTimestamp,
+          footerCenter,
+        },
         {
           responseType: "blob",
           headers: {
@@ -710,16 +645,42 @@ const ClassRoster = () => {
           CLASS LIST
         </Typography>
 
-
-
+        <button
+          onClick={handleExportClassListPdf}
+          style={{
+            padding: "10px 20px",
+            border: "2px solid black",
+            backgroundColor: "#f0f0f0",
+            color: "black",
+            borderRadius: "5px",
+            cursor: "pointer",
+            fontSize: "16px",
+            fontWeight: "bold",
+            transition: "background-color 0.3s, transform 0.2s",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#d3d3d3")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "#f0f0f0")
+          }
+          onMouseDown={(e) =>
+            (e.currentTarget.style.transform = "scale(0.95)")
+          }
+          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          type="button"
+        >
+          <FcPrint size={20} />
+          Download Class List
+        </button>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
       <br />
-      <br />
-  
-
 
       {/* ── Pagination bar ── */}
       <TableContainer component={Paper} sx={{ width: "100%" }}>
@@ -795,46 +756,9 @@ const ClassRoster = () => {
 
       {/* ── Filter panel ── */}
       <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}>
-        <Box sx={{ display: "flex", flexDirection: "column", flexWrap: "wrap", gap: "2rem" }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
 
-          {/* Row 1: export */}
-          <Box sx={{ display: "flex", gap: "1rem", justifyContent: "space-between" }}>
-            <button
-              onClick={handleExportClassListPdf}
-              style={{
-                padding: "5px 20px",
-                border: "2px solid black",
-                backgroundColor: "#f0f0f0",
-                color: "black",
-                borderRadius: "5px",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: "bold",
-                transition: "background-color 0.3s, transform 0.2s",
-                height: "40px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                userSelect: "none",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#d3d3d3")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f0f0f0")
-              }
-              onMouseDown={(e) =>
-                (e.currentTarget.style.transform = "scale(0.95)")
-              }
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              type="button"
-            >
-              <FcPrint size={20} />
-              Download Class List
-            </button>
-          </Box>
-
-          {/* Row 2: status / remarks | school year / semester | department / program */}
+          {/* Row 1: status / remarks | school year / semester | department / program */}
           <Box display="flex" justifyContent="space-between">
 
             {/* Left column */}

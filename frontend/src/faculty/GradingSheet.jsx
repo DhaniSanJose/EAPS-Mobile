@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef, useCallback, useMemo } from "react";
+﻿import React, { useState, useEffect, useContext, useRef, useCallback, useMemo } from "react";
 import { SettingsContext } from "../App";
 import "../styles/TempStyles.css";
 import axios from "axios";
@@ -35,14 +35,21 @@ import API_BASE_URL from "../apiConfig";
 import { useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import SearchIcon from "@mui/icons-material/Search";
+import EaristLogo from "../assets/EaristLogo.png";
 import {
   convertRawToRatingDynamic,
   setRemarksFromRatingDynamic,
 } from "../utils/gradeConversion";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+import {
+  buildGradingReportPrintHtml,
+  mapStudentToGradingPrintRow,
+  printGradingReportDocument,
+  resolveLogoDataUrl,
+} from "../utils/gradingReportPrintLayout";
 
-// ── Defined OUTSIDE the component so the reference never changes ──────────────
+// Defined OUTSIDE the component so the reference never changes
 const gradeOptions = [
   ...Array.from({ length: 41 }, (_, i) => (100 - i).toString()),
   "INC",
@@ -82,7 +89,7 @@ const displayGradeValue = (rawValue) => {
   return rawValue ?? "";
 };
 
-// ── GradeSelect outside + React.memo = no unmount/remount on parent re-render ─
+// â”€â”€ GradeSelect outside + React.memo = no unmount/remount on parent re-render â”€
 const GradeSelect = React.memo(({ value, onChange, placeholder = "", disabled = false }) => {
   const [inputValue, setInputValue] = useState(displayGradeValue(value));
   const [open, setOpen] = useState(false);
@@ -1345,97 +1352,97 @@ const GradingSheet = () => {
     }
   };
 
-  const divToPrintRef = useRef();
+  const printDiv = async () => {
+    const printStudents = sortStudentsByNameAsc(
+      filteredStudents.length ? filteredStudents : students,
+    );
+    const meta = printStudents[0] || {};
+    const lecUnit = Number(meta.course_unit) || 0;
+    const labUnit = Number(meta.lab_unit) || 0;
+    const creditUnit = lecUnit + labUnit;
+    const facultyName = [
+      profData.fname,
+      profData.mname ? `${String(profData.mname)[0]}.` : "",
+      profData.lname,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
-  const printDiv = () => {
-    const printTitle = getGradingSheetBaseName();
-    const printDate = new Date().toLocaleString();
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "absolute";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
+    const academicYearTerm = [
+      meta.current_year && meta.next_year
+        ? `${meta.current_year}-${meta.next_year}`
+        : "",
+      meta.semester_description || "",
+    ]
+      .filter(Boolean)
+      .join(", ");
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
+    const sessionParts = [
+      meta.day || meta.session_day || "",
+      meta.school_time_start && meta.school_time_end
+        ? `${meta.school_time_start}-${meta.school_time_end}`
+        : meta.session || "",
+    ].filter(Boolean);
+    const session = sessionParts.join(" - ");
 
-    doc.write(`
-        <html>
-          <head>
-            <title>${printTitle}</title>
-            <style>
-              @page {
-                margin: 0;
-                size: auto;
-              }
+    const datePostedRaw =
+      meta.date_posted || meta.posted_at || meta.grade_posted_at || "";
+    const datePosted = datePostedRaw
+      ? new Date(datePostedRaw).toLocaleDateString("en-PH", {
+          month: "2-digit",
+          day: "2-digit",
+          year: "2-digit",
+        })
+      : "";
 
-              html,
-              body {
-                font-family: Arial;
-                margin: 0;
-              }
-              .print-content {
-                padding: 0.5in 0.5in 0.75in;
-              }
-              .print-footer {
-                position: fixed;
-                left: 0.5in;
-                right: 0.5in;
-                bottom: 0.25in;
-                display: flex;
-                justify-content: space-between;
-                font-size: 9px;
-              }
-              .print-footer .page-number::after {
-                content: counter(page) "/" counter(pages);
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 13px;
-              }
-              th, td {
-                border: 1px solid black;
-                padding: 6px;
-                text-align: left;
-              }
-              th {
-                background-color: #f0f0f0;
-              }
-              h2, h3, h4 {
-                text-align: center;
-                margin: 0;
-              }
-              h3 {
-                margin-top: 20px;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="print-content">
-              ${divToPrintRef.current.innerHTML}
-            </div>
-            <div class="print-footer">
-              <span>${printDate}</span>
-              <span class="page-number"></span>
-            </div>
-          </body>
-        </html>
-      `);
+    const printTimestamp = new Date().toLocaleString("en-PH", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
 
-    doc.close();
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-    document.body.removeChild(iframe);
+    const logoDataUrl = await resolveLogoDataUrl(
+      fetchedLogo || EaristLogo || "",
+    );
+
+    const html = buildGradingReportPrintHtml({
+      companyName,
+      campusAddress: campusAddress || "Nagtahan St, Sampaloc, Manila",
+      logoUrl: logoDataUrl,
+      subjectCode: meta.course_code || "",
+      subjectTitle: (meta.course_description || "").toUpperCase(),
+      academicYearTerm,
+      classSection: `${meta.program_code || ""} ${meta.section_description || ""}`
+        .replace(/\s+/g, " ")
+        .trim(),
+      lecUnit: lecUnit.toFixed(1),
+      labUnit: labUnit.toFixed(1),
+      creditUnit: creditUnit.toFixed(1),
+      session,
+      facultyName,
+      datePosted,
+      collegeName: meta.dprtmnt_name || "",
+      students: printStudents.map((student) =>
+        mapStudentToGradingPrintRow(student, {
+          convertRawToRating,
+          remarkConversion,
+        }),
+      ),
+      stats: gradeStats,
+      printInfoLabel: printTimestamp,
+    });
+
+    printGradingReportDocument(html, getGradingSheetBaseName(meta));
   };
 
-  // 🔒 Disable right-click
+  // Disable right-click
   // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // // Block DevTools shortcuts + Ctrl+P silently
   // document.addEventListener("keydown", (e) => {
   //   const isBlockedKey =
   //     e.key === "F12" ||
@@ -1740,7 +1747,7 @@ const GradingSheet = () => {
             gap: 2,
           }}
         >
-          {/* ── LEFT: Course / Section / Sort + School Year + Semester + Find ── */}
+          {/* â”€â”€ LEFT: Course / Section / Sort + School Year + Semester + Find â”€â”€ */}
           <Box display="flex" flexDirection="column" gap={2}>
 
             
@@ -1886,7 +1893,7 @@ const GradingSheet = () => {
             </Box>
           </Box>
 
-          {/* ── RIGHT: File upload + actions ── */}
+          {/* â”€â”€ RIGHT: File upload + actions â”€â”€ */}
           <Box display="flex" flexDirection="column" gap={1.5} alignItems="flex-end" sx={{ minWidth: 260 }}>
 
             {/* Import Excel button */}
@@ -2004,7 +2011,8 @@ const GradingSheet = () => {
                 justifyContent: "center",
               }}
             >
-              📥 Download Template
+              <FaFileExcel size={18} color="green" />
+              Download Template
             </button>
 
           </Box>
@@ -2279,715 +2287,6 @@ const GradingSheet = () => {
           </TableBody>
         </Table>
       </TableContainer>
-
-      <div style={{ display: "none" }}>
-        <div ref={divToPrintRef}>
-          <style>
-            {`
-              @media print {
-                table {
-                  page-break-inside: auto;
-                }
-                tr {
-                  page-break-inside: avoid;
-                  page-break-after: auto;
-                }
-                  
-              }
-            `}
-          </style>
-          {/* Header Section */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "20px",
-            }}
-          >
-            {/* Logo */}
-            <div>
-              <img
-                src={fetchedLogo}
-                alt="Logo"
-                style={{
-                  width: "80px",
-                  height: "80px",
-                  objectFit: "contain",
-                  marginTop: "-10px",
-                }}
-              />
-            </div>
-
-            {/* School Info */}
-            <div
-              style={{
-                textAlign: "center",
-                flex: 1,
-                marginLeft: "10px",
-                marginRight: "10px",
-              }}
-            >
-              <span style={{ margin: 0, fontFamily: "Arial", fontSize: "13px" }}>
-                Republic of the Philippines
-              </span>
-              <h2
-                style={{ margin: 0, fontSize: "20px", letterSpacing: "-1px" }}
-              >
-                {companyName}
-              </h2>
-              <span style={{ margin: 0, fontSize: "12px" }}>
-                {campusAddress || "Nagtahan St. Sampaloc, Manila"}
-              </span>
-            </div>
-
-            {/* Empty space or right-aligned info */}
-            <div style={{ width: "80px" }}></div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              lineSpacing: "-1px",
-              marginTop: "2rem",
-              marginBottom: "1rem",
-            }}
-          >
-            <span style={{ fontSize: "20px" }}>
-              <b>GRADE SHEET</b>
-            </span>
-          </div>
-
-          {/* School Info Table */}
-          <table
-            style={{
-              borderCollapse: "collapse",
-              fontSize: "12px",
-              lineHeight: "1",
-              padding: 0,
-            }}
-          >
-            <thead>
-              {/* Subject Code + Class Section */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Subject Code:
-                </td>
-                <td
-                  colSpan={7}
-                  style={{
-                    borderRight: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {filteredStudents[0]?.course_code || ""}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}>
-                    Ac. Year &amp; Term:
-                  </div>
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {filteredStudents[0]?.current_year || ""}-
-                  {filteredStudents[0]?.next_year || ""},{" "}
-                  {filteredStudents[0]?.semester_description || ""},
-                </td>
-              </tr>
-
-              {/* Subject Title + Year Level */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Subject Title:
-                </td>
-
-                <td
-                  colSpan={7}
-                  style={{
-                    borderRight: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {filteredStudents[0]?.course_description || ""}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}>
-                    Section:
-                  </div>
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {filteredStudents[0]?.program_code || ""}-
-                  {filteredStudents[0]?.section_description || ""}
-                </td>
-              </tr>
-
-              {/* Academic Units + Lab Units + Schedule */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Lec Units:
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    textAlign: "center",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {filteredStudents[0]?.course_unit || "0"}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    borderLeft: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Lab Units:
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    textAlign: "center",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {filteredStudents[0]?.lab_unit || "0"}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    borderLeft: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Credit Units:
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    textAlign: "center",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {((Number(filteredStudents[0]?.lab_unit) || 0) +
-                    (Number(filteredStudents[0]?.course_unit) || 0)) || ""}
-                </td>
-
-                <td
-                  colSpan={2}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}></div>
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}>
-                    Session:
-                  </div>
-                </td>
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    borderBottom: "none",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                    width: "60px",
-                  }}
-                >
-                </td>
-              </tr>
-              {/* Faculty */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    borderTop: "none",
-                  }}
-                >
-                  Faculty:
-                </td>
-                <td
-                  colSpan={7}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                  }}
-                >
-                  {profData.fname} {profData.mname} {profData.lname}
-                </td>
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}>
-                    Date Posted:
-                  </div>
-                </td>
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                  }}
-                ></td>
-              </tr>
-            </thead>
-          </table>
-
-          {/* Students Table */}
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "13px",
-              marginTop: "0.5rem",
-            }}
-          >
-            <thead>
-              <tr>
-                <th
-                  rowSpan={2}
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    width: "30px",
-                    textAlign: "center",
-                  }}
-                >
-                  #
-                </th>
-                <th
-                  rowSpan={2}
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    width: "80px",
-                    textAlign: "center",
-                  }}
-                >
-                  Student No.
-                </th>
-                <th
-                  rowSpan={2}
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px",
-                    width: "200px",
-                    textAlign: "start",
-                  }}
-                >
-                  Student Name
-                </th>
-                <th
-                  colSpan={5}
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    textAlign: "center",
-                  }}
-                >
-                  GRADES
-                </th>
-              </tr>
-              <tr>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    fontSize: "10px",
-                    width: "50px",
-                    textAlign: "center",
-                  }}
-                >
-                  Mid
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    fontSize: "10px",
-                    width: "50px",
-                    textAlign: "center",
-                  }}
-                >
-                  Final
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    fontSize: "10px",
-                    width: "50px",
-                    textAlign: "center",
-                  }}
-                >
-                  Final Grade
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    fontSize: "10px",
-                    width: "50px",
-                    textAlign: "center",
-                  }}
-                >
-                  Re exam
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "2px 0px",
-                    fontSize: "10px",
-                    width: "50px",
-                    textAlign: "center",
-                  }}
-                >
-                  Remarks
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStudents.length > 0 ? (
-                filteredStudents.map((s, index) => (
-                  <tr key={s.student_number}>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {index + 1}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {s.student_number}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                      }}
-                    >{`${s.last_name}, ${s.first_name} ${s.middle_name || ""}`}</td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {convertRawToRating(s.midterm)}{" "}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {convertRawToRating(s.finals)}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {convertRawToRating(s.final_grade)}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    ></td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        fontSize: "10px",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {remarkConversion(s)}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={11}
-                    style={{
-                      border: "1px solid black",
-                      padding: "6px",
-                      textAlign: "center",
-                    }}
-                  >
-                    No class details available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-            <div
-              style={{
-                marginTop: "1rem",
-                padding: "1.7rem",
-                fontSize: "12px",
-                border: "1px solid black",
-                maxWidth: "170px",
-              }}
-            >
-              <div
-                style={{
-                  textDecoration: "underline",
-                  textUnderlineOffset: "2px",
-                }}
-              >
-                Grade Sheet Statistic
-              </div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={{ marginLeft: "16px", width: "10rem" }}>
-                  Passed
-                </span>
-                <span>{gradeStats.passed}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={{ marginLeft: "16px", width: "10rem" }}>
-                  Failed
-                </span>
-                <span>{gradeStats.failed}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={{ marginLeft: "16px", width: "10rem" }}>
-                  Incomplete
-                </span>
-                <span>{gradeStats.incomplete}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={{ marginLeft: "16px", width: "10rem" }}>Drop</span>
-                <span>{gradeStats.drop}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={{ marginLeft: "16px", width: "10rem" }}>
-                  No Grade
-                </span>
-                <span>{gradeStats.noGrade}</span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  borderTop: "1px solid black",
-                }}
-              >
-                <span style={{ marginLeft: "16px", width: "10rem" }}>
-                  Total # of Students
-                </span>
-                <span>{filteredStudents.length}</span>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "2rem",
-                marginTop: "0.5rem",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  width: "450px",
-                }}
-              >
-                <div style={{ textAlign: "center", width: "45%" }}>
-                  <div style={{ fontSize: "12px" }}>
-                    {profData.fname}{" "}
-                    {profData.mname ? `${profData.mname[0]}.` : ""}{" "}
-                    {profData.lname}
-                  </div>
-                  <div
-                    style={{ borderTop: "solid 1px black", fontSize: "12px" }}
-                  >
-                    Instructor
-                  </div>
-                </div>
-
-                <div style={{ textAlign: "center", width: "45%" }}>
-                  <div>&nbsp;</div>
-                  <div
-                    style={{ borderTop: "solid 1px black", fontSize: "12px" }}
-                  >
-                    Department Chairperson
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  width: "450px",
-                }}
-              >
-                <div style={{ textAlign: "center", width: "45%" }}>
-                  <div>&nbsp;</div>
-                  <div
-                    style={{ borderTop: "solid 1px black", fontSize: "12px" }}
-                  >
-                    Dean, {filteredStudents[0]?.dprtmnt_name || ""}
-                  </div>
-                </div>
-
-                <div style={{ textAlign: "center", width: "45%" }}>
-                  <div>&nbsp;</div>
-                  <div
-                    style={{ borderTop: "solid 1px black", fontSize: "12px" }}
-                  >
-                    Registrar
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <Dialog
         open={postDialogOpen}

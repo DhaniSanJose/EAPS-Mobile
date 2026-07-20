@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useState,
   useEffect,
   useContext,
@@ -30,6 +30,13 @@ import API_BASE_URL from "../apiConfig";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FcPrint } from "react-icons/fc";
 import SearchIcon from "@mui/icons-material/Search";
+import EaristLogo from "../assets/EaristLogo.png";
+import {
+  buildClassListPrintHtml,
+  mapStudentToPrintRow,
+  printClassListDocument,
+  resolveLogoDataUrl,
+} from "../utils/classListPrintLayout";
 
 const getStudentRegularStatus = (student) =>
   Number(student.is_regular ?? student.status);
@@ -126,8 +133,8 @@ const FacultyMasterList = () => {
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // âœ… NEW
+  const [stepperColor, setStepperColor] = useState("#000000"); // âœ… NEW
 
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
@@ -137,23 +144,23 @@ const FacultyMasterList = () => {
   useEffect(() => {
     if (!settings) return;
 
-    // 🎨 Colors
+    // Colors
     if (settings.title_color) setTitleColor(settings.title_color);
     if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
     if (settings.main_button_color)
       setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
+    if (settings.stepper_color) setStepperColor(settings.stepper_color);
 
-    // 🏫 Logo
+    // Logo
     if (settings.logo_url) {
       setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
-    // 🏷️ School Information
+    // School Information
     if (settings.company_name) setCompanyName(settings.company_name);
     if (settings.short_term) setShortTerm(settings.short_term);
     if (settings.campus_address) setCampusAddress(settings.campus_address);
@@ -270,7 +277,7 @@ const FacultyMasterList = () => {
           }
 
           if (!initialDepartmentSectionId && sections.length > 0) {
-            setSelectedSection(sections[0].department_section_id);
+            setSelectedSection(String(sections[0].department_section_id));
           }
 
           skipNextSectionFetchRef.current = true;
@@ -304,7 +311,9 @@ const FacultyMasterList = () => {
 
   useEffect(() => {
     if (course_id) setSelectedCourse(course_id);
-    if (initialDepartmentSectionId) setSelectedSection(initialDepartmentSectionId);
+    if (initialDepartmentSectionId) {
+      setSelectedSection(String(initialDepartmentSectionId));
+    }
     if (school_year_id) setSelectedSchoolYear(school_year_id);
   }, [course_id, initialDepartmentSectionId, school_year_id]);
 
@@ -314,28 +323,33 @@ const FacultyMasterList = () => {
       skipNextSectionFetchRef.current = false;
       return;
     }
-    if (
-      !profData.prof_id ||
-      !selectedCourse ||
-      !selectedSchoolYear ||
-      !selectedSchoolSemester
-    )
-      return;
+    if (!profData.prof_id || !selectedCourse || !selectedActiveSchoolYear) return;
+
     axios
       .get(
-        `${API_BASE_URL}/api/section_assigned_to/${profData.prof_id}/${selectedCourse}/${selectedSchoolYear}/${selectedSchoolSemester}`,
+        `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${selectedCourse}/${selectedActiveSchoolYear}`,
       )
       .then((res) => {
         setSectionAssignedTo(res.data);
 
-        if (res.data.length > 0) {
-          setSelectedSection(res.data[0].department_section_id);
-        } else {
+        const selectedSectionExists = res.data.some(
+          (section) =>
+            String(section.department_section_id) === String(selectedSection),
+        );
+
+        if (res.data.length > 0 && !selectedSectionExists) {
+          setSelectedSection(String(res.data[0].department_section_id));
+        } else if (res.data.length === 0) {
           setSelectedSection("");
         }
       })
       .catch((err) => console.error(err));
-  }, [masterlistBootstrapped, profData.prof_id, selectedCourse, selectedSchoolYear, selectedSchoolSemester]);
+  }, [
+    masterlistBootstrapped,
+    profData.prof_id,
+    selectedCourse,
+    selectedActiveSchoolYear,
+  ]);
 
   useEffect(() => {
     const currentYear = new Date().getFullYear();
@@ -385,7 +399,7 @@ const FacultyMasterList = () => {
   };
 
   const handleSelectSectionChange = (event) => {
-    setSelectedSection(event.target.value);
+    setSelectedSection(String(event.target.value));
   };
 
   const findPastClass = async () => {
@@ -395,7 +409,7 @@ const FacultyMasterList = () => {
         return;
       }
 
-      // 1️⃣ Fetch courses assigned to the professor
+      // 1ï¸âƒ£ Fetch courses assigned to the professor
       const courseRes = await axios.get(
         `${API_BASE_URL}/api/course_assigned_to/${profData.prof_id}/${selectedSchoolYear}/${selectedSchoolSemester}`,
       );
@@ -410,14 +424,14 @@ const FacultyMasterList = () => {
         return;
       }
 
-      // 2️⃣ Choose first course if none selected
+      // 2ï¸âƒ£ Choose first course if none selected
       const selectedCourseExists = courses.some(
         (course) => String(course.course_id) === String(selectedCourse),
       );
       const courseId = selectedCourseExists ? selectedCourse : courses[0].course_id;
       setSelectedCourse(courseId);
 
-      // 3️⃣ Fetch sections for the selected course
+      // 3ï¸âƒ£ Fetch sections for the selected course
       const sectionRes = await axios.get(
         `${API_BASE_URL}/api/handle_section_of/${profData.prof_id}/${courseId}/${selectedActiveSchoolYear}`,
       );
@@ -431,8 +445,8 @@ const FacultyMasterList = () => {
         );
         setSelectedSection(
           selectedSectionExists
-            ? selectedSection
-            : sections[0].department_section_id,
+            ? String(selectedSection)
+            : String(sections[0].department_section_id),
         );
       } else {
         setSelectedSection("");
@@ -445,16 +459,16 @@ const FacultyMasterList = () => {
         return;
       }
 
-      // 4️⃣ Choose first section if none selected
+      // 4ï¸âƒ£ Choose first section if none selected
       const sectionId = sections.some(
         (section) =>
           String(section.department_section_id) === String(selectedSection),
       )
         ? selectedSection
         : sections[0].department_section_id;
-      setSelectedSection(sectionId);
+      setSelectedSection(String(sectionId));
 
-      // 5️⃣ Fetch students for this section
+      // 5ï¸âƒ£ Fetch students for this section
       const detailsRes = await axios.get(`${API_BASE_URL}/api/get_class_details/${profData.prof_id}`);
       setClassListAndDetails(detailsRes.data);
       setMessage("");
@@ -600,7 +614,7 @@ const FacultyMasterList = () => {
         (section) =>
           String(section.department_section_id) === String(selectedSection),
       )
-        ? selectedSection
+        ? String(selectedSection)
         : "",
     [sectionAssignedTo, selectedSection],
   );
@@ -638,71 +652,88 @@ const FacultyMasterList = () => {
     department_section_id,
   ]);
 
-  const divToPrintRef = useRef();
-
-  const printDiv = () => {
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "absolute";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow.document;
-    doc.open();
-
-    doc.write(`
-      <html>
-        <head>
-          <title>Print</title>
-          <style>
-            body {
-              font-family: Arial;
-              margin: 0.5in; /* 0.5 inch margins */
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 13px;
-            }
-            th, td {
-              border: 1px solid black;
-              padding: 6px;
-              text-align: left;
-            }
-            th {
-              background-color: #f0f0f0;
-            }
-            h2, h3, h4 {
-              text-align: center;
-              margin: 0;
-            }
-            h3 {
-              margin-top: 20px;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-            }
-            @media print {
-              @page { margin: 0.5in; size: auto; }
-            }
-          </style>
-        </head>
-        <body>
-          ${divToPrintRef.current.innerHTML}
-        </body>
-      </html>
-    `);
-
-    doc.close();
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-    document.body.removeChild(iframe);
+  const formatScheduleLines = (schedules = []) => {
+    if (!schedules.length) return [];
+    return schedules
+      .map((schedule) =>
+        `${schedule.day || ""} ${schedule.start || ""}-${schedule.end || ""}`.trim(),
+      )
+      .filter(Boolean);
   };
 
-  // 🔒 Disable right-click
+  const printDiv = async () => {
+    const meta = groupedList[0] || {};
+    const scheduleLines = formatScheduleLines(meta.schedules || []);
+    const selectedYear = schoolYears.find(
+      (yearObj) => String(yearObj.year_id) === String(selectedSchoolYear),
+    );
+    const selectedSemester = schoolSemester.find(
+      (sem) => String(sem.semester_id) === String(selectedSchoolSemester),
+    );
+    const printTimestamp = new Date().toLocaleString("en-PH", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+    const facultyName = [
+      profData.lname,
+      [profData.fname, profData.mname ? `${String(profData.mname)[0]}.` : ""]
+        .filter(Boolean)
+        .join(" "),
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const logoDataUrl = await resolveLogoDataUrl(
+      fetchedLogo || EaristLogo || "",
+    );
+
+    const footerCenter = `${meta.course_code || ""} - ${
+      meta.course_description || "Class List"
+    }`;
+
+    const html = buildClassListPrintHtml({
+      companyName,
+      campusAddress: campusAddress || "Nagtahan Sampaloc Manila",
+      logoUrl: logoDataUrl,
+      courseTitle: (meta.course_description || "").toUpperCase(),
+      departmentTitle: meta.dprtmnt_name || "",
+      academicYearLabel: selectedYear
+        ? `${selectedYear.current_year}-${selectedYear.next_year}`
+        : `${meta.current_year || ""}-${meta.next_year || ""}`,
+      semesterLabel:
+        selectedSemester?.semester_description ||
+        meta.semester_description ||
+        "",
+      subjectCode: meta.course_code || "",
+      classSection: `${meta.program_code || ""} ${meta.section_description || ""}`
+        .replace(/\s+/g, " ")
+        .trim(),
+      subjectTitle: meta.course_description || "",
+      yearLevel: meta.year_level_description || "",
+      academicUnits: meta.course_unit ?? "0",
+      labUnits: meta.lab_unit ?? "0",
+      creditUnits: meta.course_unit ?? "0",
+      labHours: "0",
+      scheduleLines,
+      mode: "",
+      facultyName,
+      students: groupedList.map(mapStudentToPrintRow),
+      printInfoLeft: printTimestamp,
+      printInfoCenter: footerCenter,
+    });
+
+    printClassListDocument(html, "Class List");
+  };
+
+  // Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // Block DevTools shortcuts + Ctrl+P silently
   document.addEventListener("keydown", (e) => {
     const isBlockedKey =
       e.key === "F12" || // DevTools
@@ -739,7 +770,7 @@ const FacultyMasterList = () => {
           width: "100%",
         }}
       >
-        {/* LEFT SIDE — TITLE */}
+        {/* LEFT SIDE â€” TITLE */}
         <Typography
           variant="h4"
           sx={{
@@ -751,7 +782,7 @@ const FacultyMasterList = () => {
           CLASS LIST
         </Typography>
 
-        {/* RIGHT SIDE — SEARCH + PRINT */}
+        {/* RIGHT SIDE â€” SEARCH + PRINT */}
         <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
           <TextField
             size="small"
@@ -803,11 +834,11 @@ const FacultyMasterList = () => {
         </Box>
       </Box>
 
-      <hr style={{ border: "1px solid #ccc", width: "98%" }} />
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
       <br />
 
-      <TableContainer component={Paper} sx={{ width: "98%" }}>
+      <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table size="small">
           <TableHead sx={{ backgroundColor: "#6D2323", color: "white" }}>
             <TableRow>
@@ -993,7 +1024,7 @@ const FacultyMasterList = () => {
       </TableContainer>
       <TableContainer
         component={Paper}
-        sx={{ width: "98%", border: `1px solid ${borderColor}`, p: 2 }}
+        sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}
       >
         <Box
           sx={{
@@ -1048,7 +1079,7 @@ const FacultyMasterList = () => {
                   id="section-select"
                   label="Section"
                   value={selectedSectionValue}
-                  onChange={(e) => setSelectedSection(e.target.value)}
+                  onChange={handleSelectSectionChange}
                 >
                   {!selectedCourse ? (
                     <MenuItem disabled>
@@ -1058,7 +1089,10 @@ const FacultyMasterList = () => {
                     </MenuItem>
                   ) : sectionAssignedTo.length > 0 ? (
                     sectionAssignedTo.map((section) => (
-                      <MenuItem key={section.department_section_id} value={section.department_section_id}>
+                      <MenuItem
+                        key={section.department_section_id}
+                        value={String(section.department_section_id)}
+                      >
                         {section.program_code}-{section.section_description}
                       </MenuItem>
                     ))
@@ -1099,8 +1133,8 @@ const FacultyMasterList = () => {
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
                 >
-                  <MenuItem value="asc">A – Z</MenuItem>
-                  <MenuItem value="desc">Z – A</MenuItem>
+                  <MenuItem value="asc">A â€“ Z</MenuItem>
+                  <MenuItem value="desc">Z â€“ A</MenuItem>
                 </Select>
               </FormControl>
             </Box>
@@ -1182,7 +1216,7 @@ const FacultyMasterList = () => {
       </TableContainer>
       <TableContainer
         component={Paper}
-        sx={{ width: "98%", marginTop: "2rem" }}
+        sx={{ width: "100%", marginTop: "2rem" }}
       >
         <Table size="small">
           <TableHead
@@ -1287,656 +1321,6 @@ const FacultyMasterList = () => {
           </TableBody>
         </Table>
       </TableContainer>
-
-      <div style={{ display: "none" }}>
-        <div ref={divToPrintRef} style={{ margin: "0.5in" }}>
-          <style>
-            {`
-              @media print {
-                body {
-                  margin: 0.5in;
-                }
-                table {
-                  page-break-inside: auto;
-                }
-                tr {
-                  page-break-inside: avoid;
-                  page-break-after: auto;
-                }
-                  
-              }
-            `}
-          </style>
-          {/* Header Section */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "20px",
-            }}
-          >
-            {/* Logo */}
-            <div>
-              <img
-                src={fetchedLogo}
-                alt="Logo"
-                style={{
-                  width: "80px",
-                  height: "80px",
-                  objectFit: "contain",
-                  marginTop: "-10px",
-                }}
-              />
-            </div>
-
-            {/* School Info */}
-            <div
-              style={{
-                textAlign: "center",
-                flex: 1,
-                marginLeft: "10px",
-                marginRight: "10px",
-              }}
-            >
-              <span style={{ margin: 0, fontFamily: "Arial", fontSize: "13px" }}>
-                Republic of the Philippines
-              </span>
-              <h2
-                style={{ margin: 0, fontSize: "20px", letterSpacing: "-1px" }}
-              >
-                {companyName}
-              </h2>
-              <span style={{ margin: 0, fontSize: "12px" }}>
-                {campusAddress || "Nagtahan St. Sampaloc, Manila"}
-              </span>
-            </div>
-
-            {/* Empty space or right-aligned info */}
-            <div style={{ width: "80px" }}></div>
-          </div>
-
-          {/* Document Title */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              lineSpacing: "-1px",
-            }}
-          >
-            <span style={{ fontSize: "20px" }}>
-              <b>{groupedList[0]?.course_description.toUpperCase() || ""}</b>
-            </span>
-            <span style={{ fontSize: "15px" }}>
-              {groupedList[0]?.dprtmnt_name || ""}
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              lineSpacing: "-1px",
-              marginTop: "2rem",
-              marginBottom: "1rem",
-            }}
-          >
-            <span style={{ fontSize: "20px" }}>
-              <b>OFFICIAL LIST OF ENROLLED STUDENTS</b>
-            </span>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "end",
-                justifyContent: "center",
-              }}
-            >
-              <span style={{ marginRight: "0.5rem", fontSize: "15px" }}>
-                Academic Year
-              </span>
-              <span style={{ fontSize: "15px" }}>
-                {groupedList[0]?.current_year || ""}-
-                {groupedList[0]?.next_year || ""},&nbsp;&nbsp;
-                {groupedList[0]?.semester_description || ""}
-              </span>
-            </div>
-          </div>
-
-          {/* School Info Table */}
-          <table
-            style={{
-              borderCollapse: "collapse",
-              fontSize: "12px",
-              lineHeight: "1",
-              padding: 0,
-            }}
-          >
-            <thead>
-              {/* spacer row to remove double borders */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    borderRight: "none",
-                    borderBottom: "none",
-                  }}
-                ></td>
-                <td
-                  colSpan={5}
-                  style={{ borderRight: "none", borderBottom: "none" }}
-                ></td>
-                <td
-                  colSpan={1}
-                  style={{ borderLeft: "none", borderBottom: "none" }}
-                ></td>
-                <td
-                  colSpan={2}
-                  style={{ borderLeft: "none", borderBottom: "none" }}
-                ></td>
-              </tr>
-
-              {/* Subject Code + Class Section */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    borderTop: "none",
-                    padding: "0px 2px",
-                  }}
-                >
-                  Subject Code:
-                </td>
-                <td
-                  colSpan={5}
-                  style={{
-                    borderRight: "none",
-                    borderTop: "none",
-                    padding: "0px 2px",
-                  }}
-                >
-                  {groupedList[0]?.course_code || ""}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    borderLeft: "none",
-                    borderTop: "none",
-                    padding: "0px 2px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}>
-                    Class Section:
-                  </div>
-                </td>
-
-                <td
-                  colSpan={2}
-                  style={{ borderTop: "none", padding: "0px 2px" }}
-                >
-                  {groupedList[0]?.program_code || ""}-
-                  {groupedList[0]?.section_description || ""}
-                </td>
-              </tr>
-
-              {/* Subject Title + Year Level */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Subject Title:
-                </td>
-
-                <td
-                  colSpan={5}
-                  style={{
-                    borderRight: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {groupedList[0]?.course_description || ""}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    borderLeft: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}>
-                    Year Level:
-                  </div>
-                </td>
-
-                <td
-                  colSpan={2}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {groupedList[0]?.year_level_description || ""}
-                </td>
-              </tr>
-
-              {/* Academic Units + Lab Units + Schedule */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Academic Units:
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    textAlign: "center",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {groupedList[0]?.course_unit || "0"}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    borderLeft: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Lab Units:
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    textAlign: "center",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {groupedList[0]?.lab_unit || "0"}
-                </td>
-
-                <td
-                  colSpan={3}
-                  style={{
-                    borderLeft: "none",
-                    borderTop: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}>
-                    Schedule:
-                  </div>
-                </td>
-                <td
-                  colSpan={2}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    borderBottom: "none",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {groupedList.length > 0 &&
-                    groupedList[0].schedules.length > 0 ? (
-                    <div>
-                      {groupedList[0].schedules[0].day}{" "}
-                      {groupedList[0].schedules[0].start} -{" "}
-                      {groupedList[0].schedules[0].end}
-                    </div>
-                  ) : (
-                    <div>TBA</div>
-                  )}
-                </td>
-              </tr>
-
-              {/* Credit Units + Lab Units */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Credit Units:
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    textAlign: "center",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {groupedList[0]?.course_unit || "0"}
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    borderLeft: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Lab Units:
-                </td>
-
-                <td
-                  colSpan={1}
-                  style={{
-                    paddingRight: "2px",
-                    textAlign: "center",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {groupedList[0]?.lab_unit || "0"}
-                </td>
-
-                <td
-                  colSpan={3}
-                  style={{
-                    borderLeft: "none",
-                    borderTop: "none",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    paddingTop: "6px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "end" }}></div>
-                </td>
-                <td
-                  colSpan={2}
-                  rowSpan={4}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    borderTop: "none",
-                    paddingTop: "6px",
-                  }}
-                ></td>
-              </tr>
-
-              {/* Mode */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    borderTop: "none",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Mode:
-                </td>
-                <td
-                  colSpan={6}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    borderTop: "none",
-                    paddingTop: "6px",
-                  }}
-                ></td>
-              </tr>
-
-              {/* Faculty */}
-              <tr>
-                <td
-                  colSpan={1}
-                  style={{
-                    width: "80px",
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    borderTop: "none",
-                    paddingTop: "6px",
-                  }}
-                >
-                  Faculty:
-                </td>
-                <td
-                  colSpan={6}
-                  style={{
-                    paddingRight: "2px",
-                    paddingLeft: "2px",
-                    paddingBottom: "1px",
-                    borderTop: "none",
-                    paddingTop: "6px",
-                  }}
-                >
-                  {profData.fname} {profData.mname} {profData.lname}
-                </td>
-              </tr>
-            </thead>
-          </table>
-
-          {/* Students Table */}
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "13px",
-              marginTop: "0.5rem",
-            }}
-          >
-            <thead>
-              <tr>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "6px 0px",
-                    width: "30px",
-                    textAlign: "center",
-                  }}
-                >
-                  #
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "6px 0px",
-                    width: "80px",
-                    textAlign: "center",
-                  }}
-                >
-                  Student No.
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "6px",
-                    width: "280px",
-                    textAlign: "start",
-                  }}
-                >
-                  Student Name
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "6px 0px",
-                    width: "50px",
-                    textAlign: "center",
-                  }}
-                >
-                  Age
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "6px 0px",
-                    width: "50px",
-                    textAlign: "center",
-                  }}
-                >
-                  Sex
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "6px 0px",
-                    width: "80px",
-                    textAlign: "center",
-                  }}
-                >
-                  Year Level
-                </th>
-                <th
-                  style={{
-                    border: "1px solid black",
-                    padding: "6px 0px",
-                    width: "80px",
-                    textAlign: "center",
-                  }}
-                >
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupedList.length > 0 ? (
-                groupedList.map((s, index) => (
-                  <tr key={s.student_number}>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {index + 1}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {s.student_number}
-                    </td>
-                    <td
-                      style={{ border: "1px solid black", padding: "6px" }}
-                    >{`${s.last_name}, ${s.first_name} ${s.middle_name || ""}`}</td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {s.age}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {s.gender === 0 ? "Male" : "Female"}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {s.year_level_description}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid black",
-                        padding: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {getStudentRegularLabel(s)}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={7}
-                    style={{
-                      border: "1px solid black",
-                      padding: "6px",
-                      textAlign: "center",
-                    }}
-                  >
-                    No class details available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </Box>
   );
 };

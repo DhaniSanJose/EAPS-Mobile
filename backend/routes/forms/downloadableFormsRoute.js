@@ -2388,11 +2388,18 @@ router.post("/generate-class-list-pdf", async (req, res) => {
   let browser;
 
   try {
-    const { html } = req.body;
+    const { html, footerLeft = "", footerCenter = "" } = req.body;
 
     if (!html || typeof html !== "string") {
       return res.status(400).json({ message: "No HTML received" });
     }
+
+    const escapeFooter = (value) =>
+      String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 
     browser = await launchBrowser();
     const page = await browser.newPage();
@@ -2419,9 +2426,11 @@ router.post("/generate-class-list-pdf", async (req, res) => {
       }
     });
 
-    // Same corner-label header style used by the Applicant List / Entrance
-    // Examination Scores exports (Department left / Program right, centered
-    // logo + school name block), applied to the registrar Class List.
+    // Class List PDF uses the shared layout from EXAMPLES/ClassList.pdf.
+    // Frontend embeds CLASS_LIST_PRINT_CSS in the submitted HTML.
+    // Header is duplicated per page in HTML (Chromium cannot reliably repeat
+    // complex letterhead via <thead>). Footer with live page numbers is
+    // injected by Puppeteer; in-document .print-footer is hidden.
     const wrappedHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -2429,105 +2438,19 @@ router.post("/generate-class-list-pdf", async (req, res) => {
   <meta charset="UTF-8" />
   <style>
     @page { size: A4 portrait; margin: 8mm; }
-
-    * { box-sizing: border-box; }
-
     html, body {
       margin: 0;
       padding: 0;
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #ffffff;
     }
-
-    .print-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      padding-left: 10px;
-      padding-right: 10px;
-    }
-
-    .print-header {
-      position: relative;
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    .header-content {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-    }
-
-    .header-content img {
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      object-fit: cover;
-      flex-shrink: 0;
-      margin-top: 50px;
-    }
-
-    .header-text {
-      text-align: center;
-      margin-top: 50px;
-    }
-
-    .print-corner-label {
-      position: absolute;
-      top: 0;
-      font-size: 12px;
-      font-weight: bold;
-    }
-
-    .print-corner-label.left {
-      left: 0;
-      text-align: left;
-    }
-
-    .print-corner-label.right {
-      right: 0;
-      text-align: right;
-    }
-
-    .table-wrapper {
-      width: 100%;
-      margin-top: 20px;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      border: 1.5px solid black;
-      table-layout: fixed;
-    }
-
-    th, td {
-      border: 1.5px solid black;
-      padding: 4px 3px;
-      font-size: 9px;
-      text-align: center;
-      word-wrap: break-word;
-      white-space: normal;
-    }
-
-    th {
-      background-color: lightgray;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-
-    td.student-name {
-      text-align: left;
+    .pdf-hide-doc-footer .print-footer {
+      display: none !important;
     }
   </style>
 </head>
-<body>
-  <div class="print-container">
-    ${html}
-  </div>
+<body class="pdf-hide-doc-footer">
+  ${html}
 </body>
 </html>
     `.trim();
@@ -2540,12 +2463,23 @@ router.post("/generate-class-list-pdf", async (req, res) => {
     await waitForImages(page);
     await new Promise((resolve) => setTimeout(resolve, 400));
 
+    const footerTemplate = `
+      <div style="width:100%;box-sizing:border-box;padding:4px 10mm 0;font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#000;border-top:1px solid #000;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span style="white-space:nowrap;">Print Info: ${escapeFooter(footerLeft)}</span>
+        <span style="flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeFooter(footerCenter)}</span>
+        <span style="white-space:nowrap;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+      </div>
+    `;
+
     const pdfBuffer = await page.pdf({
       format: "A4",
       landscape: false,
       printBackground: true,
       preferCSSPageSize: false,
-      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+      displayHeaderFooter: true,
+      headerTemplate: "<div></div>",
+      footerTemplate,
+      margin: { top: "8mm", bottom: "14mm", left: "8mm", right: "8mm" },
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {

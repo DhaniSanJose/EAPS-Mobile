@@ -473,6 +473,9 @@ const CourseTagging = () => {
     const nextEnrolled = Array.isArray(data) ? data : [];
     setEnrolled(nextEnrolled);
     setIsEnrolled(nextEnrolled.length > 0);
+    // Year buttons lock via hasNonSpecialEnrollment from enrolled rows.
+    // Always clear this sticky flag so it does not carry over to the next student.
+    setDisableYearButtons(false);
     if (nextEnrolled.length > 0) {
       setCourseCode(cleanDisplayValue(nextEnrolled[0].program_code));
       setCourseDescription(
@@ -967,6 +970,10 @@ const CourseTagging = () => {
       setStudentYearLevel(cleanDisplayValue(yearLevelDescription));
       setPersonID(cleanDisplayValue(person_id2));
       setSectionDescription(cleanDisplayValue(section));
+      // Clear previous student's enrollment UI so bulk-enroll buttons unlock
+      // until this student's enrolled subjects are loaded.
+      setEnrolled([]);
+      setDisableYearButtons(false);
       const nextSectionId =
         departmentSectionId != null && String(departmentSectionId).trim() !== ""
           ? String(departmentSectionId)
@@ -996,6 +1003,7 @@ const CourseTagging = () => {
       setCourses([]);
       setEnrolled([]);
       setIsEnrolled(false);
+      setDisableYearButtons(false);
       setCurriculumYear("");
       setStudentYearLevel("");
       setSectionDescription("");
