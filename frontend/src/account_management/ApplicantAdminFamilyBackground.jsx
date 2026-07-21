@@ -28,7 +28,7 @@ import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 
 const SuperAdminApplicantDashboard2 = () => {
-  useAccountAuditMac();
+    useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
 
@@ -92,18 +92,18 @@ const SuperAdminApplicantDashboard2 = () => {
     const [employeeID, setEmployeeID] = useState("");
 
     const getAuditHeaders = () =>
-    getAuditConfig({
-      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-page-id": pageId,
-      "x-audit-change-section": "family_information",
-      "x-audit-actor-id":
-        employeeID ||
-        localStorage.getItem("employee_id") ||
-        localStorage.getItem("person_id") ||
-        localStorage.getItem("email") ||
-        "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-    });
+        getAuditConfig({
+            "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+            "x-page-id": pageId,
+            "x-audit-change-section": "family_information",
+            "x-audit-actor-id":
+                employeeID ||
+                localStorage.getItem("employee_id") ||
+                localStorage.getItem("person_id") ||
+                localStorage.getItem("email") ||
+                "unknown",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+        });
 
     useEffect(() => {
 
@@ -572,188 +572,188 @@ const SuperAdminApplicantDashboard2 = () => {
         setExamPermitError("");
     };
 
-    
-  const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices" | "examPermitDownload"
-  const hiddenFormRef = useRef();
 
-  const FORM_CONFIGS = {
-    ecat: {
-      label: "ECAT Application Form",
-      endpoint: "/api/generate-ecat-form-pdf",
-      filenamePrefix: "ECAT_Application_Form",
-      Component: AdminECATApplicationForm,
-    },
-    personalData: {
-      label: "Personal Data Form",
-      endpoint: "/api/generate-personal-data-form-pdf",
-      filenamePrefix: "Personal_Data_Form",
-      Component: AdminPersonalDataForm,
-    },
-    registrar: {
-      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
-      endpoint: "/api/generate-registrar-form-pdf",
-      filenamePrefix: "Office_Of_The_Registrar",
-      Component: AdminOfficeOfTheRegistrar,
-    },
-    admissionServices: {
-      label: "Application/Student Satisfactory Survey",
-      endpoint: "/api/generate-admission-services-pdf",
-      filenamePrefix: "Admission_Services_CSM_Form",
-      Component: ApplicantServicesSurvey,
-      dateStamped: true,
-    },
-  };
+    const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices" | "examPermitDownload"
+    const hiddenFormRef = useRef();
 
-
-  const buildClientFilename = (prefix, { lastName, firstName, applicantNumber }) => {
-    const safeLast = (lastName || "Applicant").trim().replace(/\s+/g, "_");
-    const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
-    const suffix = applicantNumber ? `_${applicantNumber}` : "";
-    return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
-  };
-
-  const generateFormPdf = async (key) => {
-    const config = FORM_CONFIGS[key];
-    if (!config || generatingKey) return;
-
-    // 🔒 Require a searched/selected applicant before generating anything
-    if (!userID || !person?.person_id) {
-      setSnackbar({
-        open: true,
-        message: "Please search and select an applicant first.",
-        severity: "warning",
-      });
-      return;
-    }
-
-    setGeneratingKey(key);
-
-    try {
-      // give the hidden Admin component time to mount + finish its own
-      // fetches for this applicant before we read its rendered HTML
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      const node = hiddenFormRef.current;
-      if (!node) throw new Error(`${config.label} did not render in time.`);
-
-      const response = await axios.post(
-        `${API_BASE_URL}${config.endpoint}`,
-        {
-          html: node.innerHTML,
-          applicant_number: person?.applicant_number || "",
-          last_name: person?.last_name || "",
-          first_name: person?.first_name || "",
-          audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
-          audit_actor_role: userRole || "registrar",
+    const FORM_CONFIGS = {
+        ecat: {
+            label: "ECAT Application Form",
+            endpoint: "/api/generate-ecat-form-pdf",
+            filenamePrefix: "ECAT_Application_Form",
+            Component: AdminECATApplicationForm,
         },
-        { responseType: "blob" },
-      );
-
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-
-      const fileName = config.dateStamped
-        ? `${config.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`
-        : buildClientFilename(config.filenamePrefix, {
-          lastName: person?.last_name,
-          firstName: person?.first_name,
-          applicantNumber: person?.applicant_number,
-        });
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(`Error generating ${config.label} PDF:`, err);
-      setSnackbar({
-        open: true,
-        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
-        severity: "error",
-      });
-    } finally {
-      setGeneratingKey(null);
-    }
-  };
-
-
-  const downloadExamPermitPDF = async () => {
-    if (!userID || !person?.person_id) {
-      setSnackbar({
-        open: true,
-        message: "Please search and select an applicant first.",
-        severity: "warning",
-      });
-      return;
-    }
-
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
-      const verified = res.data.some((a) => a.person_id === parseInt(userID));
-
-      if (!verified) {
-        setExamPermitError("❌ This applicant's documents are not yet verified.");
-        setExamPermitModalOpen(true);
-        return;
-      }
-
-      setGeneratingKey("examPermitDownload");
-      setShowPrintView(true);
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const divToPrint = divToPrintRef.current;
-      if (!divToPrint) throw new Error("Exam permit content did not render in time.");
-
-      const response = await axios.post(
-        `${API_BASE_URL}/api/generate-exam-permit-pdf`,
-        {
-          html: divToPrint.innerHTML,
-          applicant_number: person?.applicant_number || "",
-          last_name: person?.last_name || "",
-          first_name: person?.first_name || "",
+        personalData: {
+            label: "Personal Data Form",
+            endpoint: "/api/generate-personal-data-form-pdf",
+            filenamePrefix: "Personal_Data_Form",
+            Component: AdminPersonalDataForm,
         },
-        { responseType: "blob" },
-      );
+        registrar: {
+            label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+            endpoint: "/api/generate-registrar-form-pdf",
+            filenamePrefix: "Office_Of_The_Registrar",
+            Component: AdminOfficeOfTheRegistrar,
+        },
+        admissionServices: {
+            label: "Application/Student Satisfactory Survey",
+            endpoint: "/api/generate-admission-services-pdf",
+            filenamePrefix: "Admission_Services_CSM_Form",
+            Component: ApplicantServicesSurvey,
+            dateStamped: true,
+        },
+    };
 
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const fileName = buildClientFilename("Exam_Permit", {
-        lastName: person?.last_name,
-        firstName: person?.first_name,
-        applicantNumber: person?.applicant_number,
-      });
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error downloading exam permit PDF:", err);
-      setExamPermitError("⚠️ Unable to generate the Exam Permit PDF right now.");
-      setExamPermitModalOpen(true);
-    } finally {
-      setShowPrintView(false);
-      setGeneratingKey(null);
-    }
-  };
+    const buildClientFilename = (prefix, { lastName, firstName, applicantNumber }) => {
+        const safeLast = (lastName || "Applicant").trim().replace(/\s+/g, "_");
+        const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
+        const suffix = applicantNumber ? `_${applicantNumber}` : "";
+        return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
+    };
 
-  const links = [
-    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
-    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
-    {
-      key: "registrar",
-      label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
-      onClick: () => generateFormPdf("registrar"),
-    },
-    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
-    { key: "examPermitDownload", label: "Examination Permit", onClick: downloadExamPermitPDF },
-  ];
+    const generateFormPdf = async (key) => {
+        const config = FORM_CONFIGS[key];
+        if (!config || generatingKey) return;
+
+        // 🔒 Require a searched/selected applicant before generating anything
+        if (!userID || !person?.person_id) {
+            setSnackbar({
+                open: true,
+                message: "Please search and select an applicant first.",
+                severity: "warning",
+            });
+            return;
+        }
+
+        setGeneratingKey(key);
+
+        try {
+            // give the hidden Admin component time to mount + finish its own
+            // fetches for this applicant before we read its rendered HTML
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            const node = hiddenFormRef.current;
+            if (!node) throw new Error(`${config.label} did not render in time.`);
+
+            const response = await axios.post(
+                `${API_BASE_URL}${config.endpoint}`,
+                {
+                    html: node.innerHTML,
+                    applicant_number: person?.applicant_number || "",
+                    last_name: person?.last_name || "",
+                    first_name: person?.first_name || "",
+                    audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
+                    audit_actor_role: userRole || "registrar",
+                },
+                { responseType: "blob" },
+            );
+
+            const blob = new Blob([response.data], { type: "application/pdf" });
+            const url = window.URL.createObjectURL(blob);
+
+            const fileName = config.dateStamped
+                ? `${config.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`
+                : buildClientFilename(config.filenamePrefix, {
+                    lastName: person?.last_name,
+                    firstName: person?.first_name,
+                    applicantNumber: person?.applicant_number,
+                });
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(`Error generating ${config.label} PDF:`, err);
+            setSnackbar({
+                open: true,
+                message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+                severity: "error",
+            });
+        } finally {
+            setGeneratingKey(null);
+        }
+    };
+
+
+    const downloadExamPermitPDF = async () => {
+        if (!userID || !person?.person_id) {
+            setSnackbar({
+                open: true,
+                message: "Please search and select an applicant first.",
+                severity: "warning",
+            });
+            return;
+        }
+
+        try {
+            const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
+            const verified = res.data.some((a) => a.person_id === parseInt(userID));
+
+            if (!verified) {
+                setExamPermitError("❌ This applicant's documents are not yet verified.");
+                setExamPermitModalOpen(true);
+                return;
+            }
+
+            setGeneratingKey("examPermitDownload");
+            setShowPrintView(true);
+            await new Promise((resolve) => setTimeout(resolve, 800));
+
+            const divToPrint = divToPrintRef.current;
+            if (!divToPrint) throw new Error("Exam permit content did not render in time.");
+
+            const response = await axios.post(
+                `${API_BASE_URL}/api/generate-exam-permit-pdf`,
+                {
+                    html: divToPrint.innerHTML,
+                    applicant_number: person?.applicant_number || "",
+                    last_name: person?.last_name || "",
+                    first_name: person?.first_name || "",
+                },
+                { responseType: "blob" },
+            );
+
+            const blob = new Blob([response.data], { type: "application/pdf" });
+            const url = window.URL.createObjectURL(blob);
+            const fileName = buildClientFilename("Exam_Permit", {
+                lastName: person?.last_name,
+                firstName: person?.first_name,
+                applicantNumber: person?.applicant_number,
+            });
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Error downloading exam permit PDF:", err);
+            setExamPermitError("⚠️ Unable to generate the Exam Permit PDF right now.");
+            setExamPermitModalOpen(true);
+        } finally {
+            setShowPrintView(false);
+            setGeneratingKey(null);
+        }
+    };
+
+    const links = [
+        { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
+        { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
+        {
+            key: "registrar",
+            label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
+            onClick: () => generateFormPdf("registrar"),
+        },
+        { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
+        { key: "examPermitDownload", label: "Examination Permit", onClick: downloadExamPermitPDF },
+    ];
 
 
 
@@ -807,27 +807,27 @@ const SuperAdminApplicantDashboard2 = () => {
     // dot not alter
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
-       
 
- {showPrintView && (
-        <div
-          ref={divToPrintRef}
-          style={{
-            position: "absolute",
-            left: "-9999px",
-            top: 0,
-            width: "8.5in",
-            background: "#fff",
-          }}
-        >
-          <ExamPermit personId={userID} />
-        </div>
-      )}
-      {generatingKey && FORM_CONFIGS[generatingKey] && (
-        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
-          {React.createElement(FORM_CONFIGS[generatingKey].Component, { personId: userID })}
-        </div>
-      )}
+
+            {showPrintView && (
+                <div
+                    ref={divToPrintRef}
+                    style={{
+                        position: "absolute",
+                        left: "-9999px",
+                        top: 0,
+                        width: "8.5in",
+                        background: "#fff",
+                    }}
+                >
+                    <ExamPermit personId={userID} />
+                </div>
+            )}
+            {generatingKey && FORM_CONFIGS[generatingKey] && (
+                <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+                    {React.createElement(FORM_CONFIGS[generatingKey].Component, { personId: userID })}
+                </div>
+            )}
 
 
 
@@ -970,98 +970,98 @@ const SuperAdminApplicantDashboard2 = () => {
 
 
             {/* Cards Section */}
-           <Box
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 2,
-          mt: 2,
-          pb: 1,
-          justifyContent: "center",
-        }}
-      >
-        {links.map((lnk, i) => {
-          const isGenerating = generatingKey === lnk.key;
-          const disabled = generatingKey !== null;
-
-          return (
-            <motion.div
-              key={i}
-              style={{ flex: "0 0 calc(30% - 16px)" }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.4 }}
-            >
-              <Card
+            <Box
                 sx={{
-                  minHeight: 60,
-                  borderRadius: 2,
-                  border: `1px solid ${borderColor}`,
-                  backgroundColor: "#fff",
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  p: 1.5,
-                  cursor: disabled ? "default" : "pointer",
-                  opacity: disabled && !isGenerating ? 0.5 : 1,
-                  pointerEvents: disabled ? "none" : "auto",
-                  transition: "all 0.3s ease-in-out",
-                  "&:hover": {
-                    transform: disabled ? "none" : "scale(1.05)",
-                    backgroundColor: disabled
-                      ? "#fff"
-                      : settings?.header_color || "#1976d2",
-
-                    "& .card-text": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                    "& .card-icon": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                  },
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 2,
+                    mt: 2,
+                    pb: 1,
+                    justifyContent: "center",
                 }}
-                onClick={() => {
-                  if (disabled) return;
+            >
+                {links.map((lnk, i) => {
+                    const isGenerating = generatingKey === lnk.key;
+                    const disabled = generatingKey !== null;
 
-                  if (lnk.onClick) {
-                    lnk.onClick();
-                  } else if (lnk.to) {
-                    navigate(lnk.to);
-                  }
-                }}
-              >
-                {/* Icon / Loading */}
-                {isGenerating ? (
-                  <CircularProgress
-                    size={26}
-                    sx={{ color: mainButtonColor, mr: 1.5 }}
-                  />
-                ) : (
-                  <PictureAsPdfIcon
-                    className="card-icon"
-                    sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
-                  />
-                )}
+                    return (
+                        <motion.div
+                            key={i}
+                            style={{ flex: "0 0 calc(30% - 16px)" }}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1, duration: 0.4 }}
+                        >
+                            <Card
+                                sx={{
+                                    minHeight: 60,
+                                    borderRadius: 2,
+                                    border: `1px solid ${borderColor}`,
+                                    backgroundColor: "#fff",
+                                    display: "flex",
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    textAlign: "center",
+                                    p: 1.5,
+                                    cursor: disabled ? "default" : "pointer",
+                                    opacity: disabled && !isGenerating ? 0.5 : 1,
+                                    pointerEvents: disabled ? "none" : "auto",
+                                    transition: "all 0.3s ease-in-out",
+                                    "&:hover": {
+                                        transform: disabled ? "none" : "scale(1.05)",
+                                        backgroundColor: disabled
+                                            ? "#fff"
+                                            : settings?.header_color || "#1976d2",
 
-                {/* Label */}
-                <Typography
-                  className="card-text"
-                  sx={{
-                    color: mainButtonColor,
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: "bold",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  {isGenerating ? "Generating PDF..." : lnk.label}
-                </Typography>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </Box>
+                                        "& .card-text": {
+                                            color: disabled ? mainButtonColor : "#fff",
+                                        },
+                                        "& .card-icon": {
+                                            color: disabled ? mainButtonColor : "#fff",
+                                        },
+                                    },
+                                }}
+                                onClick={() => {
+                                    if (disabled) return;
+
+                                    if (lnk.onClick) {
+                                        lnk.onClick();
+                                    } else if (lnk.to) {
+                                        navigate(lnk.to);
+                                    }
+                                }}
+                            >
+                                {/* Icon / Loading */}
+                                {isGenerating ? (
+                                    <CircularProgress
+                                        size={26}
+                                        sx={{ color: mainButtonColor, mr: 1.5 }}
+                                    />
+                                ) : (
+                                    <PictureAsPdfIcon
+                                        className="card-icon"
+                                        sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
+                                    />
+                                )}
+
+                                {/* Label */}
+                                <Typography
+                                    className="card-text"
+                                    sx={{
+                                        color: mainButtonColor,
+                                        fontFamily: "Poppins, sans-serif",
+                                        fontWeight: "bold",
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    {isGenerating ? "Generating PDF..." : lnk.label}
+                                </Typography>
+                            </Card>
+                        </motion.div>
+                    );
+                })}
+            </Box>
 
 
 
@@ -2206,29 +2206,117 @@ const SuperAdminApplicantDashboard2 = () => {
                                     top: "50%",
                                     left: "50%",
                                     transform: "translate(-50%, -50%)",
-                                    width: 400,
+                                    width: { xs: "90%", sm: 420 },
                                     bgcolor: "background.paper",
-                                    border: `1px solid ${borderColor}`,
-                                    boxShadow: 24,
-                                    p: 4,
-                                    borderRadius: 2,
-                                    textAlign: "center",
+                                    boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                                    borderRadius: "16px",
+                                    overflow: "hidden",
                                 }}
                             >
-                                <ErrorIcon sx={{ color: mainButtonColor, fontSize: 50, mb: 2 }} />
-                                <Typography id="exam-permit-error-title" variant="h6" component="h2" color="maroon">
-                                    Exam Permit Notice
-                                </Typography>
-                                <Typography id="exam-permit-error-description" sx={{ mt: 2 }}>
-                                    {examPermitError}
-                                </Typography>
-                                <Button
-                                    onClick={handleCloseExamPermitModal}
-                                    variant="contained"
-                                    sx={{ mt: 3, backgroundcolor: mainButtonColor, "&:hover": { backgroundColor: "#8B0000" } }}
+                                {/* Header bar */}
+                                <Box
+                                    sx={{
+                                        bgcolor: mainButtonColor,
+                                        color: "white",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1.5,
+                                        px: 3,
+                                        py: 2,
+                                    }}
                                 >
-                                    Close
-                                </Button>
+                                    <Box
+                                        sx={{
+                                            backgroundColor: "rgba(255,255,255,0.2)",
+                                            borderRadius: "50%",
+                                            width: 40,
+                                            height: 40,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <ErrorIcon sx={{ fontSize: 22, color: "#fff" }} />
+                                    </Box>
+                                    <Box>
+                                        <Typography
+                                            id="exam-permit-error-title"
+                                            fontWeight="bold"
+                                            fontSize={16}
+                                            color="white"
+                                            lineHeight={1.2}
+                                        >
+                                            Exam Permit Notice
+                                        </Typography>
+                                        <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                                            Please review the message below
+                                        </Typography>
+                                    </Box>
+                                </Box>
+
+                                {/* Body */}
+                                <Box sx={{ px: 3, pt: 3, pb: 1, textAlign: "center" }}>
+                                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                                        <Box
+                                            sx={{
+                                                width: 64,
+                                                height: 64,
+                                                borderRadius: "50%",
+                                                backgroundColor: "rgba(255,255,255,0.9)",
+                                                border: `3px solid ${mainButtonColor}`,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <ErrorIcon sx={{ color: mainButtonColor, fontSize: 30 }} />
+                                        </Box>
+                                    </Box>
+
+                                    <Box
+                                        sx={{
+                                            border: `1.5px solid ${mainButtonColor}`,
+                                            borderRadius: "12px",
+                                            overflow: "hidden",
+                                            mb: 1,
+                                        }}
+                                    >
+                                        <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
+                                            <Typography
+                                                id="exam-permit-error-description"
+                                                sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.65 }}
+                                            >
+                                                {examPermitError}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </Box>
+
+                                {/* Actions */}
+                                <Box sx={{ px: 3, pb: 3, pt: 1.5 }}>
+                                    <Button
+                                        fullWidth
+                                        onClick={handleCloseExamPermitModal}
+                                        variant="contained"
+                                        sx={{
+                                            height: 44,
+                                            borderRadius: "10px",
+                                            backgroundColor: mainButtonColor,
+                                            color: "#fff",
+                                            fontWeight: 700,
+                                            fontSize: 14,
+                                            textTransform: "none",
+                                            boxShadow: "none",
+                                            "&:hover": {
+                                                backgroundColor: "#8B0000",
+                                                boxShadow: "none",
+                                            },
+                                        }}
+                                    >
+                                        Close
+                                    </Button>
+                                </Box>
                             </Box>
                         </Modal>
 

@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.42:5173",
+  "http://192.168.50.44:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -3558,7 +3558,7 @@ app.put("/api/enrollment/person/:person_id", async (req, res) => {
   try {
     const [[personBefore]] = await db3.query(
       `
-      SELECT person_id, program
+      SELECT person_id, program, profile_img
       FROM person_table
       WHERE person_id = ?
       LIMIT 1
@@ -3572,16 +3572,41 @@ app.put("/api/enrollment/person/:person_id", async (req, res) => {
         .json({ message: "Person not found in ENROLLMENT" });
     }
 
+    // 🗑️ Delete the old Student1by1 photo file if profile_img is being
+    // cleared or replaced, so removed/changed photos don't orphan on disk.
+    if (Object.prototype.hasOwnProperty.call(sanitizedData, "profile_img")) {
+      const nextValue = sanitizedData.profile_img;
+      const oldProfileImg = personBefore.profile_img;
+
+      if (oldProfileImg && oldProfileImg !== nextValue) {
+        const oldPhotoPath = path.join(
+          __dirname,
+          "uploads",
+          "Student1by1",
+          oldProfileImg,
+        );
+
+        try {
+          await fs.promises.unlink(oldPhotoPath);
+          console.log("✅ Old student photo deleted:", oldPhotoPath);
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            console.warn("⚠️ Old student photo already missing:", oldPhotoPath);
+          } else {
+            console.error("❌ Failed to delete old student photo:", err);
+          }
+        }
+      }
+    }
+
     if (sanitizedData.emailAddress) {
       const [duplicateEmail] = await db3.query(
-        `
-        SELECT id
-        FROM user_accounts
-        WHERE LOWER(email) = ?
-          AND person_id <> ?
-          AND role = 'student'
-        LIMIT 1
-        `,
+        `SELECT id
+         FROM user_accounts
+         WHERE LOWER(email) = ?
+           AND person_id <> ?
+           AND role = 'student'
+         LIMIT 1`,
         [sanitizedData.emailAddress, person_id],
       );
 
@@ -3616,12 +3641,10 @@ app.put("/api/enrollment/person/:person_id", async (req, res) => {
 
     if (sanitizedData.emailAddress) {
       await db3.query(
-        `
-        UPDATE user_accounts
-        SET email = ?
-        WHERE person_id = ?
-          AND role = 'student'
-        `,
+        `UPDATE user_accounts
+         SET email = ?
+         WHERE person_id = ?
+           AND role = 'student'`,
         [sanitizedData.emailAddress, person_id],
       );
     }
@@ -3808,68 +3831,6 @@ app.post("/api/student_edit_permissions", async (req, res) => {
   }
 });
 
-app.post(
-  "/api/enrollment/upload-profile-picture",
-  upload.single("profile_picture"),
-  async (req, res) => {
-    const { person_id } = req.body;
-
-    if (!person_id || !req.file) {
-      return res.status(400).json({ message: "Missing person_id or file." });
-    }
-
-    try {
-      // ✅ Get applicant_number FROM DB3
-      const [rows] = await db3.query(
-        "SELECT student_number FROM student_numbering_table WHERE person_id = ?",
-        [person_id]
-      );
-
-      if (!rows.length) {
-        return res.status(404).json({
-          message: "Student number not found for person_id " + person_id,
-        });
-      }
-
-      const student_number = rows[0].student_number;
-
-      const ext = path.extname(req.file.originalname).toLowerCase();
-      const year = new Date().getFullYear();
-      const filename = `${student_number}_1by1_${year}${ext}`;
-
-      const uploadDir = path.join(__dirname, "uploads/Student1by1");
-      const finalPath = path.join(uploadDir, filename);
-
-      // ✅ delete old file
-      const files = await fs.promises.readdir(uploadDir);
-      for (const file of files) {
-        if (file.startsWith(`${student_number}_1by1_`)) {
-          await fs.promises.unlink(path.join(uploadDir, file));
-        }
-      }
-
-      // ✅ save new file
-      await fs.promises.writeFile(finalPath, req.file.buffer);
-
-      // ✅ UPDATE USING DB3
-      await db3.query(
-        "UPDATE person_table SET profile_img = ? WHERE person_id = ?",
-        [filename, person_id]
-      );
-
-      res.status(200).json({
-        message: "Uploaded successfully",
-        filename,
-      });
-    } catch (err) {
-      console.error("Upload error:", err);
-      res.status(500).json({
-        message: "Failed to upload image.",
-        error: err.message,
-      });
-    }
-  }
-);
 
 // ===========================================================
 //  STUDENT  can update ONLY their own personal information
@@ -3962,51 +3923,128 @@ app.get("/api/programs", async (req, res) => {
 });
 
 app.post(
-  "/api/upload-profile-picture",
+  "/api/update_student/:user_id",
+  profileUpload.single("profile_picture"),
+  async (req, res) => {
+    const { user_id } = req.params;
+    const data = req.body;
+    const file = req.file;
+
+    try {
+      const [existing] = await db3.query(
+        "SELECT * FROM user_accounts WHERE id = ?",
+        [user_id],
+      );
+      if (existing.length === 0)
+        return res.status(404).json({ message: "User not found" });
+      const student_person_id = existing[0].person_id;
+
+      const [student] = await db3.query(
+        "SELECT * FROM student_numbering_table WHERE person_id = ?",
+        [student_person_id],
+      );
+
+      if (student.length === 0)
+        return res.status(404).json({ message: "Student not found" });
+      const student_number = student[0].student_number;
+
+      const [datas] = await db3.query(
+        "SELECT * FROM person_table WHERE person_id = ?",
+        [student_person_id],
+      );
+      const current = datas[0];
+
+      let finalFilename = current.profile_img;
+
+      if (file) {
+        const s_id = student_number || "unknown";
+        const philTime = new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" });
+        const year = new Date(philTime).getFullYear();
+        const ext = path.extname(file.originalname).toLowerCase();
+        finalFilename = `${s_id}_1by1_${year}${ext}`; // ✅ matches _1by1_ convention now
+
+        const tempUploadDir = path.join(__dirname, "uploads");
+        const studentPhotoDir = path.join(__dirname, "uploads", "Student1by1");
+
+        if (!fs.existsSync(studentPhotoDir)) {
+          fs.mkdirSync(studentPhotoDir, { recursive: true });
+        }
+
+        const tempPath = path.join(tempUploadDir, file.filename);
+        const newPath = path.join(studentPhotoDir, finalFilename);
+
+        if (current.profile_img) {
+          const oldPath = path.join(studentPhotoDir, current.profile_img);
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        fs.renameSync(tempPath, newPath);
+      }
+
+      const sql = `UPDATE person_table SET profile_img = ? WHERE person_id = ?`;
+      const [updated] = await db3.query(sql, [finalFilename, student_person_id]);
+
+      res.json({
+        success: true,
+        message: "Student updated successfully!",
+        updated,
+      });
+    } catch (error) {
+      console.error(" Error updating student:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
+
+app.post(
+  "/api/enrollment/upload-profile-picture",
   upload.single("profile_picture"),
   async (req, res) => {
     const { person_id } = req.body;
+
     if (!person_id || !req.file) {
       return res.status(400).json({ message: "Missing person_id or file." });
     }
 
     try {
-      // ✅ Get student_number from DB3
       const [rows] = await db3.query(
         "SELECT student_number FROM student_numbering_table WHERE person_id = ?",
-        [person_id]
+        [person_id],
       );
-
       if (!rows.length) {
-        return res.status(404).json({
-          message: "Student number not found for person_id " + person_id,
-        });
+        return res.status(404).json({ message: "Student number not found for person_id " + person_id });
       }
-
       const student_number = rows[0].student_number;
+
+      const [[current]] = await db3.query(
+        "SELECT profile_img FROM person_table WHERE person_id = ?",
+        [person_id],
+      );
 
       const ext = path.extname(req.file.originalname).toLowerCase();
       const year = new Date().getFullYear();
       const filename = `${student_number}_1by1_${year}${ext}`;
 
       const uploadDir = path.join(__dirname, "uploads/Student1by1");
-      const finalPath = path.join(uploadDir, filename);
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-      // ✅ Delete old file if exists
-      const files = await fs.promises.readdir(uploadDir);
-      for (const file of files) {
-        if (file.startsWith(`${student_number}_1by1_`)) {
-          await fs.promises.unlink(path.join(uploadDir, file));
+      // ✅ delete by DB value instead of:
+      // const files = await fs.promises.readdir(uploadDir);
+      // for (const file of files) { if (file.startsWith(`${student_number}_1by1_`)) ... }
+      if (current?.profile_img) {
+        const oldPath = path.join(uploadDir, current.profile_img);
+        try {
+          await fs.promises.unlink(oldPath);
+        } catch (err) {
+          if (err.code !== "ENOENT") console.error("Old photo delete failed:", err);
         }
       }
 
-      // ✅ Save new file
-      await fs.promises.writeFile(finalPath, req.file.buffer);
+      await fs.promises.writeFile(path.join(uploadDir, filename), req.file.buffer);
 
-      // ✅ Update DB3
       await db3.query(
         "UPDATE person_table SET profile_img = ? WHERE person_id = ?",
-        [filename, person_id]
+        [filename, person_id],
       );
 
       res.status(200).json({ message: "Uploaded successfully", filename });
@@ -4014,7 +4052,7 @@ app.post(
       console.error("Upload error:", err);
       res.status(500).json({ message: "Failed to upload image.", error: err.message });
     }
-  }
+  },
 );
 
 //  2. Get person details by person_id

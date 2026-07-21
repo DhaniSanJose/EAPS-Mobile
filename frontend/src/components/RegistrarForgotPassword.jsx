@@ -643,15 +643,23 @@ const RegistrarForgotPasswordQR = () => {
   const cardMaxWidth = isMobile ? 480 : isTablet ? 540 : undefined;
   const cardBorderWidth = isMobile ? "3px" : isTablet ? "4px" : "5px";
   const bodyPadding = isMobile ? "16px" : isTablet ? "20px" : "24px";
-  const fieldHeight = isMobile ? 48 : 50;
+  // NEW
+  const fieldHeight = isMobile ? "52px" : "54px";
 
   const fieldSx = {
     "& .MuiOutlinedInput-root": {
-      height: `${fieldHeight}px`,
-      "& input": { height: `${fieldHeight}px`, padding: "0 10px", boxSizing: "border-box" },
+      height: fieldHeight,
+      borderRadius: "10px",
+      "& input": {
+        height: fieldHeight,
+        padding: "0 10px",
+        boxSizing: "border-box",
+        fontSize: "16px",
+      },
     },
   };
 
+  
   const logoSrc = settings?.logo_url ? `${API_BASE_URL}${settings.logo_url}` : Logo;
   const backgroundImage = settings?.bg_image
     ? `url(${API_BASE_URL}${settings.bg_image})`

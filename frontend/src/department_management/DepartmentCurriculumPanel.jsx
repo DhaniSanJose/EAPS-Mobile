@@ -576,9 +576,14 @@ export default function DepartmentCurriculumPanel() {
                   width: "10%",
                   textAlign: "center",
                 }}>
-                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>ID</TableCell>
+                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>#</TableCell>
                   <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Department</TableCell>
-                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Program Code / Description</TableCell>
+                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Program Code</TableCell>
+                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Program Description</TableCell>
+                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Major</TableCell>
+                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Curriculum</TableCell>
+
+
                   {showActionColumn && (
                     <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Action</TableCell>
                   )}
@@ -605,33 +610,59 @@ export default function DepartmentCurriculumPanel() {
                   mappings.map((m, index) => (
                     <TableRow key={m.dprtmnt_curriculum_id}>
 
-                      <TableCell sx={{ border: `1px solid ${borderColor}`, }}>{index + 1}</TableCell>
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{index + 1}</TableCell>
 
                       {/* Department */}
-                      <TableCell sx={{ border: `1px solid ${borderColor}`, }}>
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                         {m.dprtmnt_code} — {m.dprtmnt_name}
                       </TableCell>
 
-                      {/* Program Code / Description */}
-                      <TableCell sx={{ border: `1px solid ${borderColor}` }}>
-                        {m.p_code || ""} — {m.p_description || ""}
-                        {m.year_description
-                          ? ` (${formatSchoolYear(m.year_description)}: ${m.p_major || ""})`
-                          : ""}
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                        {m.p_code || ""}
+
                       </TableCell>
+
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                        {m.p_description || ""}
+
+                      </TableCell>
+
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                        {m.p_major && (
+                          <Typography variant="body2">
+                            {m.p_major}
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      {/* Program Code / Description */}
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                        {m.year_description && (
+                          <Typography variant="body2">
+                            {formatSchoolYear(m.year_description)}
+                          </Typography>
+                        )}
+                      </TableCell>
+
 
                       {/* Actions */}
                       {showActionColumn && (
-                        <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", width: "250px" }}>
+                        <TableCell
+                          sx={{
+                            border: `1px solid ${borderColor}`,
+                            textAlign: "center",
+                            width: "250px",
+                          }}
+                        >
                           <Box
                             sx={{
                               display: "flex",
-                              flexDirection: "column",
+                              flexDirection: "row", // Changed from column to row
+                              justifyContent: "center",
                               alignItems: "center",
-                              gap: 1
+                              gap: 1,
                             }}
                           >
-
                             {canEdit && (
                               <Button
                                 variant="contained"
@@ -647,6 +678,9 @@ export default function DepartmentCurriculumPanel() {
                                   justifyContent: "center",
                                   gap: "5px",
                                   cursor: "pointer",
+                                  "&:hover": {
+                                    backgroundColor: "#0b7a0b",
+                                  },
                                 }}
                                 onClick={() => openEditDialog(m)}
                               >
@@ -669,13 +703,15 @@ export default function DepartmentCurriculumPanel() {
                                   justifyContent: "center",
                                   gap: "5px",
                                   cursor: "pointer",
+                                  "&:hover": {
+                                    backgroundColor: "#7a0000",
+                                  },
                                 }}
                                 onClick={() => openDeleteDialog(m.dprtmnt_curriculum_id)}
                               >
                                 <DeleteIcon fontSize="small" /> Delete
                               </Button>
                             )}
-
                           </Box>
                         </TableCell>
                       )}

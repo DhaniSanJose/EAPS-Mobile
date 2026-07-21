@@ -722,7 +722,7 @@ const ApplicantDashboard = (props) => {
       return (
         <Typography variant="body2" sx={{ color: "maroon", fontWeight: "bold" }}>
           {collegeApproval === "Accepted"
-            ? "✅ Approved by College"
+            ? "✅ Congratulations! You have successfully passed the qualifying examination and interview. You may now proceed to the clinic for your medical examination and the completion of your health record requirements."
             : collegeApproval === "Rejected"
               ? `❌ After careful evaluation, we regret to inform you that your application could not be approved at this time as it did not satisfy one or more of the admission requirements or program qualifications. Thank you for your understanding, and we wish you success in your future academic endeavors.`
               : "⏳ Waiting for College Approval"}
@@ -2080,10 +2080,10 @@ const ApplicantDashboard = (props) => {
                     ))}
                   </Stepper>
 
-                  <Grid container justifyContent="space-between" sx={{ mt: 3 }}>
+                  <Grid container justifyContent="space-between" sx={{ mt: 3, mb: 5 }}>
                     {steps.map((label, index) => (
                       <Grid item xs={2} key={index} sx={{ display: "flex", justifyContent: "center" }}>
-                        <Box sx={{ height: 360, width: "100%", maxWidth: 230, border: `2px solid ${borderColor}`, borderRadius: 2, p: 2, overflowY: "auto", fontSize: "13px", backgroundColor: "#fff9ec", transition: "transform 0.2s ease", boxShadow: 3, "&:hover": { transform: "scale(1.03)" }, color: "maroon", fontWeight: "bold", lineHeight: 1.6 }}>
+                        <Box sx={{ height: 380, width: "100%", maxWidth: 230, border: `2px solid ${borderColor}`, borderRadius: 2, p: 2, overflowY: "auto", fontSize: "13px", backgroundColor: "#fff9ec", transition: "transform 0.2s ease", boxShadow: 3, "&:hover": { transform: "scale(1.03)" }, color: "maroon", fontWeight: "bold", lineHeight: 1.6 }}>
                           {renderStepDetail(index)}
                         </Box>
                       </Grid>

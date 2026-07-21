@@ -337,7 +337,7 @@ const SuperAdminStudentDashboard1 = () => {
 
   const fetchByPersonId = async (personID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person/${personID}`);
+      const res = await axios.get(`${API_BASE_URL}/api/enrollment_person/${personID}`);
       setPerson(res.data);
       setSelectedPerson(res.data);
       setOriginalEmailAddress(String(res.data?.emailAddress || "").trim());
@@ -460,12 +460,7 @@ const SuperAdminStudentDashboard1 = () => {
   // 🧠 Updates record in ENROLLMENT.person_table in real time
   const handleUpdate = async (updatedPerson) => {
     try {
-      // ✅ force the request to the enrollment route
-      await axios.put(
-        `${API_BASE_URL}/api/enrollment/person/${userID}`,
-        updatedPerson,
-        getAuditHeaders(),
-      );
+      await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, updatedPerson, getAuditHeaders())
       console.log("✅ Auto-saved to ENROLLMENT DB3");
     } catch (error) {
       console.error("❌ Auto-save failed:", error);
@@ -1110,7 +1105,7 @@ const SuperAdminStudentDashboard1 = () => {
       const studentName = person?.last_name
         ? `${person.last_name}, ${person.first_name || ""}${middleInitial}`.trim()
         : [person?.first_name, person?.middle_name].filter(Boolean).join(" ") ||
-          "Unknown Student";
+        "Unknown Student";
 
       await postAuditEvent("PRINTING_STUDENT_DOCS", {
         document_label: documentLabel,
@@ -1497,100 +1492,100 @@ const SuperAdminStudentDashboard1 = () => {
 
       <Container>
         {/* Cards Section */}
-     
 
-    <Box
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 2,
-          mt: 2,
-          pb: 1,
-          justifyContent: "center",
-        }}
-      >
-        {links.map((lnk, i) => {
-          const isGenerating = generatingKey === lnk.key;
-          const disabled = generatingKey !== null;
 
-          return (
-            <motion.div
-              key={i}
-              style={{ flex: "0 0 calc(30% - 16px)" }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.4 }}
-            >
-              <Card
-                sx={{
-                  minHeight: 60,
-                  borderRadius: 2,
-                  border: `1px solid ${borderColor}`,
-                  backgroundColor: "#fff",
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  p: 1.5,
-                  cursor: disabled ? "default" : "pointer",
-                  opacity: disabled && !isGenerating ? 0.5 : 1,
-                  pointerEvents: disabled ? "none" : "auto",
-                  transition: "all 0.3s ease-in-out",
-                  "&:hover": {
-                    transform: disabled ? "none" : "scale(1.05)",
-                    backgroundColor: disabled
-                      ? "#fff"
-                      : settings?.header_color || "#1976d2",
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 2,
+            mt: 2,
+            pb: 1,
+            justifyContent: "center",
+          }}
+        >
+          {links.map((lnk, i) => {
+            const isGenerating = generatingKey === lnk.key;
+            const disabled = generatingKey !== null;
 
-                    "& .card-text": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                    "& .card-icon": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                  },
-                }}
-                onClick={() => {
-                  if (disabled) return;
-
-                  if (lnk.onClick) {
-                    lnk.onClick();
-                  } else if (lnk.to) {
-                    navigate(lnk.to);
-                  }
-                }}
+            return (
+              <motion.div
+                key={i}
+                style={{ flex: "0 0 calc(30% - 16px)" }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1, duration: 0.4 }}
               >
-                {/* Icon / Loading */}
-                {isGenerating ? (
-                  <CircularProgress
-                    size={26}
-                    sx={{ color: mainButtonColor, mr: 1.5 }}
-                  />
-                ) : (
-                  <PictureAsPdfIcon
-                    className="card-icon"
-                    sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
-                  />
-                )}
-
-                {/* Label */}
-                <Typography
-                  className="card-text"
+                <Card
                   sx={{
-                    color: mainButtonColor,
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: "bold",
-                    fontSize: "0.85rem",
+                    minHeight: 60,
+                    borderRadius: 2,
+                    border: `1px solid ${borderColor}`,
+                    backgroundColor: "#fff",
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    p: 1.5,
+                    cursor: disabled ? "default" : "pointer",
+                    opacity: disabled && !isGenerating ? 0.5 : 1,
+                    pointerEvents: disabled ? "none" : "auto",
+                    transition: "all 0.3s ease-in-out",
+                    "&:hover": {
+                      transform: disabled ? "none" : "scale(1.05)",
+                      backgroundColor: disabled
+                        ? "#fff"
+                        : settings?.header_color || "#1976d2",
+
+                      "& .card-text": {
+                        color: disabled ? mainButtonColor : "#fff",
+                      },
+                      "& .card-icon": {
+                        color: disabled ? mainButtonColor : "#fff",
+                      },
+                    },
+                  }}
+                  onClick={() => {
+                    if (disabled) return;
+
+                    if (lnk.onClick) {
+                      lnk.onClick();
+                    } else if (lnk.to) {
+                      navigate(lnk.to);
+                    }
                   }}
                 >
-                  {isGenerating ? "Generating PDF..." : lnk.label}
-                </Typography>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </Box>
+                  {/* Icon / Loading */}
+                  {isGenerating ? (
+                    <CircularProgress
+                      size={26}
+                      sx={{ color: mainButtonColor, mr: 1.5 }}
+                    />
+                  ) : (
+                    <PictureAsPdfIcon
+                      className="card-icon"
+                      sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
+                    />
+                  )}
+
+                  {/* Label */}
+                  <Typography
+                    className="card-text"
+                    sx={{
+                      color: mainButtonColor,
+                      fontFamily: "Poppins, sans-serif",
+                      fontWeight: "bold",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    {isGenerating ? "Generating PDF..." : lnk.label}
+                  </Typography>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </Box>
 
 
 
@@ -3782,18 +3777,15 @@ const SuperAdminStudentDashboard1 = () => {
                             <Button
                               size="small"
                               onClick={async () => {
-                                setSelectedFile(null);
-                                setPreview(null);
-
-                                const updatedPerson = { ...person, profile_img: "" };
-                                setPerson(updatedPerson);
-                                await handleUpdate(updatedPerson);
-
-                                setSnack({
-                                  open: true,
-                                  message: "Image removed successfully.",
-                                  severity: "info",
-                                });
+                                if (preview) { setSelectedFile(null); setPreview(null); return; }
+                                try {
+                                  const updatedPerson = { ...person, profile_img: "" };
+                                  await handleUpdate(updatedPerson);
+                                  setPerson(updatedPerson);
+                                  setSnackbar({ open: true, message: "Image removed successfully.", severity: "info" });
+                                } catch (err) {
+                                  setSnackbar({ open: true, message: "Failed to remove photo.", severity: "error" });
+                                }
                               }}
                               sx={{
                                 position: "absolute",

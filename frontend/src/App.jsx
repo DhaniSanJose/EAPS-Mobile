@@ -25,6 +25,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import axios from "axios";
 import "./App.css";
 import Clock from "./components/Clock";
+import InactivityLogoutModal from "./components/InactivityLogoutModal";
 
 // COMPONENTS FOLDER
 import ProtectedRoute, { isTokenValid } from "./components/ProtectedRoute";
@@ -36,7 +37,7 @@ import StudentAccounts from "./account_management/StudentAccounts";
 import ApplicationProcessAdmin from "./admission/ApplicationProcessAdmin";
 import CollegeCourseTaggingSummer from "./enrollment_management/CollegeCourseTaggingSummer";
 import CollegeStudentList from "./enrollment_management/CollegeStudentList";
-import CollegeStudentGradeFile from "./enrollment_management/CollegeStudentGradeFile"; 
+import CollegeStudentGradeFile from "./enrollment_management/CollegeStudentGradeFile";
 
 import GradeConversionAdmin from "./system_management/GradeConversionAdmin";
 import HonorsReport from "./system_management/HonorsReport";
@@ -458,6 +459,8 @@ function App() {
     clearAuthStorage();
     setIsAuthenticated(false);
   }, []);
+
+
 
   useEffect(() => {
     if (!isAuthenticated || localStorage.getItem("role") !== "registrar") return undefined;
@@ -925,6 +928,15 @@ function App() {
                 </div>
               </div>
 
+              <InactivityLogoutModal
+                isAuthenticatedPage={isAuthenticated}
+                onLogout={() => {
+                  clearAuthStorage();
+                  setIsAuthenticated(false);
+                  window.location.href = "/";
+                }}
+              />
+
               {/* Footer */}
               {!isCorExportRenderRoute && (
                 <Box
@@ -946,6 +958,8 @@ function App() {
                   </Typography>
                 </Box>
               )}
+
+
             </div>
           </Router>
         </Suspense>

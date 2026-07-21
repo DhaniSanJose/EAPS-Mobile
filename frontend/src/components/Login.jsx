@@ -1074,7 +1074,7 @@ const Login = ({ setIsAuthenticated }) => {
   const cardBorderWidth = isMobile ? "3px" : isTablet ? "4px" : "5px";
   const cardMarginLeft = isDesktop ? -100 : 0;
   const cardMarginTop = isDesktop ? -130 : 0;
-  const fieldHeight = isMobile ? 48 : isTablet ? 52 : 55;
+  const fieldHeight = isMobile ? "52px" : "54px";
 
   return (
     <Box
@@ -1161,11 +1161,11 @@ const Login = ({ setIsAuthenticated }) => {
                 }}
                 style={{
                   width: "100%",
-                  padding: "0.8rem 2.5rem 0.8rem 2.5rem",
+                  padding: "0.8rem 2.5rem 0.8rem 2.80rem",
                   borderRadius: "10px",
                   border: "2px solid black",
-                  fontSize: "1rem",
-                  height: `${fieldHeight}px`,
+                  fontSize: "16px",
+                  height: fieldHeight,
                   backgroundColor: "white",
                   outline: "none",
                   appearance: "none",
@@ -1177,11 +1177,11 @@ const Login = ({ setIsAuthenticated }) => {
                 <option value="user">Student / Faculty / Registrar</option>
                 <option value="applicant">Applicant</option>
               </select>
-              <PersonIcon style={{ position: "absolute", top: "2.75rem", left: "0.7rem", color: "rgba(0,0,0,0.4)" }} />
+              <PersonIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", color: "rgba(0,0,0,0.4)" }} />
               <ArrowDropDownIcon
                 style={{
                   position: "absolute",
-                  top: "2.75rem",
+                  top: "2.80rem",
                   right: "0.7rem",
                   fontSize: "30px",
                   color: "black",
@@ -1203,14 +1203,16 @@ const Login = ({ setIsAuthenticated }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !isLocked && !loading && handleLogin()}
                 style={{
-                  paddingLeft: "2.5rem",
-                  height: `${fieldHeight}px`,
+                  paddingLeft: "2.80rem",
+                  height: fieldHeight,
+                  fontSize: "16px",
                   border: errors.email ? "2px solid red" : "2px solid black",
                   borderRadius: "10px",
+                  width: "100%",
                 }}
               />
-              {errors.email && <span style={{ color: "red", fontSize: "12px" }}>Email is required</span>}
-              <EmailIcon style={{ position: "absolute", top: "2.75rem", left: "0.7rem", color: "rgba(0,0,0,0.4)" }} />
+              {errors.email && <span style={{ color: "red", fontSize: "15px" }}>Email is required</span>}
+              <EmailIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", color: "rgba(0,0,0,0.4)" }} />
             </div>
 
             {/* Password */}
@@ -1226,14 +1228,16 @@ const Login = ({ setIsAuthenticated }) => {
                 onKeyDown={(e) => e.key === "Enter" && !isLocked && !loading && handleLogin()}
                 className="border"
                 style={{
-                  paddingLeft: "2.5rem",
-                  height: `${fieldHeight}px`,
+                  paddingLeft: "2.80rem",
+                  height: fieldHeight,
+                  fontSize: "16px",
                   border: errors.password ? "2px solid red" : "2px solid black",
                   borderRadius: "10px",
+                  width: "100%",
                 }}
               />
-              {errors.password && <span style={{ color: "red", fontSize: "12px" }}>Password is required</span>}
-              <LockIcon style={{ position: "absolute", top: "2.75rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "26px" }} />
+              {errors.password && <span style={{ color: "red", fontSize: "15px" }}>Password is required</span>}
+              <LockIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "22px" }} />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -1241,7 +1245,7 @@ const Login = ({ setIsAuthenticated }) => {
                   color: "rgba(0,0,0,0.3)",
                   outline: "none",
                   position: "absolute",
-                  top: "2.5rem",
+                  top: "2.80rem",
                   right: "1rem",
                   background: "none",
                   border: "none",
@@ -1250,9 +1254,9 @@ const Login = ({ setIsAuthenticated }) => {
                 }}
               >
                 {showPassword ? (
-                  <Visibility sx={{ fontSize: "26px", color: "rgba(0,0,0,0.4)" }} />
+                  <Visibility sx={{ fontSize: "22px", color: "rgba(0,0,0,0.4)" }} />
                 ) : (
-                  <VisibilityOff sx={{ fontSize: "26px", color: "rgba(0,0,0,0.4)" }} />
+                  <VisibilityOff sx={{ fontSize: "22px", color: "rgba(0,0,0,0.4)" }} />
                 )}
               </button>
             </div>

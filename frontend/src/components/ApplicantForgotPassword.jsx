@@ -629,12 +629,18 @@ const ApplicantForgotPassword = () => {
   const cardMaxWidth = isMobile ? 480 : isTablet ? 540 : undefined;
   const cardBorderWidth = isMobile ? "3px" : isTablet ? "4px" : "5px";
   const bodyPadding = isMobile ? "16px" : isTablet ? "20px" : "24px";
-  const fieldHeight = isMobile ? 48 : isTablet ? 50 : 50;
+  const fieldHeight = isMobile ? "52px" : "54px";
 
   const fieldSx = {
     "& .MuiOutlinedInput-root": {
-      height: `${fieldHeight}px`,
-      "& input": { height: `${fieldHeight}px`, padding: "0 10px", boxSizing: "border-box" },
+      height: fieldHeight,
+      borderRadius: "10px",
+      "& input": {
+        height: fieldHeight,
+        padding: "0 10px",
+        boxSizing: "border-box",
+        fontSize: "16px",
+      },
     },
   };
 
@@ -679,24 +685,24 @@ const ApplicantForgotPassword = () => {
     }
   };
 
-     document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   const isButtonDisabled =
     identifyLoading || !applicantNumber.trim() || !email.trim() || !birthdate;

@@ -334,218 +334,297 @@ const ScheduleFilterer = () => {
         ))}
       </Grid>
 
-      <Grid
-        container
-        spacing={4}
-        justifyContent="center"
-        alignItems="stretch"
-        sx={{ mt: 2, gap: 2 }}
+      <Box
+        sx={{
+          mt: 2,
+          p: 2,
+          border: `1px solid ${borderColor}`,
+          borderRadius: 2,
+        }}
       >
-        {/* ---------------- Department Access panel ---------------- */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Paper
-            sx={{
-              p: 2,
-              border: `1px solid ${borderColor}`,
-              height: PANEL_HEIGHT,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <Typography variant="h6" fontWeight="bold" textAlign="center" sx={{ mb: 2, color: titleColor }}>
-              Department Access
-            </Typography>
-            {!permissionsLoading && !canEditAccess && (
-              <Typography variant="body2" color="warning.main" sx={{ mb: 2 }}>
-                View only: your account does not have Edit permission on this page, so
-                department access switches are disabled.
-              </Typography>
-            )}
-            {!permissionsLoading && canEditAccess && !employeeID && (
-              <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-                Missing employee ID in your session. Log out and log in again, then retry.
-              </Typography>
-            )}
-            {toggleError && (
-              <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-                {toggleError}
-              </Typography>
-            )}
-            <TableContainer sx={{ flex: 1, overflowY: "auto" }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell
-                      sx={{
-                        color: "white",
-                        fontWeight: "bold",
-                        backgroundColor: settings?.header_color || "#1976d2",
-                      }}
-                    >
-                      Department
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        color: "white",
-                        fontWeight: "bold",
-                        width: 100,
-                        backgroundColor: settings?.header_color || "#1976d2",
-                      }}
-                      align="center"
-                    >
-                      Allowed
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {departmentList.map((department) => (
-                    <TableRow key={`allowed-${department.dprtmnt_id}`}>
-                      <TableCell>
-                        <Typography fontWeight="bold">{department.dprtmnt_code}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {department.dprtmnt_name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Switch
-                          checked={Number(department.is_allowed ?? 1) === 1}
-                          onChange={handleAllowedToggle(department.dprtmnt_id)}
-                          disabled={
-                            permissionsLoading ||
-                            !canEditAccess ||
-                            !employeeID ||
-                            updatingAllowedId === department.dprtmnt_id
-                          }
-                          color="primary"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {departmentList.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={2} align="center">
-                        No departments found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
-
-        {/* ---------------- Plotted Schedules panel ---------------- */}
-        <Grid size={{ xs: 12, md: 8}}>
-          <Paper
-            sx={{
-              p: 2,
-              border: `1px solid ${borderColor}`,
-              height: PANEL_HEIGHT,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              flexWrap="wrap"
-              gap={2}
-              mb={2}
-              position="relative"
+        <Grid container spacing={2} alignItems="stretch">
+          {/* ---------------- Department Access panel ---------------- */}
+          <Grid item xs={12} md={4}>
+            <Paper
+              sx={{
+                p: 2,
+                border: `1px solid ${borderColor}`,
+                height: PANEL_HEIGHT,
+                display: "flex",
+                flexDirection: "column",
+              }}
             >
-              <Typography variant="h6" fontWeight="bold" sx={{ color: titleColor }}>
-                Plotted Schedules
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                textAlign="center"
+                sx={{ mb: 2, color: titleColor }}
+              >
+                Department Access
               </Typography>
-              <FormControl size="small" sx={{ minWidth: 220 }}>
-                <InputLabel id="schedule-department-select-label">Department</InputLabel>
-                <Select
-                  labelId="schedule-department-select-label"
-                  label="Department"
-                  value={tableDepartmentId}
-                  onChange={(event) => setTableDepartmentId(event.target.value)}
-                >
-                  {departmentList.map((department) => (
-                    <MenuItem key={department.dprtmnt_id} value={String(department.dprtmnt_id)}>
-                      {department.dprtmnt_code} Schedules
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
 
-            {selectedTableDepartment && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {selectedTableDepartment.dprtmnt_name} — all plotted schedules for the active school year
-                (one row per class; the plot grid shows one room at a time).
-              </Typography>
-            )}
+              {!permissionsLoading && !canEditAccess && (
+                <Typography variant="body2" color="warning.main" sx={{ mb: 2 }}>
+                  View only: your account does not have Edit permission on this page,
+                  so department access switches are disabled.
+                </Typography>
+              )}
 
-            {schedulesLoading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
-                <CircularProgress size={28} />
-              </Box>
-            ) : (
+              {!permissionsLoading && canEditAccess && !employeeID && (
+                <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+                  Missing employee ID in your session. Log out and log in again, then
+                  retry.
+                </Typography>
+              )}
+
+              {toggleError && (
+                <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+                  {toggleError}
+                </Typography>
+              )}
+
               <TableContainer sx={{ flex: 1, overflowY: "auto" }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      {[
-                        "#",
-                        "Professor",
-                        "Course",
-                        "Section",
-                        "Day",
-                        "Time Start",
-                        "Time End",
-                        "Room",
-                      ].map((label) => (
-                        <TableCell
-                          key={label}
-                          sx={{
-                            color: "white",
-                            fontWeight: "bold",
-                            whiteSpace: "nowrap",
-                            backgroundColor: settings?.header_color || "#1976d2",
-                          }}
-                          align={label === "#" ? "center" : "left"}
-                        >
-                          {label}
-                        </TableCell>
-                      ))}
+                      <TableCell
+                        sx={{
+                          color: "white",
+                          fontWeight: "bold",
+                          border: `1px solid ${borderColor}`,
+                          textAlign: "center",
+                          backgroundColor:
+                            settings?.header_color || "#1976d2",
+                        }}
+                      >
+                        Department
+                      </TableCell>
+
+                      <TableCell
+                        align="center"
+                        sx={{
+                          color: "white",
+                          fontWeight: "bold",
+                          width: 100,
+                          border: `1px solid ${borderColor}`,
+                          textAlign: "center",
+                          backgroundColor:
+                            settings?.header_color || "#1976d2",
+                        }}
+                      >
+                        Allowed
+                      </TableCell>
                     </TableRow>
                   </TableHead>
+
                   <TableBody>
-                    {plottedSchedules.map((row, index) => (
-                      <TableRow key={`${row.employee_id}-${row.day}-${row.school_time_start}-${index}`}>
-                        <TableCell align="center">{index + 1}</TableCell>
-                        <TableCell>{formatProfessorName(row)}</TableCell>
-                        <TableCell>{row.course_code || "—"}</TableCell>
-                        <TableCell>
-                          {row.program_code && row.section_description
-                            ? `${row.program_code}-${row.section_description}`
-                            : "—"}
+                    {departmentList.map((department) => (
+                      <TableRow key={`allowed-${department.dprtmnt_id}`}>
+                        <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }} >
+                          <Typography fontWeight="bold" >
+                            {department.dprtmnt_code}
+                          </Typography>
+
+                          <Typography variant="body2" color="text.secondary">
+                            {department.dprtmnt_name}
+                          </Typography>
                         </TableCell>
-                        <TableCell>{row.day || "—"}</TableCell>
-                        <TableCell>{row.school_time_start || "—"}</TableCell>
-                        <TableCell>{row.school_time_end || "—"}</TableCell>
-                        <TableCell>{row.room_description || "—"}</TableCell>
+
+                        <TableCell align="center" sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }} >
+                          <Switch
+                            checked={Number(department.is_allowed ?? 1) === 1}
+                            onChange={handleAllowedToggle(department.dprtmnt_id)}
+                            disabled={
+                              permissionsLoading ||
+                              !canEditAccess ||
+                              !employeeID ||
+                              updatingAllowedId === department.dprtmnt_id
+                            }
+                            color="primary"
+                          />
+                        </TableCell>
                       </TableRow>
                     ))}
-                    {plottedSchedules.length === 0 && (
+
+                    {departmentList.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
-                          No plotted schedules found for this department.
+                        <TableCell colSpan={2} align="center">
+                          No departments found.
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
               </TableContainer>
-            )}
-          </Paper>
+            </Paper>
+          </Grid>
+
+          {/* ---------------- Plotted Schedules panel ---------------- */}
+          <Grid item xs={12} md={8}>
+            <Paper
+              sx={{
+                p: 2,
+                border: `1px solid ${borderColor}`,
+                height: PANEL_HEIGHT,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                flexWrap="wrap"
+                gap={2}
+                mb={2}
+              >
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                  sx={{ color: titleColor }}
+                >
+                  Plotted Schedules
+                </Typography>
+
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                  <InputLabel id="schedule-department-select-label">
+                    Department
+                  </InputLabel>
+
+                  <Select
+                    labelId="schedule-department-select-label"
+                    label="Department"
+                    value={tableDepartmentId}
+                    onChange={(event) =>
+                      setTableDepartmentId(event.target.value)
+                    }
+                  >
+                    {departmentList.map((department) => (
+                      <MenuItem
+                        key={department.dprtmnt_id}
+                        value={String(department.dprtmnt_id)}
+                      >
+                        ({department.dprtmnt_code}) - {department.dprtmnt_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {selectedTableDepartment && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 1 }}
+                >
+                  {selectedTableDepartment.dprtmnt_name} — all plotted schedules
+                  for the active school year (one row per class; the plot grid
+                  shows one room at a time).
+                </Typography>
+              )}
+
+              {schedulesLoading ? (
+                <Box
+                  display="flex"
+                  justifyContent="center"
+                  alignItems="center"
+                  flex={1}
+                >
+                  <CircularProgress size={28} />
+                </Box>
+              ) : (
+                <TableContainer sx={{ flex: 1, overflowY: "auto" }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        {[
+                          "#",
+                          "Professor",
+                          "Course",
+                          "Section",
+                          "Day",
+                          "Time Start",
+                          "Time End",
+                          "Room",
+                        ].map((label) => (
+                          <TableCell
+                            key={label}
+                            align={label === "#" ? "center" : "left"}
+                            sx={{
+                              color: "white",
+                              fontWeight: "bold",
+                              whiteSpace: "nowrap",
+                              border: `1px solid ${borderColor}`,
+                              textAlign: "center",
+                              backgroundColor:
+                                settings?.header_color || "#1976d2",
+                            }}
+                          >
+                            {label}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+
+                    <TableBody>
+                      {plottedSchedules.map((row, index) => (
+                        <TableRow
+                          key={`${row.employee_id}-${row.day}-${row.school_time_start}-${index}`}
+                        >
+                          <TableCell align="center" sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>
+                            {index + 1}
+                          </TableCell>
+
+                          <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>
+                            {formatProfessorName(row)}
+                          </TableCell>
+
+                          <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>
+                            {row.course_code || "—"}
+                          </TableCell>
+
+                          <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>
+                            {row.program_code &&
+                              row.section_description
+                              ? `${row.program_code}-${row.section_description}`
+                              : "—"}
+                          </TableCell>
+
+                          <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>{row.day || "—"}</TableCell>
+
+                          <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>
+                            {row.school_time_start || "—"}
+                          </TableCell>
+
+                          <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>
+                            {row.school_time_end || "—"}
+                          </TableCell>
+
+                          <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", }}>
+                            {row.room_description || "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {plottedSchedules.length === 0 && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={8}
+                            align="center"
+                            sx={{ border: `1px solid ${borderColor}`, textAlign: "center", py: 3 }}
+                          >
+                            No plotted schedules found for this department.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
+      </Box>
     </Box>
   );
 };

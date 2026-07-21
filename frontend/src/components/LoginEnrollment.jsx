@@ -10,7 +10,7 @@ import {
   Typography,
   Button,
   CircularProgress,
-   IconButton,
+  IconButton,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import {
@@ -250,7 +250,7 @@ const TotpLoginModal = ({
                     ? "One-time setup — Step 1 of 2"
                     : "Step 2 of 2 — Confirm & complete registration"}
                 </Typography>
-            
+
               </Box>
             </Box>
 
@@ -286,7 +286,7 @@ const TotpLoginModal = ({
               <Typography sx={{ mt: 2, color: "#666", fontSize: "14px" }}>
                 Generating your authenticator QR code…
               </Typography>
-            
+
             </Box>
           )}
 
@@ -316,7 +316,7 @@ const TotpLoginModal = ({
                       <Typography fontSize={13} color="#444" fontWeight={600}>
                         1. Download and install <strong>Google Authenticator</strong>:
                       </Typography>
-                    
+
                     </Box>
 
                     {/* Download buttons — each on its own row */}
@@ -365,7 +365,7 @@ const TotpLoginModal = ({
                       <Typography fontSize={13} color="#444" lineHeight={1.6}>
                         <strong>2.</strong> Open the app → tap <strong>"+"</strong> → <strong>"Scan a QR code"</strong>.
                       </Typography>
-                  
+
                     </Box>
 
                     {/* Step 3 */}
@@ -373,7 +373,7 @@ const TotpLoginModal = ({
                       <Typography fontSize={13} color="#444" lineHeight={1.6}>
                         <strong>3.</strong> Scan the QR code shown on the right.
                       </Typography>
-                    
+
                     </Box>
 
                   </Box>
@@ -415,7 +415,7 @@ const TotpLoginModal = ({
                         <Typography fontSize={11.5} color="#888" sx={{ mt: 0.5 }}>
                           In Google Authenticator: tap + → Enter a setup key → paste this key, select "Time based".
                         </Typography>
-                    
+
                       </>
                     )}
                   </Box>
@@ -432,7 +432,7 @@ const TotpLoginModal = ({
                     <Typography fontSize={12} color="#5d4037" lineHeight={1.5}>
                       This QR code expires in <strong>10 minutes</strong>. If it expires, close this dialog and click "Submit Application" again.
                     </Typography>
-                 
+
                   </Box>
                 </Box>
               </Box>
@@ -535,7 +535,7 @@ const TotpLoginModal = ({
                 >
                   I've scanned it — Enter the code →
                 </Button>
-                
+
               </Box>
             </Box>
           )}
@@ -550,11 +550,11 @@ const TotpLoginModal = ({
                 <Typography fontSize={13} color="#444" lineHeight={1.7}>
                   Open <strong>Google Authenticator</strong> on your phone and enter the <strong>6-digit code</strong> shown for this account.
                 </Typography>
-            
+
                 <Typography fontSize={12} color="#888" sx={{ mt: 0.8 }}>
                   The code refreshes every 30 seconds — use the current one.
                 </Typography>
-              
+
               </Box>
 
               {/* 6-digit input boxes */}
@@ -635,7 +635,7 @@ const TotpLoginModal = ({
               >
                 ← Back to QR code
               </Button>
-          
+
             </>
           )}
         </Box>
@@ -906,7 +906,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
   const cardMaxWidth = isMobile ? 480 : isTablet ? 520 : undefined;
   const cardBorderWidth = isMobile ? "3px" : isTablet ? "4px" : "5px";
   const containerMarginTop = isMobile ? 0 : isTablet ? -40 : -100;
-  const fieldHeight = isMobile ? 48 : isTablet ? 52 : 55;
+  const fieldHeight = isMobile ? "52px" : "54px";
 
   return (
     <>
@@ -988,11 +988,11 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                   }}
                   style={{
                     width: "100%",
-                    padding: "0.8rem 2.5rem 0.8rem 2.5rem",
-                    borderRadius: "6px",
+                    padding: "0.8rem 2.5rem 0.8rem 2.80rem",
+                    borderRadius: "10px",
                     border: "2px solid black",
-                    height: `${fieldHeight}px`,
-                    fontSize: "1rem",
+                    height: fieldHeight,
+                    fontSize: "16px",
                     backgroundColor: "white",
                     outline: "none",
                     appearance: "none",
@@ -1007,7 +1007,7 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                 <PersonIcon
                   style={{
                     position: "absolute",
-                    top: "2.75rem",
+                    top: "2.80rem",
                     left: "0.7rem",
                     color: "rgba(0,0,0,0.4)",
                   }}
@@ -1042,19 +1042,21 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     style={{
-                      paddingLeft: "2.5rem",
-                      height: `${fieldHeight}px`,
+                      paddingLeft: "2.80rem",
+                      height: fieldHeight,
+                      fontSize: "16px",
                       border: errors.email ? "2px solid red" : "2px solid black",
+                      width: "100%",
                     }}
                     autoFocus={isDesktop}
                   />
                   {errors.email && (
-                    <span style={{ color: "red", fontSize: "12px" }}>Email is required</span>
+                    <span style={{ color: "red", fontSize: "15px" }}>Email is required</span>
                   )}
                   <EmailIcon
                     style={{
                       position: "absolute",
-                      top: "2.75rem",
+                      top: "2.80rem",
                       left: "0.7rem",
                       color: "rgba(0,0,0,0.4)",
                     }}
@@ -1072,21 +1074,23 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                     onChange={(e) => setPassword(e.target.value)}
                     className="border"
                     style={{
-                      paddingLeft: "2.5rem",
-                      height: `${fieldHeight}px`,
+                      paddingLeft: "2.80rem",
+                      height: fieldHeight,
+                      fontSize: "16px",
                       border: errors.password ? "2px solid red" : "2px solid black",
+                      width: "100%",
                     }}
                   />
                   {errors.password && (
-                    <span style={{ color: "red", fontSize: "12px" }}>Password is required</span>
+                    <span style={{ color: "red", fontSize: "15px" }}>Password is required</span>
                   )}
                   <LockIcon
                     style={{
                       position: "absolute",
-                      top: "2.75rem",
+                      top: "2.80rem",
                       left: "0.7rem",
                       color: "rgba(0,0,0,0.4)",
-                      fontSize: "26px",
+                      fontSize: "22px",
                     }}
                   />
                   <button
@@ -1096,19 +1100,18 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
                       color: "rgba(0,0,0,0.3)",
                       outline: "none",
                       position: "absolute",
-                      top: "2.5rem",
+                      top: "2.80rem",
                       right: "1rem",
                       background: "none",
                       border: "none",
                       cursor: "pointer",
-                      marginBottom: "50px",
                       touchAction: "manipulation",
                     }}
                   >
                     {showPassword ? (
-                      <Visibility sx={{ fontSize: "26px", color: "rgba(0,0,0,0.4)" }} />
+                      <Visibility sx={{ fontSize: "22px", color: "rgba(0,0,0,0.4)" }} />
                     ) : (
-                      <VisibilityOff sx={{ fontSize: "26px", color: "rgba(0,0,0,0.4)" }} />
+                      <VisibilityOff sx={{ fontSize: "22px", color: "rgba(0,0,0,0.4)" }} />
                     )}
                   </button>
                 </div>

@@ -192,6 +192,38 @@ router.put("/person/:id", async (req, res) => {
       return res.status(400).json({ error: "No valid fields to update" });
     }
 
+    // 🗑️ Delete the old Applicant1by1 photo file if profile_img is being
+    // cleared or replaced, so removed/changed photos don't orphan on disk.
+    const profileImgEntry = cleanedEntries.find(([key]) => key === "profile_img");
+
+    if (profileImgEntry) {
+      const nextValue = profileImgEntry[1];
+      const [[personBeforePhoto]] = await db.query(
+        "SELECT profile_img FROM person_table WHERE person_id = ? LIMIT 1",
+        [id],
+      );
+      const oldProfileImg = personBeforePhoto?.profile_img;
+
+      if (oldProfileImg && oldProfileImg !== nextValue) {
+        const oldPhotoPath = path.join(
+          __dirname,
+          "../../uploads/Applicant1by1",
+          oldProfileImg,
+        );
+
+        try {
+          await fs.promises.unlink(oldPhotoPath);
+          console.log("✅ Old applicant photo deleted:", oldPhotoPath);
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            console.warn("⚠️ Old applicant photo already missing:", oldPhotoPath);
+          } else {
+            console.error("❌ Failed to delete old applicant photo:", err);
+          }
+        }
+      }
+    }
+
     const emailEntry = cleanedEntries.find(([key]) => key === "emailAddress");
     const nextEmailRaw = emailEntry?.[1] ?? null;
     const nextEmail =
@@ -299,6 +331,7 @@ router.put("/person/:id", async (req, res) => {
     });
   }
 });
+
 
 router.post("/upload-profile-picture", uploadProfile.single("profile_picture"), async (req, res) => {
   const { person_id } = req.body;

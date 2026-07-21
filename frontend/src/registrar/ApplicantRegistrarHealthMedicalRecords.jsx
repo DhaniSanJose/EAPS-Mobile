@@ -1811,29 +1811,117 @@ const AdminDashboard4 = () => {
                   top: "50%",
                   left: "50%",
                   transform: "translate(-50%, -50%)",
-                  width: 400,
+                  width: { xs: "90%", sm: 420 },
                   bgcolor: "background.paper",
-                  border: `1px solid ${borderColor}`,
-                  boxShadow: 24,
-                  p: 4,
-                  borderRadius: 2,
-                  textAlign: "center",
+                  boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                  borderRadius: "16px",
+                  overflow: "hidden",
                 }}
               >
-                <ErrorIcon sx={{ color: mainButtonColor, fontSize: 50, mb: 2 }} />
-                <Typography id="exam-permit-error-title" variant="h6" component="h2" color="maroon">
-                  Exam Permit Notice
-                </Typography>
-                <Typography id="exam-permit-error-description" sx={{ mt: 2 }}>
-                  {examPermitError}
-                </Typography>
-                <Button
-                  onClick={handleCloseExamPermitModal}
-                  variant="contained"
-                  sx={{ mt: 3, backgroundcolor: mainButtonColor, "&:hover": { backgroundColor: "#8B0000" } }}
+                {/* Header bar */}
+                <Box
+                  sx={{
+                    bgcolor: mainButtonColor,
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                    px: 3,
+                    py: 2,
+                  }}
                 >
-                  Close
-                </Button>
+                  <Box
+                    sx={{
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      borderRadius: "50%",
+                      width: 40,
+                      height: 40,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ErrorIcon sx={{ fontSize: 22, color: "#fff" }} />
+                  </Box>
+                  <Box>
+                    <Typography
+                      id="exam-permit-error-title"
+                      fontWeight="bold"
+                      fontSize={16}
+                      color="white"
+                      lineHeight={1.2}
+                    >
+                      Exam Permit Notice
+                    </Typography>
+                    <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                      Please review the message below
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* Body */}
+                <Box sx={{ px: 3, pt: 3, pb: 1, textAlign: "center" }}>
+                  <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                    <Box
+                      sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: "50%",
+                        backgroundColor: "rgba(255,255,255,0.9)",
+                        border: `3px solid ${mainButtonColor}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ErrorIcon sx={{ color: mainButtonColor, fontSize: 30 }} />
+                    </Box>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      border: `1.5px solid ${mainButtonColor}`,
+                      borderRadius: "12px",
+                      overflow: "hidden",
+                      mb: 1,
+                    }}
+                  >
+                    <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
+                      <Typography
+                        id="exam-permit-error-description"
+                        sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.65 }}
+                      >
+                        {examPermitError}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Actions */}
+                <Box sx={{ px: 3, pb: 3, pt: 1.5 }}>
+                  <Button
+                    fullWidth
+                    onClick={handleCloseExamPermitModal}
+                    variant="contained"
+                    sx={{
+                      height: 44,
+                      borderRadius: "10px",
+                      backgroundColor: mainButtonColor,
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 14,
+                      textTransform: "none",
+                      boxShadow: "none",
+                      "&:hover": {
+                        backgroundColor: "#8B0000",
+                        boxShadow: "none",
+                      },
+                    }}
+                  >
+                    Close
+                  </Button>
+                </Box>
               </Box>
             </Modal>
 

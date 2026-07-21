@@ -51,7 +51,6 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
 
 
-
 const ApplicantListRegistrar = () => {
   useAuditMac();
   const socket = useRef(null);
@@ -338,8 +337,8 @@ const ApplicantListRegistrar = () => {
 
   const pageId = 80;
 
-  const getAuditHeaders = () =>
-    getAuditConfig({
+  const getAuditHeaders = () => ({
+    headers: getFlatAuditHeaders({
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
       "x-audit-actor-id":
@@ -348,7 +347,8 @@ const ApplicantListRegistrar = () => {
         localStorage.getItem("email") ||
         "unknown",
       "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-    });
+    }),
+  });
 
   const [employeeID, setEmployeeID] = useState("");
 

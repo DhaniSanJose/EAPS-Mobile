@@ -54,7 +54,13 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Autocomplete from "@mui/material/Autocomplete";
 import { motion, AnimatePresence } from "framer-motion";
 import MuiLink from "@mui/material/Link";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
+import Popover from "@mui/material/Popover";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 
+dayjs.extend(customParseFormat);
 /* ─── Device breakpoint hooks ───────────────────────────────────────────────
    Three tiers instead of one: phones get their own compact layout, tablets
    get a wider single-column layout (previously tablets fell into whichever
@@ -104,8 +110,8 @@ const FormattedContent = ({ text, style = {} }) => {
         if (subBullet) {
           return (
             <div key={i} style={{ display: "flex", gap: "6px", alignItems: "flex-start", paddingLeft: "14px" }}>
-              <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px", marginTop: "3px", flexShrink: 0 }}>◦</span>
-              <span style={{ color: "rgba(255,255,255,0.8)", fontSize: "12.5px", lineHeight: 1.55 }}>{subBullet[1]}</span>
+              <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "14px", marginTop: "3px", flexShrink: 0 }}>◦</span>
+              <span style={{ color: "rgba(255,255,255,0.8)", fontSize: "15.5px", lineHeight: 1.55 }}>{subBullet[1]}</span>
             </div>
           );
         }
@@ -114,22 +120,22 @@ const FormattedContent = ({ text, style = {} }) => {
         if (bullet) {
           return (
             <div key={i} style={{ display: "flex", gap: "7px", alignItems: "flex-start" }}>
-              <span style={{ color: "#fff", fontSize: "13px", marginTop: "2px", flexShrink: 0 }}>•</span>
-              <span style={{ color: "rgba(255,255,255,0.92)", fontSize: "13px", lineHeight: 1.55 }}>{bullet[1]}</span>
+              <span style={{ color: "#fff", fontSize: "15px", marginTop: "2px", flexShrink: 0 }}>•</span>
+              <span style={{ color: "rgba(255,255,255,0.92)", fontSize: "15px", lineHeight: 1.55 }}>{bullet[1]}</span>
             </div>
           );
         }
 
         if (trimmed.startsWith("#")) {
           return (
-            <p key={i} style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.45)", fontSize: "11.5px", lineHeight: 1.5 }}>
+            <p key={i} style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.45)", fontSize: "14.5px", lineHeight: 1.5 }}>
               {trimmed}
             </p>
           );
         }
 
         return (
-          <p key={i} style={{ margin: 0, color: "rgba(255,255,255,0.9)", fontSize: "13px", lineHeight: 1.6 }}>
+          <p key={i} style={{ margin: 0, color: "rgba(255,255,255,0.9)", fontSize: "15px", lineHeight: 1.6 }}>
             {trimmed}
           </p>
         );
@@ -181,7 +187,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
           <CampaignIcon sx={{ color: "#fff", fontSize: 18, flexShrink: 0 }} />
           <span style={{
-            color: "#fff", fontWeight: 600, fontSize: "13px",
+            color: "#fff", fontWeight: 600, fontSize: "15px",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
             {current.title}
@@ -274,7 +280,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
           {scale > 1 && (
             <div style={{
               position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
-              background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "11px",
+              background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "14px",
               padding: "4px 10px", borderRadius: "20px", pointerEvents: "none",
             }}>
               {Math.round(scale * 100)}% — tap − to zoom out
@@ -292,7 +298,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
             padding: "9px 16px",
             background: showContent ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.07)",
             border: "none", borderTop: "1px solid rgba(255,255,255,0.12)",
-            color: "#fff", cursor: "pointer", fontSize: "12.5px", fontWeight: 600,
+            color: "#fff", cursor: "pointer", fontSize: "15.5px", fontWeight: 600,
             transition: "background 0.2s",
           }}
         >
@@ -301,7 +307,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
           {!showContent && (
             <span style={{
               background: "rgba(255,255,255,0.2)", borderRadius: "10px",
-              padding: "1px 7px", fontSize: "10.5px", marginLeft: 2,
+              padding: "1px 7px", fontSize: "14.5px", marginLeft: 2,
             }}>
               tap to read
             </span>
@@ -320,7 +326,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
           scrollbarWidth: "thin",
           scrollbarColor: "rgba(255,255,255,0.2) transparent",
         }}>
-          <p style={{ margin: "0 0 10px", color: "#fff", fontWeight: 700, fontSize: "13.5px", lineHeight: 1.4 }}>
+          <p style={{ margin: "0 0 10px", color: "#fff", fontWeight: 700, fontSize: "15.5px", lineHeight: 1.4 }}>
             {current.title}
           </p>
           <div style={{ width: 28, height: 2, background: "rgba(255,255,255,0.3)", borderRadius: 2, marginBottom: 12 }} />
@@ -342,7 +348,7 @@ const AnnouncementViewerModal = ({ slides, startIndex, onClose }) => {
             }} />
         ))}
         {slides.length > 1 && (
-          <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", marginLeft: 2 }}>
+          <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "15px", marginLeft: 2 }}>
             {index + 1} / {slides.length}
           </span>
         )}
@@ -406,7 +412,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
           background: "rgba(0,0,0,0.08)", border: "1.5px dashed rgba(0,0,0,0.25)",
           borderRadius: "10px", cursor: "pointer", display: "flex",
           alignItems: "center", justifyContent: "center", gap: 6,
-          color: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 500,
+          color: "rgba(0,0,0,0.55)", fontSize: "15px", fontWeight: 500,
         }}>
           <CampaignIcon sx={{ fontSize: 16 }} />
           Show Announcements
@@ -439,7 +445,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
                 background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "20px",
                 padding: "4px 10px", color: "#fff", cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 4,
-                fontSize: "11px", fontWeight: 600,
+                fontSize: "14px", fontWeight: 600,
               }}>
                 <ZoomInIcon sx={{ fontSize: 14 }} />
                 View
@@ -536,7 +542,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <CampaignIcon sx={{ color: "rgba(255,255,255,0.7)", fontSize: 15 }} />
-                <span style={{ color: "#fff", fontSize: "12.5px", fontWeight: 600 }}>
+                <span style={{ color: "#fff", fontSize: "15.5px", fontWeight: 600 }}>
                   {expandedContent ? "Hide details" : "Read full announcement"}
                 </span>
               </div>
@@ -544,7 +550,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
                 {!expandedContent && (
                   <span style={{
                     background: "rgba(255,255,255,0.18)", borderRadius: "10px",
-                    padding: "2px 8px", fontSize: "10.5px", color: "rgba(255,255,255,0.85)",
+                    padding: "2px 8px", fontSize: "14.5px", color: "rgba(255,255,255,0.85)",
                   }}>
                     tap to read
                   </span>
@@ -569,7 +575,7 @@ const MobileAnnouncementBanner = ({ slides }) => {
             }}>
               {!hasImage && (
                 <>
-                  <p style={{ margin: "0 0 8px", color: "#fff", fontWeight: 700, fontSize: "13.5px", lineHeight: 1.4 }}>
+                  <p style={{ margin: "0 0 8px", color: "#fff", fontWeight: 700, fontSize: "15.5px", lineHeight: 1.4 }}>
                     {current.title}
                   </p>
                   <div style={{ width: 28, height: 2, background: "rgba(255,255,255,0.3)", borderRadius: 2, marginBottom: 12 }} />
@@ -585,11 +591,129 @@ const MobileAnnouncementBanner = ({ slides }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   PASSWORD RULES
-   Applicants are unfamiliar with password requirements, so the
-   rules are shown up front (English + Tagalog) and validated
-   live as they type.
+   DATE FIELD
+   Inlined here (previously ../components/DateField) so the
+   birthday picker lives directly in the Register page.
 ════════════════════════════════════════════════════════════ */
+const parseDateValue = (value) => {
+  if (!value) return null;
+  const parsed = dayjs(value, ["YYYY-MM-DD", "MM/DD/YYYY"], true);
+  return parsed.isValid() ? parsed : null;
+};
+
+const DateField = React.forwardRef(function DateField(props, ref) {
+  const {
+    value,
+    onChange,
+    name,
+    format = "MM/DD/YYYY",
+    style = {},
+    disabled,
+    minDate,
+    maxDate,
+    placeholder = "MM/DD/YYYY",
+    ...rest
+  } = props;
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [text, setText] = useState("");
+  const internalRef = useRef(null);
+
+  useEffect(() => {
+    const parsed = parseDateValue(value);
+    setText(parsed ? parsed.format(format) : "");
+  }, [value, format]);
+
+  const openCalendar = (e) => {
+    if (disabled) return;
+    setAnchorEl(e.currentTarget.closest("[data-datefield-root]"));
+  };
+  const closeCalendar = () => setAnchorEl(null);
+
+  const handleSelect = (newValue) => {
+    if (newValue && dayjs(newValue).isValid()) {
+      const formatted = dayjs(newValue).format("YYYY-MM-DD");
+      setText(dayjs(newValue).format(format));
+      onChange?.({ target: { name, value: formatted } });
+    }
+    closeCalendar();
+  };
+
+  const handleTextChange = (e) => {
+    const raw = e.target.value;
+    setText(raw);
+    const parsed = dayjs(raw, format, true);
+    if (parsed.isValid()) {
+      onChange?.({ target: { name, value: parsed.format("YYYY-MM-DD") } });
+    } else if (raw === "") {
+      onChange?.({ target: { name, value: "" } });
+    }
+  };
+
+  return (
+    <div
+      data-datefield-root
+      style={{
+        position: "relative",
+        width: style.width ?? "100%",
+        height: style.height,
+        boxSizing: "border-box",
+      }}
+    >
+      <input
+        ref={(el) => {
+          internalRef.current = el;
+          if (typeof ref === "function") ref(el);
+          else if (ref) ref.current = el;
+        }}
+        type="text"
+        value={text}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={handleTextChange}
+        onClick={openCalendar}
+        style={{
+          width: "100%",
+          height: style.height ?? "100%",
+          boxSizing: "border-box",
+          fontSize: style.fontSize,
+          paddingLeft: style.paddingLeft ?? "14px",
+          paddingRight: "40px",
+          border: style.border || "2px solid black",
+          borderRadius: style.borderRadius ?? 0,
+          backgroundColor: disabled ? "#f0f0f0" : "#fff",
+          outline: "none",
+        }}
+        {...rest}
+      />
+
+      <IconButton
+        onClick={openCalendar}
+        disabled={disabled}
+        size="small"
+        sx={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+      >
+        <CalendarTodayIcon fontSize="small" />
+      </IconButton>
+
+      <Popover
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={closeCalendar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      >
+        <DateCalendar
+          value={parseDateValue(value)}
+          onChange={handleSelect}
+          minDate={minDate}
+          maxDate={maxDate}
+        />
+      </Popover>
+    </div>
+  );
+});
+
+
 const passwordRules = [
   {
     label: "Minimum of 8 characters",
@@ -630,10 +754,10 @@ const PasswordRulesNotice = ({ password, isMobile, mainButtonColor, showChecklis
       }}>
         <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>🔐</span>
         <Box>
-          <Typography sx={{ fontSize: isMobile ? "12px" : "13px", color: "#5d4037", fontWeight: 700, lineHeight: 1.5 }}>
+          <Typography sx={{ fontSize: isMobile ? "16px" : "15px", color: "#5d4037", fontWeight: 700, lineHeight: 1.5 }}>
             IMPORTANT: Your password MUST follow all the rules below.
           </Typography>
-          <Typography sx={{ fontSize: isMobile ? "11.5px" : "12.5px", color: "#5d4037", lineHeight: 1.6, mt: 0.4 }}>
+          <Typography sx={{ fontSize: isMobile ? "14.5px" : "15.5px", color: "#5d4037", lineHeight: 1.6, mt: 0.4 }}>
             We're showing this now so you get familiar with it early — the same rules will be
             required every time you make or change a password on this system.
           </Typography>
@@ -647,7 +771,7 @@ const PasswordRulesNotice = ({ password, isMobile, mainButtonColor, showChecklis
           border: "1.5px solid #ddd", borderRadius: "10px",
           p: 1.5, bgcolor: "#fafafa",
         }}>
-          <Typography sx={{ fontSize: isMobile ? "11px" : "12px", color: "#666", fontWeight: 700, mb: 1, letterSpacing: "0.03em" }}>
+          <Typography sx={{ fontSize: isMobile ? "14px" : "16px", color: "#666", fontWeight: 700, mb: 1, letterSpacing: "0.03em" }}>
             PASSWORD REQUIREMENTS
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9 }}>
@@ -661,7 +785,7 @@ const PasswordRulesNotice = ({ password, isMobile, mainButtonColor, showChecklis
                 </span>
                 <Box>
                   <Typography sx={{
-                    fontSize: isMobile ? "12px" : "12.5px",
+                    fontSize: isMobile ? "15px" : "15.5px",
                     color: rule.passed ? "#2e7d32" : "#000000",
                     fontWeight: rule.passed ? 700 : 500,
                     lineHeight: 1.45,
@@ -669,7 +793,7 @@ const PasswordRulesNotice = ({ password, isMobile, mainButtonColor, showChecklis
                     {rule.label}
                   </Typography>
                   <Typography sx={{
-                    fontSize: isMobile ? "11px" : "12px",
+                    fontSize: isMobile ? "14px" : "15px",
                     color: rule.passed ? "#2e7d32" : "#000000",
                     fontStyle: "italic",
                     lineHeight: 1.45,
@@ -836,10 +960,10 @@ const TotpSetupModal = ({
                 )}
               </Box>
               <Box>
-                <Typography fontWeight={700} fontSize={isMobile ? 15 : 17} color="white" lineHeight={1.2}>
+                <Typography fontWeight={700} fontSize={isMobile ? 17 : 17} color="white" lineHeight={1.2}>
                   {step === "scan" ? "Set Up Google Authenticator" : "Enter Authenticator Code"}
                 </Typography>
-                <Typography fontSize={12} color="rgba(255,255,255,0.85)" lineHeight={1.3}>
+                <Typography fontSize={15} color="rgba(255,255,255,0.85)" lineHeight={1.3}>
                   {step === "scan"
                     ? "One-time setup — Step 1 of 2"
                     : "Step 2 of 2 — Confirm & complete registration"}
@@ -877,7 +1001,7 @@ const TotpSetupModal = ({
           {step === "loading" && (
             <Box sx={{ textAlign: "center", py: 5 }}>
               <CircularProgress sx={{ color: mainButtonColor }} />
-              <Typography sx={{ mt: 2, color: "#666", fontSize: "14px" }}>
+              <Typography sx={{ mt: 2, color: "#666", fontSize: "16px" }}>
                 Generating your authenticator QR code…
               </Typography>
 
@@ -907,7 +1031,7 @@ const TotpSetupModal = ({
 
                     {/* Step 1 label */}
                     <Box>
-                      <Typography fontSize={13} color="#444" fontWeight={600}>
+                      <Typography fontSize={15} color="#444" fontWeight={600}>
                         1. Download and install <strong>Google Authenticator</strong>:
                       </Typography>
 
@@ -927,7 +1051,7 @@ const TotpSetupModal = ({
                           rel="noopener noreferrer"
                           underline="always"
                           fontWeight="bold"
-                          fontSize={13}
+                          fontSize={15}
                           color="inherit"
                         >
                           App Store <span style={{ fontWeight: 400, color: "#888" }}>(iPhone / iPad)</span>
@@ -946,7 +1070,7 @@ const TotpSetupModal = ({
                           rel="noopener noreferrer"
                           underline="always"
                           fontWeight="bold"
-                          fontSize={13}
+                          fontSize={15}
                           color="inherit"
                         >
                           Google Play <span style={{ fontWeight: 400, color: "#888" }}>(Android)</span>
@@ -956,7 +1080,7 @@ const TotpSetupModal = ({
 
                     {/* Step 2 */}
                     <Box>
-                      <Typography fontSize={13} color="#444" lineHeight={1.6}>
+                      <Typography fontSize={15} color="#444" lineHeight={1.6}>
                         <strong>2.</strong> Open the app → tap <strong>"+"</strong> → <strong>"Scan a QR code"</strong>.
                       </Typography>
 
@@ -964,7 +1088,7 @@ const TotpSetupModal = ({
 
                     {/* Step 3 */}
                     <Box>
-                      <Typography fontSize={13} color="#444" lineHeight={1.6}>
+                      <Typography fontSize={15} color="#444" lineHeight={1.6}>
                         <strong>3.</strong> Scan the QR code shown on the right.
                       </Typography>
 
@@ -980,7 +1104,7 @@ const TotpSetupModal = ({
                       onClick={() => setShowManualKey((v) => !v)}
                       style={{
                         background: "none", border: "none", cursor: "pointer",
-                        color: mainButtonColor, fontSize: "13px", fontWeight: 600,
+                        color: mainButtonColor, fontSize: "15px", fontWeight: 600,
                         padding: 0, textDecoration: "underline",
                       }}
                     >
@@ -993,7 +1117,7 @@ const TotpSetupModal = ({
                         bgcolor: "#f5f5f5", borderRadius: "8px",
                         border: "1px solid #ddd",
                         fontFamily: "monospace",
-                        fontSize: isMobile ? "12px" : "13.5px",
+                        fontSize: isMobile ? "15px" : "15.5px",
                         letterSpacing: "0.08em",
                         color: "#222",
                         wordBreak: "break-all",
@@ -1004,7 +1128,7 @@ const TotpSetupModal = ({
                     )}
                     {showManualKey && (
                       <>
-                        <Typography fontSize={11.5} color="#888" sx={{ mt: 0.5 }}>
+                        <Typography fontSize={14.5} color="#888" sx={{ mt: 0.5 }}>
                           In Google Authenticator: tap + → Enter a setup key → paste this key, select "Time based".
                         </Typography>
 
@@ -1021,7 +1145,7 @@ const TotpSetupModal = ({
                 }}>
                   <span style={{ fontSize: 16, flexShrink: 0 }}>⏱️</span>
                   <Box>
-                    <Typography fontSize={12} color="#5d4037" lineHeight={1.5}>
+                    <Typography fontSize={15} color="#5d4037" lineHeight={1.5}>
                       This QR code expires in <strong>10 minutes</strong>. If it expires, close this dialog and click "Submit Application" again.
                     </Typography>
 
@@ -1048,7 +1172,7 @@ const TotpSetupModal = ({
                     border: "1px solid #f44336", borderRadius: "12px",
                     p: 2, textAlign: "center", width: "100%",
                   }}>
-                    <Typography color="error" fontSize={13}>{error}</Typography>
+                    <Typography color="error" fontSize={15}>{error}</Typography>
                   </Box>
                 ) : (
                   <Box sx={{ textAlign: "center" }}>
@@ -1086,7 +1210,7 @@ const TotpSetupModal = ({
                       style={{
                         display: "flex", alignItems: "center", gap: 4,
                         background: "#f0f0f0", border: "1px solid #ddd", borderRadius: "20px",
-                        padding: "5px 12px", fontSize: "12px", fontWeight: 600, color: "#333",
+                        padding: "5px 12px", fontSize: "15px", fontWeight: 600, color: "#333",
                         cursor: "pointer",
                       }}
                     >
@@ -1097,7 +1221,7 @@ const TotpSetupModal = ({
                       style={{
                         display: "flex", alignItems: "center", gap: 4,
                         background: "#f0f0f0", border: "1px solid #ddd", borderRadius: "20px",
-                        padding: "5px 12px", fontSize: "12px", fontWeight: 600, color: "#333",
+                        padding: "5px 12px", fontSize: "15px", fontWeight: 600, color: "#333",
                         cursor: "pointer",
                       }}
                     >
@@ -1120,7 +1244,7 @@ const TotpSetupModal = ({
                     mt: 2.5,
                     backgroundColor: mainButtonColor,
                     color: "#fff", fontWeight: 700,
-                    fontSize: "15px", borderRadius: "12px",
+                    fontSize: "17px", borderRadius: "12px",
                     py: 1.25, textTransform: "none",
                     "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 },
                   }}
@@ -1139,11 +1263,11 @@ const TotpSetupModal = ({
                 bgcolor: "#f8f9ff", borderRadius: "12px",
                 p: 2, mb: 2.5, border: "1px solid #e8eaff",
               }}>
-                <Typography fontSize={13} color="#444" lineHeight={1.7}>
+                <Typography fontSize={15} color="#444" lineHeight={1.7}>
                   Open <strong>Google Authenticator</strong> on your phone and enter the <strong>6-digit code</strong> shown for this account.
                 </Typography>
 
-                <Typography fontSize={12} color="#888" sx={{ mt: 0.8 }}>
+                <Typography fontSize={15} color="#888" sx={{ mt: 0.8 }}>
                   The code refreshes every 30 seconds — use the current one.
                 </Typography>
 
@@ -1183,7 +1307,7 @@ const TotpSetupModal = ({
                   bgcolor: "#fff5f5", border: "1px solid #f44336",
                   borderRadius: "8px", p: 1.5, mb: 2,
                 }}>
-                  <Typography fontSize={13} color="#c62828">{error}</Typography>
+                  <Typography fontSize={15} color="#c62828">{error}</Typography>
                 </Box>
               )}
 
@@ -1195,7 +1319,7 @@ const TotpSetupModal = ({
                 sx={{
                   backgroundColor: mainButtonColor,
                   color: "#fff", fontWeight: 700,
-                  fontSize: "15px", borderRadius: "12px",
+                  fontSize: "17px", borderRadius: "12px",
                   py: 1.5, textTransform: "none", mb: 0.5,
                   "&:hover": { backgroundColor: mainButtonColor, opacity: 0.92 },
                 }}
@@ -1217,10 +1341,10 @@ const TotpSetupModal = ({
                 onClick={() => { setStep("scan"); setError(""); }}
                 disabled={step === "submitting"}
                 sx={{
-                  fontWeight: 600, fontSize: "13px",
+                  fontWeight: 600, fontSize: "15px",
                   borderRadius: "12px", py: 1.25,
                   textTransform: "none", color: "#555",
-
+                  mt: 2
                 }}
               >
                 ← Back to QR code
@@ -1231,6 +1355,367 @@ const TotpSetupModal = ({
         </Box>
       </Box>
     </Modal>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   REVIEW / CONFIRM MODAL
+   Shown when the applicant clicks "SUBMIT APPLICATION", before
+   any request is sent to the server. Lets the applicant verify
+   every field they filled in / selected, catch typos, and go
+   back to edit if something is wrong, instead of only finding
+   out about a mistake after the TOTP step.
+════════════════════════════════════════════════════════════ */
+const ReviewApplicationModal = ({
+  open,
+  onClose,
+  onConfirm,
+  isSubmitting,
+  isMobile,
+  mainButtonColor,
+  data,
+}) => {
+  if (!open) return null;
+
+  const Field = ({ label, value, size = 14 }) => (
+    <Box>
+      <Typography sx={{ fontSize: 11, color: "#666" }}>{label}</Typography>
+      <Typography sx={{ fontSize: size, fontWeight: 700, color: "#1a1a1a" }}>
+        {value?.toString().trim() ? value : "—"}
+      </Typography>
+    </Box>
+  );
+
+  return (
+    <Dialog
+      open={open}
+      onClose={isSubmitting ? undefined : onClose}
+      maxWidth="sm"
+      fullWidth
+      fullScreen={isMobile}
+      PaperProps={{ sx: { borderRadius: isMobile ? 0 : "16px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}
+    >
+      <DialogTitle sx={{
+        bgcolor: mainButtonColor, color: "white", display: "flex",
+        alignItems: "center", fontWeight: "bold", px: 3, py: 2,
+      }}>
+        <Box display="flex" alignItems="center" gap={1.5}>
+          <Box sx={{
+            backgroundColor: "rgba(255,255,255,0.2)", borderRadius: "50%",
+            width: 40, height: 40, display: "flex", alignItems: "center",
+            justifyContent: "center", flexShrink: 0,
+          }}>
+            <Typography fontSize={20}>📝</Typography>
+          </Box>
+          <Box>
+            <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              Review Your Information
+            </Typography>
+            <Typography fontSize={13} color="rgba(255,255,255,0.85)" lineHeight={1.2}>
+              Please double-check everything before submitting
+            </Typography>
+          </Box>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1 }}>
+        {/* Icon, same visual language as the success modal */}
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 2, mt: 1 }}>
+          <Box sx={{
+            width: 64, height: 64, borderRadius: "50%",
+            backgroundColor: "rgba(255,255,255,0.9)",
+            border: `3px solid ${mainButtonColor}`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
+          }}>
+            🔎
+          </Box>
+        </Box>
+
+        <Box sx={{
+          display: "flex", gap: 1, alignItems: "flex-start",
+          bgcolor: "#fffbf2", border: "1px solid #f5a623",
+          borderRadius: "8px", p: 1.5, mb: 2,
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+          <Typography fontSize={13.5} color="#5d4037" lineHeight={1.5}>
+            After you confirm, you'll be asked to set up Google Authenticator to secure your account. Some fields below cannot be changed later — please check them carefully.
+          </Typography>
+        </Box>
+
+        {/* Single summary card, matching the reference layout */}
+        <Box sx={{ border: `1.5px solid ${mainButtonColor}`, borderRadius: "12px", overflow: "hidden", mb: 1 }}>
+          <Box sx={{ backgroundColor: mainButtonColor, px: 2, py: 1 }}>
+            <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>
+              Application Summary
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
+            {/* Campus */}
+            <Field label="Campus" value={data.campusLabel} size={14.5} />
+
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1.5 }} />
+
+            {/* Applicant name row — mirrors the reference's grouped name fields */}
+            <Typography sx={{ fontSize: 12.5, color: "#000", mb: 0.25 }}>
+              Applicant Name
+            </Typography>
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1.5 }}>
+              <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
+                <Field label="First Name" value={data.firstName} />
+              </Box>
+              <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
+                <Field label="Middle Name" value={data.middleName} />
+              </Box>
+              <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
+                <Field label="Last Name" value={data.lastName} />
+              </Box>
+            </Box>
+            <Field label="Birth Date" value={data.birthday} size={13.5} />
+
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1.5 }} />
+
+            {/* Academic section — Program Level and Course are visually
+                separated (label + emphasis) so they no longer read as
+                a duplicate of each other */}
+            <Typography sx={{ fontSize: 12.5, color: "#000", mb: 0.5 }}>
+              Academic Details
+            </Typography>
+            <Box sx={{ mb: 1 }}>
+              <Field label="Program Level" value={data.academicProgramLabel} size={13.5} />
+            </Box>
+            <Box sx={{ mb: 1.5 }}>
+              <Field label="Applying As" value={data.applyingAsLabel} size={13.5} />
+            </Box>
+
+            {/* Course gets the highlighted dashed box — it's the field
+                most worth double-checking (slots, correct course, etc.) */}
+            <Box sx={{
+              backgroundColor: "#fff3cd",
+              border: "1.5px dashed #d4a017",
+              borderRadius: "8px",
+              p: 1.25,
+              mb: 1.5,
+            }}>
+              <Typography sx={{ fontSize: 11, color: "#7a5c00", fontWeight: 700, letterSpacing: "0.04em" }}>
+                COURSE APPLIED FOR
+              </Typography>
+              <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#5d4500", mt: 0.25 }}>
+                {data.curriculumLabel || "—"}
+              </Typography>
+            </Box>
+
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1.5 }} />
+
+            {/* Account */}
+            <Field label="Email Address" value={data.email} size={13.5} />
+
+            {/* Explains why no Applicant Number appears yet — it's only
+                generated by the server after Google Authenticator setup
+                completes on the next screen. */}
+            <Box sx={{
+              display: "flex", gap: 1, alignItems: "flex-start",
+              backgroundColor: "#f0f7ff",
+              border: "1px solid #b3d4ff",
+              borderRadius: "8px",
+              p: 1.25,
+              mt: 1.5,
+            }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>ℹ️</span>
+              <Typography sx={{ fontSize: 12, color: "#1a237e", lineHeight: 1.5 }}>
+                Your <strong>Applicant Number</strong> will be generated after you complete the next step (Google Authenticator setup). You'll be able to use either your Applicant Number or your email to log in later.
+              </Typography>
+            </Box>
+
+            <Typography sx={{ fontSize: 11.5, color: "#888", mt: 1.5, fontStyle: "italic", lineHeight: 1.5 }}>
+              Please verify that everything above is correct before continuing.
+            </Typography>
+          </Box>
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2.5, pt: 1.5, gap: 1.5, display: "flex", flexDirection: isMobile ? "column-reverse" : "row" }}>
+        <Button
+          fullWidth
+          color="error"
+          variant="outlined"
+          disabled={isSubmitting}
+          onClick={onClose}
+          sx={{ height: 46, borderRadius: "10px", fontWeight: 600, fontSize: 15, textTransform: "none" }}
+        >
+          ← Edit My Information
+        </Button>
+        <Button
+          fullWidth
+          variant="contained"
+          disabled={isSubmitting}
+          onClick={onConfirm}
+          sx={{
+            height: 46, borderRadius: "10px", backgroundColor: mainButtonColor,
+            color: "#fff", fontWeight: 700, fontSize: 15, textTransform: "none",
+            boxShadow: "none",
+            "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9, boxShadow: "none" },
+          }}
+        >
+          {isSubmitting ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <CircularProgress size={18} sx={{ color: "#fff" }} />
+              Checking Your Details…
+            </Box>
+          ) : "Looks Good — Set Up Security"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+/* ═══════════════════════════════════════════════════════════
+   REGISTRATION SUCCESS MODAL
+   Shown after the TOTP step completes and /api/register returns
+   successfully. Displays the applicant number the same way the
+   Applicant Dashboard does, so applicants are told to remember
+   it before being redirected to the login page.
+════════════════════════════════════════════════════════════ */
+const RegistrationSuccessModal = ({
+  open,
+  applicantNumber,
+  email,
+  firstName,
+  middleName,
+  lastName,
+  birthday,
+  companyName,
+  mainButtonColor,
+  isMobile,
+  onContinue,
+}) => {
+  if (!open) return null;
+
+  return (
+    <Dialog
+      open={open}
+      maxWidth="sm"
+      fullWidth
+      fullScreen={isMobile}
+      PaperProps={{ sx: { borderRadius: isMobile ? 0 : "16px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}
+    >
+      <DialogTitle sx={{ bgcolor: mainButtonColor, color: "white", display: "flex", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
+        <Box display="flex" alignItems="center" gap={1.5}>
+          <Box sx={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Typography fontSize={20}>🎉</Typography>
+          </Box>
+          <Box>
+            <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>Account Created Successfully!</Typography>
+            <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>Your applicant account is ready</Typography>
+          </Box>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 2.5, mt: 3 }}>
+          <Box sx={{ width: 76, height: 76, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.9)", border: `3px solid ${mainButtonColor}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34 }}>
+            🎓
+          </Box>
+        </Box>
+
+        <Box sx={{ textAlign: "center", mb: 2 }}>
+          <Typography sx={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", mb: 1 }}>Congratulations, Applicant!</Typography>
+          <Typography sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.65 }}>
+            Your applicant account with <strong style={{ color: mainButtonColor }}>{companyName}</strong> has been created successfully. You can now log in using your <strong>applicant number</strong> or <strong>email address</strong>, along with your password.
+          </Typography>
+        </Box>
+
+        {/* Applicant summary card */}
+        <Box sx={{ border: `1.5px solid ${mainButtonColor}`, borderRadius: "12px", overflow: "hidden", mb: 1 }}>
+          <Box sx={{ backgroundColor: mainButtonColor, px: 2, py: 1 }}>
+            <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>
+              Your Applicant Details
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
+            <Typography sx={{ fontSize: 12.5, color: "#000", mb: 0.25 }}>
+              Applicant Name
+            </Typography>
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1.5 }}>
+              <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
+                <Typography sx={{ fontSize: 11, color: "#666" }}>First Name</Typography>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+                  {firstName || "—"}
+                </Typography>
+              </Box>
+              <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
+                <Typography sx={{ fontSize: 11, color: "#666" }}>Middle Name</Typography>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+                  {middleName || "—"}
+                </Typography>
+              </Box>
+              <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
+                <Typography sx={{ fontSize: 11, color: "#666" }}>Last Name</Typography>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+                  {lastName || "—"}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Applicant number callout — the one just generated for this user */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                backgroundColor: "#fff3cd",
+                border: "1.5px dashed #d4a017",
+                borderRadius: "8px",
+                p: 1.25,
+                mb: 1.5,
+              }}
+            >
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 11.5, color: "#7a5c00", fontWeight: 700, letterSpacing: "0.04em", textAlign: "center" }}>
+                  ⚠️ PLEASE REMEMBER YOUR APPLICANT NUMBER
+                </Typography>
+                <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#5d4500", textAlign: "center", letterSpacing: "0.03em", mt: 0.25 }}>
+                  {applicantNumber || "—"}
+                </Typography>
+                <Typography sx={{ fontSize: 10.5, color: "#7a5c00", textAlign: "center", mt: 0.5 }}>
+                  You can use this to log in instead of your email
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <Box sx={{ flex: "1 1 45%", minWidth: 130 }}>
+                <Typography sx={{ fontSize: 11.5, color: "#000" }}>Birth Date</Typography>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#222" }}>
+                  {birthday || "—"}
+                </Typography>
+              </Box>
+              <Box sx={{ flex: "1 1 100%" }}>
+                <Typography sx={{ fontSize: 11.5, color: "#000" }}>Email Address</Typography>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#222", wordBreak: "break-all" }}>
+                  {email || "—"}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Typography sx={{ fontSize: 11.5, color: "#888", mt: 1.5, fontStyle: "italic", lineHeight: 1.5 }}>
+              Please verify that your details above are correct. Your applicant number and email can both be used to log in and identify you for important updates.
+            </Typography>
+          </Box>
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2.5, pt: 1.5 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          onClick={onContinue}
+          sx={{ height: 44, borderRadius: "10px", backgroundColor: mainButtonColor, color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9, boxShadow: "none" } }}
+        >
+          Continue to Login
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 
@@ -1283,6 +1768,97 @@ const Register = () => {
     const branch = branches.find((item) => String(item.id) === String(branchId));
     return branch?.branch || "—";
   };
+
+  const [person, setPerson] = useState({
+    applicant_number: "",
+    profile_img: "",
+    campus: "",
+    academicProgram: "",
+    classifiedAs: "",
+    program: "",
+    program2: "",
+    program3: "",
+    yearLevel: "",
+    last_name: "",
+    first_name: "",
+    middle_name: "",
+    extension: "",
+    nickname: "",
+    height: "",
+    weight: "",
+    lrnNumber: "",
+    gender: "",
+    pwdType: "",
+    pwdId: "",
+    birthOfDate: "",
+    age: "",
+    birthPlace: "",
+    languageDialectSpoken: "",
+    citizenship: "",
+    religion: "",
+    civilStatus: "",
+    tribeEthnicGroup: "",
+    otherEthnicGroup: "",
+    cellphoneNumber: "",
+    emailAddress: "",
+    telephoneNumber: "",
+    facebookAccount: "",
+    presentStreet: "",
+    presentBarangay: "",
+    presentZipCode: "",
+    presentRegion: "",
+    presentProvince: "",
+    presentMunicipality: "",
+    presentDswdHouseholdNumber: "",
+    permanentStreet: "",
+    permanentBarangay: "",
+    permanentZipCode: "",
+    permanentRegion: "",
+    permanentProvince: "",
+    permanentMunicipality: "",
+    permanentDswdHouseholdNumber: "",
+    father_deceased: "",
+    father_family_name: "",
+    father_given_name: "",
+    father_middle_name: "",
+    father_ext: "",
+    father_contact: "",
+    father_occupation: "",
+    father_income: "",
+    father_email: "",
+    mother_deceased: "",
+    mother_family_name: "",
+    mother_given_name: "",
+    mother_middle_name: "",
+    mother_contact: "",
+    mother_occupation: "",
+    mother_income: "",
+    guardian: "",
+    guardian_family_name: "",
+    guardian_given_name: "",
+    guardian_middle_name: "",
+    guardian_ext: "",
+    guardian_nickname: "",
+    guardian_address: "",
+    guardian_contact: "",
+    guardian_email: "",
+    schoolLevel: "",
+    schoolLastAttended: "",
+    schoolAddress: "",
+    courseProgram: "",
+    honor: "",
+    generalAverage: "",
+    yearGraduated: "",
+    schoolLevel1: "",
+    schoolLastAttended1: "",
+    schoolAddress1: "",
+    courseProgram1: "",
+    honor1: "",
+    generalAverage1: "",
+    yearGraduated1: "",
+    strand: "",
+  });
+
 
   const [usersData, setUserData] = useState({ email: "", password: "" });
   const [emailDomainStatus, setEmailDomainStatus] = useState(null); // null | "checking" | "valid" | "invalid"
@@ -1371,6 +1947,15 @@ const Register = () => {
   const [tempEmail, setTempEmail] = useState("");
   // Snapshot of the full payload to pass into TotpSetupModal
   const [registrationPayload, setRegistrationPayload] = useState(null);
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // ── NEW: Review-before-submit modal state ──────────────────────────────────
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // ── NEW: Post-registration success modal (shows the applicant number) ──────
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [applicantNumber, setApplicantNumber] = useState("");
   // ──────────────────────────────────────────────────────────────────────────
 
   const [redirectLoading, setRedirectLoading] = useState(false);
@@ -1463,29 +2048,47 @@ const Register = () => {
 
   const getIconTop = (hasError) => hasError ? "55%" : "70%";
 
-  // ── UPDATED: handleRegister now opens TotpSetupModal instead of email OTP ─
-  const handleRegister = async () => {
-    if (isSubmitting) return;
+  // ── Human-readable labels for the review modal ─────────────────────────────
+  const selectedBranchForReview = branches.find((b) => String(b.id) === String(branchId));
+  const selectedProgramForReview = selectedBranchForReview?.academicPrograms?.find(
+    (prog) => String(prog.id) === String(academicProgram)
+  );
+  const applyingAsLabelMap = {
+    "1": "Senior High School Graduate",
+    "2": "Senior High School Graduating Student",
+    "3": "ALS Passer",
+    "4": "Transferee",
+    "5": "Cross Enrollee",
+    "6": "Foreign Applicant",
+    "7": "Baccalaureate Graduate",
+    "8": "Master Degree Graduate",
+  };
+  const selectedCurriculumForReview = curriculumOptions.find(
+    (c) => String(c.curriculum_id) === String(selectedCurriculum)
+  );
 
-    if (emailDomainSuggestion) {
-      setSnack({
-        open: true,
-        message: `Please fix the suspected typo in your email before submitting. Did you mean "${emailDomainSuggestion}"?`,
-        severity: "warning",
-      });
-      return;
-    }
-    if (emailDomainStatus === "invalid") {
-      setSnack({
-        open: true,
-        message: "This email domain doesn't appear to accept mail. Please correct it before submitting.",
-        severity: "error",
-      });
-      return;
-    }
+  const reviewData = {
+    campusLabel: getBranchLabel(branchId),
+    lastName,
+    firstName,
+    middleName,
+    birthday,
+    academicProgramLabel: selectedProgramForReview?.name || "",
+    applyingAsLabel: applyingAsLabelMap[applyingAs] || "",
+    curriculumLabel: selectedCurriculumForReview
+      ? `(${selectedCurriculumForReview.program_code}): ${selectedCurriculumForReview.program_description}${selectedCurriculumForReview.major ? ` (${selectedCurriculumForReview.major})` : ""}`
+      : "",
+    email: usersData.email,
+  };
 
-    if (!reminderChecked) {
-      setSnack({ open: true, message: "You must agree to the Terms and Conditions before registering.", severity: "warning" });
+  // ── Runs all pre-submit validation, and if everything passes, opens the
+  //    Review modal instead of immediately hitting the server. ──────────────
+  const handleOpenReview = () => {
+    if (!branchSelected) { setSnack({ open: true, message: "Please select a branch first!", severity: "warning" }); return; }
+    if (!registrationOpen) { setSnack({ open: true, message: "Registration is currently closed for this campus.", severity: "error" }); return; }
+    if (!reminderChecked) { setSnack({ open: true, message: "Please agree to the Terms and Conditions before registering.", severity: "warning" }); return; }
+    if (emailDomainSuggestion || emailDomainStatus === "invalid") {
+      setSnack({ open: true, message: "Please correct the email address typo before submitting.", severity: "warning" });
       return;
     }
     if (usersData.password && !allPasswordRulesPassed) {
@@ -1501,10 +2104,6 @@ const Register = () => {
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!branchId || !registrationOpen) {
-      setSnack({ open: true, message: "Registration is closed for this campus.", severity: "error" });
-      return;
-    }
     if (!emailRegex.test(usersData.email)) {
       setSnack({ open: true, message: "Please enter a valid email address!", severity: "error" });
       return;
@@ -1513,6 +2112,15 @@ const Register = () => {
       setSnack({ open: true, message: "Passwords do not match!", severity: "error" });
       return;
     }
+
+    // All good — let the applicant review everything before it's sent anywhere.
+    setShowReviewModal(true);
+  };
+
+  // ── UPDATED: handleRegister now opens TotpSetupModal instead of email OTP ─
+  // Called only after the applicant confirms the Review modal.
+  const handleRegister = async () => {
+    if (isSubmitting) return;
 
     const normalizedEmail = usersData.email.trim().toLowerCase();
     setIsSubmitting(true);
@@ -1546,7 +2154,9 @@ const Register = () => {
         ...getLoginMacPayload(),
       });
 
-      // Step 3: Open the TOTP modal (it calls /register-totp-setup internally)
+      // Step 3: Close the review modal and open the TOTP modal
+      // (it calls /register-totp-setup internally)
+      setShowReviewModal(false);
       setShowTotpModal(true);
     } catch (error) {
       setSnack({
@@ -1559,11 +2169,20 @@ const Register = () => {
     }
   };
 
-  // Called by TotpSetupModal on successful /register response
-  const handleTotpSuccess = () => {
+  // Called by TotpSetupModal on successful /register response.
+  // `data` is the response body from POST /api/register — it's expected to
+  // include the newly-created applicant_number, same as the applicant
+  // dashboard displays after document submission.
+  const handleTotpSuccess = (data) => {
     setShowTotpModal(false);
+    setApplicantNumber(data?.applicant_number || data?.applicantNumber || "");
+    setShowSuccessModal(true);
+  };
+
+  const handleContinueToLogin = () => {
+    setShowSuccessModal(false);
     setRedirectLoading(true);
-    setTimeout(() => navigate("/login_applicant"), 3000);
+    setTimeout(() => navigate("/login_applicant"), 1200);
   };
 
   const [registrationOpen, setRegistrationOpen] = useState(true);
@@ -1601,8 +2220,21 @@ const Register = () => {
       if (academicProgram && Number(item.academic_program) !== Number(academicProgram)) return false;
       return true;
     });
+
+    // Dedupe by the program itself (code + major + branch), not by curriculum_id.
+    // curriculum_table has one row per year level for the same program, so the
+    // same course was showing up multiple times (once per year level). We only
+    // want the entry-level (lowest year_id) curriculum row per program, since
+    // applicants are always applying as incoming freshmen.
     const uniqueMap = new Map();
-    filtered.forEach((item) => { if (!uniqueMap.has(item.curriculum_id)) uniqueMap.set(item.curriculum_id, item); });
+    filtered.forEach((item) => {
+      const key = `${item.program_code}__${item.major || ""}__${item.components}`;
+      const existing = uniqueMap.get(key);
+      if (!existing || Number(item.year_id) < Number(existing.year_id)) {
+        uniqueMap.set(key, item);
+      }
+    });
+
     return Array.from(uniqueMap.values());
   }, [curriculumOptions, branchId, academicProgram]);
 
@@ -1610,7 +2242,7 @@ const Register = () => {
     if (e.key === "Enter" && !isSubmitting) {
       if (!branchId) { setSnack({ open: true, message: "Please select a branch!", severity: "warning" }); return; }
       if (!registrationOpen) { setSnack({ open: true, message: "Registration is closed for this campus.", severity: "error" }); return; }
-      handleRegister();
+      handleOpenReview();
     }
   };
 
@@ -1643,7 +2275,7 @@ const Register = () => {
 
   if (redirectLoading) return <RedirectLoading message="Account created! Redirecting to login..." />;
 
-  const inputH = isMobile ? "44px" : "45px";
+  const inputH = isMobile ? "52px" : "54px";
 
   return (
     <>
@@ -1727,7 +2359,7 @@ const Register = () => {
 
               <div style={{ display: "flex", alignItems: "center", margin: "1.2rem 0" }}>
                 <div style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }} />
-                <span style={{ margin: "0 0.8rem", fontWeight: "600", color: "#555", fontSize: isMobile ? "13px" : "14px", whiteSpace: "nowrap" }}>Personal Information</span>
+                <span style={{ margin: "0 0.8rem", fontWeight: "600", color: "#555", fontSize: isMobile ? "15px" : "16px", whiteSpace: "nowrap" }}>Personal Information</span>
                 <div style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }} />
               </div>
 
@@ -1737,41 +2369,52 @@ const Register = () => {
                   <input type="text" placeholder="Enter your last name" required disabled={fieldDisabled}
                     value={lastName} onChange={(e) => setLastName(e.target.value.toUpperCase())}
                     onKeyDown={handleKeyDownRegister} className="border"
-                    style={{ paddingLeft: "2.5rem", height: inputH, fontSize: "16px", border: errors.lastName ? "2px solid red" : "2px solid black", width: "100%" }} />
-                  <BadgeIcon style={{ position: "absolute", top: "2.5rem", left: "0.7rem", fontSize: "20px" }} />
-                  {errors.lastName && <span style={{ color: "red", fontSize: "12px" }}>This field is required</span>}
+                    style={{ paddingLeft: "2.80rem", height: inputH, fontSize: "16px", border: errors.lastName ? "2px solid red" : "2px solid black", width: "100%" }} />
+                  <BadgeIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", fontSize: "20px" }} />
+                  {errors.lastName && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
                 </div>
 
                 <div className="TextField" style={{ position: "relative" }}>
                   <label style={{ color: "black" }}>First Name<span style={{ color: "red" }}> *</span></label>
                   <input type="text" required placeholder="Enter your first name" value={firstName} disabled={fieldDisabled}
                     onChange={(e) => setFirstName(e.target.value.toUpperCase())} onKeyDown={handleKeyDownRegister} className="border"
-                    style={{ paddingLeft: "2.5rem", height: inputH, fontSize: "16px", border: errors.firstName ? "2px solid red" : "2px solid black", width: "100%" }} />
-                  <PersonIcon style={{ position: "absolute", top: "2.5rem", left: "0.7rem", fontSize: "20px" }} />
-                  {errors.firstName && <span style={{ color: "red", fontSize: "12px" }}>This field is required</span>}
+                    style={{ paddingLeft: "2.80rem", height: inputH, fontSize: "16px", border: errors.firstName ? "2px solid red" : "2px solid black", width: "100%" }} />
+                  <PersonIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", fontSize: "20px" }} />
+                  {errors.firstName && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
                 </div>
 
                 <div className="TextField" style={{ position: "relative" }}>
                   <label style={{ color: "black" }}>Middle Name (Optional)</label>
                   <input type="text" placeholder="Enter your middle name" value={middleName} disabled={fieldDisabled}
                     onChange={(e) => setMiddleName(e.target.value.toUpperCase())} onKeyDown={handleKeyDownRegister} className="border"
-                    style={{ paddingLeft: "2.5rem", height: inputH, fontSize: "16px", border: "2px solid black", width: "100%" }} />
-                  <PersonIcon style={{ position: "absolute", top: "2.5rem", left: "0.7rem", fontSize: "20px" }} />
+                    style={{ paddingLeft: "2.80rem", height: inputH, fontSize: "16px", border: "2px solid black", width: "100%" }} />
+                  <PersonIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", fontSize: "20px" }} />
                 </div>
 
                 <div className="TextField" style={{ position: "relative" }}>
                   <label style={{ color: "black" }}>Birth Date<span style={{ color: "red" }}> *</span></label>
-                  <input type="date" required value={birthday} disabled={fieldDisabled}
-                    onChange={(e) => setBirthday(e.target.value)} onKeyDown={handleKeyDownRegister} className="border"
-                    style={{ paddingLeft: "2.5rem", height: inputH, fontSize: "16px", border: errors.birthday ? "2px solid red" : "2px solid black", width: "100%" }} />
-                  <CakeIcon style={{ position: "absolute", top: "2.5rem", left: "0.7rem", fontSize: "20px" }} />
-                  {errors.birthday && <span style={{ color: "red", fontSize: "12px" }}>This field is required</span>}
+                  <DateField
+                    required
+                    value={birthday}
+                    disabled={fieldDisabled}
+                    onChange={(e) => setBirthday(e.target.value)}
+                    style={{
+                      paddingLeft: "1rem",
+                      height: inputH,
+
+                      borderRadius: "10px",
+                      fontSize: "16px",
+                      border: errors.birthday ? "2px solid red" : "2px solid black",
+                      width: "100%",
+                    }}
+                  />
+                  {errors.birthday && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
                 </div>
               </div>
 
               <div style={{ display: "flex", alignItems: "center", margin: "1.2rem 0" }}>
                 <div style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }} />
-                <span style={{ margin: "0 0.8rem", fontWeight: "600", color: "#555", fontSize: isMobile ? "13px" : "14px", whiteSpace: "nowrap" }}>Academic Information</span>
+                <span style={{ margin: "0 0.8rem", fontWeight: "600", color: "#555", fontSize: isMobile ? "15px" : "16px", whiteSpace: "nowrap" }}>Academic Information</span>
                 <div style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }} />
               </div>
 
@@ -1787,7 +2430,7 @@ const Register = () => {
                       <option key={prog.id} value={prog.id}>{prog.name}</option>
                     ))}
                   </select>
-                  {errors.academicProgram && <span style={{ color: "red", fontSize: "12px" }}>This field is required</span>}
+                  {errors.academicProgram && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
                   <ArrowDropDownIcon sx={{ position: "absolute", right: "10px", top: getIconTop(errors.academicProgram), transform: "translateY(-50%)", fontSize: "30px", pointerEvents: "none" }} />
                 </div>
 
@@ -1824,7 +2467,7 @@ const Register = () => {
                       return null;
                     })()}
                   </select>
-                  {errors.applyingAs && <span style={{ color: "red", fontSize: "12px" }}>This field is required</span>}
+                  {errors.applyingAs && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
                   <ArrowDropDownIcon sx={{ position: "absolute", right: "10px", top: getIconTop(errors.applyingAs), transform: "translateY(-50%)", fontSize: "30px", pointerEvents: "none" }} />
                 </div>
               </div>
@@ -1851,7 +2494,7 @@ const Register = () => {
                     const remaining = availability?.remaining ?? 0;
                     const isFull = availability?.isFull;
                     return (
-                      <li {...props} style={{ color: isFull ? "red" : "green", fontSize: isMobile ? "13px" : "14px" }}>
+                      <li {...props} style={{ color: isFull ? "red" : "green", fontSize: isMobile ? "15px" : "16px" }}>
                         {`(${option.program_code}): ${option.program_description}${option.major ? ` (${option.major})` : ""} (${getBranchLabel(option.components)})`}
                         {isFull ? " — FULL (0 slots left)" : ` — (${remaining} slots left)`}
                       </li>
@@ -1863,10 +2506,24 @@ const Register = () => {
                       helperText={errors.selectedCurriculum ? "This field is required" : ""}
                       sx={{
                         "& .MuiOutlinedInput-root": {
-                          height: inputH, fontSize: "16px",
-                          "& fieldset": { border: errors.selectedCurriculum ? "2px solid red" : "2px solid black" },
-                          "&:hover fieldset": { border: errors.selectedCurriculum ? "2px solid red" : "2px solid black" },
-                          "&.Mui-focused fieldset": { border: errors.selectedCurriculum ? "2px solid red" : "2px solid black" },
+                          height: inputH,
+                          fontSize: "16px",
+                          borderRadius: "10px",
+                          "& fieldset": {
+                            border: errors.selectedCurriculum
+                              ? "2px solid red"
+                              : "2px solid black",
+                          },
+                          "&:hover fieldset": {
+                            border: errors.selectedCurriculum
+                              ? "2px solid red"
+                              : "2px solid black",
+                          },
+                          "&.Mui-focused fieldset": {
+                            border: errors.selectedCurriculum
+                              ? "2px solid red"
+                              : "2px solid black",
+                          },
                         },
                       }}
                     />
@@ -1876,7 +2533,7 @@ const Register = () => {
 
               <div style={{ display: "flex", alignItems: "center", margin: "1.2rem 0" }}>
                 <div style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }} />
-                <span style={{ margin: "0 0.8rem", fontWeight: "600", color: "#555", fontSize: isMobile ? "13px" : "14px", whiteSpace: "nowrap" }}>Account Information</span>
+                <span style={{ margin: "0 0.8rem", fontWeight: "600", color: "#555", fontSize: isMobile ? "15px" : "16px", whiteSpace: "nowrap" }}>Account Information</span>
                 <div style={{ flex: 1, height: "1px", backgroundColor: "#ccc" }} />
               </div>
 
@@ -1899,25 +2556,25 @@ const Register = () => {
                   onBlur={handleEmailBlur}
                   onKeyDown={handleKeyDownRegister}
                   style={{
-                    paddingLeft: "2.5rem",
+                    paddingLeft: "2.80rem",
                     height: inputH, fontSize: "16px",
                     border: errors.email || emailDomainStatus === "invalid" ? "2px solid red" : "2px solid black",
                   }}
                 />
-                <EmailIcon style={{ position: "absolute", top: "2.5rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "20px" }} />
-                {errors.email && <span style={{ color: "red", fontSize: "12px" }}>This field is required</span>}
+                <EmailIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "20px" }} />
+                {errors.email && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
                 {emailDomainStatus === "checking" && (
-                  <span style={{ fontSize: "12px", color: "#888", marginTop: "4px", display: "block" }}>
+                  <span style={{ fontSize: "16px", color: "#888", marginTop: "4px", display: "block" }}>
                     Checking email domain…
                   </span>
                 )}
                 {emailDomainStatus === "invalid" && (
-                  <span style={{ fontSize: "12.5px", color: "#c62828", marginTop: "4px", display: "block", fontWeight: 600 }}>
+                  <span style={{ fontSize: "16px", color: "#c62828", marginTop: "4px", display: "block", fontWeight: 600 }}>
                     ⚠️ This domain doesn't appear to accept email. Please check for typos.
                   </span>
                 )}
                 {emailDomainSuggestion && (
-                  <span style={{ fontSize: "12.5px", color: "#b36b00", marginTop: "4px", display: "block" }}>
+                  <span style={{ fontSize: "16px", color: "#b36b00", marginTop: "4px", display: "block" }}>
                     Did you mean{" "}
                     <button
                       type="button"
@@ -1937,7 +2594,7 @@ const Register = () => {
                     ?
                   </span>
                 )}
-                <span style={{ fontSize: "13px", color: "red", marginTop: "4px", display: "block" }}>
+                <span style={{ fontSize: "16px", color: "red", marginTop: "4px", display: "block" }}>
                   Note: Each email can only be used once. Use a valid and unused email address.
                 </span>
               </div>
@@ -1960,19 +2617,19 @@ const Register = () => {
                     onFocus={() => setPasswordFocused(true)}
                     onBlur={() => setPasswordFocused(false)}
                     onKeyDown={handleKeyDownRegister} required
-                    style={{ paddingLeft: "2.5rem", height: inputH, fontSize: "16px", border: errors.password ? "2px solid red" : "2px solid black", width: "100%" }} />
-                  <LockIcon style={{ position: "absolute", top: "2.5rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "22px" }} />
+                    style={{ paddingLeft: "2.80rem", height: inputH, fontSize: "16px", border: errors.password ? "2px solid red" : "2px solid black", width: "100%" }} />
+                  <LockIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "22px" }} />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    style={{ position: "absolute", top: "2.5rem", right: "1rem", background: "none", border: "none", cursor: "pointer" }}>
+                    style={{ position: "absolute", top: "2.80rem", right: "1rem", background: "none", border: "none", cursor: "pointer" }}>
                     {showPassword ? <Visibility /> : <VisibilityOff />}
                   </button>
                   {errors.passwordRules && (
-                    <span style={{ color: "red", fontSize: "12px" }}>
+                    <span style={{ color: "red", fontSize: "15px" }}>
                       Password does not meet all requirements
                     </span>
                   )}
                   {!errors.passwordRules && errors.password && (
-                    <span style={{ color: "red", fontSize: "12px" }}>This field is required</span>
+                    <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>
                   )}
                 </div>
 
@@ -1983,18 +2640,18 @@ const Register = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)} onKeyDown={handleKeyDownRegister}
                     required disabled={!usersData.password}
                     style={{
-                      paddingLeft: "2.5rem", height: inputH, fontSize: "16px",
+                      paddingLeft: "2.80rem", height: inputH, fontSize: "16px",
                       border: errors.confirmPassword ? "2px solid red" : "2px solid black",
                       width: "100%",
                       backgroundColor: !usersData.password ? "#f0f0f0" : "white",
                       cursor: !usersData.password ? "not-allowed" : "text",
                     }} />
-                  <LockIcon style={{ position: "absolute", top: "2.5rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "22px" }} />
+                  <LockIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", color: "rgba(0,0,0,0.4)", fontSize: "22px" }} />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    style={{ position: "absolute", top: "2.5rem", right: "1rem", background: "none", border: "none", cursor: "pointer" }}>
+                    style={{ position: "absolute", top: "2.80rem", right: "1rem", background: "none", border: "none", cursor: "pointer" }}>
                     {showConfirmPassword ? <Visibility /> : <VisibilityOff />}
                   </button>
-                  {errors.confirmPassword && <span style={{ color: "red", fontSize: "12px" }}>Passwords do not match</span>}
+                  {errors.confirmPassword && <span style={{ color: "red", fontSize: "15px" }}>Passwords do not match</span>}
                 </div>
               </div>
 
@@ -2006,7 +2663,7 @@ const Register = () => {
               }}>
                 <PhoneAndroidIcon sx={{ color: "#1565c0", fontSize: 20, flexShrink: 0, mt: 0.2 }} />
                 <Box>
-                  <Typography fontSize={12.5} color="#1a237e" lineHeight={1.6}>
+                  <Typography fontSize={15.5} color="#1a237e" lineHeight={1.6}>
                     <strong>Two-factor authentication required.</strong> After clicking Submit, you will be asked to scan a QR code using <strong>Google Authenticator</strong> on your phone. Please have it ready.
                   </Typography>
 
@@ -2017,7 +2674,7 @@ const Register = () => {
                 <FormControlLabel
                   control={<Checkbox checked={reminderChecked} onChange={(e) => setReminderChecked(e.target.checked)} />}
                   label={
-                    <Typography sx={{ fontSize: isMobile ? "12px" : "14px" }}>
+                    <Typography sx={{ fontSize: isMobile ? "15px" : "16px" }}>
                       I have read and agree to the admission requirements and policies of {settings?.company_name || ""} before proceeding.
                     </Typography>
                   }
@@ -2027,25 +2684,11 @@ const Register = () => {
               <div
                 tabIndex={0}
                 onClick={() => {
-                  if (!branchSelected) { setSnack({ open: true, message: "Please select a branch first!", severity: "warning" }); return; }
-                  if (!registrationOpen) { setSnack({ open: true, message: "Registration is currently closed for this campus.", severity: "error" }); return; }
-                  if (!reminderChecked) { setSnack({ open: true, message: "Please agree to the Terms and Conditions before registering.", severity: "warning" }); return; }
-                  if (emailDomainSuggestion || emailDomainStatus === "invalid") {
-                    setSnack({ open: true, message: "Please correct the email address typo before submitting.", severity: "warning" });
-                    return;
-                  }
-                  if (!isSubmitting) handleRegister();
+                  if (!isSubmitting) handleOpenReview();
                 }}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter") return;
-                  if (!branchSelected) { setSnack({ open: true, message: "Please select a branch first!", severity: "warning" }); return; }
-                  if (!registrationOpen) { setSnack({ open: true, message: "Registration is currently closed for this campus.", severity: "error" }); return; }
-                  if (!reminderChecked) { setSnack({ open: true, message: "Please agree to the Terms and Conditions before registering.", severity: "warning" }); return; }
-                  if (emailDomainSuggestion || emailDomainStatus === "invalid") {
-                    setSnack({ open: true, message: "Please correct the email address typo before submitting.", severity: "warning" });
-                    return;
-                  }
-                  if (!isSubmitting) handleRegister();
+                  if (!isSubmitting) handleOpenReview();
                 }}
                 style={{
                   opacity: reminderChecked && registrationOpen && branchSelected && !emailDomainSuggestion && emailDomainStatus !== "invalid" ? 1 : 0.5,
@@ -2074,7 +2717,7 @@ const Register = () => {
                         : "SUBMIT APPLICATION"}
               </div>
 
-              <div className="LinkContainer RegistrationLink" style={{ margin: "0.1rem 0rem", fontSize: isMobile ? "13px" : undefined }}>
+              <div className="LinkContainer RegistrationLink" style={{ margin: "0.1rem 0rem", fontSize: isMobile ? "15px" : undefined }}>
                 <p>Already Have an Account?</p>
                 <span><Link to={"/login_applicant"}>Sign In here</Link></span>
               </div>
@@ -2090,6 +2733,17 @@ const Register = () => {
           </div>
         </Container>
 
+        {/* ── Review / Confirm Modal (shown BEFORE anything is submitted) ── */}
+        <ReviewApplicationModal
+          open={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          onConfirm={handleRegister}
+          isSubmitting={isSubmitting}
+          isMobile={isCompact}
+          mainButtonColor={mainButtonColor}
+          data={reviewData}
+        />
+
         {/* ── TOTP Setup Modal (replaces old email OTP modal) ── */}
         <TotpSetupModal
           open={showTotpModal}
@@ -2101,51 +2755,283 @@ const Register = () => {
           registrationPayload={registrationPayload}
         />
 
+        {/* ── Registration Success Modal (shows the applicant number) ── */}
+        <RegistrationSuccessModal
+          open={showSuccessModal}
+          applicantNumber={applicantNumber}
+          email={tempEmail}
+          firstName={firstName}
+          middleName={middleName}
+          lastName={lastName}
+          birthday={birthday}
+          companyName={settings?.company_name}
+          mainButtonColor={mainButtonColor}
+          isMobile={isCompact}
+          onContinue={handleContinueToLogin}
+        />
+
         <Snackbar open={snack.open} autoHideDuration={4000} onClose={handleClose} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
           <Alert severity={snack.severity} onClose={handleClose} sx={{ width: "100%" }}>{snack.message}</Alert>
         </Snackbar>
 
         {/* Dialog: Important Reminder */}
-        <Dialog open={openReminder} onClose={() => setOpenReminder(false)} maxWidth="sm" fullWidth
-          PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", mx: isMobile ? 2 : "auto", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}>
-          <DialogTitle sx={{ bgcolor: mainButtonColor, color: "white", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
+        <Dialog
+          open={openReminder}
+          onClose={() => setOpenReminder(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: "16px",
+              overflow: "hidden",
+              mx: isMobile ? 2 : "auto",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              bgcolor: mainButtonColor,
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              fontWeight: "bold",
+              px: 3,
+              py: 2,
+            }}
+          >
             <Box display="flex" alignItems="center" gap={1.5}>
-              <Box sx={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Box
+                sx={{
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  borderRadius: "50%",
+                  width: 40,
+                  height: 40,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
                 <WarningAmberIcon sx={{ color: "white", fontSize: 22 }} />
               </Box>
+
               <Box>
-                <Typography fontWeight="bold" fontSize={isMobile ? 14 : 16} color="white" lineHeight={1.2}>Important Reminder for Applicants</Typography>
-                <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>Please read before proceeding</Typography>
+                <Typography
+                  fontWeight="bold"
+                  fontSize={16}
+                  color="white"
+                  lineHeight={1.2}
+                >
+                  Important Reminder for Applicants
+                </Typography>
+
+                <Typography
+                  fontSize={12}
+                  color="rgba(255,255,255,0.8)"
+                  lineHeight={1.2}
+                >
+                  Please read carefully before proceeding.
+                </Typography>
               </Box>
             </Box>
           </DialogTitle>
-          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Box sx={{ border: "1px solid #f5a623", borderRadius: "8px", p: 1.5, mb: 2, mt: 2, display: "flex", gap: 1, alignItems: "flex-start", backgroundColor: "#fffbf2" }}>
-              <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
-              <Typography fontSize={12.5} color="#5d4037" lineHeight={1.5}>
-                Please ensure all information is accurate and complete. Submitting{" "}
-                <strong>multiple accounts or duplicate applications is strictly prohibited</strong>{" "}
-                and may result in automatic disqualification.
+
+          <DialogContent
+            sx={{
+              px: { xs: 2, sm: 3 },
+              pt: 2.5,
+              pb: 1,
+            }}
+          >
+            {/* Icon */}
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                mb: 2.5,
+                mt: 1,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 76,
+                  height: 76,
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255,255,255,0.9)",
+                  border: `3px solid ${mainButtonColor}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 34,
+                  mt: 3
+                }}
+              >
+                ⚠️
+              </Box>
+            </Box>
+
+            {/* Main Reminder */}
+            <Box sx={{ textAlign: "center", mb: 2 }}>
+              <Typography
+                sx={{
+                  fontSize: "13.5px",
+                  color: "#333",
+                  lineHeight: 1.7,
+                }}
+              >
+                This online admission is intended only for
+                <strong style={{ color: mainButtonColor }}>
+                  {" "}first-time applicants
+                </strong>.
+                Applicants who have already taken the admission examination in any
+                previous school year are not allowed to register for another
+                applicant account.
               </Typography>
             </Box>
-            <Typography sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.6, mb: 2 }}>
-              Each applicant must register and submit only one application. Await the official announcement for screening results.
-            </Typography>
-            <Box component="label" htmlFor="agreeCheck" sx={{ display: "flex", alignItems: "center", gap: 1.5, border: "1.5px solid #cc3333", borderRadius: "4px", px: 1.5, py: 1.25, mt: 2, mb: 0.5, cursor: "pointer", transition: "background 0.15s" }}>
-              <Checkbox id="agreeCheck" checked={agreeChecked} onChange={(e) => setAgreeChecked(e.target.checked)}
-                sx={{ p: 0, color: "#cc3333", "&.Mui-checked": { color: "#cc3333" } }} size="small" />
-              <Typography sx={{ fontSize: "13px", color: "#333", userSelect: "none" }}>I understand and agree to submit only one application.</Typography>
+
+            {/* Rules */}
+            <Box
+              sx={{
+                border: `1.5px solid ${mainButtonColor}`,
+                borderRadius: "12px",
+                overflow: "hidden",
+                mb: 2,
+              }}
+            >
+              <Box
+                sx={{
+                  backgroundColor: mainButtonColor,
+                  px: 2,
+                  py: 1,
+                }}
+              >
+                <Typography
+                  sx={{
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 13,
+                  }}
+                >
+                  Admission Rules
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 2,
+                  backgroundColor: "#fafcff",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: "12.5px",
+                    color: "#333",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  • Register only if you have <strong>never taken</strong> the
+                  admission examination before.
+                  <br />
+                  <br />
+                  • Applicants who have previously taken the admission examination are
+                  <strong> no longer eligible to submit a new application or create another applicant account.</strong>
+                  <br />
+                  <br />
+                  • The University reserves the right to verify all applicant
+                  records. Any account found to belong to a previous examinee may be
+                  automatically rejected or disqualified.
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Agreement */}
+            <Box
+              component="label"
+              htmlFor="agreeCheck"
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+                backgroundColor: "#f0f7ff",
+                borderLeft: `3px solid ${mainButtonColor}`,
+                borderRadius: "0 9px 9px 0",
+                px: 1.5,
+                py: 1.25,
+                mb: 1,
+                cursor: "pointer",
+              }}
+            >
+              <Checkbox
+                id="agreeCheck"
+                checked={agreeChecked}
+                onChange={(e) => setAgreeChecked(e.target.checked)}
+                sx={{
+                  p: 0,
+                  color: mainButtonColor,
+                  "&.Mui-checked": {
+                    color: mainButtonColor,
+                  },
+                }}
+                size="small"
+              />
+
+              <Typography
+                sx={{
+                  fontSize: 12.5,
+                  color: "#333",
+                  lineHeight: 1.5,
+                  userSelect: "none",
+                }}
+              >
+                I have read and understood the admission rules. I confirm that I
+                have never taken the admission examination before and that the
+                information I provide is true and accurate.
+              </Typography>
             </Box>
           </DialogContent>
-          <DialogActions sx={{ justifyContent: "center", px: 3, pb: 2.5, pt: 1, mt: 1 }}>
-            <Button variant="contained" disabled={!agreeChecked} onClick={() => setOpenReminder(false)}
-              fullWidth={isMobile}
-              sx={{ backgroundColor: agreeChecked ? mainButtonColor : "#b0b8c8", color: "#fff", fontWeight: 600, fontSize: "14px", px: 4, py: 1.25, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: agreeChecked ? mainButtonColor : "#b0b8c8", boxShadow: "none" }, "&.Mui-disabled": { backgroundColor: "#b0b8c8", color: "#fff", opacity: 0.7 } }}>
+
+          <DialogActions
+            sx={{
+              px: { xs: 2, sm: 3 },
+              pb: 2.5,
+              pt: 1.5,
+            }}
+          >
+            <Button
+              fullWidth
+              variant="contained"
+              disabled={!agreeChecked}
+              onClick={() => setOpenReminder(false)}
+              sx={{
+                height: 44,
+                borderRadius: "10px",
+                backgroundColor: agreeChecked
+                  ? mainButtonColor
+                  : "#b0b8c8",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 14,
+                textTransform: "none",
+                boxShadow: "none",
+                "&:hover": {
+                  backgroundColor: agreeChecked
+                    ? mainButtonColor
+                    : "#b0b8c8",
+                  opacity: 0.9,
+                  boxShadow: "none",
+                },
+                "&.Mui-disabled": {
+                  backgroundColor: "#b0b8c8",
+                  color: "#fff",
+                  opacity: 0.7,
+                },
+              }}
+            >
               I Agree — Continue to Registration
             </Button>
           </DialogActions>
         </Dialog>
-
         {/* Dialog: Registration Closed */}
         <Dialog open={openClosedDialog} maxWidth="sm" fullWidth
           PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", mx: isMobile ? 2 : "auto", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}>
@@ -2155,8 +3041,8 @@ const Register = () => {
                 <Typography fontSize={20}>🚫</Typography>
               </Box>
               <Box>
-                <Typography fontWeight="bold" fontSize={isMobile ? 14 : 16} color="white" lineHeight={1.2}>Registration Closed</Typography>
-                <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>Applications are not being accepted</Typography>
+                <Typography fontWeight="bold" fontSize={isMobile ? 16 : 16} color="white" lineHeight={1.2}>Registration Closed</Typography>
+                <Typography fontSize={15} color="rgba(255,255,255,0.8)" lineHeight={1.2}>Applications are not being accepted</Typography>
               </Box>
             </Box>
           </DialogTitle>
@@ -2166,12 +3052,12 @@ const Register = () => {
                 <Typography fontSize={34}>🚫</Typography>
               </Box>
               <Typography fontWeight="bold" fontSize={17} color="#c62828" mb={1}>Registration is Currently Closed</Typography>
-              <Typography fontSize={13.5} color="#555" lineHeight={1.6}>Please wait for the official announcement before attempting to register.</Typography>
+              <Typography fontSize={15.5} color="#555" lineHeight={1.6}>Please wait for the official announcement before attempting to register.</Typography>
             </Box>
           </DialogContent>
           <DialogActions sx={{ justifyContent: "center", px: 3, pb: 2.5, pt: 1.5 }}>
             <Button variant="contained" onClick={() => navigate("/login_applicant")} fullWidth={isMobile}
-              sx={{ backgroundColor: "#7a0000", color: "#fff", fontWeight: 600, fontSize: "14px", px: 4, py: 1.25, borderRadius: "10px", textTransform: "none", boxShadow: "none" }}>
+              sx={{ backgroundColor: "#7a0000", color: "#fff", fontWeight: 600, fontSize: "16px", px: 4, py: 1.25, borderRadius: "10px", textTransform: "none", boxShadow: "none" }}>
               Go to Login
             </Button>
           </DialogActions>
@@ -2186,24 +3072,24 @@ const Register = () => {
                 <CampaignIcon sx={{ color: "white", fontSize: 22 }} />
               </Box>
               <Box>
-                <Typography fontWeight="bold" fontSize={isMobile ? 14 : 16} color="white" lineHeight={1.2}>Admissions Currently Closed</Typography>
-                <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>This campus is not accepting applications</Typography>
+                <Typography fontWeight="bold" fontSize={isMobile ? 16 : 16} color="white" lineHeight={1.2}>Admissions Currently Closed</Typography>
+                <Typography fontSize={15} color="rgba(255,255,255,0.8)" lineHeight={1.2}>This campus is not accepting applications</Typography>
               </Box>
             </Box>
           </DialogTitle>
           <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
             <Box sx={{ border: "1px solid #f5a623", borderRadius: "8px", p: 1.5, mb: 2, mt: 2, display: "flex", gap: 1, alignItems: "flex-start", backgroundColor: "#fffbf2" }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
-              <Typography fontSize={12.5} color="#5d4037" lineHeight={1.5}>
+              <Typography fontSize={15.5} color="#5d4037" lineHeight={1.5}>
                 Registration is only available during the officially designated hours. Submissions outside this period <strong>cannot be processed</strong>.
               </Typography>
             </Box>
-            <Typography sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.6, mb: 1.5 }}>
+            <Typography sx={{ fontSize: "15.5px", color: "#333", lineHeight: 1.6, mb: 1.5 }}>
               Kindly return during the authorized registration hours to complete your application.
             </Typography>
             {selectedBranch?.start_date && selectedBranch?.end_date && (
               <Box sx={{ textAlign: "center", mt: 2, p: 2, background: "#fff9ec", borderRadius: "8px", border: "1.5px solid #e2e8f0" }}>
-                <Typography sx={{ fontSize: "11px", color: "red", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, mb: 0.5 }}>Registration Hours</Typography>
+                <Typography sx={{ fontSize: "14px", color: "red", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, mb: 0.5 }}>Registration Hours</Typography>
                 <Typography sx={{ fontSize: isMobile ? "20px" : "26px", fontWeight: 700, color: "#1a1a2e", fontFamily: "'DM Sans', sans-serif" }}>
                   {new Date(selectedBranch.start_date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" })}
                   {" – "}
@@ -2211,13 +3097,13 @@ const Register = () => {
                 </Typography>
               </Box>
             )}
-            <Typography sx={{ fontSize: "13px", color: "#888", lineHeight: 1.6, textAlign: "center", fontStyle: "italic", mt: 2, mb: 0.5 }}>
+            <Typography sx={{ fontSize: "15px", color: "#888", lineHeight: 1.6, textAlign: "center", fontStyle: "italic", mt: 2, mb: 0.5 }}>
               We sincerely appreciate your patience and understanding.
             </Typography>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5, pt: 1.5, gap: 1.5, display: "flex", flexDirection: isMobile ? "column" : "row" }}>
-            <Button variant="outlined" color="error" onClick={() => setOpenBranchDialog(false)} fullWidth sx={{ height: 48, textTransform: "none", fontWeight: 600, fontSize: "14px" }}>Close</Button>
-            <Button variant="contained" onClick={() => navigate("/login_applicant")} fullWidth sx={{ height: 48, backgroundColor: mainButtonColor, color: "#fff", fontWeight: 600, fontSize: "14px", textTransform: "none", boxShadow: "none" }}>Go to Login</Button>
+            <Button variant="outlined" color="error" onClick={() => setOpenBranchDialog(false)} fullWidth sx={{ height: 48, textTransform: "none", fontWeight: 600, fontSize: "16px" }}>Close</Button>
+            <Button variant="contained" onClick={() => navigate("/login_applicant")} fullWidth sx={{ height: 48, backgroundColor: mainButtonColor, color: "#fff", fontWeight: 600, fontSize: "16px", textTransform: "none", boxShadow: "none" }}>Go to Login</Button>
           </DialogActions>
         </Dialog>
       </Box>
