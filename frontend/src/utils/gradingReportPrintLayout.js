@@ -96,23 +96,26 @@ export const GRADING_REPORT_PRINT_CSS = `
     vertical-align: top;
   }
   .grade-sheet-table > tfoot > tr.footer-row > td {
-    padding-top: 24px;
+    padding-top: 1rem;
   }
 
   /* ── Header with logo ── */
   .header-wrap {
-    position: relative;
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
     min-height: 72px;
     margin-bottom: 2px;
   }
   .header-logo {
-    position: absolute;
-    left: 0;
-    top: 0;
     width: 64px;
     height: 64px;
+    flex-shrink: 0;
     object-fit: contain;
+  }
+  .school-header {
+    text-align: center;
   }
   .school-header .republic {
     font-size: 11px;
@@ -142,7 +145,7 @@ export const GRADING_REPORT_PRINT_CSS = `
     border-collapse: collapse;
     font-size: 11px;
     line-height: 1.25;
-    margin-bottom: 4px;
+    margin-bottom: calc(4px + 1rem);
   }
   .info-table td {
     border: 1px solid #000;
@@ -155,7 +158,7 @@ export const GRADING_REPORT_PRINT_CSS = `
     background: #fff;
   }
   .info-value {
-    font-weight: 700;
+    font-weight: 400;
   }
   .info-label-mid {
     white-space: nowrap;
@@ -164,7 +167,7 @@ export const GRADING_REPORT_PRINT_CSS = `
   .info-value-narrow {
     width: 40px;
     text-align: center;
-    font-weight: 700;
+    font-weight: 400;
   }
   .info-label-right {
     white-space: nowrap;
@@ -203,42 +206,44 @@ export const GRADING_REPORT_PRINT_CSS = `
   .col-sno { width: 88px; }
   .col-mid { width: 48px; }
   .col-final { width: 48px; }
-  .col-fg { width: 58px; }
+  .col-fg { width: calc(58px + 2rem); }
   .col-re { width: 52px; }
-  .col-remarks { width: 78px; }
+  .col-remarks { width: calc(78px + 2rem); }
 
   /* ── Stats + signatures ── */
   .footer-block {
     display: flex;
     align-items: flex-start;
     gap: 16px;
-    margin-top: 28px;
+    margin-top: 0;
   }
   .stats-box {
     border: 1px solid #000;
-    padding: 6px 8px 4px;
+    padding: 15px 20px;
     font-size: 11px;
     min-width: 168px;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
   .stats-box .stats-title {
     text-decoration: underline;
     margin-bottom: 4px;
-    font-weight: 700;
+    font-weight: 400;
   }
   .stats-row {
     display: flex;
     justify-content: space-between;
     gap: 16px;
     margin: 1px 0;
+    padding-left: 10px;
   }
   .stats-row.total {
     margin-top: 4px;
     padding-top: 2px;
-    font-weight: 700;
+    font-weight: 400;
   }
   .stats-row.total .stats-total-value {
-    text-decoration: underline;
+    border-top: solid 1px black;
   }
   .signatures {
     flex: 1;
@@ -247,6 +252,7 @@ export const GRADING_REPORT_PRINT_CSS = `
     justify-content: space-between;
     gap: 22px;
     padding-top: 2px;
+    margin-top: 25px;
     min-height: 96px;
   }
   .sig-row {
@@ -260,14 +266,19 @@ export const GRADING_REPORT_PRINT_CSS = `
     font-size: 11px;
   }
   .sig-name {
-    min-height: 16px;
-    font-weight: 700;
+    min-height: 14px;
+    font-weight: 400;
+    line-height: 1;
+    margin: 0;
+    padding: 0 0 1px;
+    border-bottom: 1px solid #000;
   }
   .sig-line {
-    border-top: 1px solid #000;
-    margin-top: 2px;
+    border-top: none;
+    margin-top: 0;
     padding-top: 2px;
     font-size: 10px;
+    line-height: 1.2;
   }
 
   .print-info {
@@ -446,7 +457,7 @@ export const buildGradingReportPrintHtml = ({
         <colgroup>
           <col class="col-num" />
           <col class="col-sno" />
-          <col />
+          <col class="col-name" />
           <col class="col-mid" />
           <col class="col-final" />
           <col class="col-fg" />
@@ -460,7 +471,7 @@ export const buildGradingReportPrintHtml = ({
           <tr class="col-head-row">
             <th rowspan="2" class="col-num">#</th>
             <th rowspan="2" class="col-sno">Student No.</th>
-            <th rowspan="2">Student Name</th>
+            <th rowspan="2" class="col-name">Student Name</th>
             <th colspan="5" class="grades-banner">G R A D E S</th>
           </tr>
           <tr class="col-head-row">

@@ -100,9 +100,9 @@ export const CLASS_LIST_PRINT_CSS = `
     margin-top: 2px;
   }
   .school-header .school-name {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -1px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
     line-height: 1.2;
     text-transform: uppercase;
   }
@@ -111,9 +111,9 @@ export const CLASS_LIST_PRINT_CSS = `
   }
   .course-title {
     text-align: center;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -1px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
     margin-top: 10px;
     text-transform: uppercase;
   }
@@ -121,20 +121,21 @@ export const CLASS_LIST_PRINT_CSS = `
     text-align: center;
     font-size: 12px;
     margin-top: 2px;
+    font-weight: 600;
   }
   .official-title {
     text-align: center;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -1px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
     margin: 10px 0 2px;
     text-transform: uppercase;
   }
   .academic-year-line {
     text-align: center;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -1px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
     margin-bottom: 8px;
   }
 
@@ -159,7 +160,7 @@ export const CLASS_LIST_PRINT_CSS = `
     font-weight: 400;
   }
   .info-table strong {
-    font-weight: 400;
+    font-weight: 600;
   }
   .info-table .lbl {
     width: 120px;
@@ -173,6 +174,7 @@ export const CLASS_LIST_PRINT_CSS = `
   }
   .info-table .val-open-right {
     border-right: none !important;
+    font-weight: 600;
   }
   .info-table .lbl-open-left {
     white-space: nowrap;
@@ -180,11 +182,12 @@ export const CLASS_LIST_PRINT_CSS = `
     border-left: none !important;
   }
   .info-table .val {
-    font-weight: 400;
+    font-weight: 600;
     font-size: 11px;
   }
   .info-table .section-val {
     white-space: nowrap;
+    font-weight: 600;
   }
   .info-table .unit-num {
     width: 36px;
@@ -192,6 +195,7 @@ export const CLASS_LIST_PRINT_CSS = `
     padding-left: 2px;
     padding-right: 2px;
     white-space: nowrap;
+    font-weight: 600;
   }
   .info-table .lab-lbl {
     white-space: nowrap;
@@ -208,6 +212,7 @@ export const CLASS_LIST_PRINT_CSS = `
     vertical-align: top;
     border-top: none !important;
     border-bottom: none !important;
+    font-weight: 600;
   }
   .info-table .sched-val-first {
     border-top: 1px solid #000 !important;
@@ -219,6 +224,9 @@ export const CLASS_LIST_PRINT_CSS = `
   /* ── Students sheet (one full page block; header copied per page) ── */
   .print-page {
     width: 100%;
+    min-height: calc(297mm - 0.45in - 0.55in);
+    display: flex;
+    flex-direction: column;
     page-break-after: always;
     break-after: page;
   }
@@ -233,29 +241,31 @@ export const CLASS_LIST_PRINT_CSS = `
     font-size: 11px;
   }
   .class-list-sheet > thead > tr.col-head-row > th {
-    border-top: 3px double #000;
-    border-bottom: 3px double #000;
+    border-top: 1px solid #000;
+    border-bottom: 1px solid #000;
     border-left: none;
     border-right: none;
-    padding: 4px 3px;
-    font-weight: 700;
+    padding: 0 6px;
+    font-weight: 600;
     text-align: left;
     font-size: 11px;
     background: #fff;
+  }
+  .class-list-sheet > thead > tr.col-head-row > th:first-child {
+    border-left: 1px solid #000;
+    padding-left: 10px;
+  }
+  .class-list-sheet > thead > tr.col-head-row > th:last-child {
+    border-right: 1px solid #000;
+    padding-right: 10px;
   }
   .class-list-sheet > thead > tr.col-head-row > th.center {
     text-align: center;
   }
   .class-list-sheet > tbody > tr.student-row > td {
-    border-top: none;
-    border-bottom: 1px solid #bbb;
-    border-left: none;
-    border-right: none;
+    border: none;
     padding: 3px 3px;
     vertical-align: middle;
-  }
-  .class-list-sheet > tbody > tr.student-row:last-child > td {
-    border-bottom: 1px solid #000;
   }
   .class-list-sheet td.name-cell {
     text-align: left;
@@ -265,8 +275,22 @@ export const CLASS_LIST_PRINT_CSS = `
     text-align: center;
   }
   .class-list-sheet td.encoded-cell {
-    text-align: left;
+    text-align: center;
     text-transform: uppercase;
+  }
+  .class-list-sheet th.col-sno,
+  .class-list-sheet th.col-age,
+  .class-list-sheet th.col-gender,
+  .class-list-sheet th.col-year,
+  .class-list-sheet th.col-or,
+  .class-list-sheet th.col-encoded,
+  .class-list-sheet td.col-sno,
+  .class-list-sheet td.col-age,
+  .class-list-sheet td.col-gender,
+  .class-list-sheet td.col-year,
+  .class-list-sheet td.col-or,
+  .class-list-sheet td.col-encoded {
+    text-align: center;
   }
   .col-num { width: 28px; }
   .col-sno { width: 90px; }
@@ -277,16 +301,19 @@ export const CLASS_LIST_PRINT_CSS = `
   .col-encoded { width: 90px; }
 
   /* ── Totals (last page only) ── */
+  .page-bottom {
+    margin-top: auto;
+  }
   .totals-block {
-    margin-top: 14px;
-    font-size: 12px;
-    font-weight: 700;
+    margin: 0 0 calc(1rem - 10px);
+    font-size: 10px;
+    font-weight: 600;
     line-height: 1.55;
   }
 
   /* ── In-document footer (PDF uses Puppeteer footer instead) ── */
   .print-footer {
-    margin-top: 8px;
+    margin-top: 0;
     border-top: 1px solid #000;
     padding-top: 4px;
     font-size: 10px;
@@ -508,24 +535,26 @@ export const buildClassListPrintHtml = ({
           <thead>
             <tr class="col-head-row">
               <th class="center col-num">#</th>
-              <th class="col-sno">Student No.</th>
+              <th class="center col-sno">Student No.</th>
               <th>Full Name</th>
               <th class="center col-age">Age</th>
               <th class="center col-gender">Gender</th>
-              <th class="col-year">Year Level</th>
-              <th class="col-or">OR No.</th>
-              <th class="col-encoded">Encoded By</th>
+              <th class="center col-year">Year Level</th>
+              <th class="center col-or">OR No.</th>
+              <th class="center col-encoded">Encoded By</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
           </tbody>
         </table>
-        ${totalsHtml}
-        <div class="print-footer">
-          <span>Print Info: ${escapeHtml(printInfoLeft || "")}</span>
-          <span class="footer-center">${escapeHtml(footerCenter)}</span>
-          <span class="footer-right">Page ${pageIndex + 1} of ${pages.length}</span>
+        <div class="page-bottom">
+          ${totalsHtml}
+          <div class="print-footer">
+            <span>Print Info: ${escapeHtml(printInfoLeft || "")}</span>
+            <span class="footer-center">${escapeHtml(footerCenter)}</span>
+            <span class="footer-right">Page ${pageIndex + 1} of ${pages.length}</span>
+          </div>
         </div>
       </div>`;
     })
