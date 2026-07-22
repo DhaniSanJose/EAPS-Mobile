@@ -446,7 +446,7 @@ const SearchCorForCollege = () => {
                     setStudentDetails([]);
                     showSnackbar(
                         errorBody?.message ||
-                            "No enrolled-subject summary found. COR can still be generated from student record.",
+                        "No enrolled-subject summary found. COR can still be generated from student record.",
                         "info",
                     );
                     return;
@@ -627,7 +627,7 @@ const SearchCorForCollege = () => {
         );
     }
 
-       // 🔒 Disable right-click
+    // 🔒 Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
     // 🔒 Block DevTools shortcuts + Ctrl+P silently
@@ -711,6 +711,36 @@ const SearchCorForCollege = () => {
             <CollegeEnrollmentTabs />
             <br />
 
+
+            <br />
+            <TableContainer component={Paper} sx={{ width: '100%' }}>
+                <Table>
+                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
+                        <TableRow>
+                            {/* Left cell: Student Number */}
+                            <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
+                                Student Number:&nbsp;
+                                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
+                                    {studentData.student_number || "N/A"}
+                                </span>
+                            </TableCell>
+
+                            {/* Right cell: Student Name */}
+                            <TableCell
+                                align="right"
+                                sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}
+                            >
+                                Student Name:&nbsp;
+                                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
+                                    {studentData && studentData.last_name
+                                        ? `${studentData.last_name.toUpperCase()}, ${studentData.first_name.toUpperCase()} ${studentData.middle_name.toUpperCase()}`
+                                        : "N/A"}
+                                </span>
+                            </TableCell>
+                        </TableRow>
+                    </TableHead>
+                </Table>
+            </TableContainer>
             <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, mb: 2 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 4, p: 2, flexWrap: "wrap" }}>
                     <Box display="flex" alignItems="center" gap={1}>
@@ -763,35 +793,6 @@ const SearchCorForCollege = () => {
                 </Box>
             </TableContainer>
 
-            <br />
-            <TableContainer component={Paper} sx={{ width: '100%' }}>
-                <Table>
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
-                        <TableRow>
-                            {/* Left cell: Student Number */}
-                            <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
-                                Student Number:&nbsp;
-                                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
-                                    {studentData.student_number || "N/A"}
-                                </span>
-                            </TableCell>
-
-                            {/* Right cell: Student Name */}
-                            <TableCell
-                                align="right"
-                                sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}
-                            >
-                                Student Name:&nbsp;
-                                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
-                                    {studentData && studentData.last_name
-                                        ? `${studentData.last_name.toUpperCase()}, ${studentData.first_name.toUpperCase()} ${studentData.middle_name.toUpperCase()}`
-                                        : "N/A"}
-                                </span>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                </Table>
-            </TableContainer>
             <br />
 
             <button

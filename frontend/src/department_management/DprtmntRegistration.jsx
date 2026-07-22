@@ -8,8 +8,6 @@ import {
   DialogActions,
   DialogContent,
   Grid,
-  Card,
-  CardContent,
   Typography,
   TextField,
   Button,
@@ -26,6 +24,7 @@ import {
   Select,
   MenuItem,
   TableContainer,
+  CircularProgress,
 } from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
 import Unauthorized from "../components/Unauthorized";
@@ -45,8 +44,8 @@ const DepartmentRegistration = () => {
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
+  const [stepperColor, setStepperColor] = useState("#000000");
 
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
@@ -64,8 +63,8 @@ const DepartmentRegistration = () => {
     if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
     if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);   // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);           // ✅ NEW
+    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
+    if (settings.stepper_color) setStepperColor(settings.stepper_color);
 
     // 🏫 Logo
     if (settings.logo_url) {
@@ -95,7 +94,7 @@ const DepartmentRegistration = () => {
 
   }, [settings]);
 
-  // 🔎 Helper to get a branch name from its id (used on cards)
+  // 🔎 Helper to get a branch name from its id
   const getBranchName = (componentId) => {
     if (!componentId) return "—";
     const match = branches.find(
@@ -112,6 +111,7 @@ const DepartmentRegistration = () => {
   });
   const [departmentList, setDepartmentList] = useState([]);
   const [openModal, setOpenModal] = useState(false);
+  const [departmentLoading, setDepartmentLoading] = useState(false);
 
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
@@ -196,11 +196,15 @@ const DepartmentRegistration = () => {
   }, []);
 
   const fetchDepartment = async () => {
+    setDepartmentLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/api/get_department`);
-      setDepartmentList(response.data);
+      setDepartmentList(response.data || []);
     } catch (err) {
       console.error(err);
+      setDepartmentList([]);
+    } finally {
+      setDepartmentLoading(false);
     }
   };
 
@@ -383,7 +387,7 @@ const DepartmentRegistration = () => {
   });
 
   const showCreateActions = canCreate;
-  const showActionArea = canEdit || canDelete;
+  const showActionColumn = canEdit || canDelete;
 
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
@@ -391,11 +395,9 @@ const DepartmentRegistration = () => {
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-
+          gap: 4,
+          alignItems: 'stretch',
           mb: 2,
-
         }}
       >
         <Typography
@@ -408,50 +410,12 @@ const DepartmentRegistration = () => {
         >
           DEPARTMENT REGISTRATION
         </Typography>
-
-
-
-
       </Box>
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
       <br />
-
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        {showCreateActions && (
-          <Button
-            variant="contained"
-            sx={{
-              textTransform: "none",
-              fontWeight: 600,
-              px: 3,
-              borderRadius: 2,
-              "&:hover": { opacity: 0.9 },
-            }}
-            onClick={() => {
-              setEditMode(false);
-              setDepartment({
-                dep_name: "",
-                dep_code: "",
-                dept_number: "",
-                components: "",
-              });
-              setOpenModal(true);
-            }}
-          >
-            + Add Department
-          </Button>
-        )}
-      </Box>
       <br />
+
       <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, }}>
         <Table>
           <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", }}>
@@ -467,113 +431,185 @@ const DepartmentRegistration = () => {
         sx={{
           p: 3,
           border: `1px solid ${borderColor}`,
-
         }}
       >
+        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <Grid item>
+            <Typography variant="body1" fontWeight="bold">
+              Departments:
+            </Typography>
+          </Grid>
 
-        <Grid container spacing={2}>
-          {departmentList.map((department, index) => (
-            <Grid item xs={12} sm={6} md={3} key={department.dprtmnt_id}>
-              <Card
-                elevation={0}
+          {showCreateActions && (
+            <Grid item>
+              <Button
+                variant="contained"
+                startIcon={<EditIcon sx={{ display: 'none' }} />}
                 sx={{
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: 3,
-                  backgroundColor: index % 2 === 0 ? "white" : "lightgray",
-
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    boxShadow: 4,
-                    transform: "translateY(-4px)",
-                  },
-                  height: "100%",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  px: 3,
+                  borderRadius: 2,
+                  "&:hover": { opacity: 0.9 },
+                }}
+                onClick={() => {
+                  setEditMode(false);
+                  setDepartment({
+                    dep_name: "",
+                    dep_code: "",
+                    dept_number: "",
+                    components: "",
+                  });
+                  setOpenModal(true);
                 }}
               >
-                <CardContent
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    height: "100%",
-                  }}
-                >
-                  <Box>
-                    <Typography variant="h6" fontWeight={600}>
-                      {department.dprtmnt_name}
-                    </Typography>
-
-                    <Typography variant="subtitle" sx={{ color: subtitleColor }}>
-                      Code: {department.dprtmnt_code}
-                    </Typography>
-
-                    <br />
-
-                    <Typography variant="subtitle" sx={{ color: subtitleColor }}>
-                      Dept No: {department.dept_number}
-                    </Typography>
-
-                    <br />
-                    <Typography variant="subtitle" sx={{ color: subtitleColor }}>
-                      Branch: {getBranchName(department.components)}
-                    </Typography>
-                  </Box>
-
-                  {showActionArea && (
-                    <Box mt={2} display="flex" justifyContent="flex-end" gap={1}>
-                      {canEdit && (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          sx={{
-                            backgroundColor: "green",
-                            color: "white",
-                            borderRadius: "5px",
-                            padding: "8px 14px",
-                            width: "100px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "5px",
-                            cursor: "pointer",
-                          }}
-                          onClick={() => handleEdit(department)}
-                        >
-                          <EditIcon fontSize="small" /> Edit
-                        </Button>
-                      )}
-
-                      {canDelete && (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          sx={{
-                            backgroundColor: "#9E0000",
-                            color: "white",
-                            borderRadius: "5px",
-                            padding: "8px 14px",
-                            width: "100px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "5px",
-                            cursor: "pointer",
-                          }}
-                          onClick={() => {
-                            setDepartmentToDelete(department);
-                            setOpenDeleteDialog(true);
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" /> Delete
-                        </Button>
-                      )}
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
+                + Add Department
+              </Button>
             </Grid>
-          ))}
+          )}
         </Grid>
       </Paper>
+
+      <Box>
+        {departmentLoading ? (
+          <CircularProgress />
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow style={{
+                border: `1px solid ${borderColor}`,
+                backgroundColor: settings?.header_color || "#1976d2",
+                color: "#fff",
+                width: "10%",
+                textAlign: "center",
+              }}>
+                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>#</TableCell>
+                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Department Name</TableCell>
+                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Code</TableCell>
+                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Dept No.</TableCell>
+                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Branch</TableCell>
+
+                {showActionColumn && (
+                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Action</TableCell>
+                )}
+              </TableRow>
+            </TableHead>
+
+            <TableBody
+              sx={{
+                border: `1px solid ${borderColor}`,
+                "& .MuiTableRow-root:nth-of-type(odd)": {
+                  backgroundColor: "#ffffff",
+                },
+                "& .MuiTableRow-root:nth-of-type(even)": {
+                  backgroundColor: "lightgray",
+                },
+              }}
+            >
+              {departmentList.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6}><em>No Department</em></TableCell>
+                </TableRow>
+              ) : (
+                departmentList.map((dept, index) => (
+                  <TableRow key={dept.dprtmnt_id}>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{index + 1}</TableCell>
+
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                      {dept.dprtmnt_name}
+                    </TableCell>
+
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                      {dept.dprtmnt_code}
+                    </TableCell>
+
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                      {dept.dept_number}
+                    </TableCell>
+
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                      {getBranchName(dept.components)}
+                    </TableCell>
+
+                    {showActionColumn && (
+                      <TableCell
+                        sx={{
+                          border: `1px solid ${borderColor}`,
+                          textAlign: "center",
+                          width: "250px",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "row",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          {canEdit && (
+                            <Button
+                              variant="contained"
+                              size="small"
+                              sx={{
+                                backgroundColor: "green",
+                                color: "white",
+                                borderRadius: "5px",
+                                padding: "8px",
+                                width: "100px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "5px",
+                                cursor: "pointer",
+                                "&:hover": {
+                                  backgroundColor: "#0b7a0b",
+                                },
+                              }}
+                              onClick={() => handleEdit(dept)}
+                            >
+                              <EditIcon fontSize="small" /> Edit
+                            </Button>
+                          )}
+
+                          {canDelete && (
+                            <Button
+                              variant="contained"
+                              size="small"
+                              sx={{
+                                backgroundColor: "#9E0000",
+                                color: "white",
+                                borderRadius: "5px",
+                                padding: "8px",
+                                width: "100px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "5px",
+                                cursor: "pointer",
+                                "&:hover": {
+                                  backgroundColor: "#7a0000",
+                                },
+                              }}
+                              onClick={() => {
+                                setDepartmentToDelete(dept);
+                                setOpenDeleteDialog(true);
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" /> Delete
+                            </Button>
+                          )}
+                        </Box>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </Box>
 
       <Dialog
         open={openModal}

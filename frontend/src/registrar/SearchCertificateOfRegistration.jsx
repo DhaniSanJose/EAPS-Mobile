@@ -300,6 +300,7 @@ const SearchCertificateOfRegistration = () => {
       try {
         setCorPreload(null);
         setCorPreloadLoading(true);
+
         const [res, preloadRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/program_evaluation/${debouncedStudentNumber}`),
           axios
@@ -309,29 +310,55 @@ const SearchCertificateOfRegistration = () => {
                 studentNumber: debouncedStudentNumber,
                 active_school_year_id: selectedActiveSchoolYear,
               },
-              { headers: { "Content-Type": "application/json" } },
+              { headers: { "Content-Type": "application/json" } }
             )
             .catch((err) => {
               console.error("COR preload failed:", err);
               showSnackbar(
-                err.response?.data?.message || "No COR found for the selected academic term.",
-                "warning",
+                err.response?.data?.message ||
+                "No COR found for the selected academic term.",
+                "warning"
               );
               return null;
             }),
         ]);
 
-        const data = await res.json();
         setCorPreload(preloadRes?.data || null);
 
+        // Match the first function's response handling
+        if (!res.ok) {
+          const errorBody = await res.json().catch(() => null);
+
+          setSelectedStudent(null);
+          setStudentData([]);
+          setStudentDetails([]);
+
+          showSnackbar(
+            errorBody?.message ||
+            "No enrolled-subject summary found. COR can still be generated from student record.",
+            "info"
+          );
+          return;
+        }
+
+        const data = await res.json();
+
+        console.log("Fetched student data:", data);
 
         if (data) {
           setSelectedStudent(data);
           setStudentData(data);
+
           await logCorSearchAudit(data, debouncedStudentNumber);
 
-          const detailsRes = await fetch(`${API_BASE_URL}/api/program_evaluation/details/${debouncedStudentNumber}`);
+          // Same success snackbar as the first function
+          showSnackbar("Student found successfully.", "success");
+
+          const detailsRes = await fetch(
+            `${API_BASE_URL}/api/program_evaluation/details/${debouncedStudentNumber}`
+          );
           const detailsData = await detailsRes.json();
+
           if (Array.isArray(detailsData) && detailsData.length > 0) {
             setStudentDetails(detailsData);
           } else {
@@ -343,11 +370,13 @@ const SearchCertificateOfRegistration = () => {
           setStudentData([]);
           setStudentDetails([]);
           setCorPreload(null);
+
           showSnackbar("No student data found.", "info");
         }
       } catch (err) {
         console.error("Error fetching student", err);
         setCorPreload(null);
+
         showSnackbar("Server error. Please try again.", "error");
       } finally {
         setCorPreloadLoading(false);
@@ -477,25 +506,25 @@ const SearchCertificateOfRegistration = () => {
     );
   }
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
@@ -556,6 +585,38 @@ const SearchCertificateOfRegistration = () => {
 
       <br />
 
+
+
+      <br />
+      <TableContainer component={Paper} sx={{ width: '100%' }}>
+        <Table>
+          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
+            <TableRow>
+              {/* Left cell: Student Number */}
+              <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
+                Student Number:&nbsp;
+                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
+                  {studentData.student_number || "N/A"}
+
+                </span>
+              </TableCell>
+
+              {/* Right cell: Student Name */}
+              <TableCell
+                align="right"
+                sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}
+              >
+                Student Name:&nbsp;
+                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
+                  {studentData && studentData.last_name
+                    ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()} ${studentData.middle_name?.toUpperCase() || ""}`
+                    : "N/A"}
+                </span>
+              </TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </TableContainer>
       <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, mb: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 4, p: 2, flexWrap: "wrap" }}>
           <Box display="flex" alignItems="center" gap={1}>
@@ -606,37 +667,6 @@ const SearchCertificateOfRegistration = () => {
             </FormControl>
           </Box>
         </Box>
-      </TableContainer>
-
-      <br />
-      <TableContainer component={Paper} sx={{ width: '100%' }}>
-        <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
-            <TableRow>
-              {/* Left cell: Student Number */}
-              <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
-                Student Number:&nbsp;
-                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
-                  {studentData.student_number || "N/A"}
-
-                </span>
-              </TableCell>
-
-              {/* Right cell: Student Name */}
-              <TableCell
-                align="right"
-                sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}
-              >
-                Student Name:&nbsp;
-                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
-                  {studentData && studentData.last_name
-                    ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()} ${studentData.middle_name?.toUpperCase() || ""}`
-                    : "N/A"}
-                </span>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-        </Table>
       </TableContainer>
 
       <button

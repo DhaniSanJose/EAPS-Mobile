@@ -7,16 +7,34 @@ import React, {
 } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { Box, TextField, Container, Typography } from "@mui/material";
+import {
+  Box,
+  TextField,
+  MenuItem,
+  Container,
+  Typography,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+} from "@mui/material";
 import FreeTuitionImage from "../assets/FreeTuition.png";
 import EaristLogo from "../assets/EaristLogo.png";
 import "../styles/Print.css";
 import { Search } from "@mui/icons-material";
 import { FcPrint } from "react-icons/fc";
+import { MdOutlinePayment } from "react-icons/md";
+import { IoMdSchool } from "react-icons/io";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
+import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
+import useAuditMac from "../utils/useAuditMac";
+
 const CertificateOfRegistration = forwardRef(
   ({ student_number, onReadyChange }, divToPrintRef) => {
+    useAuditMac();
     const settings = useContext(SettingsContext);
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
@@ -24,14 +42,12 @@ const CertificateOfRegistration = forwardRef(
 
     useEffect(() => {
       if (settings) {
-        // ✅ load dynamic logo
         if (settings.logo_url) {
           setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
         } else {
           setFetchedLogo(EaristLogo);
         }
 
-        // ✅ load dynamic name + address
         if (settings.company_name) setCompanyName(settings.company_name);
         if (settings?.branches) {
           try {
@@ -39,7 +55,7 @@ const CertificateOfRegistration = forwardRef(
               typeof settings.branches === "string"
                 ? JSON.parse(settings.branches)
                 : settings.branches;
-            setBranches(parsed);
+            setBranches(Array.isArray(parsed) ? parsed : []);
           } catch (err) {
             console.error("Failed to parse branches:", err);
             setBranches([]);
@@ -57,6 +73,7 @@ const CertificateOfRegistration = forwardRef(
     const [studentNumber, setStudentNumber] = useState("");
     const effectiveStudentNumber =
       student_number?.trim() || studentNumber?.trim() || "";
+    const hasStudentData = Boolean(effectiveStudentNumber && data?.[0]);
 
     useEffect(() => {
       if (student_number?.trim()) {
@@ -69,71 +86,7 @@ const CertificateOfRegistration = forwardRef(
     const [person, setPerson] = useState({
       profile_img: "",
       campus: "",
-      academicProgram: "",
-      classifiedAs: "",
-      program: "",
-      program2: "",
-      program3: "",
-      yearLevel: "",
-      last_name: "",
-      first_name: "",
-      middle_name: "",
-      extension: "",
-      nickname: "",
-      height: "",
-      weight: "",
-      lrnNumber: "",
-      gender: "",
-      pwdType: "",
-      pwdId: "",
-      birthOfDate: "",
-      age: "",
-      birthPlace: "",
-      languageDialectSpoken: "",
-      citizenship: "",
-      religion: "",
-      civilStatus: "",
-      tribeEthnicGroup: "",
-      cellphoneNumber: "",
-      emailAddress: "",
-      presentStreet: "",
-      presentBarangay: "",
-      presentZipCode: "",
-      presentRegion: "",
-      presentProvince: "",
-      presentMunicipality: "",
-      presentDswdHouseholdNumber: "",
-      permanentStreet: "",
-      permanentBarangay: "",
-      permanentZipCode: "",
-      permanentRegion: "",
-      permanentProvince: "",
-      permanentMunicipality: "",
-      permanentDswdHouseholdNumber: "",
-      father_family_name: "",
-      father_given_name: "",
-      father_middle_name: "",
-      father_ext: "",
-      father_contact: "",
-      father_occupation: "",
-      father_income: "",
-      father_email: "",
-      mother_family_name: "",
-      mother_given_name: "",
-      mother_middle_name: "",
-      mother_contact: "",
-      mother_occupation: "",
-      mother_income: "",
-      guardian: "",
-      guardian_family_name: "",
-      guardian_given_name: "",
-      guardian_middle_name: "",
-      guardian_ext: "",
-      guardian_nickname: "",
-      guardian_address: "",
-      guardian_contact: "",
-      guardian_email: "",
-      generalAverage1: "",
+      // ...(unchanged from your existing file 2/3 `person` initial state)
     });
 
     const [userID, setUserID] = useState("");
@@ -142,24 +95,35 @@ const CertificateOfRegistration = forwardRef(
 
     const [campusAddress, setCampusAddress] = useState("");
 
+    // Needed by handleSaveToUnifast/handleSaveToMatriculation payload (campus_name)
+    const getBranchName = (branchId) => {
+      const matchedBranch = branches.find(
+        (branch) =>
+          String(branch?.id) === String(branchId) ||
+          String(branch?.branch_id) === String(branchId),
+      );
+      return (
+        matchedBranch?.branch ||
+        matchedBranch?.branch_name ||
+        matchedBranch?.name ||
+        ""
+      );
+    };
+
     useEffect(() => {
       if (!settings) return;
-
       const branchId = person?.campus;
       const matchedBranch = branches.find(
         (branch) => String(branch?.id) === String(branchId),
       );
-
       if (matchedBranch?.address) {
         setCampusAddress(matchedBranch.address);
         return;
       }
-
       if (settings.campus_address) {
         setCampusAddress(settings.campus_address);
         return;
       }
-
       setCampusAddress(settings.address || "");
     }, [settings, branches, person?.campus]);
 
@@ -193,23 +157,18 @@ const CertificateOfRegistration = forwardRef(
         try {
           const res = await fetch(`${API_BASE_URL}/api/signature-latest`);
           const data = await res.json();
-
-          if (data.success) {
-            setApprovedBy(data.data);
-          }
+          if (data.success) setApprovedBy(data.data);
         } catch (err) {
           console.error(err);
         }
       };
-
       fetchApprovedBy();
     }, []);
 
-    // ✅ Fetch person data from backend
     const fetchPersonData = async (id) => {
       try {
         const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
-        setPerson(res.data); // make sure backend returns the correct format
+        setPerson(res.data);
         if (res.data?.student_number) {
           setStudentNumber(String(res.data.student_number));
         }
@@ -248,7 +207,6 @@ const CertificateOfRegistration = forwardRef(
       setUser(storedUser);
       setUserRole(storedRole);
 
-      // Allow Applicant, Admin, SuperAdmin to view ECAT
       const allowedRoles = ["registrar", "applicant", "student"];
       if (allowedRoles.includes(storedRole)) {
         const targetId = searchedPersonId || queryPersonId || loggedInPersonId;
@@ -267,7 +225,6 @@ const CertificateOfRegistration = forwardRef(
       try {
         const res = await axios.get(`${API_BASE_URL}/api/user/${person_id}`);
         if (res.data && res.data.profile_img) {
-          console.log(res.data.profile_img);
           setProfilePicture(
             `${API_BASE_URL}/uploads/Student1by1/${res.data.profile_img}`,
           );
@@ -279,16 +236,8 @@ const CertificateOfRegistration = forwardRef(
     };
 
     useEffect(() => {
-      if (personID) {
-        fetchProfilePicture(personID);
-      }
+      if (personID) fetchProfilePicture(personID);
     }, [personID]);
-
-    useEffect(() => {
-      if (personID) {
-        console.log("Fetched Data:", data); // SEE what's actually returned
-      }
-    }, [data]);
 
     const [shortDate, setShortDate] = useState("");
     const [longDate, setLongDate] = useState("");
@@ -296,12 +245,9 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       const updateDates = () => {
         const now = new Date();
-
-        // Format 1: MM/DD/YYYY
         const formattedShort = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}/${now.getFullYear()}`;
         setShortDate(formattedShort);
 
-        // Format 2: MM DD, YYYY hh:mm:ss AM/PM
         const day = String(now.getDate()).padStart(2, "0");
         const month = String(now.getMonth() + 1).padStart(2, "0");
         const year = now.getFullYear();
@@ -309,27 +255,22 @@ const CertificateOfRegistration = forwardRef(
         const minutes = String(now.getMinutes()).padStart(2, "0");
         const seconds = String(now.getSeconds()).padStart(2, "0");
         const ampm = now.getHours() >= 12 ? "PM" : "AM";
-
-        const formattedLong = `${month} ${day}, ${year} ${hours}:${minutes}:${seconds} ${ampm}`;
-        setLongDate(formattedLong);
+        setLongDate(`${month} ${day}, ${year} ${hours}:${minutes}:${seconds} ${ampm}`);
       };
-
-      updateDates(); // Set initial values
-      const interval = setInterval(updateDates, 1000); // Update every second
-
-      return () => clearInterval(interval); // Cleanup on unmount
+      updateDates();
+      const interval = setInterval(updateDates, 1000);
+      return () => clearInterval(interval);
     }, []);
 
     const [courses, setCourses] = useState([]);
     const [enrolled, setEnrolled] = useState([]);
     const [isEnrolledLoaded, setIsEnrolledLoaded] = useState(false);
 
-    const [userId, setUserId] = useState(null); // Dynamic userId
-    const [first_name, setUserFirstName] = useState(null); // Dynamic userId
-    const [middle_name, setUserMiddleName] = useState(null); // Dynamic userId
-
-    const [last_name, setUserLastName] = useState(null); // Dynamic userId
-    const [currId, setCurr] = useState(null); // Dynamic userId
+    const [userId, setUserId] = useState(null);
+    const [first_name, setUserFirstName] = useState(null);
+    const [middle_name, setUserMiddleName] = useState(null);
+    const [last_name, setUserLastName] = useState(null);
+    const [currId, setCurr] = useState(null);
     const [courseCode, setCourseCode] = useState("");
     const [courseDescription, setCourseDescription] = useState("");
 
@@ -343,28 +284,23 @@ const CertificateOfRegistration = forwardRef(
     const [subjectCounts, setSubjectCounts] = useState({});
     const [year_Level_Description, setYearLevelDescription] = useState(null);
     const [major, setMajor] = useState(null);
+    // NEW: needed for isFirstYear check used by fee logic below
+    const [yearlevel, setYearLevelId] = useState("");
 
     useEffect(() => {
-      if (selectedSection) {
-        fetchSubjectCounts(selectedSection);
-      }
+      if (selectedSection) fetchSubjectCounts(selectedSection);
     }, [selectedSection]);
 
     const fetchSubjectCounts = async (sectionId) => {
       try {
         const response = await axios.get(
           `${API_BASE_URL}/api/subject-enrollment-count`,
-          {
-            params: { sectionId },
-          },
+          { params: { sectionId } },
         );
-
-        // Transform into object for easy lookup: { subject_id: enrolled_count }
         const counts = {};
         response.data.forEach((item) => {
           counts[item.subject_id] = item.enrolled_count;
         });
-
         setSubjectCounts(counts);
       } catch (err) {
         console.error("Failed to fetch subject counts", err);
@@ -408,42 +344,27 @@ const CertificateOfRegistration = forwardRef(
           ),
         );
       }
-    }, [
-      onReadyChange,
-      effectiveStudentNumber,
-      data,
-      userId,
-      currId,
-      isEnrolledLoaded,
-    ]);
+    }, [onReadyChange, effectiveStudentNumber, data, userId, currId, isEnrolledLoaded]);
 
-    // Fetch department sections when component mounts
     useEffect(() => {
       fetchDepartmentSections();
     }, []);
 
-    // Fetch sections whenever selectedDepartment changes
     useEffect(() => {
-      if (selectedDepartment) {
-        fetchDepartmentSections();
-      }
+      if (selectedDepartment) fetchDepartmentSections();
     }, [selectedDepartment]);
 
-    // Fetch department sections based on selected department
     const fetchDepartmentSections = async () => {
       try {
         setLoading(true);
         const response = await axios.get(
           `${API_BASE_URL}/api/department-sections`,
-          {
-            params: { departmentId: selectedDepartment },
-          },
+          { params: { departmentId: selectedDepartment } },
         );
-        // Artificial delay
         setTimeout(() => {
           setSections(response.data);
           setLoading(false);
-        }, 700); // 3 seconds delay
+        }, 700);
       } catch (err) {
         console.error("Error fetching department sections:", err);
         setError("Failed to load department sections");
@@ -463,19 +384,33 @@ const CertificateOfRegistration = forwardRef(
     const [isPaymentStatusLoaded, setIsPaymentStatusLoaded] = useState(false);
     const [selectedPaymentData, setSelectedPaymentData] = useState(null);
 
+    // NEW: fee totals + flags used by the fee table / Save handlers (mirrors file 1)
+    const [totalLecFees, setTotalLecFees] = useState(0);
+    const [totalLabFees, setTotalLabFees] = useState(0);
+    const [isHaveNSTP, setIsHaveNSTP] = useState(0);
+    const [isHaveComputerFees, setIsHaveComputerFees] = useState(0);
+    const [isHaveLaboratory, setIsHaveLaboratory] = useState(0);
+
     useEffect(() => {
-      if (!effectiveStudentNumber) return; // don't run if empty
+      if (!effectiveStudentNumber) return;
 
       const fetchStudent = async () => {
         try {
-          // 1. Authenticate and tag student
           const response = await axios.post(
             `${API_BASE_URL}/api/student-tagging`,
             { studentNumber: effectiveStudentNumber },
-            {
-              headers: { "Content-Type": "application/json" },
-            },
+            { headers: { "Content-Type": "application/json" } },
           );
+
+          // TODO: confirm your /api/student-tagging response actually
+          // includes these fee/flag fields (file 1 gets them from the
+          // /api/student-tagging/dprtmnt endpoint instead). Adjust field
+          // names below to match your backend if different.
+          setTotalLecFees(Number(response.data.totalLecFee || 0));
+          setTotalLabFees(Number(response.data.totalLabFee || 0));
+          setIsHaveNSTP(Number(response.data.totalNstpCount || 0));
+          setIsHaveComputerFees(Number(response.data.totalComputerLab || 0));
+          setIsHaveLaboratory(Number(response.data.totalLaboratory || 0));
 
           const {
             token2,
@@ -496,9 +431,6 @@ const CertificateOfRegistration = forwardRef(
             lastName: last_name,
           } = response.data;
 
-          console.log(course_unit);
-
-          // Save to localStorage
           localStorage.setItem("token2", token2);
           localStorage.setItem("person_id2", person_id2);
           localStorage.setItem("studentNumber", studentNum);
@@ -516,7 +448,6 @@ const CertificateOfRegistration = forwardRef(
           localStorage.setItem("yearLevelDescription", yearLevelDescription);
           localStorage.setItem("yearDesc", yearDesc);
 
-          // Update state variables
           setUserId(studentNum);
           setUserFirstName(first_name);
           setUserMiddleName(middle_name);
@@ -530,12 +461,13 @@ const CertificateOfRegistration = forwardRef(
           setLabUnit(lab_unit);
           setPersonID(person_id2);
           setYearLevelDescription(yearLevelDescription);
+          setYearLevelId(yearLevel); // NEW
           setYearDescription(yearDesc);
-
-          console.log(yearLevelDescription);
 
           const fullData = {
             ...(response.data.corData || {}),
+            branch_id: person?.campus || "", // NEW, needed by requestedData
+            campus: person?.campus || "", // NEW
             student_number: studentNum,
             first_name,
             middle_name,
@@ -569,13 +501,10 @@ const CertificateOfRegistration = forwardRef(
               response.data.corData?.emailAddress ??
               "",
           };
-          setData([fullData]); // Wrap in array for data[0] compatibility
+          setData([fullData]);
 
           setGender(fullData.gender ?? null);
           setAge(fullData.age ?? null);
-          console.log(age);
-          console.log(major);
-          console.log("person.program:", data[0]?.program);
           setEmail(fullData.email || fullData.emailAddress || null);
           setProgram(active_curriculum);
         } catch (error) {
@@ -584,7 +513,7 @@ const CertificateOfRegistration = forwardRef(
       };
 
       fetchStudent();
-    }, [effectiveStudentNumber]); // 🔑 runs automatically when prop changes
+    }, [effectiveStudentNumber]);
 
     useEffect(() => {
       if (!effectiveStudentNumber) {
@@ -624,12 +553,10 @@ const CertificateOfRegistration = forwardRef(
         setSelectedPaymentData(null);
         return;
       }
-
       if (!savedUnifast && !savedMatriculation) {
         setSelectedPaymentData(null);
         return;
       }
-
       const endpoint = savedUnifast
         ? "/get_student_data_unifast"
         : "/get_student_data_matriculation";
@@ -638,7 +565,6 @@ const CertificateOfRegistration = forwardRef(
         try {
           const res = await axios.get(`${API_BASE_URL}/api${endpoint}`);
           const rows = Array.isArray(res.data) ? res.data : [];
-
           const matched = rows
             .filter(
               (item) =>
@@ -646,7 +572,6 @@ const CertificateOfRegistration = forwardRef(
                 Number(item?.status) === 1,
             )
             .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
-
           setSelectedPaymentData(matched[0] || null);
         } catch (error) {
           console.error("Failed to fetch payment data:", error);
@@ -655,12 +580,7 @@ const CertificateOfRegistration = forwardRef(
       };
 
       fetchPaymentData();
-    }, [
-      effectiveStudentNumber,
-      savedUnifast,
-      savedMatriculation,
-      isPaymentStatusLoaded,
-    ]);
+    }, [effectiveStudentNumber, savedUnifast, savedMatriculation, isPaymentStatusLoaded]);
 
     const formatFee = (value) => {
       const numeric = Number(value);
@@ -681,7 +601,6 @@ const CertificateOfRegistration = forwardRef(
         : "";
     const showFreeTuitionStamp = Boolean(effectiveStudentNumber);
 
-    // Fetch all departments when component mounts
     useEffect(() => {
       const fetchDepartments = async () => {
         try {
@@ -691,33 +610,53 @@ const CertificateOfRegistration = forwardRef(
           console.error("Error fetching departments:", err);
         }
       };
-
       fetchDepartments();
+    }, []);
+
+    // ===== NEW: pulled from file 1 (tosf / scholarship / active school year) =====
+    const [tosf, setTosfData] = useState([]);
+    const [scholarshipTypes, setScholarshipTypes] = useState([]);
+    const [activeSchoolYear, setActiveSchoolYear] = useState([]);
+
+    const fetchTosf = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/tosf`);
+        setTosfData(res.data);
+      } catch (error) {
+        console.error("Error fetching tosf data:", error);
+      }
+    };
+
+    const fetchScholarship = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/scholarship_types`);
+        const activeTypes = Array.isArray(res.data)
+          ? res.data.filter((item) => Number(item.scholarship_status) === 1)
+          : [];
+        setScholarshipTypes(activeTypes);
+      } catch (error) {
+        console.error("Error fetching scholarship types:", error);
+      }
+    };
+
+    useEffect(() => {
+      fetchTosf();
+    }, []);
+
+    useEffect(() => {
+      fetchScholarship();
+    }, []);
+
+    useEffect(() => {
+      axios
+        .get(`${API_BASE_URL}/api/get_active_school_years`)
+        .then((res) => setActiveSchoolYear(res.data))
+        .catch((err) => console.error(err));
     }, []);
 
     const toWholeUnit = (value) => {
       const num = Number(value);
       return Number.isFinite(num) ? Math.round(num) : 0;
-    };
-    // Keep subject cells transform-free so html2canvas / PDF capture stays vertically centered
-    const subjectCellContentStyle = {
-      width: "100%",
-      height: "26px",
-      lineHeight: "26px",
-      border: "none",
-      background: "none",
-      padding: "0 3px",
-      margin: 0,
-      boxSizing: "border-box",
-      verticalAlign: "middle",
-      display: "block",
-    };
-    const subjectCellTdStyle = {
-      borderRight: "1px solid black",
-      borderBottom: "1px solid black",
-      verticalAlign: "middle",
-      height: "28px",
-      padding: 0,
     };
 
     const totalCourseUnits = enrolled.reduce(
@@ -729,76 +668,365 @@ const CertificateOfRegistration = forwardRef(
       0,
     );
     const totalCombined = totalCourseUnits + totalLabUnits;
-    const corAssessedFeeRows = [
-      {
-        label: `Tuition (${totalCombined || 0} unit(s))`,
-        value: selectedPaymentData?.tuition_fees,
-      },
-      { label: "Athletic Fee", value: selectedPaymentData?.athletic_fees },
-      { label: "Cultural Fee", value: selectedPaymentData?.cultural_fees },
-      {
-        label: "Development Fee",
-        value: selectedPaymentData?.development_fees,
-      },
-      { label: "Guidance Fee", value: selectedPaymentData?.guidance_fees },
-      { label: "Library Fee", value: selectedPaymentData?.library_fees },
-      {
-        label: "Medical and Dental Fee",
-        value: selectedPaymentData?.medical_and_dental_fees,
-      },
-      {
-        label: "Registration Fee",
-        value: selectedPaymentData?.registration_fees,
-      },
-      { label: "Computer Fee", value: selectedPaymentData?.computer_fees },
-    ];
-    const corAssessmentRows = [
-      { label: "Total Assessment", value: selectedPaymentData?.total_tosf },
-      { label: "Less Financial Aid", value: "" },
-      { label: "Net Assessed", value: "" },
-      { label: "Credit Memo", value: "" },
-      { label: "Total Discount", value: "" },
-      { label: "Total Payment", value: "" },
-      { label: "Outstanding Balance", value: "" },
-    ];
-    const corRefundRules = [
-      "1. Full refund of tuition fee - Before the start of classes.",
-      "2. 80% refund of tuition fee - within 1 week from the start of classes.",
-      "3. 50% refund - within 2 weeks from the start of classes.",
-      "4. No refund - after the 2nd week of classes.",
-    ];
-    const formatGender = (value) => {
-      if (value === null || value === undefined || value === "") return "";
-      if (Number(value) === 0) return "Male";
-      if (Number(value) === 1) return "Female";
-      return value || "";
-    };
+
+    const isFirstYear = Number(yearlevel) === 1;
+    const isFirstSemester = Number(activeSchoolYear[0]?.semester_id) === 1;
+    const isFirstYearFirstSem = isFirstYear && isFirstSemester;
 
     const [curriculumOptions, setCurriculumOptions] = useState([]);
 
     useEffect(() => {
       const fetchCurriculums = async () => {
         try {
-          const response = await axios.get(
-            `${API_BASE_URL}/api/applied_program`,
-          );
+          const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
           setCurriculumOptions(response.data);
         } catch (error) {
           console.error("Error fetching curriculum options:", error);
         }
       };
-
       fetchCurriculums();
     }, []);
 
-    {
-      curriculumOptions.find(
-        (item) =>
-          item?.curriculum_id?.toString() ===
-          (person?.program ?? "").toString(),
-      )?.program_description ||
-        (person?.program ?? "");
-    }
+    // ===== NEW: requestedData + payment save logic (mirrors file 1) =====
+    const [requestedData, setRequestedData] = useState({
+      campus_name: "",
+      branch_id: "",
+      student_number: "",
+      learner_reference_number: "",
+      last_name: "",
+      given_name: "",
+      middle_initial: "",
+      degree_program: "",
+      year_level: "",
+      sex: "",
+      email_address: "",
+      phone_number: "",
+      laboratory_units: 0,
+      computer_units: 0,
+      academic_units_enrolled: 0,
+      academic_units_nstp_enrolled: 0,
+      tuition_fees: 0,
+      nstp_fees: 0,
+      athletic_fees: 0,
+      computer_fees: 0,
+      cultural_fees: 0,
+      development_fees: 0,
+      guidance_fees: 0,
+      laboratory_fees: 0,
+      library_fees: 0,
+      medical_and_dental_fees: 0,
+      registration_fees: 0,
+      school_id_fees: 0,
+      total_tosf: 0,
+      remark: "",
+      active_school_year_id: 1,
+    });
+
+    useEffect(() => {
+      if (
+        !data[0]?.student_number ||
+        !tosf[0] ||
+        !activeSchoolYear[0] ||
+        totalLabFees == null ||
+        totalLecFees == null ||
+        yearlevel === "" ||
+        yearlevel == null
+      ) {
+        return;
+      }
+
+      const middleInitial = data[0]?.middle_name?.[0] || "";
+      const branchId = person?.campus || "";
+      const campusName = getBranchName(branchId);
+      const genderLabel = String(data[0]?.gender) === "1" ? "Female" : "Male";
+      const baseTotalSum = totalLecFees + totalLabFees;
+      const totalSum = isFirstYear
+        ? baseTotalSum - tosf[0]?.nstp_fees
+        : baseTotalSum;
+      const schoolIdFee = isFirstYearFirstSem
+        ? Number(tosf[0]?.school_id_fees || 0)
+        : 0;
+      const totalTotalTOSF =
+        totalSum +
+        Number(tosf[0]?.cultural_fee || 0) +
+        Number(tosf[0]?.athletic_fee || 0) +
+        (isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0) +
+        Number(tosf[0]?.developmental_fee || 0) +
+        Number(tosf[0]?.guidance_fee || 0) +
+        Number(tosf[0]?.library_fee || 0) +
+        Number(tosf[0]?.medical_and_dental_fee || 0) +
+        Number(tosf[0]?.registration_fee || 0) +
+        schoolIdFee +
+        (isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0) +
+        (isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0);
+
+      setRequestedData({
+        campus_name: campusName,
+        branch_id: branchId,
+        student_number: data[0]?.student_number,
+        learner_reference_number: data[0]?.lrnNumber,
+        last_name: data[0]?.last_name,
+        given_name: data[0]?.first_name,
+        middle_initial: middleInitial,
+        degree_program: data[0]?.program,
+        year_level: year_Level_Description,
+        sex: genderLabel,
+        email_address: data[0]?.email,
+        phone_number: data[0]?.cellphoneNumber,
+        laboratory_units: totalLabUnits,
+        computer_units: 3, // ONGOING
+        academic_units_enrolled: totalCombined,
+        academic_units_nstp_enrolled: 3,
+        tuition_fees: totalSum,
+        nstp_fees: isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0,
+        athletic_fees: tosf[0]?.athletic_fee || 0,
+        computer_fees:
+          isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0,
+        cultural_fees: tosf[0]?.cultural_fee || 0,
+        development_fees: tosf[0]?.developmental_fee || 0,
+        guidance_fees: tosf[0]?.guidance_fee || 0,
+        laboratory_fees:
+          isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0,
+        library_fees: tosf[0]?.library_fee || 0,
+        medical_and_dental_fees: tosf[0]?.medical_and_dental_fee || 0,
+        registration_fees: tosf[0]?.registration_fee,
+        school_id_fees: schoolIdFee,
+        total_tosf: totalTotalTOSF,
+        remark: "",
+        active_school_year_id: activeSchoolYear[0]?.id || null,
+      });
+    }, [
+      data,
+      tosf,
+      enrolled,
+      totalLabFees,
+      totalLecFees,
+      branches,
+      person?.campus,
+      activeSchoolYear,
+      isHaveNSTP,
+      isHaveComputerFees,
+      isHaveLaboratory,
+      year_Level_Description,
+      yearlevel,
+    ]);
+
+    const toNumber = (value) => {
+      if (typeof value === "string") {
+        const cleaned = value.replace(/[^0-9.-]/g, "");
+        const parsedFromString = Number(cleaned);
+        return Number.isFinite(parsedFromString) ? parsedFromString : 0;
+      }
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const toDecimalPercent = (value) => {
+      const numeric = toNumber(value);
+      if (numeric <= 0) return 0;
+      return numeric > 1 ? numeric / 100 : numeric;
+    };
+
+    const round2 = (value) =>
+      Math.round((toNumber(value) + Number.EPSILON) * 100) / 100;
+
+    const applyScholarshipToMatriculationFees = (baseData, scholarship) => {
+      if (!scholarship) {
+        return { payload: { ...baseData, scholarship_id: null }, computed: null };
+      }
+
+      const tuitionFee = toNumber(baseData.tuition_fees);
+      const nstpFee = toNumber(baseData.nstp_fees);
+
+      const miscKeys = [
+        "cultural_fees",
+        "athletic_fees",
+        "development_fees",
+        "guidance_fees",
+        "library_fees",
+        "medical_and_dental_fees",
+        "registration_fees",
+        "school_id_fees",
+        "computer_fees",
+        "laboratory_fees",
+      ];
+
+      const miscTotal = miscKeys.reduce((sum, key) => sum + toNumber(baseData[key]), 0);
+
+      const afd = toNumber(scholarship.afd);
+      const hasAfdOverride = afd > 0;
+
+      const tfdDec = toDecimalPercent(scholarship.tfd);
+      const mfdDec = toDecimalPercent(scholarship.mfd);
+      const nfdDec = toDecimalPercent(scholarship.nfd);
+
+      let finalTuitionFee = tuitionFee;
+      let finalMiscTotal = miscTotal;
+      let finalNstpFee = nstpFee;
+
+      if (!hasAfdOverride) {
+        finalTuitionFee = tuitionFee - tuitionFee * tfdDec;
+        finalMiscTotal = miscTotal - miscTotal * mfdDec;
+        finalNstpFee = nstpFee - nstpFee * nfdDec;
+      }
+
+      finalTuitionFee = round2(finalTuitionFee);
+      finalMiscTotal = round2(finalMiscTotal);
+      finalNstpFee = round2(finalNstpFee);
+
+      const miscScale = miscTotal > 0 ? finalMiscTotal / miscTotal : 0;
+      const scaledMiscEntries = miscKeys.map((key) => ({
+        key,
+        value: round2(toNumber(baseData[key]) * miscScale),
+      }));
+
+      if (scaledMiscEntries.length > 0) {
+        const scaledMiscSum = scaledMiscEntries.reduce((sum, item) => sum + item.value, 0);
+        const delta = round2(finalMiscTotal - scaledMiscSum);
+        scaledMiscEntries[scaledMiscEntries.length - 1].value = round2(
+          scaledMiscEntries[scaledMiscEntries.length - 1].value + delta,
+        );
+      }
+
+      const scaledMiscMap = scaledMiscEntries.reduce((acc, item) => {
+        acc[item.key] = item.value;
+        return acc;
+      }, {});
+
+      const totalTosf = round2(finalTuitionFee + finalNstpFee + finalMiscTotal);
+
+      return {
+        payload: {
+          ...baseData,
+          ...scaledMiscMap,
+          tuition_fees: finalTuitionFee,
+          nstp_fees: finalNstpFee,
+          registration_fees: scaledMiscMap.registration_fees ?? 0,
+          total_tosf: totalTosf,
+          total_misc: finalMiscTotal,
+          scholarship_id: scholarship.id ? Number(scholarship.id) : null,
+        },
+        computed: {
+          scholarship_name: scholarship.scholarship_name || "",
+          tfd: scholarship.tfd ?? 0,
+          mfd: scholarship.mfd ?? 0,
+          nfd: scholarship.nfd ?? 0,
+          afd: scholarship.afd ?? 0,
+          miscTotal,
+          finalMiscTotal,
+          finalTuitionFee,
+          finalNstpFee,
+        },
+      };
+    };
+
+    const insertPaymentAuditLog = async (paymentTarget) => {
+      try {
+        await postAuditEvent("payment_saved", {
+          student_number: requestedData.student_number,
+          payment_target: paymentTarget,
+        });
+      } catch (err) {
+        console.error("Error inserting audit log");
+      }
+    };
+
+    const handleSaveToUnifast = async () => {
+      try {
+        const res = await axios.post(
+          `${API_BASE_URL}/api/save_to_unifast`,
+          { ...requestedData, status: 1 },
+          { headers: getAuditHeaders() },
+        );
+        if (res.data.success) {
+          setSavedUnifast(true);
+          await insertPaymentAuditLog("UniFAST");
+        } else {
+          console.error(res.data.message || "Failed to save data");
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const handleSaveToMatriculation = async () => {
+      try {
+        if (!selectedScholarshipId) {
+          console.error("Please select a scholarship type.");
+          return false;
+        }
+        const scholarship = scholarshipTypes.find(
+          (item) => Number(item.id) === Number(selectedScholarshipId),
+        );
+        if (!scholarship) {
+          console.error("Selected scholarship type not found.");
+          return false;
+        }
+        const { payload } = applyScholarshipToMatriculationFees(
+          { ...requestedData, status: 1 },
+          scholarship,
+        );
+        const res = await axios.post(
+          `${API_BASE_URL}/api/save_to_matriculation`,
+          { ...payload },
+          { headers: getAuditHeaders() },
+        );
+        if (res.data.success) {
+          setSavedMatriculation(true);
+          await insertPaymentAuditLog("Matriculation");
+          return true;
+        } else {
+          console.error(res.data.message || "Failed to save data");
+          return false;
+        }
+      } catch (error) {
+        console.error(error);
+        return false;
+      }
+    };
+
+    // ===== NEW: dialog/modal state + handlers used by the JSX buttons =====
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmTarget, setConfirmTarget] = useState(null);
+    const [scholarshipModalOpen, setScholarshipModalOpen] = useState(false);
+    const [selectedScholarshipId, setSelectedScholarshipId] = useState("");
+
+    const openConfirm = (target) => {
+      setConfirmTarget(target);
+      setConfirmOpen(true);
+    };
+
+    const closeConfirm = () => {
+      setConfirmOpen(false);
+    };
+
+    const openScholarshipModal = () => {
+      setScholarshipModalOpen(true);
+    };
+
+    const closeScholarshipModal = () => {
+      setScholarshipModalOpen(false);
+    };
+
+    const handleConfirmScholarshipModal = async () => {
+      const saved = await handleSaveToMatriculation();
+      if (saved) setScholarshipModalOpen(false);
+    };
+
+    const handleConfirmSave = async () => {
+      const target = confirmTarget;
+      setConfirmOpen(false);
+      if (target === "unifast") {
+        await handleSaveToUnifast();
+      }
+    };
+
+    const isAnySaved = savedUnifast || savedMatriculation;
+    const unifastLabel = savedUnifast ? "Saved To Unifast" : "Save to Unifast";
+    const matriculationLabel = savedMatriculation
+      ? "Saved To Matriculation"
+      : "Save Matriculation";
+    // ===== end NEW =====
 
     // 🔒 Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -820,460 +1048,174 @@ const CertificateOfRegistration = forwardRef(
       }
     });
 
-
     return (
-      <Container
-        maxWidth={false}
-        disableGutters
-        className="mb-[4rem]"
-        sx={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          px: 2,
-          py: 4,
-        }}
-      >
+      <Container className="mb-[4rem]">
+        {/* SAVE TO UNIFAST BUTTON */}
+        <Box sx={{ position: "relative" }}>
+          <button
+            onClick={() => openConfirm("unifast")}
+            disabled={isAnySaved}
+            style={{
+              marginBottom: "2rem",
+              padding: "10px 20px",
+              border: "2px solid black",
+              backgroundColor: "#f0f0f0",
+              color: "black",
+              borderRadius: "5px",
+              marginTop: "20px",
+              cursor: isAnySaved ? "not-allowed" : "pointer",
+              fontSize: "16px",
+              fontWeight: "bold",
+              position: "absolute",
+              zIndex: 1000,
+              right: "12%",
+              top: "-3rem",
+              opacity: isAnySaved ? 0.6 : 1,
+              transition: "background-color 0.3s, transform 0.2s",
+            }}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
+            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
+            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <MdOutlinePayment size={20} />
+              {unifastLabel}
+            </span>
+          </button>
+
+          {/* SAVE TO MATRICULATION BUTTON */}
+          <button
+            onClick={openScholarshipModal}
+            disabled={isAnySaved}
+            style={{
+              marginBottom: "1rem",
+              padding: "10px 20px",
+              border: "2px solid black",
+              backgroundColor: "#f0f0f0",
+              color: "black",
+              borderRadius: "5px",
+              marginTop: "20px",
+              cursor: isAnySaved ? "not-allowed" : "pointer",
+              zIndex: 1000,
+              position: "absolute",
+              right: "-10%",
+              top: "-3rem",
+              fontSize: "16px",
+              fontWeight: "bold",
+              opacity: isAnySaved ? 0.6 : 1,
+              transition: "background-color 0.3s, transform 0.2s",
+            }}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
+            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
+            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
+            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <IoMdSchool size={20} />
+              {matriculationLabel}
+            </span>
+          </button>
+        </Box>
+
+        <Dialog open={confirmOpen} onClose={closeConfirm}>
+          <DialogTitle>Confirm Save</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to save this payment to{" "}
+              {confirmTarget === "unifast" ? "Unifast" : "Matriculation"}?
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              color="error"
+              variant="outlined"
+
+              onClick={closeConfirm}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmSave} variant="contained">
+              Confirm
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={scholarshipModalOpen}
+          onClose={closeScholarshipModal}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>Select Scholarship Type</DialogTitle>
+          <DialogContent>
+            <TextField
+              select
+              fullWidth
+              label="Scholarship Type"
+              value={selectedScholarshipId}
+              onChange={(e) => setSelectedScholarshipId(e.target.value)}
+              sx={{ mt: 1 }}
+            >
+              {scholarshipTypes.map((item) => (
+                <MenuItem key={item.id} value={item.id}>
+                  {item.scholarship_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              color="error"
+              variant="outlined"
+              onClick={closeScholarshipModal}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmScholarshipModal} variant="contained">
+              Save to Matriculation
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <div className="flex-container">
           <div className="section">
             <Box></Box>
 
             <div ref={divToPrintRef} className="certificate-wrapper">
               {/* Watermark across the page */}
-              <div className="certificate-watermark">STUDENT COPY</div>
 
-              <style>{`
-    .certificate-wrapper {
-      position: relative;
-      width: 210mm;
-      min-height: 297mm;
-      margin: 0 auto;
-      background: white;
-      overflow: visible;
-    }
-
-    .certificate-watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-   
-      transform: translate(-50%, -50%) rotate(-45deg); /* diagonal */
-      font-size: 7rem; /* adjust to fit your page */
-      font-weight: 900;
-      color: rgba(0, 0, 0, 0.08); /* light grey, adjust opacity */
-      text-transform: uppercase;
-      white-space: nowrap;
-      pointer-events: none;
-      user-select: none;
-      z-index: 9999;
-    }
-
-    @media print {
-      @page {
-        size: A4;
-        margin: 0;
-      }
-
-      .certificate-wrapper {
-        width: 210mm;
-        min-height: 297mm;
-      }
-
-      .certificate-watermark {
-        color: rgba(0, 0, 0, 0.15); /* a bit darker so it prints */
-      }
-      button {
-        display: none;
-      }
-    }
-
-    .cor-fees-start input,
-    .cor-fees-start ~ tr input,
-    .cor-fees-start td > i,
-    .cor-fees-start ~ tr td > i {
-      transform: translateY(-10px);
-      display: inline-block;
-    }
-
-    .cor-student-info-row input,
-    .cor-student-info-row td > b {
-      transform: translateY(-5px);
-      display: inline-block;
-    }
-
-    .cor-subject-header-row td > div {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      margin: 0;
-      transform: none;
-    }
-
-    .cor-subject-subheader-row .cor-content-offset,
-    .cor-subject-total-row .cor-content-offset {
-      display: inline-block;
-      transform: none;
-      line-height: 1.2;
-      vertical-align: middle;
-    }
-
-    .cor-subject-data-row td {
-      vertical-align: middle !important;
-    }
-
-    .cor-subject-data-row input {
-      transform: none !important;
-    }
-
-    .cor-lower-extra input,
-    .cor-lower-extra img,
-    .cor-lower-extra i {
-      transform: translateY(-10px);
-      display: inline-block;
-    }
-
-    .cor-student-general-info .cor-student-info-row input {
-      transform: translateY(-10px);
-    }
-
-    .cor-student-general-info .cor-shift-left-label {
-      transform: translate(-16px, -10px);
-    }
-
-    .cor-student-general-info .cor-left-value-wide {
-      width: calc(98% + 35px) !important;
-    }
-
-    .cor-student-general-info .cor-content-offset {
-      white-space: nowrap;
-    }
-
-    .cor-fees-start,
-    .cor-fees-start ~ tr {
-      display: none;
-    }
-
-    .cor-fees-div-row td {
-      padding: 0;
-      border-right: 1px solid black;
-    }
-
-    .cor-fees-div-layout {
-      display: grid;
-      grid-template-columns: 20fr 22fr;
-      width: 100%;
-      min-height: 4.05in;
-      font-family: Arial;
-      color: black;
-      transform: translateY(-5px);
-    }
-
-    .cor-fees-left {
-      text-align: left;
-    }
-
-    .cor-fees-title {
-      height: 0.18in;
-      line-height: 0.18in;
-      background: gray;
-      border-top: 1px solid black;
-      border-left: 1px solid black;
-      border-right: 1px solid black;
-      font-size: 10px;
-      font-weight: bold;
-      letter-spacing: 4px;
-      text-align: center;
-      position: relative;
-      box-sizing: border-box;
-    }
-
-    .cor-assessed-title {
-      width: 100%;
-      border-bottom: 1px solid black;
-    }
-
-    .cor-schedule-title,
-    .cor-payment-grid {
-      margin-left: -4px;
-      margin-right: -8px;
-      width: auto;
-      box-sizing: border-box;
-    }
-
-    .cor-schedule-title {
-      margin-left: -4px;
-      margin-right: -8px;
-      margin-top: 8px;
-      width: auto;
-    }
-
-    .cor-schedule-title::before {
-      content: "";
-      position: absolute;
-      top: -8px;
-      left: -1px;
-      right: -1px;
-      height: 8px;
-      border-left: 1px solid black;
-      border-right: 1px solid black;
-      box-sizing: border-box;
-    }
-
-    .cor-fees-title span {
-      position: absolute;
-      top: 40%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .cor-fees-body {
-      padding: 0 8px 0 4px;
-      text-align: left;
-    }
-
-    .cor-assessment-content {
-      margin-left: -4px;
-      margin-right: -8px;
-      padding: 4px 8px 0 4px;
-      border-left: 1px solid black;
-      border-right: 1px solid black;
-    }
-
-    .cor-fee-line,
-    .cor-assessment-line {
-      display: grid;
-      grid-template-columns: 1fr 72px;
-      align-items: center;
-      min-height: 15px;
-      font-size: 12px;
-      font-weight: bold;
-      line-height: 1;
-      width: 100%;
-    }
-
-    .cor-fee-line span:first-child,
-    .cor-assessment-line span:first-child {
-      text-align: left;
-    }
-
-    .cor-fee-line span:last-child,
-    .cor-assessment-line span:last-child {
-      text-align: right;
-    }
-
-    .cor-assessment-list {
-      margin-top: 14px;
-      padding-left: 54px;
-    }
-
-    .cor-payment-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border-top: 1px solid black;
-      border-bottom: 1px solid black;
-      border-left: 1px solid black;
-      border-right: 1px solid black;
-      font-size: 12px;
-      font-weight: bold;
-      text-align: center;
-    }
-
-    .cor-payment-cell {
-      min-height: 16px;
-      border-right: 1px solid black;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-
-    .cor-payment-cell:nth-child(3n) {
-      border-right: 0;
-    }
-
-    .cor-payment-cell span {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .cor-payment-value {
-      min-height: 16px;
-      border-top: 1px solid black;
-      position: relative;
-    }
-
-    .cor-payment-value span {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    .cor-payment-footer {
-      display: grid;
-      grid-template-columns: 172px 1fr;
-      row-gap: 1px;
-      column-gap: 8px;
-      margin-left: -4px;
-      margin-right: -8px;
-      padding-top: 2px;
-      box-sizing: border-box;
-      font-size: 11px;
-      font-weight: bold;
-      align-items: end;
-    }
-
-    .cor-payment-label {
-      display: flex;
-      align-items: center;
-      min-height: 22px;
-      white-space: nowrap;
-    }
-
-    .cor-fee-stamp-row {
-      display: none;
-    }
-
-    .cor-line-value {
-      border-bottom: 1px solid black;
-      text-align: center;
-      min-height: 22px;
-    }
-
-    .cor-fees-right {
-      padding: 12px 12px 0;
-      text-align: center;
-      font-size: 10px;
-      font-weight: bold;
-    }
-
-    .cor-refund-title,
-    .cor-pledge-title {
-      font-weight: bold;
-      text-align: center;
-      font-size: 10px;
-      line-height: 1.1;
-    }
-
-    .cor-refund-list {
-      margin: 4px auto 12px;
-      width: 92%;
-      text-align: left;
-      font-size: 9px;
-      font-style: italic;
-      line-height: 1.35;
-    }
-
-    .cor-pledge-copy {
-      width: 90%;
-      margin: 4px auto 0;
-      font-size: 9px;
-      font-style: italic;
-      line-height: 1.25;
-    }
-
-    .cor-student-signature {
-      width: 68%;
-      margin: 44px auto 0;
-      border-top: 1px solid black;
-      padding-top: 2px;
-      line-height: 12px;
-    }
-
-    .cor-approval-row {
-      position: relative;
-      margin-top: 38px;
-    }
-
-    .cor-approved-block {
-      position: absolute;
-      left: 21px;
-      top: 31px;
-      line-height: 12px;
-      text-align: left;
-      white-space: nowrap;
-    }
-
-    .cor-registrar-signature {
-      width: 76%;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    .cor-registrar-signature-slot {
-      height: 31px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-    }
-
-    .cor-registrar-signature-image {
-      height: 38px;
-      object-fit: contain;
-      width: 150px;
-      display: block;
-      margin-bottom: -6px;
-    }
-
-    .cor-registrar-line {
-      width: 94%;
-      margin: 4px auto 0;
-      border-top: 1px solid black;
-      height: 0;
-    }
-
-    .cor-registrar-name {
-      height: 12px;
-      line-height: 12px;
-      font-weight: bold;
-    }
-
-    .cor-registrar-role {
-      margin-top: 1px;
-      line-height: 11px;
-    }
-
-    .cor-lower-extra {
-      margin-top: -8px !important;
-    }
-
-    .cor-lower-extra-stamp-row {
-      height: 1.9in;
-      vertical-align: bottom;
-    }
-
-    .cor-free-tuition-cell {
-      vertical-align: bottom;
-    }
-
-    .cor-free-tuition-stamp {
-      width: 345px;
-      height: 200px;
-      object-fit: contain;
-      display: block;
-      margin: 0 0 4px 10px;
-    }
-
-    .cor-qr-code-img {
-      width: 125px;
-      height: 125px;
-      object-fit: contain;
-      display: block;
-      margin-left: auto;
-      margin-right: 28px;
-    }
-
-    .cor-footer-time {
-      height: 0.2in;
-      font-size: 14px;
-      text-align: right;
-      vertical-align: bottom;
-    }
-  `}</style>
+              <style>
+                {`
+                 .certificate-wrapper {
+                   position: relative;
+                 }
+ 
+                 .certificate-watermark {
+                   position: absolute;
+                   top: 50%;
+                   left: 50%;
+                   transform: translate(-50%, -50%) rotate(-45deg); /* diagonal */
+                   font-size: 7rem; /* adjust to fit your page */
+                   font-weight: 900;
+                   color: rgba(0, 0, 0, 0.08); /* light grey, adjust opacity */
+                   text-transform: uppercase;
+                   white-space: nowrap;
+                   pointer-events: none;
+                   user-select: none;
+                   z-index: 9999;
+                 }
+ 
+                 @media print {
+                   .certificate-watermark {
+                     color: rgba(0, 0, 0, 0.15); /* a bit darker so it prints */
+                   }
+                   button {
+                     display: none;
+                   }
+                   .fee-table-con{
+                     width: calc(8in - 2px) !important;
+                   }
+                 }
+               `}</style>
 
               <div className="section">
                 <table
@@ -1282,21 +1224,21 @@ const CertificateOfRegistration = forwardRef(
                     borderCollapse: "collapse",
                     fontFamily: "Arial",
                     width: "8in",
-                    marginTop: "-20px",
                     margin: "0 auto", // Center the table inside the form
                     textAlign: "center",
                     tableLayout: "fixed",
+                    marginTop: "-40px"
                   }}
                 >
                   <style>
                     {`
-                  @media print {
-                    .Box {
-                      display: none;
-                    }
-
-                  }
-                `}
+                   @media print {
+                     .Box {
+                       display: none;
+                     }
+ 
+                   }
+                 `}
                   </style>
 
                   <tbody>
@@ -1363,7 +1305,7 @@ const CertificateOfRegistration = forwardRef(
                     <tr>
                       <td
                         colSpan={2}
-                        style={{ height: "0.1in", fontSize: "62.5%" }}
+                        style={{ height: "0.1in", fontSize: "40%" }}
                       ></td>
                     </tr>
                     <tr>
@@ -1380,13 +1322,12 @@ const CertificateOfRegistration = forwardRef(
                               <td style={{ width: "20%", textAlign: "center" }}>
                                 <img
                                   src={fetchedLogo || EaristLogo}
-                                  crossOrigin="anonymous"
                                   alt="School Logo"
                                   style={{
                                     marginLeft: "10px",
-                                    width: "140px",
-                                    height: "140px",
-                                    borderRadius: "50%", // ✅ makes it circular
+                                    width: "110px",
+                                    height: "110px",
+                                    borderRadius: "50%", // ? makes it circular
                                     objectFit: "cover",
                                   }}
                                 />
@@ -1398,6 +1339,7 @@ const CertificateOfRegistration = forwardRef(
                                   width: "60%",
                                   textAlign: "center",
                                   lineHeight: "1",
+                                  fontFamily: "Arial",
                                 }}
                               >
                                 <div style={{ fontFamily: "Arial", fontSize: "13px" }}>
@@ -1425,16 +1367,7 @@ const CertificateOfRegistration = forwardRef(
                                     {secondLine}
                                   </div>
                                 )}
-                                {campusAddress && (
-                                  <div
-                                    style={{
-                                      fontSize: "13px",
-                                      fontFamily: "Arial",
-                                    }}
-                                  >
-                                    {campusAddress}
-                                  </div>
-                                )}
+                                <div>{campusAddress}</div>
 
                                 {/* Add spacing here */}
                                 <div style={{ marginTop: "30px" }}>
@@ -1461,8 +1394,8 @@ const CertificateOfRegistration = forwardRef(
                               >
                                 <div
                                   style={{
-                                    width: "3.80cm",
-                                    height: "3.80cm",
+                                    width: "3.50cm",
+                                    height: "3.50cm",
                                     marginRight: "30px",
                                     display: "flex",
                                     justifyContent: "center",
@@ -1474,7 +1407,6 @@ const CertificateOfRegistration = forwardRef(
                                   {profilePicture ? (
                                     <img
                                       src={profilePicture}
-                                      crossOrigin="anonymous"
                                       alt="Profile"
                                       style={{
                                         width: "100%",
@@ -1485,7 +1417,7 @@ const CertificateOfRegistration = forwardRef(
                                   ) : (
                                     <span
                                       style={{
-                                        fontSize: "12px",
+                                        fontSize: "11px",
                                         color: "#666",
                                       }}
                                     >
@@ -1500,19 +1432,20 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                     </tr>
 
-                    <tr className="cor-student-info-row">
+                    <tr>
                       <td
                         colSpan={10}
                         style={{
                           height: "0.1in",
                           fontSize: "55%",
                           textAlign: "start",
+
                         }}
                       >
                         <b
                           style={{
                             fontFamily: "Arial",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             color: "black",
                             textAlign: "start",
                             marginLeft: "25px",
@@ -1529,6 +1462,7 @@ const CertificateOfRegistration = forwardRef(
                           height: "0.1in",
                           fontSize: "50%",
                           textAlign: "right",
+
                         }}
                       >
                         <b
@@ -1539,192 +1473,164 @@ const CertificateOfRegistration = forwardRef(
                           }}
                         >
                           Academic Year/Term :{" "}
-                          <span style={{ color: "red" }}></span>
+                          <span style={{ color: "red" }}>{activeSchoolYear[0]?.semester_description}{" "} AY {" "}
+                            {activeSchoolYear[0]?.year_description || " "}-{activeSchoolYear[0]?.year_description + 1 || " "}</span>
                         </b>
                       </td>
                     </tr>
                   </tbody>
                 </table>
 
-                <table
-                  className="cor-student-general-info"
+                <div
+                  className="cor-bordered-frame"
                   style={{
-                    borderLeft: "1px solid black",
-                    borderTop: "1px solid black",
-                    borderRight: "1px solid black",
-                    borderCollapse: "collapse",
-                    fontFamily: "Arial",
                     width: "8in",
-                    margin: "0 auto", // Center the table inside the form
-                    textAlign: "center",
-                    tableLayout: "fixed",
+                    margin: "0 auto",
+                    border: "1px solid black",
+                    boxSizing: "border-box",
                   }}
                 >
-                  <tbody>
-                    <tr>
-                      <td
-                        colSpan={42}
-                        style={{
-                          height: "0.2in",
-                          fontSize: "72.5%",
-                          backgroundColor: "gray",
-                          color: "white",
-                        }}
-                      >
-                        <b>
-                          <b
-                            style={{
-                              border: "1px solid black",
-                              color: "black",
-                              fontFamily: "Arial",
-                              fontSize: "12px",
-                              textAlign: "center",
-                              display: "block",
-                            }}
-                          >
-                            <span className="cor-content-offset">
+                  <table
+                    style={{
+                      borderCollapse: "collapse",
+                      fontFamily: "Arial",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      tableLayout: "fixed",
+                    }}
+                  >
+                    <tbody>
+                      <tr>
+                        <td
+                          colSpan={42}
+                          style={{
+                            height: "0.2in",
+                            fontSize: "72.5%",
+                            backgroundColor: "gray",
+                            color: "white",
+                          }}
+                        >
+                          <b>
+                            <b
+                              style={{
+                                border: "1px solid black",
+                                color: "black",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                textAlign: "center",
+                                display: "block",
+                              }}
+                            >
                               STUDENT GENERAL INFORMATION
-                            </span>
+                            </b>
                           </b>
-                        </b>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
 
-                    <tr className="cor-student-info-row">
-                      <td colSpan={4} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          type="text"
-                          value="Student No:"
-                          readOnly
-                          style={{
+                      <tr>
+                        <td colSpan={4} style={{ fontSize: "40%" }}>
+                          <div style={{
                             fontWeight: "bold",
                             color: "black",
                             width: "98%",
                             fontFamily: "Arial",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             border: "none",
                             outline: "none",
                             background: "none",
-                          }}
-                        />
-                      </td>
+                          }}>Student No:</div>
+                        </td>
 
-                      <td colSpan={14} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          className="cor-left-value-wide"
-                          type="text"
-                          value={data[0]?.student_number || ""}
-                          readOnly
-                          style={{
+                        <td colSpan={11} style={{ fontSize: "40%" }}>
+                          <div style={{
                             fontFamily: "Arial",
                             color: "black",
                             width: "98%",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             border: "none",
                             outline: "none",
                             background: "none",
-                          }}
-                        />
-                      </td>
+                          }}>{data[0]?.student_number || ""}</div>
+                        </td>
 
-                      <td colSpan={4} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value="College:"
-                          readOnly
-                          style={{
+                        <td colSpan={4} style={{ fontSize: "40%" }}>
+                          <div style={{
                             fontWeight: "bold",
                             color: "black",
                             width: "98%",
                             fontFamily: "Arial",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             border: "none",
                             outline: "none",
                             background: "none",
-                          }}
-                        />
-                      </td>
+                          }}>College:</div>
+                        </td>
 
-                      {/* College Display */}
-                      <td colSpan={14} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value={data[0]?.college || ""}
-                          readOnly
-                          style={{
+                        {/* College Display */}
+                        <td colSpan={16} style={{ fontSize: "40%" }}>
+                          <div style={{
                             fontFamily: "Arial",
                             color: "black",
                             width: "98%",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             border: "none",
                             outline: "none",
                             background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
+                          }}>{data[0]?.college || ""}</div>
+                        </td>
+                      </tr>
 
-                    <tr className="cor-student-info-row" >
-                      {/* Name Label */}
-                      <td colSpan={4} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          type="text"
-                          value="Name:"
-                          readOnly
-                          style={{
+                      <tr>
+                        {/* Name Label */}
+                        <td colSpan={4} style={{ fontSize: "40%" }}>
+                          <div style={{
                             fontWeight: "bold",
                             color: "black",
                             width: "98%",
                             fontFamily: "Arial",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             border: "none",
                             outline: "none",
                             background: "none",
-                          }}
-                        />
-                      </td>
-                      {/* Name Value */}
-                      <td colSpan={14} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          className="cor-left-value-wide"
-                          type="text"
-                          value={`${data[0]?.last_name || ""}, ${data[0]?.first_name || ""} ${data[0]?.middle_name || ""} ${data[0]?.extension || ""}`.trim()}
-                          readOnly
-                          style={{
+                          }}>Name:</div>
+                        </td>
+                        {/* Name Value */}
+                        <td colSpan={11} style={{ fontSize: "40%" }}>
+                          <div style={{
                             fontFamily: "Arial",
                             color: "black",
                             width: "98%",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             border: "none",
                             outline: "none",
                             background: "none",
-                          }}
-                        />
-                      </td>
+                          }}>{`${data[0]?.last_name || ""}, ${data[0]?.first_name || ""} ${data[0]?.middle_name || ""} ${data[0]?.extension || ""}`.trim()}</div>
+                        </td>
 
-                      {/* Program Label */}
-                      <td colSpan={4} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value="Program:"
-                          readOnly
-                          style={{
+                        {/* Program Label */}
+                        <td colSpan={4} style={{ fontSize: "40%" }}>
+                          <div style={{
                             fontWeight: "bold",
                             color: "black",
                             width: "98%",
                             fontFamily: "Arial",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             border: "none",
                             outline: "none",
                             background: "none",
-                          }}
-                        />
-                      </td>
+                          }}>Program:</div>
+                        </td>
 
-                      <td colSpan={20} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value={(() => {
+                        <td colSpan={23} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{(() => {
                             const match = curriculumOptions.find(
                               (item) =>
                                 item?.curriculum_id?.toString() ===
@@ -1733,2463 +1639,2220 @@ const CertificateOfRegistration = forwardRef(
                             return match
                               ? match.program_description
                               : (data[0]?.program ?? "");
-                          })()}
-                          readOnly
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-
-                    <tr className="cor-student-info-row">
-                      {/* Gender Label */}
-                      <td colSpan={4} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          type="text"
-                          value="Gender:"
-                          readOnly
-                          style={{
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-
-                      {/* Gender Value */}
-                      <td colSpan={14} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          className="cor-left-value-wide"
-                          type="text"
-                          value={formatGender(data[0]?.gender)}
-                          readOnly
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-
-                      {/* Major Label */}
-                      <td colSpan={4} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value="Major:"
-                          readOnly
-                          style={{
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td colSpan={6} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          readOnly
-                          value={
-                            major
-                              ? major.charAt(0).toUpperCase() +
-                              major.slice(1).toLowerCase()
-                              : ""
-                          }
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-
-                      {/* Curriculum Label */}
-                      <td colSpan={5} style={{ fontSize: "62.5%" }}>
-                        <input
-                          className="cor-shift-left-label"
-                          type="text"
-                          value="Curriculum:"
-                          readOnly
-                          style={{
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-
-                      {/* Curriculum Value */}
-                      <td colSpan={9} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value={`${year_desc || ""}-${year_desc || ""}`}
-                          readOnly
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-
-                    <tr className="cor-student-info-row">
-                      <td colSpan={4} style={{ fontSize: "50%", padding: "0px 8px" }}>
-                        <input
-                          readOnly
-                          type="text"
-                          value={"Age:"}
-                          style={{
-                            fontWeight: "bold",
-                            color: "black",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td colSpan={14} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          className="cor-left-value-wide"
-                          type="text"
-                          value={data[0]?.age || ""}
-                          readOnly
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td colSpan={4} style={{ fontSize: "50%" }}>
-                        <input
-                          readOnly
-                          type="text"
-                          value={"Year Level:"}
-                          style={{
-                            fontWeight: "bold",
-                            color: "black",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td colSpan={6} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value={year_Level_Description || ""}
-                          readOnly
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            marginLeft: "5px",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td colSpan={8} style={{ fontSize: "50%" }}>
-                        <input
-                          className="cor-shift-left-label"
-                          type="text"
-                          value={"Scholarship/Discount:"}
-                          readOnly
-                          style={{
-                            fontWeight: "bold",
-                            color: "black",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td colSpan={6} style={{ fontSize: "62.5%" }}>
-                        <input
-                          type="text"
-                          value={scholarshipDiscountValue}
-                          readOnly
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-
-                    <tr className="cor-student-info-row">
-                      <td colSpan={5} style={{ fontSize: "50%", padding: "0px 8px" }}>
-                        <input
-                          type="text"
-                          value={"Email Address:"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            fontWeight: "bold",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            width: "98%",
-                            border: "none",
-                            height: "28px",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td colSpan={12} style={{ fontSize: "62.5%", padding: "0px 8px" }}>
-                        <input
-                          className="cor-left-value-wide"
-                          type="text"
-                          value={data[0]?.email || ""}
-                          readOnly
-                          style={{
-                            fontFamily: "Arial",
-                            color: "black",
-                            width: "98%",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                            height: "28px",
-                          }}
-                        />
-                      </td>
-                    </tr>
-
-                    {/*----------------------------------------------------------------------------------------------------------------------------------*/}
-
-                    <tr className="cor-subject-header-row">
-                      <td
-                        colSpan={5.5}
-                        rowSpan={2}
-                        style={{
-                          color: "black",
-                          height: "0.3in",
-                          fontFamily: "Arial",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-
-                          backgroundColor: "gray",
-                          borderTop: "1px solid black",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            marginTop: "-1px",
-                          }}
-                        >
-                          CODE
-                        </div>
-                      </td>
-                      <td
-                        colSpan={11}
-                        rowSpan={2}
-                        style={{
-                          color: "black",
-                          height: "0.3in",
-                          fontFamily: "Arial",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          backgroundColor: "gray",
-                          borderTop: "1px solid black",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            marginTop: "-1px",
-                          }}
-                        >
-                          SUBJECT TITLE
-                        </div>
-                      </td>
-
-                      <td
-                        colSpan={6}
-                        style={{
-                          color: "black",
-                          height: "0.2in",
-                          fontFamily: "Arial",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-
-                          backgroundColor: "gray",
-                          borderTop: "1px solid black",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            marginTop: "-1px",
-                          }}
-                        >
-                          UNIT
-                        </div>
-                      </td>
-
-                      <td
-                        colSpan={4}
-                        rowSpan={2}
-                        style={{
-                          color: "black",
-                          height: "0.3in",
-                          fontFamily: "Arial",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-
-                          backgroundColor: "gray",
-                          borderTop: "1px solid black",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            marginTop: "-1px",
-                          }}
-                        >
-                          SECTION
-                        </div>
-                      </td>
-                      <td
-                        colSpan={8}
-                        rowSpan={2}
-                        style={{
-                          color: "black",
-                          height: "0.3in",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          backgroundColor: "gray",
-                          borderTop: "1px solid black",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            marginTop: "-1px",
-                          }}
-                        >
-                          SCHEDULE ROOM
-                        </div>
-                      </td>
-                      <td
-                        colSpan={8}
-                        rowSpan={2}
-                        style={{
-                          color: "black",
-                          height: "0.3in",
-                          fontFamily: "Arial",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          backgroundColor: "gray",
-                          borderTop: "1px solid black",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            marginTop: "-1px",
-                          }}
-                        >
-                          FACULTY
-                        </div>
-                      </td>
-                    </tr>
-                    <tr className="cor-subject-subheader-row">
-                      <td
-                        colSpan={1}
-                        style={{
-                          color: "black",
-                          height: "0.1in",
-                          fontSize: "50%",
-                          backgroundColor: "gray",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <span className="cor-content-offset">Lec</span>
-                      </td>
-                      <td
-                        colSpan={1}
-                        style={{
-                          color: "black",
-                          height: "0.1in",
-                          fontSize: "50%",
-                          backgroundColor: "gray",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <span className="cor-content-offset">Lab</span>
-                      </td>
-                      <td
-                        colSpan={2}
-                        style={{
-                          color: "black",
-                          height: "0.1in",
-                          fontSize: "50%",
-                          backgroundColor: "gray",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <span className="cor-content-offset">Credit</span>
-                      </td>
-                      <td
-                        colSpan={2}
-                        style={{
-                          color: "black",
-                          height: "0.1in",
-                          fontSize: "50%",
-                          backgroundColor: "gray",
-                          borderRight: "1px solid black",
-                          borderBottom: "1px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <span className="cor-content-offset">Tuition</span>
-                      </td>
-                    </tr>
-                    {enrolled.map((item, index) => (
-                      <tr key={index} className="cor-subject-data-row">
-                        <td colSpan={5.5} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={item.course_code || ""}
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "12px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={11} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={item.course_description || ""}
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "left",
-                              fontSize: "11px",
-                              padding: "0 5px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={1} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={
-                              item.course_unit == null
-                                ? ""
-                                : toWholeUnit(item.course_unit)
-                            }
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "12px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={1} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={
-                              item.lab_unit == null
-                                ? ""
-                                : toWholeUnit(item.lab_unit)
-                            }
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "12px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={2} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={
-                              toWholeUnit(item.course_unit) +
-                              toWholeUnit(item.lab_unit)
-                            }
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "12px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={2} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={
-                              toWholeUnit(item.course_unit) +
-                              toWholeUnit(item.lab_unit)
-                            }
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "12px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={4} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={item.description || ""}
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "10px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={8} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={`${item.day_description || ""} ${item.school_time_start || ""
-                              }-${item.school_time_end || ""}`.trim()}
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "8px",
-                            }}
-                          />
-                        </td>
-                        <td colSpan={8} style={subjectCellTdStyle}>
-                          <input
-                            type="text"
-                            value={`Prof. ${item.lname || "TBA"}`}
-                            readOnly
-                            style={{
-                              ...subjectCellContentStyle,
-                              textAlign: "center",
-                              fontSize: "8px",
-                            }}
-                          />
+                          })()}</div>
                         </td>
                       </tr>
-                    ))}
 
-                    {/*----------------------------------------------------------------------------------------------------------------------------------*/}
+                      <tr>
+                        {/* Gender Label */}
+                        <td colSpan={4} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            width: "98%",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>Gender:</div>
+                        </td>
 
-                    <tr className="cor-subject-total-row">
-                      <td
-                        colSpan={10}
-                        style={{
-                          height: "0.22in",
-                          fontSize: "45%",
-                          color: "black",
-                          textAlign: "left",
-                          verticalAlign: "middle",
-                          padding: "0 4px",
-                        }}
-                      >
-                        <span className="cor-content-offset">
-                          <b>Note: Subject marked with "*" is Special Subject</b>
-                        </span>
-                      </td>
-                      <td
-                        colSpan={6}
-                        style={{
-                          height: "0.22in",
-                          fontSize: "50%",
-                          color: "black",
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                        }}
-                      >
-                        <span className="cor-content-offset">
-                          <b>Total Unit(s)</b>
-                        </span>
-                      </td>
-                      <td
-                        colSpan={1}
-                        style={{
-                          height: "0.22in",
-                          fontSize: "12px",
-                          color: "black",
-                          fontFamily: "Arial",
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                        }}
-                      >
-                        <span className="cor-content-offset">
-                          {totalCourseUnits}
-                        </span>
-                      </td>
-                      <td
-                        colSpan={1}
-                        style={{
-                          height: "0.22in",
-                          fontSize: "12px",
-                          color: "black",
-                          fontFamily: "Arial",
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                        }}
-                      >
-                        <span className="cor-content-offset">
-                          {totalLabUnits}
-                        </span>
-                      </td>
-                      <td
-                        colSpan={2}
-                        style={{
-                          height: "0.22in",
-                          fontSize: "12px",
-                          color: "black",
-                          fontFamily: "Arial",
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                        }}
-                      >
-                        <span className="cor-content-offset">
-                          {totalCourseUnits + totalLabUnits}
-                        </span>
-                      </td>
-                      <td
-                        colSpan={2}
-                        style={{
-                          height: "0.22in",
-                          fontSize: "12px",
-                          color: "black",
-                          fontFamily: "Arial",
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                        }}
-                      >
-                        <span className="cor-content-offset">
-                          {totalCombined}
-                        </span>
-                      </td>
+                        {/* Gender Value */}
+                        <td colSpan={11} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{String(data[0]?.gender) === "0"
+                            ? "Male"
+                            : String(data[0]?.gender) === "1"
+                              ? "Female"
+                              : data[0]?.gender || ""}</div>
+                        </td>
 
-                      <td
-                        colSpan={2}
-                        style={{
-                          height: "0.1in",
-                          fontSize: "55%",
-                          color: "black",
-                          textAlign: "center",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={3}
-                        style={{
-                          height: "0.1in",
-                          fontSize: "55%",
-                          color: "black",
-                          textAlign: "center",
-                        }}
-                      ></td>
-                    </tr>
-                    <tr className="cor-fees-div-row">
-                      <td colSpan={42}>
-                        <div className="cor-fees-div-layout" style={{ marginTop: "5px", marginLeft: "7px" }}>
-                          <div className="cor-fees-left">
-                            <div className="cor-fees-title cor-assessed-title">
-                              <span style={{ marginTop: "-3px" }}>ASSESSED FEES</span>
-                            </div>
-                            <div className="cor-fees-body">
-                              <div className="cor-assessment-content">
-                                {corAssessedFeeRows.map((fee) => (
-                                  <div className="cor-fee-line" key={fee.label}>
-                                    <span>{fee.label}</span>
-                                    <span>{formatFee(fee.value)}</span>
-                                  </div>
-                                ))}
+                        {/* Major Label */}
+                        <td colSpan={4} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            width: "98%",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>Major:</div>
+                        </td>
+                        <td colSpan={9} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{major
+                            ? major?.charAt(0).toUpperCase() +
+                            major?.slice(1).toLowerCase()
+                            : ""}</div>
+                        </td>
 
-                                <div className="cor-assessment-list">
-                                  {corAssessmentRows.map((row) => (
-                                    <div
-                                      className="cor-assessment-line"
-                                      key={row.label}
-                                    >
-                                      <span>{row.label} :</span>
-                                      <span>{formatFee(row.value)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
+                        {/* Curriculum Label */}
+                        <td colSpan={5} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            width: "98%",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>Curriculum:</div>
+                        </td>
 
-                              <div className="cor-fees-title cor-schedule-title">
-                                <span style={{ marginTop: "-3px", width: "100%" }}>SCHEDULE OF PAYMENT</span>
-                              </div>
-                              <div className="cor-payment-grid">
-                                {[
-                                  "1st Payment/Due",
-                                  "2nd Payment/Due",
-                                  "3rd Payment/Due",
-                                ].map((label) => (
-                                  <div className="cor-payment-cell" key={label}>
-                                    <span style={{ marginTop: "-5px", width: "100%" }}>{label}</span>
-                                  </div>
-                                ))}
-                                {[0, 1, 2].map((item) => (
-                                  <div
-                                    className="cor-payment-cell cor-payment-value"
-                                    key={item}
-                                  >
-                                    <span style={{ marginTop: "-5px" }}>0.00</span>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="cor-payment-footer">
-                                <span className="cor-payment-label">Payment/Validation Date :</span>
-                                <span className="cor-line-value">
-                                  <span>{shortDate}</span>
-                                </span>
-                                <span className="cor-payment-label">Official Receipt :</span>
-                                <span className="cor-line-value">
-                                  <span>{officialReceiptValue}</span>
-                                </span>
-                              </div>
-                              <div className="cor-fee-stamp-row">
-                              </div>
-                            </div>
-                          </div>
+                        {/* Curriculum Value */}
+                        <td colSpan={9} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{(() => {
+                            const curriculumYear =
+                              data[0]?.year_description ?? year_desc;
+                            return curriculumYear
+                              ? `${curriculumYear}-${Number(curriculumYear) + 1}`
+                              : "";
+                          })()}</div>
+                        </td>
+                      </tr>
 
-                          <div className="cor-fees-right">
-                            <div className="cor-refund-title">
-                              RULES OF REFUND
-                            </div>
-                            <div className="cor-refund-list">
-                              {corRefundRules.map((rule) => (
-                                <div key={rule}>{rule}</div>
-                              ))}
-                            </div>
+                      <tr>
+                        <td colSpan={4} style={{ fontSize: "50%" }}>
+                          <div style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            width: "98%",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{"Age:"}</div>
+                        </td>
+                        <td colSpan={11} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{data[0]?.age || ""}</div>
+                        </td>
+                        <td colSpan={4} style={{ fontSize: "50%" }}>
+                          <div style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            width: "98%",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{"Year Level:"}</div>
+                        </td>
+                        <td colSpan={9} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{year_Level_Description || ""}</div>
+                        </td>
+                        <td colSpan={8} style={{ fontSize: "50%" }}>
+                          <div style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            width: "98%",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{"Scholarship/Discount:"}</div>
+                        </td>
+                        <td colSpan={6} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{savedUnifast ? "UNIFAST-FHE " : ""}</div>
+                        </td>
+                      </tr>
 
-                            <div className="cor-pledge-title">
-                              PLEDGE UPON ADMISSION
-                            </div>
-                            <div className="cor-pledge-copy" >
-                              "As a student of EARIST, I do solemnly promise
-                              that I will comply with the rules and regulations
-                              of the Institution."
-                            </div>
+                      <tr>
+                        <td colSpan={5} style={{ fontSize: "50%" }}>
+                          <div style={{
+                            color: "black",
+                            fontWeight: "bold",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            width: "98%",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{"Email Address:"}</div>
+                        </td>
+                        <td colSpan={12} style={{ fontSize: "40%" }}>
+                          <div style={{
+                            fontFamily: "Arial",
+                            color: "black",
+                            width: "98%",
+                            fontSize: "11px",
+                            border: "none",
+                            outline: "none",
+                            background: "none",
+                          }}>{data[0]?.email || ""}</div>
+                        </td>
+                      </tr>
 
-                            <div className="cor-student-signature">
-                              Student's Signature
-                            </div>
+                      {/*----------------------------------------------------------------------------------------------------------------------------------*/}
 
-                            <div className="cor-approval-row">
-                              <div className="cor-approved-block">
-                                APPROVED BY :
-                              </div>
+                      <tr>
+                        <td
+                          colSpan={6}
+                          rowSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.3in",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            fontWeight: "bold",
 
-                              <div className="cor-registrar-signature">
-                                <div className="cor-registrar-signature-slot" style={{ height: "60px" }}>
-                                  {showApprovedBySignature && (
-                                    <img
-                                      src={approvedBySignatureUrl}
-                                      crossOrigin="anonymous"
-                                      alt="Signature"
-                                      className="cor-registrar-signature-image"
-                                      onError={() =>
-                                        setApprovedBySignatureMissing(true)
-                                      }
-                                    />
-                                  )}
-                                </div>
-                                <div className="cor-registrar-name">
-                                  {approvedBy?.full_name || ""}
-                                </div>
-                                <div className="cor-registrar-line"></div>
-                                <div className="cor-registrar-role">Registrar</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr className="cor-fees-start">
-                      <td
-                        colSpan={20}
-                        style={{
-                          margin: "0px",
-                          padding: "0px",
-                          fontSize: "63.5%",
-                          border: "1px solid black",
-                          backgroundColor: "gray",
-                          height: "auto",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"A S S E S S E D  F E E S"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            fontWeight: "bold",
-                            margin: "0px",
-                            padding: "0px",
-                            textAlign: "center",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                            height: "auto",
-                            lineHeight: "1",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={8}
-                        style={{
-                          color: "white",
-                          fontSize: "62.5%",
-                          color: "black",
-                          border: "1px 0px 1px 1px solid black",
-                          textAlign: "center",
-                        }}
-                      ></td>
-                    </tr>
-
-                    <tr>
-                      <td colSpan={15} style={{ padding: 0 }}>
-                        <input
-                          type="text"
-                          value={"Tuition (21 unit(s)) "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "60.5%",
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(selectedPaymentData?.tuition_fees)}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "100%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"RULES OF REFUND"}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            marginLeft: "40px",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr></tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Athletic Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(selectedPaymentData?.athletic_fees)}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={
-                            "1. Full refund of tuition fee - Before the start of classes."
-                          }
-                          readOnly
-                          style={{
-                            textAlign: "left",
-                            color: "black",
-                            marginLeft: "40px",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                            fontStyle: "italic",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Cultural Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(selectedPaymentData?.cultural_fees)}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={20}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={
-                            "2. 80% refund of tuition fee - within 1 week from the start of classes."
-                          }
-                          readOnly
-                          style={{
-                            textAlign: "left",
-                            color: "black",
-                            marginLeft: "40px",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                            fontStyle: "italic",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Developmental Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(
-                            selectedPaymentData?.development_fees,
-                          )}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={
-                            "3. 50% refund - within 2 weeks from the start of classes."
-                          }
-                          readOnly
-                          style={{
-                            textAlign: "left",
-                            color: "black",
-                            marginLeft: "40px",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            fontStyle: "italic",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Guidance Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(selectedPaymentData?.guidance_fees)}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={
-                            "4. No refund - after the 2nd week of classes."
-                          }
-                          readOnly
-                          style={{
-                            textAlign: "left",
-                            color: "black",
-                            marginLeft: "40px",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            fontStyle: "italic",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Library Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(selectedPaymentData?.library_fees)}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Medical and Dental Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(
-                            selectedPaymentData?.medical_and_dental_fees,
-                          )}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={20}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"PLEDGE UPON ADMISSION"}
-                          readOnly
-                          style={{
-                            fontWeight: "bold",
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Registration Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(
-                            selectedPaymentData?.registration_fees,
-                          )}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={20}
-                        style={{
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: "black",
-                          fontFamily: "Arial",
-                          fontSize: "10px",
-                        }}
-                      >
-                        <i>
-                          {" "}
-                          "As a student of EARIST, I do solemnly promise that I
-                          will{" "}
-                        </i>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={15}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Computer Fee"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(selectedPaymentData?.computer_fees)}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={20}
-                        style={{
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: "black",
-                          fontFamily: "Arial",
-                          fontSize: "10px",
-                        }}
-                      >
-                        <i>
-                          comply with the rules and regulations of the
-                          Institution."
-                        </i>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={13}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            textAlign: "left",
-                            color: "black",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          marginRight: "20px",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={13}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Total Assessment : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={formatFee(selectedPaymentData?.total_tosf)}
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          marginRight: "20px",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={13}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Less Financial Aid : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          marginRight: "20px",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={13}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Net Assessed : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-
-                      <td colSpan={20}>
-                        <input
-                          type="text"
-                          value={"_________________________________"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            textDecoration: "underline",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          marginRight: "20px",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={13}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Credit Memo : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-
-                      <td colSpan={20}>
-                        <input
-                          type="text"
-                          value={"Student's Signature"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          marginRight: "20px",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={13}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Total Discount : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          marginRight: "20px",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={13}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Total Payment : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={5}
-                        style={{
-                          fontSize: "62.5%",
-                          marginRight: "20px",
-
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            textAlign: "center",
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          marginRight: "20px",
-                        }}
-                      ></td>
-                      <td
-                        colSpan={18}
-                        style={{
-                          fontSize: "62.5%",
-                          borderRight: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Outstanding Balance : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            width: "98%",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={7}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"APPROVED BY : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "left",
-                            marginLeft: "20px",
-                            fontWeight: "bold",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={7}
-                        style={{
-                          fontSize: "62.5%",
-                          border: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"1st Payment/Due"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            fontWeight: "bold",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={6}
-                        style={{
-                          border: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"2nd Payment/Due"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={7}
-                        style={{
-                          border: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"3rd Payment/Due"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={20}
-                        style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        {showApprovedBySignature ? (
-                          <img
-                            src={approvedBySignatureUrl}
-                            crossOrigin="anonymous"
-                            alt="Signature"
-                            onError={() =>
-                              setApprovedBySignatureMissing(true)
-                            }
-                            style={{
-                              height: "60px",
-                              objectFit: "contain",
-                              width: "250px",
-                              marginBottom: "2px",
-                              display: !effectiveStudentNumber
-                                ? "none"
-                                : "block",
-                              marginLeft: "auto",
-                              marginRight: "auto",
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              height: "60px",
-                              display: !effectiveStudentNumber
-                                ? "none"
-                                : "block",
-                            }}
-                          />
-                        )}
-
-                        <div
-                          style={{
-                            display: "inline-block",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            marginTop: "-10px",
-                            fontWeight: "bold",
-                            lineHeight: "1.1",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
                             textAlign: "center",
                           }}
                         >
                           <div
                             style={{
-                              minHeight: "14px",
-                              display: !effectiveStudentNumber
-                                ? "none"
-                                : "block",
+                              display: "flex",
+                              justifyContent: "center",
+                              marginTop: "-1px",
                             }}
                           >
-                            {approvedBy?.full_name || ""}
+                            CODE
                           </div>
-                          <div style={{ whiteSpace: "pre", marginTop: "-6px" }}>
-                            __________________________________
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td
-                        colSpan={7}
-                        style={{
-                          fontSize: "62.5%",
-                          border: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
+                        </td>
+                        <td
+                          colSpan={10}
+                          rowSpan={2}
                           style={{
                             color: "black",
-                            fontWeight: "bold",
-                            textAlign: "center",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={6}
-                        style={{
-                          fontSize: "62.5%",
-                          border: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                            width: "98%",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={7}
-                        style={{
-                          fontSize: "62.5%",
-                          border: "1px solid black",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            width: "98%",
-                            fontWeight: "bold",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={20}
-                        style={{
-                          fontSize: "12px",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Registrar"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            width: "98%",
-                            fontWeight: "bold",
+                            height: "0.3in",
                             fontFamily: "Arial",
-                            fontSize: "12px",
-                            border: "none",
+                            fontSize: "11px",
                             fontWeight: "bold",
-                            outline: "none",
-                            background: "none",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
                           }}
-                        />
-                      </td>
-                    </tr>
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "center",
+                              marginTop: "-1px",
+                            }}
+                          >
+                            SUBJECT TITLE
+                          </div>
+                        </td>
 
-                    <tr>
-                      <td
+                        <td
+                          colSpan={6}
+                          style={{
+                            color: "black",
+                            height: "0.2in",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "center",
+                              marginTop: "-1px",
+                            }}
+                          >
+                            UNIT
+                          </div>
+                        </td>
+
+                        <td
+                          colSpan={4}
+                          rowSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.3in",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "center",
+                              marginTop: "-1px",
+                            }}
+                          >
+                            SECTION
+                          </div>
+                        </td>
+                        <td
+                          colSpan={8}
+                          rowSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.3in",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "center",
+                              marginTop: "-1px",
+                            }}
+                          >
+                            SCHEDULE ROOM
+                          </div>
+                        </td>
+                        <td
+                          colSpan={8}
+                          rowSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.3in",
+                            fontFamily: "Arial",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "center",
+                              marginTop: "-1px",
+                            }}
+                          >
+                            FACULTY
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td
+                          colSpan={1}
+                          style={{
+                            color: "black",
+                            height: "0.1in",
+                            fontSize: "50%",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          Lec
+                        </td>
+                        <td
+                          colSpan={1}
+                          style={{
+                            color: "black",
+                            height: "0.1in",
+                            fontSize: "50%",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          Lab
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.1in",
+                            fontSize: "50%",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          Credit
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.1in",
+                            fontSize: "50%",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                          }}
+                        >
+                          Tuition
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.1in",
+                            fontSize: "50%",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                            display: "none",
+                          }}
+                        >
+                          Lec Value
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            color: "black",
+                            height: "0.1in",
+                            fontSize: "50%",
+                            backgroundColor: "gray",
+                            border: "1px solid black",
+                            textAlign: "center",
+                            display: "none",
+                          }}
+                        >
+                          Lab Value
+                        </td>
+                      </tr>
+                      {enrolled.map((item, index) => (
+                        <tr key={index}>
+                          <td colSpan={6} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              textAlign: "center",
+                              background: "none",
+                              fontSize: "11px",
+                            }}>{item.course_code || ""}</div>
+                          </td>
+                          <td colSpan={10} style={{ border: "1px solid black" }}>
+                            <textarea
+                              value={item.course_description || ""}
+                              readOnly
+                              rows={2} // auto height hint
+                              style={{
+                                width: "100%",
+                                border: "none",
+                                background: "none",
+                                textAlign: "center",
+                                fontSize: "8px",
+                                resize: "none",
+                                overflow: "hidden",
+                                whiteSpace: "normal",
+                                wordWrap: "break-word",
+                              }}
+                            />
+                          </td>
+
+                          <td colSpan={1} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "11px",
+                            }}>{item.course_unit == null
+                              ? ""
+                              : toWholeUnit(item.course_unit)}</div>
+                          </td>
+                          <td colSpan={1} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "11px",
+                            }}>{item.lab_unit == null ? "" : toWholeUnit(item.lab_unit)}</div>
+                          </td>
+                          <td colSpan={2} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "11px",
+                            }}>{toWholeUnit(item.course_unit) +
+                              toWholeUnit(item.lab_unit)}</div>
+                          </td>
+
+                          <td colSpan={2} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "11px",
+                            }}>{toWholeUnit(item.course_unit) +
+                              toWholeUnit(item.lab_unit)}</div>
+                          </td>
+                          <td
+                            colSpan={2}
+                            style={{ border: "1px solid black", display: "none" }}
+                          >
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "11px",
+                            }}>{item.total_lec_value ?? ""}</div>
+                          </td>
+                          <td
+                            colSpan={2}
+                            style={{ border: "1px solid black", display: "none" }}
+                          >
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "11px",
+                            }}>{item.total_lab_value ?? ""}</div>
+                          </td>
+                          <td colSpan={4} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "11px",
+                            }}>{item.description || ""}</div>
+                          </td>
+                          <td colSpan={8} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "8px",
+                            }}>{`${item.day_description} ${item.school_time_start}-${item.school_time_end}`}</div>
+                          </td>
+                          <td colSpan={8} style={{ border: "1px solid black" }}>
+                            <div style={{
+                              width: "98%",
+                              border: "none",
+                              background: "none",
+                              textAlign: "center",
+                              fontSize: "8px",
+                            }}>{`Prof. ${item.lname}`}</div>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/*----------------------------------------------------------------------------------------------------------------------------------*/}
+
+                      <tr>
+                        <td
+                          colSpan={10}
+                          style={{
+                            height: "0.1in",
+                            fontSize: "45%",
+                            color: "black",
+                            textAlign: "left",
+                          }}
+                        >
+                          <b>Note: Subject marked with "*" is Special Subject</b>
+                        </td>
+                        <td
+                          colSpan={6}
+                          style={{
+                            fontSize: "50%",
+                            color: "black",
+                            textAlign: "CENTER",
+                          }}
+                        >
+                          <b>Total Unit(s)</b>
+                        </td>
+                        <td
+                          colSpan={1}
+                          style={{
+                            fontSize: "11px",
+                            color: "black",
+                            fontFamily: "Arial",
+                            textAlign: "center",
+                          }}
+                        >
+                          {totalCourseUnits}
+                        </td>
+                        <td
+                          colSpan={1}
+                          style={{
+                            fontSize: "11px",
+                            color: "black",
+                            fontFamily: "Arial",
+                            textAlign: "center",
+                          }}
+                        >
+                          {totalLabUnits}
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            fontSize: "11px",
+                            color: "black",
+                            fontFamily: "Arial",
+                            textAlign: "center",
+                          }}
+                        >
+                          {totalCourseUnits + totalLabUnits}
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            fontSize: "11px",
+                            color: "black",
+                            fontFamily: "Arial",
+                            textAlign: "center",
+                          }}
+                        >
+                          {totalCombined}
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            fontSize: "11px",
+                            color: "black",
+                            fontFamily: "Arial",
+                            textAlign: "center",
+                            display: "none",
+                          }}
+                        >
+                          {totalLecFees}
+                        </td>
+                        <td
+                          colSpan={2}
+                          style={{
+                            fontSize: "11px",
+                            color: "black",
+                            fontFamily: "Arial",
+                            textAlign: "center",
+                            display: "none",
+                          }}
+                        >
+                          {totalLabFees}
+                        </td>
+
+                        <td
+                          colSpan={2}
+                          style={{
+                            height: "0.1in",
+                            fontSize: "55%",
+                            color: "black",
+                            textAlign: "center",
+                          }}
+                        ></td>
+                        <td
+                          colSpan={3}
+                          style={{
+                            height: "0.1in",
+                            fontSize: "55%",
+                            color: "black",
+                            textAlign: "center",
+                          }}
+                        ></td>
+                      </tr>
+
+                      <tr
                         colSpan={12}
                         style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Payment/Validation Date : "}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            width: "98%",
-                            fontWeight: "bold",
-                            textDecorationThickness: "2px", // <-- Thicker underline
+                          color: "white",
 
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={8}
+                          height: "0.1in",
+                          fontSize: "40%",
+                          backgroundColor: "gray",
+                          textAlign: "center",
+                        }}
+                      ></tr>
+                    </tbody>
+                  </table>
+
+                  <div
+                    className="fee-table-con"
+                    style={{
+                      display: "flex",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      alignItems: "flex-start",
+
+                    }}
+                  >
+                    <div style={{ width: "50%", marginLeft: "9px" }}>
+                      <table
+                        className="fee-table"
                         style={{
-                          height: "0.25in",
-                          fontSize: "12px",
+                          borderCollapse: "collapse",
                           fontFamily: "Arial",
-                          textAlign: "center",
-                          verticalAlign: "middle",
+                          width: "100%",
+
+                          tableLayout: "fixed",
+                          borderLeft: "none",
+                          borderRight: "none",
+                          borderBottom: "none",
+                          borderTop: "none",
                         }}
                       >
-                        <input
-                          type="text"
-                          value={shortDate}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            width: "100%", // ensures full-width underline
-                            border: "none",
-                            outline: "none",
+                        <style>{`
+ 
+                         .fee-table td {
+                           padding-top: 0px;
+                           padding-bottom: 0px;
+                         }
+                         .fee-table input {
+                           padding-top: 0px;
+                           padding-bottom: 0px;
+                           line-height: 1;
+                         }
+                       `}</style>
+                        <tbody>
+                          <tr>
+                            <td
+                              colSpan={20}
+                              style={{
+                                margin: "0px",
+                                padding: "0px",
+                                fontSize: "63.5%",
+                                border: "1px solid black",
+                                backgroundColor: "gray",
+                                height: "auto",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                fontWeight: "bold",
+                                margin: "0px",
+                                padding: "0px",
+                                textAlign: "center",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                                height: "auto",
+                                lineHeight: "1",
+                              }}>{"A S S E S S E D  F E E S"}</div>
+                            </td>
+                          </tr>
 
-                            fontWeight: "bold",
-                            background: "none",
-                            borderBottom: "1px solid black", // thicker, longer underline
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td
-                        colSpan={9}
+                          <tr style={{ borderLeft: "1px solid black", height: "2px", borderRight: "1px solid black" }}>
+                            <td colSpan={20}>
+
+                            </td>
+                          </tr>
+
+                          <tr style={{ height: "2px", }}>
+                            <td colSpan={15} style={{ padding: 0, borderLeft: "1px solid black" }}>
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{`Tuition (${totalCourseUnits} unit(s))`}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "60.5%",
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                color: "black",
+                                width: "100%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{isFirstYear
+                                ? Number(totalLecFees) + Number(totalLabFees) - Number(tosf[0]?.nstp_fees)
+                                : Number(totalLecFees) + Number(totalLabFees)}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Athletic Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.athletic_fee || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                display: isHaveNSTP === 0 ? "none" : "block",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                paddingLeft: "3px",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"NSTP Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                display: isHaveNSTP === 0 ? "none" : "block",
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.nstp_fees || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Cultural Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.cultural_fee || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Developmental Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.developmental_fee || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Guidance Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.guidance_fee || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Library Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.library_fee || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Medical and Dental Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.medical_and_dental_fee || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Registration Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.registration_fee || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                                display: isFirstYearFirstSem ? "block" : "none",
+                              }}>{"School ID Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                display: isFirstYearFirstSem ? "block" : "none",
+                                background: "none",
+                              }}>{tosf[0]?.school_id_fees || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                                display:
+                                  isHaveComputerFees === 0 ? "none" : "block",
+                              }}>{"Computer Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                display:
+                                  isHaveComputerFees === 0 ? "none" : "block",
+                                background: "none",
+                              }}>{tosf[0]?.computer_fees || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={15}
+                              style={{
+                                fontSize: "40%",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                display: isHaveLaboratory === 0 ? "none" : "block",
+                                color: "black",
+                                width: "98%",
+
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Laboratory Fee"}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                display: isHaveLaboratory === 0 ? "none" : "block",
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{tosf[0]?.laboratory_fees || "0"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                            <td
+                              colSpan={13}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "left",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            ></td>
+                            <td
+                              colSpan={13}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Total Assessment : "}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{totalLecFees +
+                                totalLabFees +
+                                Number(tosf[0]?.cultural_fee || 0) +
+                                Number(tosf[0]?.athletic_fee || 0) +
+                                (isHaveNSTP !== 0
+                                  ? Number(tosf[0]?.nstp_fees || 0)
+                                  : 0) +
+                                Number(tosf[0]?.developmental_fee || 0) +
+                                Number(tosf[0]?.guidance_fee || 0) +
+                                Number(tosf[0]?.library_fee || 0) +
+                                Number(tosf[0]?.medical_and_dental_fee || 0) +
+                                Number(tosf[0]?.registration_fee || 0) +
+                                (isHaveComputerFees !== 0
+                                  ? Number(tosf[0]?.computer_fees || 0)
+                                  : 0) +
+                                (isHaveLaboratory !== 0
+                                  ? Number(tosf[0]?.laboratory_fees || 0)
+                                  : 0)}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            ></td>
+                            <td
+                              colSpan={13}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Less Financial Aid : "}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            ></td>
+                            <td
+                              colSpan={13}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Net Assessed : "}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            ></td>
+                            <td
+                              colSpan={13}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Credit Memo : "}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            ></td>
+                            <td
+                              colSpan={13}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Total Discount : "}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            ></td>
+                            <td
+                              colSpan={13}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Total Payment : "}</div>
+                            </td>
+                            <td
+                              colSpan={5}
+                              style={{
+                                fontSize: "40%",
+                                marginRight: "20px",
+
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={2}
+                              style={{
+                                marginRight: "20px",
+                                borderLeft: "1px solid black",
+                              }}
+                            ></td>
+                            <td
+                              colSpan={18}
+                              style={{
+                                fontSize: "40%",
+                                borderRight: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Outstanding Balance : "}</div>
+                            </td>
+                          </tr>
+
+                          <tr style={{ borderLeft: "1px solid black", height: "5px", borderRight: "1px solid black" }}>
+                            <td>
+
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={20}
+                              style={{
+                                margin: "0px",
+                                padding: "0px",
+                                fontSize: "63.5%",
+                                border: "1px solid black",
+                                backgroundColor: "gray",
+                                height: "auto",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                fontWeight: "bold",
+                                margin: "0px",
+                                padding: "0px",
+                                textAlign: "center",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                                lineHeight: "1",
+                              }}>{"S C H E D U L E O F P A Y M E N T"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={7}
+                              style={{
+                                fontSize: "40%",
+                                border: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"1st Payment/Due"}</div>
+                            </td>
+                            <td
+                              colSpan={6}
+                              style={{
+                                border: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                fontWeight: "bold",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"2nd Payment/Due"}</div>
+                            </td>
+                            <td
+                              colSpan={7}
+                              style={{
+                                border: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                fontWeight: "bold",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"3rd Payment/Due"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={7}
+                              style={{
+                                fontSize: "40%",
+                                border: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                fontWeight: "bold",
+                                textAlign: "center",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                            <td
+                              colSpan={6}
+                              style={{
+                                fontSize: "40%",
+                                border: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                fontWeight: "bold",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                            <td
+                              colSpan={7}
+                              style={{
+                                fontSize: "40%",
+                                border: "1px solid black",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                width: "98%",
+                                fontWeight: "bold",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={12}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                width: "98%",
+                                fontWeight: "bold",
+                                textDecorationThickness: "2px", // <-- Thicker underline
+
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Payment/Validation Date : "}</div>
+                            </td>
+                            <td
+                              colSpan={8}
+                              style={{
+                                height: "0.25in",
+                                fontSize: "11px",
+                                fontFamily: "Arial",
+                                textAlign: "center",
+                                verticalAlign: "middle",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                width: "100%", // ensures full-width underline
+                                border: "none",
+                                outline: "none",
+
+
+                                background: "none",
+                                borderBottom: "1px solid black", // thicker, longer underline
+                              }}>{shortDate}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td
+                              colSpan={9}
+                              style={{
+                                fontSize: "40%",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                width: "98%",
+                                fontWeight: "bold",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Official Receipt :"}</div>
+                            </td>
+                            <td
+                              colSpan={10}
+                              style={{
+                                fontSize: "40%",
+                                textAlign: "center",
+                                fontWeight: "Bold",
+                              }}
+                            >
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                width: "95%",
+                                fontWeight: "bold",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                                borderBottom: "1px solid black",
+                              }}>{savedUnifast ? "Scholar" : ""}</div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ width: "50%", borderLeft: "1px solid black" }}>
+                      <table
                         style={{
-                          fontSize: "62.5%",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={"Official Receipt :"}
-                          readOnly
-                          style={{
-                            color: "black",
-                            textAlign: "center",
-                            width: "98%",
-                            fontWeight: "bold",
-                            border: "none",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            outline: "none",
-                            background: "none",
-                          }}
-                        />
-                      </td>
-                      <td
-                        colSpan={10}
-                        style={{
-                          fontSize: "62.5%",
+                          borderCollapse: "collapse",
+                          fontFamily: "Arial",
+                          width: "100%",
+                          margin: "0",
                           textAlign: "center",
-                          fontWeight: "Bold",
+                          tableLayout: "fixed",
+                          borderLeft: "none",
+                          borderBottom: "none",
+                          borderTop: "none",
                         }}
                       >
-                        <input
-                          type="text"
-                          value={officialReceiptValue}
-                          readOnly
+                        <tbody>
+                          <br />
+                          <tr>
+                            <td style={{ fontSize: "11px", fontWeight: "bold", marginBottom: "5px" }}>
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                              }}>{"RULES OF REFUND"}</div>
+                            </td>
+                          </tr>
+                          {[
+                            "1. Full refund of tuition fee - Before the start of classes.",
+                            "2. 80% refund of tuition fee - within 1 week from the start of classes.",
+                            "3. 50% refund - within 2 weeks from the start of classes.",
+                            "4. No refund - after the 2nd week of classes.",
+                          ].map((rule, index) => (
+                            <tr key={`refund-rule-${index}`}>
+                              <td style={{ fontSize: "10px" }}>
+                                <div style={{
+                                  textAlign: "left",
+                                  color: "black",
+                                  paddingLeft: "40px",
+                                  width: "98%",
+                                  border: "none",
+                                  fontFamily: "Arial",
+                                  fontSize: "10px",
+                                  fontWeight: "bold",
+                                  outline: "none",
+                                  background: "none",
+                                  fontStyle: "italic",
+                                }}>{rule}</div>
+                              </td>
+                            </tr>
+                          ))}
+
+                          <tr>
+                            <td style={{ height: "0.12in" }}></td>
+                          </tr>
+
+                          <tr>
+                            <td style={{ fontSize: "11px", fontWeight: "bold" }}>
+                              <div style={{
+                                fontWeight: "bold",
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"PLEDGE UPON ADMISSION"}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: "10px", fontWeight: "bold" }}>
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "10px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                                fontStyle: "italic",
+                              }}>{"\"As a student of EARIST, I do solemnly promise that I will"}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: "10px", fontWeight: "bold" }}>
+                              <div style={{
+                                textAlign: "center",
+                                color: "black",
+                                width: "98%",
+                                border: "none",
+                                fontFamily: "Arial",
+                                fontSize: "10px",
+                                fontWeight: "bold",
+                                outline: "none",
+                                background: "none",
+                                fontStyle: "italic",
+                              }}>{"comply with the rules and regulations of the Institution.\""}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td style={{ height: "0.2in" }}></td>
+                          </tr>
+
+                          <tr>
+                            <td>
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                fontWeight: "bold",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                textDecoration: "underline",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"_________________________________"}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Student's Signature"}</div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td style={{ height: "0.12in" }}></td>
+                          </tr>
+                          <tr>
+                            <td style={{ height: "0.12in" }}></td>
+                          </tr>
+
+                          <tr>
+                            <td style={{ textAlign: "left", paddingLeft: "20px" }}>
+                              <div style={{
+                                color: "black",
+                                textAlign: "left",
+                                fontWeight: "bold",
+                                width: "98%",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                                fontSize: "11px"
+                              }}>{"APPROVED BY : "}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ textAlign: "center", fontSize: "11px" }}>
+                              {showApprovedBySignature ? (
+                                <img
+                                  src={approvedBySignatureUrl}
+                                  alt="Signature"
+                                  onError={() =>
+                                    setApprovedBySignatureMissing(true)
+                                  }
+                                  style={{
+                                    height: "60px",
+                                    objectFit: "contain",
+                                    width: "250px",
+                                    marginBottom: "2px",
+                                    display: !student_number ? "none" : "block",
+                                    marginLeft: "auto",
+                                    marginRight: "auto",
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    height: "60px",
+                                    display: !student_number ? "none" : "block",
+                                  }}
+                                />
+                              )}
+
+                              <div
+                                style={{
+                                  display: "inline-block",
+                                  fontFamily: "Arial",
+                                  fontSize: "11px",
+                                  marginTop: "-10px",
+                                  fontWeight: "bold",
+                                  lineHeight: "1.1",
+                                  textAlign: "center",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    minHeight: "14px",
+                                    display: !student_number ? "none" : "block",
+                                  }}
+                                >
+                                  {approvedBy?.full_name || ""}
+                                </div>
+                                <div style={{ whiteSpace: "pre", marginTop: "-6px" }}>
+                                  __________________________________
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>
+                              <div style={{
+                                color: "black",
+                                textAlign: "center",
+                                width: "98%",
+                                fontWeight: "bold",
+                                fontFamily: "Arial",
+                                fontSize: "11px",
+                                border: "none",
+                                outline: "none",
+                                background: "none",
+                              }}>{"Registrar"}</div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <table
+                    style={{
+                      borderCollapse: "collapse",
+                      fontFamily: "Arial",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      textAlign: "center",
+                      tableLayout: "fixed",
+
+                    }}
+                  >
+                    <tbody>
+                      {/* TOP ROW: IMAGE (LEFT) + QR (RIGHT) */}
+                      <tr>
+                        {/* LEFT SIDE */}
+                        <td
                           style={{
-                            color: "black",
-                            textAlign: "center",
-                            width: "95%",
-                            fontWeight: "bold",
-                            fontFamily: "Arial",
-                            fontSize: "12px",
-                            border: "none",
-                            outline: "none",
-                            background: "none",
-                            borderBottom: "1px solid black", // underlines the field like a line
+                            width: "50%",
+                            textAlign: "left",
+                            paddingLeft: "50px", // ?? margin-left effect
                           }}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                        >
+                          {savedUnifast && (
+                            <img
+                              src={FreeTuitionImage}
+                              alt="EARIST MIS FEE"
+                              style={{
+                                width: "300px",
+                                height: "160px",
+                              }}
+                            />
+                          )}
+                        </td>
 
-                <table
-                  className="cor-lower-extra"
-                  style={{
-                    borderCollapse: "collapse",
-                    fontFamily: "Arial",
-                    width: "8in",
-                    margin: "0 auto", // Center the table inside the form
-                    textAlign: "center",
-                    tableLayout: "fixed",
-                    borderLeft: "1px solid black",
-                    borderBottom: "1px solid black",
-                    borderRight: "1px solid black",
-                  }}
-                >
-                  <tbody>
-                    <tr className="cor-lower-extra-stamp-row">
-                      <td
-                        className="cor-free-tuition-cell"
-                        style={{ width: "50%", textAlign: "left", position: "relative" }}
-                      >
-                        {showFreeTuitionStamp && (
-                          <img
-                            src={FreeTuitionImage}
-                            crossOrigin="anonymous"
-                            alt="EARIST MIS FEE"
-                            className="cor-free-tuition-stamp"
-                            style={{
-                              position: "absolute",
-                              top: "40px",
-                              left: "-10px",
-                            }}
-                          />
-                        )}
-                      </td>
-                      <td style={{ width: "50%", textAlign: "right" }}>
-                        {effectiveStudentNumber && !qrCodeMissing && (
-                          <img
-                            src={`${API_BASE_URL}/uploads/QrCodeGenerated/${effectiveStudentNumber}_qrcode.png`}
-                            crossOrigin="anonymous"
-                            alt="Student QR Code"
-                            className="cor-qr-code-img"
-                            onError={() => setQrCodeMissing(true)}
-                          />
-                        )}
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td
-                        colSpan={2}
-                        className="cor-footer-time"
-                      >
-                        <input
-                          type="text"
-                          value={longDate}
-                          readOnly
+                        {/* RIGHT SIDE */}
+                        <td
                           style={{
+                            width: "100%",
+                            paddingRight: "30px",
+                            display: "flex",
+                            justifyContent: "flex-end",
+                          }}
+                        >
+                          {hasStudentData && (
+                            <img
+                              className="qr-code-img"
+                              style={{ width: "120px", height: "120px", marginRight: "20px", }}
+                              src={`${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`}
+                              alt="QR Code"
+                            />
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* DATE ROW */}
+                      <tr>
+                        <td
+                          colSpan={2}
+                          style={{
+                            height: "0.25in",
+                            fontSize: "15px",
+                            textAlign: "right",
+                            verticalAlign: "middle",
+                            paddingRight: "20px",
+                          }}
+                        >
+                          <div style={{
                             color: "black",
                             textAlign: "right",
                             width: "98%",
                             border: "none",
                             outline: "none",
                             background: "none",
-                            fontSize: "10px",
-                            letterSpacing: "-0.5px",
-                            fontFamily: "Arial",
-                            fontWeight: "bold",
-                            marginRight: "10px",
-                          }}
-                        />
-                      </td>
-                    </tr>
+                          }}>{longDate}</div>
+                        </td>
+                      </tr>
 
-                    <tr>
-                      <td
-                        colSpan={2}
-                        style={{
-                          height: "0.2in",
-                          fontSize: "72.5%",
-                          backgroundColor: "gray",
-                          color: "white",
-                          position: "relative",
-                        }}
-                      >
-                        <b>
-                          <span
-                            style={{
-                              color: "black",
-                              textAlign: "center",
-                              display: "block",
-                              position: "absolute",
-                              fontSize: "10px",
-                              letterSpacing: "-0.5px",
-                              fontFamily: "Arial",
-                              fontWeight: "bold",
-                              top: "-2px",
-                              width: "100%",
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                            }}
-                          >
-                            KEEP THIS CERTIFICATE. YOU WILL BE REQUIRED TO
-                            PRESENT THIS IN ALL YOUR DEALINGS WITH THE COLLEGE.
-                          </span>
-                        </b>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                      {/* FOOTER */}
+                      <tr>
+                        <td
+                          colSpan={2}
+                          style={{
+                            height: "0.2in",
+                            fontSize: "72.5%",
+                            backgroundColor: "gray",
+                            color: "white",
+                          }}
+                        >
+                          <b>
+                            <i
+                              style={{
+                                color: "black",
+                                textAlign: "center",
+                                display: "block",
+                              }}
+                            >
+                              KEEP THIS CERTIFICATE. YOU WILL BE REQUIRED TO PRESENT THIS IN ALL
+                              YOUR DEALINGS WITH THE COLLEGE.
+                            </i>
+                          </b>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
               </div>
             </div>
           </div>

@@ -50,6 +50,7 @@ import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import { FcPrint } from "react-icons/fc";
 
 const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const navigate = useNavigate();
@@ -479,10 +480,11 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   };
 
   const downloadCorPdf = async () => {
-    let captureHost = null;
+    if (!divToPrintRef.current || isGeneratingCorPdf) return;
+
+    setIsGeneratingCorPdf(true);
 
     try {
-      setIsGeneratingCorPdf(true);
       await waitForCorReady();
 
       const certificate = divToPrintRef.current;
@@ -490,87 +492,62 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         throw new Error("Certificate is not available.");
       }
 
-      await document.fonts?.ready;
-      await waitForImages(certificate);
-      await nextFrame();
+      const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>Certificate of Registration</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              font-family: Arial;
+            }
+          </style>
+        </head>
+        <body>
+          ${certificate.innerHTML}
+        </body>
+      </html>
+    `;
 
-      captureHost = document.createElement("div");
-      captureHost.style.position = "absolute";
-      captureHost.style.left = "-99999px";
-      captureHost.style.top = "0";
-      captureHost.style.width = "8in";
-      captureHost.style.height = "auto";
-      captureHost.style.overflow = "visible";
-      captureHost.style.background = "#ffffff";
-      captureHost.style.zIndex = "0";
-      captureHost.style.pointerEvents = "none";
-      captureHost.style.opacity = "1";
-      captureHost.appendChild(cloneCertificateForCapture(certificate));
-      document.body.appendChild(captureHost);
-
-      const captureTarget =
-        captureHost.querySelector(".certificate-wrapper") || captureHost;
-      captureTarget.style.width = "8in";
-      captureTarget.style.height = "auto";
-      captureTarget.style.maxHeight = "none";
-      captureTarget.style.overflow = "visible";
-      captureTarget.style.margin = "0";
-      captureTarget.style.transform = "none";
-
-      await inlineImages(captureTarget);
-      await waitForImages(captureTarget);
-      await nextFrame();
-
-      const targetBounds = captureTarget.getBoundingClientRect();
-      const captureWidth = Math.ceil(
-        Math.max(
-          captureTarget.scrollWidth,
-          captureTarget.offsetWidth,
-          targetBounds.width,
-        ),
-      );
-      const captureHeight = Math.ceil(
-        Math.max(
-          captureTarget.scrollHeight,
-          captureTarget.offsetHeight,
-          targetBounds.height,
-        ),
-      );
-
-      if (!captureWidth || !captureHeight) {
-        throw new Error("Certificate layout is empty and cannot be captured.");
-      }
-
-      const canvas = await html2canvas(captureTarget, {
-        backgroundColor: "#ffffff",
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        width: captureWidth,
-        height: captureHeight,
-        windowWidth: captureWidth,
-        windowHeight: captureHeight,
-        scrollX: 0,
-        scrollY: 0,
+      const res = await fetch(`${API_BASE_URL}/api/generate-cor-pdf`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ html }),
       });
 
-      const imageData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 5;
+      const contentType = res.headers.get("content-type");
 
-      pdf.addImage(
-        imageData,
-        "PNG",
-        margin,
-        margin,
-        pageWidth - margin * 2,
-        pageHeight - margin * 2,
-      );
-      pdf.save(
-        `certificate-of-registration-${personData.student_number || "student"}.pdf`,
-      );
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        console.error("Backend error:", errorData);
+        throw new Error(errorData?.error || "PDF failed");
+      }
+
+      if (!contentType || !contentType.includes("application/pdf")) {
+        const text = await res.text();
+        console.error("Unexpected response:", text);
+        throw new Error("Server did not return a valid PDF");
+      }
+
+      const blob = await res.blob();
+
+      if (blob.size === 0) {
+        throw new Error("Generated PDF is empty");
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `certificate-of-registration-${personData.student_number || "student"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to generate COR PDF:", error);
       window.alert(
@@ -578,9 +555,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         "Failed to generate Certificate of Registration PDF. Please try again.",
       );
     } finally {
-      if (captureHost) {
-        captureHost.remove();
-      }
       setIsGeneratingCorPdf(false);
     }
   };
@@ -1332,16 +1306,46 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     <Box sx={{ ...iconBoxSx, width: 64, height: 64 }}><FactCheck sx={{ fontSize: 34 }} /></Box>
                     <Box><Typography sx={{ fontSize: 17, fontWeight: 700 }}>Certificate of Registration</Typography><Typography sx={{ mt: 0.5, color: "text.secondary", fontSize: 14 }}>Download your official enrollment certificate for this semester.</Typography></Box>
                   </Stack>
-                  <Button
-                    variant="outlined"
-                    startIcon={<DownloadIcon />}
+                  <button
                     onClick={downloadCorPdf}
                     disabled={!isCorReadyToPrint || isGeneratingCorPdf}
-                    fullWidth={isMobile}
-                    sx={{ border: `2px solid ${borderColor}`, color: "text.primary", textTransform: "none", borderRadius: "8px", px: 3 }}
+                    style={{
+                      marginBottom: "1rem",
+                      padding: "10px 20px",
+                      border: "2px solid black",
+                      backgroundColor: "#f0f0f0",
+                      color: "black",
+                      borderRadius: "5px",
+                      marginTop: "20px",
+                      cursor: !isCorReadyToPrint || isGeneratingCorPdf ? "not-allowed" : "pointer",
+                      fontSize: "16px",
+                      fontWeight: "bold",
+                      opacity: !isCorReadyToPrint || isGeneratingCorPdf ? 0.6 : 1,
+                      width: isMobile ? "100%" : "auto",
+                      transition: "background-color 0.3s, transform 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isCorReadyToPrint || isGeneratingCorPdf) return;
+                      e.target.style.backgroundColor = "#d3d3d3";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isCorReadyToPrint || isGeneratingCorPdf) return;
+                      e.target.style.backgroundColor = "#f0f0f0";
+                    }}
+                    onMouseDown={(e) => {
+                      if (!isCorReadyToPrint || isGeneratingCorPdf) return;
+                      e.target.style.transform = "scale(0.95)";
+                    }}
+                    onMouseUp={(e) => {
+                      if (!isCorReadyToPrint || isGeneratingCorPdf) return;
+                      e.target.style.transform = "scale(1)";
+                    }}
                   >
-                    {isGeneratingCorPdf ? "Generating PDF..." : "Download student's copy"}
-                  </Button>
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <FcPrint size={20} />
+                      {isGeneratingCorPdf ? "Generating PDF..." : "Download Certificate of Registration"}
+                    </span>
+                  </button>
                 </Stack>
               </CardContent>
             </Card>

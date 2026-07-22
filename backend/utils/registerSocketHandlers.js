@@ -7199,7 +7199,7 @@ Click the link below to log in:
         LEFT JOIN student_numbering_table AS snt ON es.student_number = snt.student_number
         LEFT JOIN person_table AS pt ON snt.person_id = pt.person_id
         LEFT JOIN curriculum_table AS cct ON es.curriculum_id = cct.curriculum_id
-        LEFT JOIN program_table AS pgt ON cct.progr am_id = pgt.program_id
+       LEFT JOIN program_table AS pgt ON cct.program_id = pgt.program_id
         LEFT JOIN year_table AS yt ON cct.year_id = yt.year_id
         LEFT JOIN dprtmnt_curriculum_table AS dct ON cct.curriculum_id = dct.curriculum_id
         LEFT JOIN dprtmnt_table AS dpt ON dct.dprtmnt_id = dpt.dprtmnt_id
