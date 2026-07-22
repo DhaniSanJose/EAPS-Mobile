@@ -45,8 +45,8 @@ import useAuditMac from "../utils/useAuditMac";
 import {
   buildGradingReportPrintHtml,
   mapStudentToGradingPrintRow,
-  printGradingReportDocument,
   resolveLogoDataUrl,
+  GRADING_REPORT_PRINT_CSS,
 } from "../utils/gradingReportPrintLayout";
 
 // Defined OUTSIDE the component so the reference never changes
@@ -277,6 +277,7 @@ const GradingSheet = () => {
   const [selectedSchoolSemester, setSelectedSchoolSemester] = useState("");
   const [selectedActiveSchoolYear, setSelectedActiveSchoolYear] = useState("");
   const [selectedSectionID, setSelectedSectionID] = useState("");
+  const [isGeneratingGradingPdf, setIsGeneratingGradingPdf] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState("");
   const [gradingSheetBootstrapped, setGradingSheetBootstrapped] = useState(false);
   const skipNextStudentFetchRef = useRef(false);
@@ -1352,91 +1353,159 @@ const GradingSheet = () => {
     }
   };
 
-  const printDiv = async () => {
+  const downloadGradingSheetPdf = async () => {
+    if (isGeneratingGradingPdf) return;
+
     const printStudents = sortStudentsByNameAsc(
       filteredStudents.length ? filteredStudents : students,
     );
-    const meta = printStudents[0] || {};
-    const lecUnit = Number(meta.course_unit) || 0;
-    const labUnit = Number(meta.lab_unit) || 0;
-    const creditUnit = lecUnit + labUnit;
-    const facultyName = [
-      profData.fname,
-      profData.mname ? `${String(profData.mname)[0]}.` : "",
-      profData.lname,
-    ]
-      .filter(Boolean)
-      .join(" ");
 
-    const academicYearTerm = [
-      meta.current_year && meta.next_year
-        ? `${meta.current_year}-${meta.next_year}`
-        : "",
-      meta.semester_description || "",
-    ]
-      .filter(Boolean)
-      .join(", ");
+    if (!printStudents.length) {
+      window.alert("No students available to generate the Grading Sheet PDF.");
+      return;
+    }
 
-    const sessionParts = [
-      meta.day || meta.session_day || "",
-      meta.school_time_start && meta.school_time_end
-        ? `${meta.school_time_start}-${meta.school_time_end}`
-        : meta.session || "",
-    ].filter(Boolean);
-    const session = sessionParts.join(" - ");
+    setIsGeneratingGradingPdf(true);
 
-    const datePostedRaw =
-      meta.date_posted || meta.posted_at || meta.grade_posted_at || "";
-    const datePosted = datePostedRaw
-      ? new Date(datePostedRaw).toLocaleDateString("en-PH", {
-          month: "2-digit",
-          day: "2-digit",
-          year: "2-digit",
-        })
-      : "";
+    try {
+      const meta = printStudents[0] || {};
+      const lecUnit = Number(meta.course_unit) || 0;
+      const labUnit = Number(meta.lab_unit) || 0;
+      const creditUnit = lecUnit + labUnit;
+      const facultyName = [
+        profData.fname,
+        profData.mname ? `${String(profData.mname)[0]}.` : "",
+        profData.lname,
+      ]
+        .filter(Boolean)
+        .join(" ");
 
-    const printTimestamp = new Date().toLocaleString("en-PH", {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
+      const academicYearTerm = [
+        meta.current_year && meta.next_year
+          ? `${meta.current_year}-${meta.next_year}`
+          : "",
+        meta.semester_description || "",
+      ]
+        .filter(Boolean)
+        .join(", ");
 
-    const logoDataUrl = await resolveLogoDataUrl(
-      fetchedLogo || EaristLogo || "",
-    );
+      const sessionParts = [
+        meta.day || meta.session_day || "",
+        meta.school_time_start && meta.school_time_end
+          ? `${meta.school_time_start}-${meta.school_time_end}`
+          : meta.session || "",
+      ].filter(Boolean);
+      const session = sessionParts.join(" - ");
 
-    const html = buildGradingReportPrintHtml({
-      companyName,
-      campusAddress: campusAddress || "Nagtahan St, Sampaloc, Manila",
-      logoUrl: logoDataUrl,
-      subjectCode: meta.course_code || "",
-      subjectTitle: (meta.course_description || "").toUpperCase(),
-      academicYearTerm,
-      classSection: `${meta.program_code || ""} ${meta.section_description || ""}`
+      const datePostedRaw =
+        meta.date_posted || meta.posted_at || meta.grade_posted_at || "";
+      const datePosted = datePostedRaw
+        ? new Date(datePostedRaw).toLocaleDateString("en-PH", {
+            month: "2-digit",
+            day: "2-digit",
+            year: "2-digit",
+          })
+        : "";
+
+      const printTimestamp = new Date().toLocaleString("en-PH", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
+
+      const logoDataUrl = await resolveLogoDataUrl(
+        fetchedLogo || EaristLogo || "",
+      );
+
+      const classSection = `${meta.program_code || ""} ${meta.section_description || ""}`
         .replace(/\s+/g, " ")
-        .trim(),
-      lecUnit: lecUnit.toFixed(1),
-      labUnit: labUnit.toFixed(1),
-      creditUnit: creditUnit.toFixed(1),
-      session,
-      facultyName,
-      datePosted,
-      collegeName: meta.dprtmnt_name || "",
-      students: printStudents.map((student) =>
-        mapStudentToGradingPrintRow(student, {
-          convertRawToRating,
-          remarkConversion,
-        }),
-      ),
-      stats: gradeStats,
-      printInfoLabel: printTimestamp,
-    });
+        .trim();
 
-    printGradingReportDocument(html, getGradingSheetBaseName(meta));
+      const footerCenter = `${meta.course_code || ""} - ${
+        meta.course_description || "Grade Sheet"
+      }`;
+
+      const fileNamePrefix = getGradingSheetBaseName(meta);
+
+      const innerHtml = `
+        <style>${GRADING_REPORT_PRINT_CSS}</style>
+        ${buildGradingReportPrintHtml({
+          companyName,
+          campusAddress: campusAddress || "Nagtahan St, Sampaloc, Manila",
+          logoUrl: logoDataUrl,
+          subjectCode: meta.course_code || "",
+          subjectTitle: (meta.course_description || "").toUpperCase(),
+          academicYearTerm,
+          classSection,
+          lecUnit: lecUnit.toFixed(1),
+          labUnit: labUnit.toFixed(1),
+          creditUnit: creditUnit.toFixed(1),
+          session,
+          facultyName,
+          datePosted,
+          collegeName: meta.dprtmnt_name || "",
+          students: printStudents.map((student) =>
+            mapStudentToGradingPrintRow(student, {
+              convertRawToRating,
+              remarkConversion,
+            }),
+          ),
+          stats: gradeStats,
+          printInfoLabel: printTimestamp,
+        })}
+      `;
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-grading-sheet-pdf`,
+        {
+          html: innerHtml,
+          footerLeft: printTimestamp,
+          footerCenter,
+          fileNamePrefix,
+        },
+        {
+          responseType: "blob",
+          headers: {
+            "x-employee-id":
+              profData.employee_id ||
+              localStorage.getItem("employee_id") ||
+              "",
+          },
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `${fileNamePrefix}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+
+      try {
+        await postAuditEvent(
+          "faculty_grading_sheet_exported",
+          buildClassAuditDetails(meta, {
+            file_name: `${fileNamePrefix}.pdf`,
+            student_count: printStudents.length,
+          }),
+        );
+      } catch (auditErr) {
+        console.warn("Grading sheet PDF audit log failed:", auditErr);
+      }
+    } catch (err) {
+      console.error("Failed to generate Grading Sheet PDF:", err);
+      window.alert("Failed to generate Grading Sheet PDF. Please try again.");
+    } finally {
+      setIsGeneratingGradingPdf(false);
+    }
   };
 
   // Disable right-click
@@ -1512,7 +1581,8 @@ const GradingSheet = () => {
           />
 
           <button
-            onClick={printDiv}
+            onClick={downloadGradingSheetPdf}
+            disabled={isGeneratingGradingPdf}
             style={{
               width: "308px",
               padding: "10px 20px",
@@ -1520,22 +1590,37 @@ const GradingSheet = () => {
               backgroundColor: "#f0f0f0",
               color: "black",
               borderRadius: "5px",
-              cursor: "pointer",
+              cursor: isGeneratingGradingPdf ? "not-allowed" : "pointer",
               fontSize: "16px",
               fontWeight: "bold",
+              opacity: isGeneratingGradingPdf ? 0.6 : 1,
               transition: "background-color 0.3s, transform 0.2s",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+            onMouseEnter={(e) => {
+              if (isGeneratingGradingPdf) return;
+              e.currentTarget.style.backgroundColor = "#d3d3d3";
+            }}
+            onMouseLeave={(e) => {
+              if (isGeneratingGradingPdf) return;
+              e.currentTarget.style.backgroundColor = "#f0f0f0";
+            }}
+            onMouseDown={(e) => {
+              if (isGeneratingGradingPdf) return;
+              e.currentTarget.style.transform = "scale(0.95)";
+            }}
+            onMouseUp={(e) => {
+              if (isGeneratingGradingPdf) return;
+              e.currentTarget.style.transform = "scale(1)";
+            }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <FcPrint size={20} />
-              Print Grade
+              {isGeneratingGradingPdf
+                ? "Generating PDF..."
+                : "Download Grade Sheet"}
             </span>
           </button>
         </Box>

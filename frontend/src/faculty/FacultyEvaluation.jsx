@@ -40,6 +40,7 @@ import { FcPrint } from "react-icons/fc";
 import EaristLogo from "../assets/EaristLogo.png";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
+import { resolveLogoDataUrl } from "../utils/gradingReportPrintLayout";
 const FacultyEvaluation = () => {
   const settings = useContext(SettingsContext);
 
@@ -121,6 +122,8 @@ const FacultyEvaluation = () => {
 
   // Add a ref for the print content
   const divToPrintRef = useRef();
+  const [isGeneratingEvaluationPdf, setIsGeneratingEvaluationPdf] =
+    useState(false);
 
   // ✅ On page load: check user session and fetch student data
   useEffect(() => {
@@ -473,9 +476,13 @@ const FacultyEvaluation = () => {
     }
   };
 
-  // Create a combined print function that logs and prints
-  // Create a combined print function that logs and prints
-  const printDiv = async () => {
+  // Create a combined PDF export that logs and downloads
+  const downloadFacultyEvaluationPdf = async () => {
+    if (isGeneratingEvaluationPdf) return;
+
+    setIsGeneratingEvaluationPdf(true);
+
+    try {
     // First log the action
     await AuditLog();
 
@@ -504,7 +511,7 @@ const FacultyEvaluation = () => {
     const branchAddress = matchedBranch?.address || campusAddress;
     const campusLine = [branchName, branchAddress].filter(Boolean).join(" - ");
 
-    const logoSrc = fetchedLogo || EaristLogo;
+    const logoSrc = await resolveLogoDataUrl(fetchedLogo || EaristLogo || "");
     const name = companyName?.trim() || "";
 
     // ✅ Split company name into two balanced lines
@@ -730,12 +737,11 @@ const FacultyEvaluation = () => {
                     `
         : graphPrintContent;
 
-    // Open new print window
-    const newWin = window.open("", "Print-Window");
-    newWin.document.open();
-    newWin.document.write(`
+    const html = `
+            <!DOCTYPE html>
             <html>
                 <head>
+                    <meta charset="UTF-8" />
                     <title>Faculty Evaluation Report</title>
                     <style>
                         @page { size: A4 portrait; margin: 6mm; }
@@ -909,11 +915,11 @@ const FacultyEvaluation = () => {
                         }
                     </style>
                 </head>
-                <body onload="window.print(); setTimeout(() => window.close(), 100);">
+                <body>
                     <div class="print-container">
                         <!-- ✅ HEADER -->
                         <div class="print-header">
-                            <img src="${logoSrc}" alt="School Logo" />
+                            ${logoSrc ? `<img src="${logoSrc}" alt="School Logo" />` : ""}
                             <div>
                                  <div style="font-size: 8px; font-family: Arial">Republic of the Philippines</div>
                                 ${
@@ -1041,8 +1047,49 @@ const FacultyEvaluation = () => {
                     </div>
                 </body>
             </html>
-        `);
-    newWin.document.close();
+        `;
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-faculty-evaluation-pdf`,
+        {
+          html,
+          employee_id: profData.employee_id || localStorage.getItem("employee_id") || "",
+          last_name: profData.lname || "",
+          first_name: profData.fname || "",
+        },
+        { responseType: "blob" },
+      );
+
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const safeLastName = String(profData.lname || "Faculty")
+        .trim()
+        .replace(/\s+/g, "_");
+      const safeFirstName = String(profData.fname || "")
+        .trim()
+        .replace(/\s+/g, "_");
+      const employeeSuffix = profData.employee_id
+        ? `_${String(profData.employee_id).trim().replace(/\s+/g, "_")}`
+        : "";
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute(
+        "download",
+        `Faculty_Evaluation_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${employeeSuffix}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Faculty Evaluation PDF:", err);
+      window.alert(
+        "Failed to generate Faculty Evaluation PDF. Please try again.",
+      );
+    } finally {
+      setIsGeneratingEvaluationPdf(false);
+    }
   };
 
   // 🔒 Disable right-click
@@ -1148,7 +1195,8 @@ const FacultyEvaluation = () => {
             </Typography>
 
             <button
-              onClick={printDiv}
+              onClick={downloadFacultyEvaluationPdf}
+              disabled={isGeneratingEvaluationPdf}
               style={{
                 width: "300px",
                 padding: "10px 20px",
@@ -1156,18 +1204,31 @@ const FacultyEvaluation = () => {
                 backgroundColor: "#f0f0f0",
                 color: "black",
                 borderRadius: "5px",
-                cursor: "pointer",
+                cursor: isGeneratingEvaluationPdf ? "not-allowed" : "pointer",
                 fontSize: "16px",
                 fontWeight: "bold",
+                opacity: isGeneratingEvaluationPdf ? 0.6 : 1,
                 transition: "background-color 0.3s, transform 0.2s",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
-              onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-              onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-              onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-              onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+              onMouseEnter={(e) => {
+                if (isGeneratingEvaluationPdf) return;
+                e.currentTarget.style.backgroundColor = "#d3d3d3";
+              }}
+              onMouseLeave={(e) => {
+                if (isGeneratingEvaluationPdf) return;
+                e.currentTarget.style.backgroundColor = "#f0f0f0";
+              }}
+              onMouseDown={(e) => {
+                if (isGeneratingEvaluationPdf) return;
+                e.currentTarget.style.transform = "scale(0.95)";
+              }}
+              onMouseUp={(e) => {
+                if (isGeneratingEvaluationPdf) return;
+                e.currentTarget.style.transform = "scale(1)";
+              }}
             >
               <span
                 style={{
@@ -1177,7 +1238,9 @@ const FacultyEvaluation = () => {
                 }}
               >
                 <FcPrint size={20} />
-                Print Evaluation
+                {isGeneratingEvaluationPdf
+                  ? "Generating PDF..."
+                  : "Download Evaluation"}
               </span>
             </button>
 

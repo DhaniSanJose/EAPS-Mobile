@@ -340,7 +340,7 @@ export const CLASS_LIST_PRINT_CSS = `
 `;
 
 /** Rows that fit under the repeating letterhead + details block on A4. */
-export const CLASS_LIST_ROWS_PER_PAGE = 32;
+export const CLASS_LIST_ROWS_PER_PAGE = 38;
 
 /**
  * Build Class List print HTML matching EXAMPLES/ClassList.pdf.

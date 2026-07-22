@@ -2730,4 +2730,476 @@ router.post("/generate-health-record-pdf", async (req, res) => {
   }
 });
 
+// ─── Faculty Workload ──────────────────────────────────────────────────────
+router.post("/generate-faculty-workload-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, styles, employee_id, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // American Legal: 8.5in x 14in. Use a wide viewport so the form can
+    // lay out at its natural ~63rem width before we scale it down.
+    const LEGAL_WIDTH_PX = 816;  // 8.5in @ 96dpi
+    const LEGAL_HEIGHT_PX = 1344; // 14in @ 96dpi
+    const PRINT_MARGIN_IN = 0.2;
+    const PRINT_MARGIN_PX = PRINT_MARGIN_IN * 96;
+
+    await page.setViewport({
+      width: 1200,
+      height: 1800,
+      deviceScaleFactor: 1,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    const safeStyles = typeof styles === "string" ? styles : "";
+
+    // Render at natural size first, then measure and scale to fill Legal
+    // while keeping everything on a single page.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    ${safeStyles}
+
+    @page {
+      size: 8.5in 14in;
+      margin: 0;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    .fw-pdf-page {
+      position: relative;
+      width: 8.5in;
+      height: 14in;
+      overflow: hidden;
+    }
+
+    .fw-pdf-content {
+      position: absolute;
+      top: ${PRINT_MARGIN_IN}in;
+      left: 0;
+      width: max-content;
+      max-width: none;
+      transform-origin: top left;
+      transform: scale(1);
+    }
+
+    .print-container {
+      position: static !important;
+      transform: none !important;
+      scale: 1 !important;
+      margin: 0 !important;
+      margin-bottom: 0 !important;
+      padding: 0 !important;
+      min-height: 0 !important;
+      width: max-content !important;
+      max-width: none !important;
+      visibility: visible !important;
+    }
+
+    .print-container.mb-\\[16rem\\],
+    .mb-\\[16rem\\],
+    .min-h-\\[10rem\\] {
+      margin-bottom: 0 !important;
+      min-height: 0 !important;
+    }
+
+    .print-container, .print-container * {
+      visibility: visible !important;
+    }
+
+    button {
+      display: none !important;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    img {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="fw-pdf-page">
+    <div class="fw-pdf-content" id="fw-pdf-content">
+      <div class="print-container">${html}</div>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // Scale content to fill available Legal page area, then center horizontally.
+    await page.evaluate(
+      ({ marginPx, pageWidthPx, pageHeightPx }) => {
+        const content = document.getElementById("fw-pdf-content");
+        if (!content) return;
+
+        content.style.transform = "scale(1)";
+        content.style.transformOrigin = "top left";
+        content.style.left = "0px";
+
+        const rect = content.getBoundingClientRect();
+        const contentWidth = Math.max(rect.width, content.scrollWidth, 1);
+        const contentHeight = Math.max(rect.height, content.scrollHeight, 1);
+
+        const availableWidth = pageWidthPx - marginPx * 2;
+        const availableHeight = pageHeightPx - marginPx * 2;
+
+        const scale = Math.min(
+          availableWidth / contentWidth,
+          availableHeight / contentHeight,
+        );
+
+        // Slightly under-scale so borders aren't clipped by rounding.
+        const safeScale = Math.max(0.1, Math.min(scale * 0.98, 1.5));
+        const scaledWidth = contentWidth * safeScale;
+        const scaledHeight = contentHeight * safeScale;
+        const left = Math.max(marginPx, (pageWidthPx - scaledWidth) / 2) + 13;
+        const top = Math.max(marginPx, (pageHeightPx - scaledHeight) / 2);
+
+        content.style.transform = `scale(${safeScale})`;
+        content.style.left = `${left}px`;
+        content.style.top = `${top}px`;
+      },
+      {
+        marginPx: PRINT_MARGIN_PX,
+        pageWidthPx: LEGAL_WIDTH_PX,
+        pageHeightPx: LEGAL_HEIGHT_PX,
+      },
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const pdfBuffer = await page.pdf({
+      width: "8.5in",
+      height: "14in",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Faculty").trim().replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const employeeSuffix = employee_id ? `_${String(employee_id).trim().replace(/\s+/g, "_")}` : "";
+    const fileName = `Faculty_Workload_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${employeeSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Faculty Workload",
+      legacyAction: "FACULTY_WORKLOAD_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Faculty Workload PDF${employee_id ? ` for Employee (${employee_id})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Faculty Workload PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+// ─── Faculty Grading Sheet ─────────────────────────────────────────────────
+router.post("/generate-grading-sheet-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, footerLeft = "", footerCenter = "", fileNamePrefix = "" } =
+      req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    const escapeFooter = (value) =>
+      String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Grade Sheet HTML embeds GRADING_REPORT_PRINT_CSS. Puppeteer footer
+    // carries page numbers; in-document .print-info is hidden to avoid
+    // duplicating the print timestamp.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+    }
+    .pdf-hide-doc-print-info .print-info {
+      display: none !important;
+    }
+  </style>
+</head>
+<body class="pdf-hide-doc-print-info">
+  ${html}
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const footerTemplate = `
+      <div style="width:100%;box-sizing:border-box;padding:4px 10mm 0;font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#000;border-top:1px solid #000;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span style="white-space:nowrap;">Date Printed: ${escapeFooter(footerLeft)}</span>
+        <span style="flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeFooter(footerCenter)}</span>
+        <span style="white-space:nowrap;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+      </div>
+    `;
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      displayHeaderFooter: true,
+      headerTemplate: "<div></div>",
+      footerTemplate,
+      margin: { top: "8mm", bottom: "14mm", left: "8mm", right: "8mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safePrefix = String(fileNamePrefix || "GradingSheet")
+      .trim()
+      .replace(/[^\w.-]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "GradingSheet";
+    const fileName = `${safePrefix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Grading Sheet",
+      legacyAction: "GRADING_SHEET_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Grading Sheet PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Grading Sheet PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+// ─── Faculty Evaluation Report ─────────────────────────────────────────────
+router.post("/generate-faculty-evaluation-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, employee_id, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    const trimmed = html.trim();
+    const wrappedHtml = /^<!DOCTYPE html|<html[\s>]/i.test(trimmed)
+      ? trimmed
+      : `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 6mm; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+    }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  </style>
+</head>
+<body>${html}</body>
+</html>
+      `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "6mm", bottom: "6mm", left: "6mm", right: "6mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Faculty").trim().replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const employeeSuffix = employee_id
+      ? `_${String(employee_id).trim().replace(/\s+/g, "_")}`
+      : "";
+    const fileName = `Faculty_Evaluation_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${employeeSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Faculty Evaluation Report",
+      legacyAction: "FACULTY_EVALUATION_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Faculty Evaluation PDF${employee_id ? ` for Employee (${employee_id})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Faculty Evaluation PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 module.exports = router;

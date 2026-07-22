@@ -34,8 +34,8 @@ import EaristLogo from "../assets/EaristLogo.png";
 import {
   buildClassListPrintHtml,
   mapStudentToPrintRow,
-  printClassListDocument,
   resolveLogoDataUrl,
+  CLASS_LIST_PRINT_CSS,
 } from "../utils/classListPrintLayout";
 
 const getStudentRegularStatus = (student) =>
@@ -196,6 +196,7 @@ const FacultyMasterList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [isGeneratingClassListPdf, setIsGeneratingClassListPdf] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -652,77 +653,123 @@ const FacultyMasterList = () => {
     department_section_id,
   ]);
 
-  const formatScheduleLines = (schedules = []) => {
-    if (!schedules.length) return [];
-    return schedules
-      .map((schedule) =>
-        `${schedule.day || ""} ${schedule.start || ""}-${schedule.end || ""}`.trim(),
-      )
-      .filter(Boolean);
-  };
+  const downloadClassListPdf = async () => {
+    if (isGeneratingClassListPdf) return;
+    if (!groupedList.length) {
+      window.alert("No students available to generate the Class List PDF.");
+      return;
+    }
 
-  const printDiv = async () => {
-    const meta = groupedList[0] || {};
-    const scheduleLines = formatScheduleLines(meta.schedules || []);
-    const selectedYear = schoolYears.find(
-      (yearObj) => String(yearObj.year_id) === String(selectedSchoolYear),
-    );
-    const selectedSemester = schoolSemester.find(
-      (sem) => String(sem.semester_id) === String(selectedSchoolSemester),
-    );
-    const printTimestamp = new Date().toLocaleString("en-PH", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
-    const facultyName = [
-      profData.lname,
-      [profData.fname, profData.mname ? `${String(profData.mname)[0]}.` : ""]
+    setIsGeneratingClassListPdf(true);
+
+    try {
+      const meta = groupedList[0] || {};
+      const selectedYear = schoolYears.find(
+        (yearObj) => String(yearObj.year_id) === String(selectedSchoolYear),
+      );
+      const selectedSemester = schoolSemester.find(
+        (sem) => String(sem.semester_id) === String(selectedSchoolSemester),
+      );
+      const printTimestamp = new Date().toLocaleString("en-PH", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
+      const facultyName = [
+        profData.lname,
+        [profData.fname, profData.mname ? `${String(profData.mname)[0]}.` : ""]
+          .filter(Boolean)
+          .join(" "),
+      ]
         .filter(Boolean)
-        .join(" "),
-    ]
-      .filter(Boolean)
-      .join(", ");
+        .join(", ");
 
-    const logoDataUrl = await resolveLogoDataUrl(
-      fetchedLogo || EaristLogo || "",
-    );
+      const logoDataUrl = await resolveLogoDataUrl(
+        fetchedLogo || EaristLogo || "",
+      );
 
-    const footerCenter = `${meta.course_code || ""} - ${
-      meta.course_description || "Class List"
-    }`;
+      const footerCenter = `${meta.course_code || ""} - ${
+        meta.course_description || "Class List"
+      }`;
 
-    const html = buildClassListPrintHtml({
-      companyName,
-      campusAddress: campusAddress || "Nagtahan Sampaloc Manila",
-      logoUrl: logoDataUrl,
-      courseTitle: (meta.course_description || "").toUpperCase(),
-      departmentTitle: meta.dprtmnt_name || "",
-      academicYearLabel: selectedYear
-        ? `${selectedYear.current_year}-${selectedYear.next_year}`
-        : `${meta.current_year || ""}-${meta.next_year || ""}`,
-      semesterLabel:
-        selectedSemester?.semester_description ||
-        meta.semester_description ||
-        "",
-      programCode: meta.course_code || "",
-      classSection: `${meta.program_code || ""} ${meta.section_description || ""}`
+      const classSection = `${meta.program_code || ""} ${meta.section_description || ""}`
         .replace(/\s+/g, " ")
-        .trim(),
-      programDescription: meta.course_description || "",
-      yearLevel: meta.year_level_description || "",
-      departmentName: meta.dprtmnt_name || "",
-      facultyName,
-      students: groupedList.map(mapStudentToPrintRow),
-      printInfoLeft: printTimestamp,
-      printInfoCenter: footerCenter,
-    });
+        .trim();
 
-    printClassListDocument(html, "Class List");
+      const innerHtml = `
+        <style>${CLASS_LIST_PRINT_CSS}</style>
+        ${buildClassListPrintHtml({
+          companyName,
+          campusAddress: campusAddress || "Nagtahan Sampaloc Manila",
+          logoUrl: logoDataUrl,
+          courseTitle: (meta.course_description || "").toUpperCase(),
+          departmentTitle: meta.dprtmnt_name || "",
+          academicYearLabel: selectedYear
+            ? `${selectedYear.current_year}-${selectedYear.next_year}`
+            : `${meta.current_year || ""}-${meta.next_year || ""}`,
+          semesterLabel:
+            selectedSemester?.semester_description ||
+            meta.semester_description ||
+            "",
+          programCode: meta.course_code || "",
+          classSection,
+          programDescription: meta.course_description || "",
+          yearLevel: meta.year_level_description || "",
+          departmentName: meta.dprtmnt_name || "",
+          facultyName,
+          students: groupedList.map(mapStudentToPrintRow),
+          printInfoLeft: printTimestamp,
+          printInfoCenter: footerCenter,
+        })}
+      `;
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-class-list-pdf`,
+        {
+          html: innerHtml,
+          footerLeft: printTimestamp,
+          footerCenter,
+        },
+        {
+          responseType: "blob",
+          headers: {
+            "x-employee-id":
+              profData.employee_id ||
+              localStorage.getItem("employee_id") ||
+              "",
+          },
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      const safeCourse = String(meta.course_code || "Class")
+        .trim()
+        .replace(/\s+/g, "_");
+      const safeSection = String(classSection || "List")
+        .trim()
+        .replace(/\s+/g, "_");
+      link.setAttribute(
+        "download",
+        `Class_List_${safeCourse}_${safeSection}_${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Class List PDF:", err);
+      window.alert("Failed to generate Class List PDF. Please try again.");
+    } finally {
+      setIsGeneratingClassListPdf(false);
+    }
   };
 
   // Disable right-click
@@ -798,7 +845,8 @@ const FacultyMasterList = () => {
           />
 
           <button
-            onClick={printDiv}
+            onClick={downloadClassListPdf}
+            disabled={isGeneratingClassListPdf}
             style={{
               width: "308px", // MATCHED WITH GRADING SHEET
               padding: "10px 20px",
@@ -806,24 +854,39 @@ const FacultyMasterList = () => {
               backgroundColor: "#f0f0f0",
               color: "black",
               borderRadius: "5px",
-              cursor: "pointer",
+              cursor: isGeneratingClassListPdf ? "not-allowed" : "pointer",
               fontSize: "16px",
               fontWeight: "bold",
               marginRight: "30px",
+              opacity: isGeneratingClassListPdf ? 0.6 : 1,
               transition: "background-color 0.3s, transform 0.2s",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: "8px",
             }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+            onMouseEnter={(e) => {
+              if (isGeneratingClassListPdf) return;
+              e.currentTarget.style.backgroundColor = "#d3d3d3";
+            }}
+            onMouseLeave={(e) => {
+              if (isGeneratingClassListPdf) return;
+              e.currentTarget.style.backgroundColor = "#f0f0f0";
+            }}
+            onMouseDown={(e) => {
+              if (isGeneratingClassListPdf) return;
+              e.currentTarget.style.transform = "scale(0.95)";
+            }}
+            onMouseUp={(e) => {
+              if (isGeneratingClassListPdf) return;
+              e.currentTarget.style.transform = "scale(1)";
+            }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <FcPrint size={20} />
-              Print Class List
+              {isGeneratingClassListPdf
+                ? "Generating PDF..."
+                : "Download Class List"}
             </span>
           </button>
         </Box>

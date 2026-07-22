@@ -1127,9 +1127,90 @@ const FacultyWorkload = () => {
   };
 
   const divToPrintRef = useRef();
+  const [isGeneratingWorkloadPdf, setIsGeneratingWorkloadPdf] = useState(false);
 
-  const printDiv = async () => {
-    window.print();
+  const collectDocumentCss = () => {
+    let cssText = "";
+    Array.from(document.styleSheets).forEach((sheet) => {
+      try {
+        Array.from(sheet.cssRules || []).forEach((rule) => {
+          cssText += `${rule.cssText}\n`;
+        });
+      } catch (_) {
+        // Ignore cross-origin stylesheets
+      }
+    });
+    return cssText;
+  };
+
+  const downloadFacultyWorkloadPdf = async () => {
+    if (!divToPrintRef.current || isGeneratingWorkloadPdf) return;
+
+    setIsGeneratingWorkloadPdf(true);
+
+    try {
+      const workload = divToPrintRef.current;
+      if (!workload) {
+        throw new Error("Faculty workload form is not available.");
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/generate-faculty-workload-pdf`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          html: workload.innerHTML,
+          styles: collectDocumentCss(),
+          employee_id: profData.employee_id || "",
+          last_name: profData.lname || "",
+          first_name: profData.fname || "",
+        }),
+      });
+
+      const contentType = res.headers.get("content-type");
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        console.error("Backend error:", errorData);
+        throw new Error(errorData?.error || errorData?.message || "PDF failed");
+      }
+
+      if (!contentType || !contentType.includes("application/pdf")) {
+        const text = await res.text();
+        console.error("Unexpected response:", text);
+        throw new Error("Server did not return a valid PDF");
+      }
+
+      const blob = await res.blob();
+
+      if (blob.size === 0) {
+        throw new Error("Generated PDF is empty");
+      }
+
+      const safeLastName = String(profData.lname || "Faculty").trim().replace(/\s+/g, "_");
+      const safeFirstName = String(profData.fname || "").trim().replace(/\s+/g, "_");
+      const employeeSuffix = profData.employee_id
+        ? `_${String(profData.employee_id).trim().replace(/\s+/g, "_")}`
+        : "";
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Faculty_Workload_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${employeeSuffix}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to generate Faculty Workload PDF:", error);
+      window.alert(
+        error?.message ||
+          "Failed to generate Faculty Workload PDF. Please try again.",
+      );
+    } finally {
+      setIsGeneratingWorkloadPdf(false);
+    }
   };
 
   // 🔒 Disable right-click
@@ -1184,7 +1265,8 @@ const FacultyWorkload = () => {
         </Typography>
 
         <button
-          onClick={printDiv}
+          onClick={downloadFacultyWorkloadPdf}
+          disabled={isGeneratingWorkloadPdf}
           style={{
             width: "300px",
             padding: "10px 20px",
@@ -1192,18 +1274,31 @@ const FacultyWorkload = () => {
             backgroundColor: "#f0f0f0",
             color: "black",
             borderRadius: "5px",
-            cursor: "pointer",
+            cursor: isGeneratingWorkloadPdf ? "not-allowed" : "pointer",
             fontSize: "16px",
             fontWeight: "bold",
+            opacity: isGeneratingWorkloadPdf ? 0.6 : 1,
             transition: "background-color 0.3s, transform 0.2s",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
-          onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-          onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-          onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+          onMouseEnter={(e) => {
+            if (isGeneratingWorkloadPdf) return;
+            e.currentTarget.style.backgroundColor = "#d3d3d3";
+          }}
+          onMouseLeave={(e) => {
+            if (isGeneratingWorkloadPdf) return;
+            e.currentTarget.style.backgroundColor = "#f0f0f0";
+          }}
+          onMouseDown={(e) => {
+            if (isGeneratingWorkloadPdf) return;
+            e.currentTarget.style.transform = "scale(0.95)";
+          }}
+          onMouseUp={(e) => {
+            if (isGeneratingWorkloadPdf) return;
+            e.currentTarget.style.transform = "scale(1)";
+          }}
         >
           <span
             style={{
@@ -1213,7 +1308,9 @@ const FacultyWorkload = () => {
             }}
           >
             <FcPrint size={20} />
-            Print Evaluation
+            {isGeneratingWorkloadPdf
+              ? "Generating PDF..."
+              : "Download Faculty Workload"}
           </span>
         </button>
       </Box>
@@ -1226,6 +1323,7 @@ const FacultyWorkload = () => {
         {`${FACULTY_WORKLOAD_STYLES}
                 @media print {
                     @page {
+                        size: 8.5in 14in;
                         margin: 0; 
                     }
                 
@@ -1282,7 +1380,7 @@ const FacultyWorkload = () => {
                     }
                     
                     @page {
-                        size: A4;
+                        size: 8.5in 14in;
                         margin: 0;
                     }
 
