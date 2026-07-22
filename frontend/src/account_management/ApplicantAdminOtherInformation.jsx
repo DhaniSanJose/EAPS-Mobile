@@ -303,17 +303,18 @@ const SuperAdminApplicantDashboard5 = () => {
 
             // ✅ Execute update to backend
             await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, getAuditHeaders());
-            console.log(`✅ Auto-saved for applicant person_id: ${targetId}`);
+            console.log(`✅ Saved for applicant person_id: ${targetId}`);
         } catch (error) {
-            console.error("❌ Auto-save failed:", {
+            console.error("❌ Save failed:", {
                 message: error.message,
                 status: error.response?.status,
                 details: error.response?.data || error,
             });
+            throw error;
         }
     };
 
-    // ✅ Real-time update on every change
+    // Local form updates only (no auto-save)
     const handleChange = (e) => {
         const { name, type, checked, value } = e.target;
 
@@ -325,7 +326,25 @@ const SuperAdminApplicantDashboard5 = () => {
         };
 
         setPerson(updatedPerson);
-        handleUpdate(updatedPerson); // Auto-save immediately
+    };
+
+    const [saving, setSaving] = useState(false);
+    const handleManualSave = async () => {
+        const targetId = selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+        if (!targetId) {
+            setSnackbar({ open: true, message: "No applicant selected.", severity: "warning" });
+            return;
+        }
+        try {
+            setSaving(true);
+            await handleUpdate(person);
+            sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+            setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
+        } catch (err) {
+            setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+        } finally {
+            setSaving(false);
+        }
     };
 
 
@@ -830,17 +849,44 @@ const SuperAdminApplicantDashboard5 = () => {
                 </Box>
             </Box>
 
-            <h1
-                style={{
-                    fontSize: "30px",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    color: "black",
-                    marginTop: "25px",
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: "25px",
+                    px: 2,
+                    position: "relative",
                 }}
             >
-                PRINTABLE DOCUMENTS
-            </h1>
+                <h1
+                    style={{
+                        fontSize: "30px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        color: "black",
+                        margin: 0,
+                    }}
+                >
+                    PRINTABLE DOCUMENTS
+                </h1>
+                <Button
+                    variant="contained"
+                    onClick={handleManualSave}
+                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                    sx={{
+                        position: "absolute",
+                        right: 16,
+                        backgroundColor: mainButtonColor,
+                        textTransform: "none",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+                    }}
+                >
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+            </Box>
 
 
 
@@ -1100,7 +1146,6 @@ const SuperAdminApplicantDashboard5 = () => {
                                         name="termsOfAgreement"
                                         checked={person.termsOfAgreement === 1}
                                         onChange={handleChange}
-                                        onBlur={handleBlur}
                                     />
                                 }
                                 label="I agree Terms of Agreement"
@@ -1267,18 +1312,25 @@ const SuperAdminApplicantDashboard5 = () => {
                             <Button
                                 variant="contained"
                                 onClick={async () => {
-                                    handleUpdate(); // Save data
-
-                                    setSnack({
-                                        open: true,
-                                        message:
-                                            "Your account has been successfully registered! Wait for further announcement. Please upload your documents.",
-                                        severity: "success",
-                                    });
-
-                                    setTimeout(() => {
-                                        navigate("/applicant_online_requirements_admin");
-                                    }, 2000);
+                                    try {
+                                        await handleUpdate(person);
+                                        sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+                                        setSnack({
+                                            open: true,
+                                            message:
+                                                "Your account has been successfully registered! Wait for further announcement. Please upload your documents.",
+                                            severity: "success",
+                                        });
+                                        setTimeout(() => {
+                                            navigate("/applicant_online_requirements_admin");
+                                        }, 2000);
+                                    } catch (err) {
+                                        setSnack({
+                                            open: true,
+                                            message: "Failed to save changes.",
+                                            severity: "error",
+                                        });
+                                    }
                                 }}
                                 endIcon={
                                     <FolderIcon

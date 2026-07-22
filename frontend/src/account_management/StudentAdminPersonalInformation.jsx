@@ -124,6 +124,19 @@ const SuperAdminStudentDashboard1 = () => {
     return branch?.branch || "—";
   };
 
+  const normalizeEnrollmentPerson = (data) => {
+    if (!data || typeof data !== "object") return data;
+    const original =
+      data.original_program ?? data.program ?? "";
+    const current =
+      data.current_program ?? data.active_curriculum ?? data.program ?? "";
+    return {
+      ...data,
+      original_program: original,
+      program: current,
+    };
+  };
+
   const [snack, setSnack] = useState({
     open: false,
     message: "",
@@ -140,6 +153,7 @@ const SuperAdminStudentDashboard1 = () => {
     classifiedAs: "",
     applyingAs: "",
     program: "",
+    original_program: "",
     program2: "",
     program3: "",
     yearLevel: "",
@@ -338,10 +352,11 @@ const SuperAdminStudentDashboard1 = () => {
   const fetchByPersonId = async (personID) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/enrollment_person/${personID}`);
-      setPerson(res.data);
-      setSelectedPerson(res.data);
-      setOriginalEmailAddress(String(res.data?.emailAddress || "").trim());
-      if (res.data?.applicant_number) {
+      const normalized = normalizeEnrollmentPerson(res.data);
+      setPerson(normalized);
+      setSelectedPerson(normalized);
+      setOriginalEmailAddress(String(normalized?.emailAddress || "").trim());
+      if (normalized?.applicant_number) {
         // optional: whatever logic you want
       }
     } catch (err) {
@@ -457,17 +472,22 @@ const SuperAdminStudentDashboard1 = () => {
     return age < 0 ? "" : age;
   };
 
-  // 🧠 Updates record in ENROLLMENT.person_table in real time
+  // Saves to ENROLLMENT only when Save is clicked (or intentional actions)
   const handleUpdate = async (updatedPerson) => {
     try {
-      await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, updatedPerson, getAuditHeaders())
-      console.log("✅ Auto-saved to ENROLLMENT DB3");
+      await axios.put(
+        `${API_BASE_URL}/api/enrollment/person/${userID}`,
+        updatedPerson,
+        getAuditHeaders(),
+      );
+      console.log("✅ Saved to ENROLLMENT DB3");
     } catch (error) {
-      console.error("❌ Auto-save failed:", error);
+      console.error("❌ Save failed:", error);
+      throw error;
     }
   };
 
-  // 🧩 Real-time handleChange with Manila-based age + filtering reset
+  // 🧩 Local form updates only (no auto-save)
   const handleChange = (e) => {
     const target = e && e.target ? e.target : {};
     const { name, type, checked, value } = target;
@@ -504,11 +524,6 @@ const SuperAdminStudentDashboard1 = () => {
     }
 
     setPerson(updatedPerson);
-    // Email is sensitive: confirm on blur before saving.
-    if (name === "emailAddress") {
-      return;
-    }
-    handleUpdate(updatedPerson); // real-time save
   };
 
   const openEmailConfirm = () => {
@@ -551,31 +566,35 @@ const SuperAdminStudentDashboard1 = () => {
     }
   };
 
-  // 🖱️ Triggered when input loses focus (safety net)
-  const handleBlur = async () => {
-    try {
-      await axios.put(
-        `${API_BASE_URL}/api/enrollment/person/${userID}`,
-        person,
-        getAuditHeaders(),
-      );
-      console.log("✅ Auto-saved (on blur) to ENROLLMENT DB3");
-    } catch (err) {
-      console.error("❌ Auto-save failed (on blur):", err);
-    }
-  };
+  // 💾 Manual save only (via Save Changes button)
+  const [saving, setSaving] = useState(false);
 
-  // 💾 Manual autosave (optional call)
-  const autoSave = async () => {
+  const handleManualSave = async () => {
+    if (!userID) {
+      setSnackbar({
+        open: true,
+        message: "No student selected.",
+        severity: "warning",
+      });
+      return;
+    }
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/enrollment/person/${userID}`,
-        person,
-        getAuditHeaders(),
-      );
-      console.log("✅ Auto-saved (manual trigger) to ENROLLMENT DB3");
+      setSaving(true);
+      await handleUpdate(person);
+      sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+      setSnackbar({
+        open: true,
+        message: "All changes saved successfully!",
+        severity: "success",
+      });
     } catch (err) {
-      console.error("❌ Auto-save failed (manual):", err);
+      setSnackbar({
+        open: true,
+        message: "Failed to save changes.",
+        severity: "error",
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -694,7 +713,7 @@ const SuperAdminStudentDashboard1 = () => {
       // keyed by student_number — not fetchByPersonId, which reads admission db.
       if (person?.student_number) {
         const res = await axios.get(`${API_BASE_URL}/api/person_id/${person.student_number}`);
-        setPerson(res.data);
+        setPerson(normalizeEnrollmentPerson(res.data));
       }
 
       setSnack({ open: true, message: "Upload successful!", severity: "success" });
@@ -897,22 +916,46 @@ const SuperAdminStudentDashboard1 = () => {
   const [errors, setErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [searchError, setSearchError] = useState("");
+  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [persons, setPersons] = useState([]);
+
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
-      if (searchQuery.trim() === "") return;
+      if (searchQuery.trim() === "") {
+        setSearchError("");
+        setSelectedPerson(null);
+        setPerson((prev) => ({
+          ...prev,
+          profile_img: "",
+          generalAverage1: "",
+          height: "",
+          applyingAs: "",
+          document_status: "",
+          last_name: "",
+          first_name: "",
+          middle_name: "",
+          extension: "",
+          student_number: "",
+          program: "",
+          original_program: "",
+        }));
+        return;
+      }
 
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/search-person-student`,
           {
-            params: { query: searchQuery },
+            params: { query: searchQuery.trim() },
           },
         );
 
         console.log("Search result data:", res.data);
-        setPerson(res.data);
+        const normalized = normalizeEnrollmentPerson(res.data);
+        setPerson(normalized);
+        setSelectedPerson(normalized);
 
-        const idToStore = res.data.person_id || res.data.id;
+        const idToStore = normalized.person_id || normalized.id;
         if (!idToStore) {
           setSearchError("Invalid search result");
           return;
@@ -921,66 +964,19 @@ const SuperAdminStudentDashboard1 = () => {
         sessionStorage.setItem("admin_edit_person_id", idToStore);
         sessionStorage.setItem(
           "admin_edit_person_data",
-          JSON.stringify(res.data),
-        ); // ✅ added
+          JSON.stringify(normalized),
+        );
         setUserID(idToStore);
         setSearchError("");
       } catch (err) {
         console.error("Search failed:", err);
         setSearchError("Student not found");
+        setSelectedPerson(null);
       }
     }, 500);
 
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
-
-  const [selectedPerson, setSelectedPerson] = useState(null);
-  const [persons, setPersons] = useState([]);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      // 🔹 If search is empty, clear everything
-      setSelectedPerson(null);
-      setPerson({
-        profile_img: "",
-        generalAverage1: "",
-        height: "",
-        applyingAs: "",
-        document_status: "",
-        last_name: "",
-        first_name: "",
-        middle_name: "",
-        extension: "",
-      });
-      return;
-    }
-
-    // 🔹 Try to find a matching applicant from the list
-    const match = persons.find((p) =>
-      `${p.first_name} ${p.middle_name} ${p.last_name} ${p.emailAddress} ${p.applicant_number || ""}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()),
-    );
-
-    if (match) {
-      // ✅ If found, set this as the "selectedPerson"
-      setSelectedPerson(match);
-    } else {
-      // ❌ If not found, clear again
-      setSelectedPerson(null);
-      setPerson({
-        profile_img: "",
-        generalAverage1: "",
-        height: "",
-        applyingAs: "",
-        document_status: "",
-        last_name: "",
-        first_name: "",
-        middle_name: "",
-        extension: "",
-      });
-    }
-  }, [searchQuery, persons]);
 
   // ✅ For Excel Import
   const [excelFile, setExcelFile] = useState(null);
@@ -1477,17 +1473,44 @@ const SuperAdminStudentDashboard1 = () => {
         </Box>
       </Box>
 
-      <h1
-        style={{
-          fontSize: "30px",
-          fontWeight: "bold",
-          textAlign: "center",
-          color: "black",
-          marginTop: "25px",
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2,
+          mt: "25px",
+          px: 2,
+          position: "relative",
         }}
       >
-        PRINTABLE DOCUMENTS
-      </h1>
+        <h1
+          style={{
+            fontSize: "30px",
+            fontWeight: "bold",
+            textAlign: "center",
+            color: "black",
+            margin: 0,
+          }}
+        >
+          PRINTABLE DOCUMENTS
+        </h1>
+        <Button
+          variant="contained"
+          onClick={handleManualSave}
+          disabled={saving || !userID}
+          sx={{
+            position: "absolute",
+            right: 16,
+            backgroundColor: mainButtonColor,
+            textTransform: "none",
+            fontWeight: "bold",
+            "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+          }}
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </Box>
 
 
       <Container>
@@ -1790,7 +1813,6 @@ const SuperAdminStudentDashboard1 = () => {
                   value={person.academicProgram ?? ""}
                   label="Academic Program"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Program</em>
@@ -1822,7 +1844,6 @@ const SuperAdminStudentDashboard1 = () => {
                   value={person.classifiedAs ?? ""}
                   label="Classified As"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Classification</em>
@@ -1858,7 +1879,6 @@ const SuperAdminStudentDashboard1 = () => {
                   value={person.applyingAs ?? ""}
                   label="Applying As"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Applying</em>
@@ -1930,7 +1950,6 @@ const SuperAdminStudentDashboard1 = () => {
                       <Select
                         name="program"
                         value={person.program || ""}
-                        onBlur={() => handleUpdate(person)}
                         onChange={handleChange}
                         label="Program"
                       >
@@ -1956,8 +1975,7 @@ const SuperAdminStudentDashboard1 = () => {
                                                                       <InputLabel>Course Applied</InputLabel>
                                                                       <Select
                                                                           name="program2"
-                                                                          value={person.program2 || ""}
-                                                                          onBlur={() => handleUpdate(person)} onChange={handleChange}
+                                                                          value={person.program2 || ""} onChange={handleChange}
                                                                           label="Program 2"
                                                                       >
                                                                           <MenuItem value=""><em>Select Program</em></MenuItem>
@@ -1983,8 +2001,7 @@ const SuperAdminStudentDashboard1 = () => {
                                                                     <InputLabel>Course Applied</InputLabel>
                                                                     <Select
                                                                         name="program3"
-                                                                        value={person.program3 || ""}
-                                                                        onBlur={() => handleUpdate(person)} onChange={handleChange}
+                                                                        value={person.program3 || ""} onChange={handleChange}
                                                                         label="Program 3"
                                                                     >
                                                                         <MenuItem value=""><em>Select Program</em></MenuItem>
@@ -2023,7 +2040,6 @@ const SuperAdminStudentDashboard1 = () => {
                         value={getYearLevelSelectValue()}
                         label="Year Level"
                         onChange={handleChange}
-                        onBlur={() => handleUpdate(person)}
                       >
                         <MenuItem value="">
                           <em>Select Year Level</em>
@@ -2118,7 +2134,6 @@ const SuperAdminStudentDashboard1 = () => {
                   required
                   value={person.last_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Last Name"
                   error={errors.last_name}
                   helperText={errors.last_name ? "This field is required." : ""}
@@ -2137,7 +2152,6 @@ const SuperAdminStudentDashboard1 = () => {
                   required
                   value={person.first_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your First Name"
                   error={errors.first_name}
                   helperText={
@@ -2158,7 +2172,6 @@ const SuperAdminStudentDashboard1 = () => {
                   required
                   value={person.middle_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Middle Name"
                   error={errors.middle_name}
                   helperText={
@@ -2181,7 +2194,6 @@ const SuperAdminStudentDashboard1 = () => {
                     value={person.extension ?? ""}
                     label="Extension"
                     onChange={handleChange}
-                    onBlur={handleBlur}
                   >
                     <MenuItem value="">
                       <em>None</em>
@@ -2212,7 +2224,6 @@ const SuperAdminStudentDashboard1 = () => {
                   required
                   value={person.nickname ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Nickname"
                   error={errors.nickname}
                   helperText={errors.nickname ? "This field is required." : ""}
@@ -2233,7 +2244,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="height"
                     value={person.height || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     placeholder="Enter your Height"
                     error={!!errors.height}
                     fullWidth
@@ -2259,7 +2269,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="weight"
                     value={person.weight || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     placeholder="Enter your Weight"
                     error={!!errors.weight}
                     fullWidth
@@ -2300,7 +2309,6 @@ const SuperAdminStudentDashboard1 = () => {
                     : (person.lrnNumber ?? "")
                 }
                 onChange={handleChange}
-                onBlur={handleBlur}
                 disabled={person.lrnNumber === "No LRN Number"}
                 size="small"
                 sx={{ width: 220 }}
@@ -2326,7 +2334,6 @@ const SuperAdminStudentDashboard1 = () => {
                       setIsLrnNA(checked); // optional: if you're tracking this separately
                       setLrnNAFlag(checked ? "1" : "0"); // optional: if you're sending this to backend
                     }}
-                    onBlur={handleBlur}
                   />
                 }
                 label="N/A"
@@ -2350,7 +2357,6 @@ const SuperAdminStudentDashboard1 = () => {
                     },
                   });
                 }}
-                onBlur={handleBlur}
                 error={Boolean(errors.gender)}
                 sx={{ width: 150 }}
                 InputProps={{ sx: { height: 40 } }}
@@ -2392,7 +2398,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="pwdType"
                     value={person.pwdType ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     required={person.pwdMember === 1}
                     error={person.pwdMember === 1 && !!errors.pwdType}
                     helperText={
@@ -2459,7 +2464,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="pwdId"
                     value={person.pwdId ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     required={person.pwdMember === 1}
                     error={person.pwdMember === 1 && !!errors.pwdId}
                     helperText={
@@ -2491,7 +2495,6 @@ const SuperAdminStudentDashboard1 = () => {
                   required
                   value={person.birthOfDate || ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   error={!!errors.birthOfDate}
                   helperText={
                     errors.birthOfDate ? "This field is required." : ""
@@ -2511,7 +2514,6 @@ const SuperAdminStudentDashboard1 = () => {
                   value={person.age || ""}
                   placeholder="Enter your Age"
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.age}
                   helperText={errors.age ? "This field is required." : ""}
@@ -2528,7 +2530,6 @@ const SuperAdminStudentDashboard1 = () => {
                   placeholder="Enter your Birth Place"
                   value={person.birthPlace ?? ""}
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.birthPlace}
                   helperText={
@@ -2547,7 +2548,6 @@ const SuperAdminStudentDashboard1 = () => {
                   placeholder="Enter your Language Spoken"
                   value={person.languageDialectSpoken ?? ""}
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.languageDialectSpoken}
                   helperText={
@@ -2577,7 +2577,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="citizenship"
                     value={person.citizenship ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Citizenship" // Required for floating label
                   >
                     <MenuItem value="">
@@ -2724,7 +2723,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="religion"
                     value={person.religion ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Religion" // Enables floating label
                   >
                     <MenuItem value="">
@@ -2782,7 +2780,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="civilStatus"
                     value={person.civilStatus ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Civil Status"
                   >
                     <MenuItem value="">
@@ -2818,7 +2815,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="tribeEthnicGroup"
                     value={person.tribeEthnicGroup ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Tribe/Ethnic Group"
                   >
                     <MenuItem value="">
@@ -2903,7 +2899,6 @@ const SuperAdminStudentDashboard1 = () => {
                   name="cellphoneNumber"
                   placeholder="9XXXXXXXXX"
                   value={person.cellphoneNumber || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     const onlyNumbers = e.target.value.replace(/\D/g, ""); // remove letters
                     handleChange({
@@ -3101,7 +3096,6 @@ const SuperAdminStudentDashboard1 = () => {
                   size="small"
                   name="presentStreet"
                   value={person.presentStreet || ""}
-                  onBlur={() => handleUpdate(person)}
                   placeholder="Enter your Present Street"
                   onChange={handleChange}
                   error={!!errors.presentStreet}
@@ -3119,7 +3113,6 @@ const SuperAdminStudentDashboard1 = () => {
                   name="presentZipCode"
                   placeholder="Enter your Zip Code"
                   value={person.presentZipCode || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={handleChange}
                   error={!!errors.presentZipCode}
                   helperText={
@@ -3145,7 +3138,6 @@ const SuperAdminStudentDashboard1 = () => {
                   name="presentRegion"
                   displayEmpty
                   value={person.presentRegion || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedRegion(e.target.value);
@@ -3155,7 +3147,6 @@ const SuperAdminStudentDashboard1 = () => {
                     setProvinceList([]);
                     setCityList([]);
                     setBarangayList([]);
-                    autoSave();
                   }}
                 >
                   <MenuItem value="">
@@ -3192,7 +3183,6 @@ const SuperAdminStudentDashboard1 = () => {
                   name="presentProvince"
                   displayEmpty
                   value={person.presentProvince || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedProvince(e.target.value);
@@ -3200,7 +3190,7 @@ const SuperAdminStudentDashboard1 = () => {
                     setSelectedBarangay("");
                     setCityList([]);
                     setBarangayList([]);
-                    autoSave();
+
                   }}
                   disabled={!person.presentRegion}
                 >
@@ -3241,13 +3231,12 @@ const SuperAdminStudentDashboard1 = () => {
                   name="presentMunicipality"
                   displayEmpty
                   value={person.presentMunicipality || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedCity(e.target.value);
                     setSelectedBarangay("");
                     setBarangayList([]);
-                    autoSave();
+
                   }}
                   disabled={!person.presentProvince}
                 >
@@ -3282,11 +3271,10 @@ const SuperAdminStudentDashboard1 = () => {
                   name="presentBarangay"
                   displayEmpty
                   value={person.presentBarangay || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedBarangay(e.target.value);
-                    autoSave();
+
                   }}
                   disabled={!person.presentMunicipality}
                 >
@@ -3317,7 +3305,6 @@ const SuperAdminStudentDashboard1 = () => {
                 size="small"
                 name="presentDswdHouseholdNumber"
                 value={person.presentDswdHouseholdNumber || ""}
-                onBlur={() => handleUpdate(person)}
                 onChange={handleChange}
                 placeholder="Enter your Present DSWD Household Number"
                 error={!!errors.presentDswdHouseholdNumber}
@@ -3369,9 +3356,8 @@ const SuperAdminStudentDashboard1 = () => {
                     }
 
                     setPerson(updatedPerson);
-                    handleUpdate(updatedPerson); // optional: real-time save
+
                   }}
-                  onBlur={() => handleUpdate(person)}
                 />
               }
               label="Same as Present Address"
@@ -3388,7 +3374,6 @@ const SuperAdminStudentDashboard1 = () => {
                   name="permanentStreet"
                   placeholder="Enter your Permanent Street"
                   value={person.permanentStreet || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={handleChange}
                   error={!!errors.permanentStreet}
                   helperText={
@@ -3407,7 +3392,6 @@ const SuperAdminStudentDashboard1 = () => {
                   name="permanentZipCode"
                   placeholder="Enter your Permanent Zip Code"
                   value={person.permanentZipCode || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={handleChange}
                   error={!!errors.permanentZipCode}
                   helperText={
@@ -3434,7 +3418,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="permanentRegion"
                     displayEmpty
                     value={person.permanentRegion || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentRegion(e.target.value);
@@ -3444,7 +3427,7 @@ const SuperAdminStudentDashboard1 = () => {
                       setPermanentProvinceList([]);
                       setPermanentCityList([]);
                       setPermanentBarangayList([]);
-                      autoSave();
+
                     }}
                   >
                     <MenuItem value="">
@@ -3484,7 +3467,6 @@ const SuperAdminStudentDashboard1 = () => {
                     name="permanentProvince"
                     displayEmpty
                     value={person.permanentProvince || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentProvince(e.target.value);
@@ -3492,7 +3474,7 @@ const SuperAdminStudentDashboard1 = () => {
                       setPermanentBarangay("");
                       setPermanentCityList([]);
                       setPermanentBarangayList([]);
-                      autoSave();
+
                     }}
                     disabled={!person.permanentRegion}
                   >
@@ -3536,13 +3518,12 @@ const SuperAdminStudentDashboard1 = () => {
                     name="permanentMunicipality"
                     displayEmpty
                     value={person.permanentMunicipality || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentCity(e.target.value);
                       setPermanentBarangay("");
                       setPermanentBarangayList([]);
-                      autoSave();
+
                     }}
                     disabled={!person.permanentProvince}
                   >
@@ -3580,11 +3561,10 @@ const SuperAdminStudentDashboard1 = () => {
                     name="permanentBarangay"
                     displayEmpty
                     value={person.permanentBarangay || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentBarangay(e.target.value);
-                      autoSave();
+
                     }}
                     disabled={!person.permanentMunicipality}
                   >
@@ -3620,7 +3600,6 @@ const SuperAdminStudentDashboard1 = () => {
                 placeholder="Enter your Permanent DSWD Household Number"
                 name="permanentDswdHouseholdNumber"
                 value={person.permanentDswdHouseholdNumber || ""}
-                onBlur={() => handleUpdate(person)}
                 onChange={handleChange}
                 error={!!errors.permanentDswdHouseholdNumber}
                 helperText={
@@ -3947,7 +3926,7 @@ const SuperAdminStudentDashboard1 = () => {
               <Button
                 variant="contained"
                 onClick={() => {
-                  handleUpdate(person);
+
                   handleNavigateWithDelay(`/student_admin_family_background?person_id=${userID}`);
                 }}
                 endIcon={<ArrowForwardIcon sx={{ color: "#fff", transition: "color 0.3s" }} />}

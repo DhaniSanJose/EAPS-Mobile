@@ -562,7 +562,11 @@ const SuperAdminApplicantDashboard1 = () => {
       }
 
       // ✅ Send update request
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+      await axios.put(
+        `${API_BASE_URL}/api/person/${targetId}`,
+        cleanedData,
+        getAuditHeaders(),
+      );
 
       console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
     } catch (error) {
@@ -571,6 +575,7 @@ const SuperAdminApplicantDashboard1 = () => {
         status: error.response?.status,
         details: error.response?.data || error,
       });
+      throw error;
     }
   };
 
@@ -654,11 +659,39 @@ const SuperAdminApplicantDashboard1 = () => {
     }
 
     setPerson(updatedPerson);
-    // Email is sensitive: confirm on blur before saving.
-    if (name === "emailAddress") {
+    // Email is sensitive: confirm before saving (via Update Email / Save Changes).
+  };
+
+  const [saving, setSaving] = useState(false);
+  const handleManualSave = async () => {
+    const targetId =
+      selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+    if (!targetId) {
+      setSnackbar({
+        open: true,
+        message: "No applicant selected.",
+        severity: "warning",
+      });
       return;
     }
-    handleUpdate(updatedPerson); // real-time save
+    try {
+      setSaving(true);
+      await handleUpdate(person);
+      sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+      setSnackbar({
+        open: true,
+        message: "All changes saved successfully!",
+        severity: "success",
+      });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: "Failed to save changes.",
+        severity: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openEmailConfirm = () => {
@@ -1175,8 +1208,7 @@ const SuperAdminApplicantDashboard1 = () => {
       };
 
       setPerson(updatedPerson);
-      await handleUpdate(updatedPerson); // ✅ this pushes the profile_img change into DB
-
+      await
       setUploadedImage(`${API_BASE_URL}/uploads/${fileName}`);
       setSnackbar({
         open: true,
@@ -2004,17 +2036,44 @@ const SuperAdminApplicantDashboard1 = () => {
         </Box>
       </Box>
 
-      <h1
-        style={{
-          fontSize: "30px",
-          fontWeight: "bold",
-          textAlign: "center",
-          color: "black",
-          marginTop: "25px",
-        }}
-      >
-        PRINTABLE DOCUMENTS
-      </h1>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: "25px",
+                    px: 2,
+                    position: "relative",
+                }}
+            >
+                <h1
+                    style={{
+                        fontSize: "30px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        color: "black",
+                        margin: 0,
+                    }}
+                >
+                    PRINTABLE DOCUMENTS
+                </h1>
+                <Button
+                    variant="contained"
+                    onClick={handleManualSave}
+                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                    sx={{
+                        position: "absolute",
+                        right: 16,
+                        backgroundColor: mainButtonColor,
+                        textTransform: "none",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+                    }}
+                >
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+            </Box>
 
       <Container>
         {/* Cards Section */}
@@ -2328,7 +2387,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   value={person.academicProgram ?? ""}
                   label="Academic Program"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Program</em>
@@ -2360,7 +2418,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   value={person.classifiedAs ?? ""}
                   label="Classified As"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Classification</em>
@@ -2396,7 +2453,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   value={person.applyingAs ?? ""}
                   label="Applying As"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Applying</em>
@@ -2458,7 +2514,6 @@ const SuperAdminApplicantDashboard1 = () => {
                       <Select
                         name="program"
                         value={person.program || ""}
-                        onBlur={() => handleUpdate(person)}
                         onChange={handleChange}
                         label="Program"
                       >
@@ -2484,8 +2539,7 @@ const SuperAdminApplicantDashboard1 = () => {
                                                                       <InputLabel>Course Applied</InputLabel>
                                                                       <Select
                                                                           name="program2"
-                                                                          value={person.program2 || ""}
-                                                                          onBlur={() => handleUpdate(person)} onChange={handleChange}
+                                                                          value={person.program2 || ""} onChange={handleChange}
                                                                           label="Program 2"
                                                                       >
                                                                           <MenuItem value=""><em>Select Program</em></MenuItem>
@@ -2511,8 +2565,7 @@ const SuperAdminApplicantDashboard1 = () => {
                                                                     <InputLabel>Course Applied</InputLabel>
                                                                     <Select
                                                                         name="program3"
-                                                                        value={person.program3 || ""}
-                                                                        onBlur={() => handleUpdate(person)} onChange={handleChange}
+                                                                        value={person.program3 || ""} onChange={handleChange}
                                                                         label="Program 3"
                                                                     >
                                                                         <MenuItem value=""><em>Select Program</em></MenuItem>
@@ -2551,7 +2604,6 @@ const SuperAdminApplicantDashboard1 = () => {
                         value={getYearLevelSelectValue()}
                         label="Year Level"
                         onChange={handleChange}
-                        onBlur={() => handleUpdate(person)}
                       >
                         <MenuItem value="">
                           <em>Select Year Level</em>
@@ -2645,7 +2697,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   required
                   value={person.last_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Last Name"
                   error={errors.last_name}
                   helperText={errors.last_name ? "This field is required." : ""}
@@ -2664,7 +2715,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   required
                   value={person.first_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your First Name"
                   error={errors.first_name}
                   helperText={
@@ -2685,7 +2735,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   required
                   value={person.middle_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Middle Name"
                   error={errors.middle_name}
                   helperText={
@@ -2708,7 +2757,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     value={person.extension ?? ""}
                     label="Extension"
                     onChange={handleChange}
-                    onBlur={handleBlur}
                   >
                     <MenuItem value="">
                       <em>None</em>
@@ -2739,7 +2787,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   required
                   value={person.nickname ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Nickname"
                   error={errors.nickname}
                   helperText={errors.nickname ? "This field is required." : ""}
@@ -2760,7 +2807,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="height"
                     value={person.height || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     placeholder="Enter your Height"
                     error={!!errors.height}
                     fullWidth
@@ -2786,7 +2832,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="weight"
                     value={person.weight || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     placeholder="Enter your Weight"
                     error={!!errors.weight}
                     fullWidth
@@ -2827,7 +2872,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     : (person.lrnNumber ?? "")
                 }
                 onChange={handleChange}
-                onBlur={handleBlur}
                 disabled={person.lrnNumber === "No LRN Number"}
                 size="small"
                 sx={{ width: 220 }}
@@ -2853,7 +2897,6 @@ const SuperAdminApplicantDashboard1 = () => {
                       setIsLrnNA(checked); // optional: if you're tracking this separately
                       setLrnNAFlag(checked ? "1" : "0"); // optional: if you're sending this to backend
                     }}
-                    onBlur={handleBlur}
                   />
                 }
                 label="N/A"
@@ -2878,7 +2921,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     },
                   });
                 }}
-                onBlur={handleBlur}
                 error={Boolean(errors.gender)}
                 sx={{ width: 150 }}
                 InputProps={{ sx: { height: 40 } }}
@@ -2920,7 +2962,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="pwdType"
                     value={person.pwdType ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     required={person.pwdMember === 1}
                     error={person.pwdMember === 1 && !!errors.pwdType}
                     helperText={
@@ -2987,7 +3028,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="pwdId"
                     value={person.pwdId ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     required={person.pwdMember === 1}
                     error={person.pwdMember === 1 && !!errors.pwdId}
                     helperText={
@@ -3018,7 +3058,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   required
                   value={person.birthOfDate || ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   error={!!errors.birthOfDate}
                   helperText={
                     errors.birthOfDate ? "This field is required." : ""
@@ -3038,7 +3077,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   value={person.age || ""}
                   placeholder="Enter your Age"
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.age}
                   helperText={errors.age ? "This field is required." : ""}
@@ -3055,7 +3093,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   placeholder="Enter your Birth Place"
                   value={person.birthPlace ?? ""}
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.birthPlace}
                   helperText={
@@ -3074,7 +3111,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   placeholder="Enter your Language Spoken"
                   value={person.languageDialectSpoken ?? ""}
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.languageDialectSpoken}
                   helperText={
@@ -3104,7 +3140,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="citizenship"
                     value={person.citizenship ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Citizenship" // Required for floating label
                   >
                     <MenuItem value="">
@@ -3251,7 +3286,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="religion"
                     value={person.religion ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Religion" // Enables floating label
                   >
                     <MenuItem value="">
@@ -3309,7 +3343,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="civilStatus"
                     value={person.civilStatus ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Civil Status"
                   >
                     <MenuItem value="">
@@ -3345,7 +3378,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="tribeEthnicGroup"
                     value={person.tribeEthnicGroup ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     label="Tribe/Ethnic Group"
                   >
                     <MenuItem value="">
@@ -3430,7 +3462,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="cellphoneNumber"
                   placeholder="9XXXXXXXXX"
                   value={person.cellphoneNumber || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     const onlyNumbers = e.target.value.replace(/\D/g, ""); // remove letters
                     handleChange({
@@ -3628,7 +3659,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   size="small"
                   name="presentStreet"
                   value={person.presentStreet || ""}
-                  onBlur={() => handleUpdate(person)}
                   placeholder="Enter your Present Street"
                   onChange={handleChange}
                   error={!!errors.presentStreet}
@@ -3647,7 +3677,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="presentZipCode"
                   placeholder="Enter your Zip Code"
                   value={person.presentZipCode || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={handleChange}
                   error={!!errors.presentZipCode}
                   helperText={
@@ -3673,7 +3702,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="presentRegion"
                   displayEmpty
                   value={person.presentRegion || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedRegion(e.target.value);
@@ -3683,7 +3711,7 @@ const SuperAdminApplicantDashboard1 = () => {
                     setProvinceList([]);
                     setCityList([]);
                     setBarangayList([]);
-                    autoSave();
+
                   }}
                 >
                   <MenuItem value="">
@@ -3720,7 +3748,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="presentProvince"
                   displayEmpty
                   value={person.presentProvince || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedProvince(e.target.value);
@@ -3728,7 +3755,7 @@ const SuperAdminApplicantDashboard1 = () => {
                     setSelectedBarangay("");
                     setCityList([]);
                     setBarangayList([]);
-                    autoSave();
+
                   }}
                   disabled={!person.presentRegion}
                 >
@@ -3769,13 +3796,12 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="presentMunicipality"
                   displayEmpty
                   value={person.presentMunicipality || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedCity(e.target.value);
                     setSelectedBarangay("");
                     setBarangayList([]);
-                    autoSave();
+
                   }}
                   disabled={!person.presentProvince}
                 >
@@ -3810,11 +3836,10 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="presentBarangay"
                   displayEmpty
                   value={person.presentBarangay || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedBarangay(e.target.value);
-                    autoSave();
+
                   }}
                   disabled={!person.presentMunicipality}
                 >
@@ -3845,7 +3870,6 @@ const SuperAdminApplicantDashboard1 = () => {
                 size="small"
                 name="presentDswdHouseholdNumber"
                 value={person.presentDswdHouseholdNumber || ""}
-                onBlur={() => handleUpdate(person)}
                 onChange={handleChange}
                 placeholder="Enter your Present DSWD Household Number"
                 error={!!errors.presentDswdHouseholdNumber}
@@ -3897,9 +3921,8 @@ const SuperAdminApplicantDashboard1 = () => {
                     }
 
                     setPerson(updatedPerson);
-                    handleUpdate(updatedPerson); // optional: real-time save
+
                   }}
-                  onBlur={() => handleUpdate(person)}
                 />
               }
               label="Same as Present Address"
@@ -3922,7 +3945,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="permanentRegion"
                     displayEmpty
                     value={person.permanentRegion || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentRegion(e.target.value);
@@ -3932,7 +3954,7 @@ const SuperAdminApplicantDashboard1 = () => {
                       setPermanentProvinceList([]);
                       setPermanentCityList([]);
                       setPermanentBarangayList([]);
-                      autoSave();
+
                     }}
                   >
                     <MenuItem value="">
@@ -3972,7 +3994,6 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="permanentProvince"
                     displayEmpty
                     value={person.permanentProvince || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentProvince(e.target.value);
@@ -3980,7 +4001,7 @@ const SuperAdminApplicantDashboard1 = () => {
                       setPermanentBarangay("");
                       setPermanentCityList([]);
                       setPermanentBarangayList([]);
-                      autoSave();
+
                     }}
                     disabled={!person.permanentRegion}
                   >
@@ -4024,13 +4045,12 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="permanentMunicipality"
                     displayEmpty
                     value={person.permanentMunicipality || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentCity(e.target.value);
                       setPermanentBarangay("");
                       setPermanentBarangayList([]);
-                      autoSave();
+
                     }}
                     disabled={!person.permanentProvince}
                   >
@@ -4068,11 +4088,10 @@ const SuperAdminApplicantDashboard1 = () => {
                     name="permanentBarangay"
                     displayEmpty
                     value={person.permanentBarangay || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentBarangay(e.target.value);
-                      autoSave();
+
                     }}
                     disabled={!person.permanentMunicipality}
                   >
@@ -4107,7 +4126,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="permanentStreet"
                   placeholder="Enter your Permanent Street"
                   value={person.permanentStreet || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={handleChange}
                   error={!!errors.permanentStreet}
                   helperText={
@@ -4127,7 +4145,6 @@ const SuperAdminApplicantDashboard1 = () => {
                   name="permanentZipCode"
                   placeholder="Enter your Permanent Zip Code"
                   value={person.permanentZipCode || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={handleChange}
                   error={!!errors.permanentZipCode}
                   helperText={
@@ -4149,7 +4166,6 @@ const SuperAdminApplicantDashboard1 = () => {
                 placeholder="Enter your Permanent DSWD Household Number"
                 name="permanentDswdHouseholdNumber"
                 value={person.permanentDswdHouseholdNumber || ""}
-                onBlur={() => handleUpdate(person)}
                 onChange={handleChange}
                 error={!!errors.permanentDswdHouseholdNumber}
                 helperText={
@@ -4314,8 +4330,7 @@ const SuperAdminApplicantDashboard1 = () => {
                                   // Actually delete the saved photo
                                   const updatedPerson = { ...person, profile_img: "" };
                                   setPerson(updatedPerson);
-                                  await handleUpdate(updatedPerson);
-
+                                  await
                                   setSnackbar({
                                     open: true,
                                     message: "Image removed successfully.",
@@ -4559,7 +4574,7 @@ const SuperAdminApplicantDashboard1 = () => {
               <Button
                 variant="contained"
                 onClick={() => {
-                  handleUpdate(person);
+
                   handleNavigateWithDelay(`/applicant_admin_family_background?person_id=${userID}`);
                 }}
                 endIcon={<ArrowForwardIcon sx={{ color: "#fff", transition: "color 0.3s" }} />}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { Button, Box, TextField, Container, Card, Modal, TableContainer, Paper, Table, TableHead, TableRow, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, CircularProgress, } from "@mui/material";
+import { Button, Box, TextField, Container, Card, Modal, TableContainer, Paper, Table, TableHead, TableRow, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, CircularProgress, Snackbar, Alert, } from "@mui/material";
 import { Link } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
@@ -373,7 +373,7 @@ const AdminDashboard3 = () => {
     }
   };
 
-  // Real-time save on every character typed
+  // Local form updates only (no auto-save)
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
     const updatedPerson = {
@@ -381,7 +381,6 @@ const AdminDashboard3 = () => {
       [name]: type === "checkbox" ? (checked ? 1 : 0) : value,
     };
     setPerson(updatedPerson);
-    handleUpdate(updatedPerson); // No delay, real-time save
   };
 
 
@@ -475,7 +474,27 @@ const AdminDashboard3 = () => {
     try {
       await axios.put(`${API_BASE_URL}/api/person/${person.person_id}`, updatedData);
     } catch (error) {
-      console.error("❌ Auto-save failed:", error);
+      console.error("❌ Save failed:", error);
+      throw error;
+    }
+  };
+
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [saving, setSaving] = useState(false);
+  const handleManualSave = async () => {
+    const targetId = selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+    if (!targetId) {
+      setSnackbar({ open: true, message: "No applicant selected.", severity: "warning" });
+      return;
+    }
+    try {
+      setSaving(true);
+      await handleUpdate(person);
+      setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
+    } catch (err) {
+      setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1017,17 +1036,44 @@ const AdminDashboard3 = () => {
         </Box>
       </Box>
 
-      <h1
-        style={{
-          fontSize: "30px",
-          fontWeight: "bold",
-          textAlign: "center",
-          color: "black",
-          marginTop: "25px",
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2,
+          mt: "25px",
+          px: 2,
+          position: "relative",
         }}
       >
-        PRINTABLE DOCUMENTS
-      </h1>
+        <h1
+          style={{
+            fontSize: "30px",
+            fontWeight: "bold",
+            textAlign: "center",
+            color: "black",
+            margin: 0,
+          }}
+        >
+          PRINTABLE DOCUMENTS
+        </h1>
+        <Button
+          variant="contained"
+          onClick={handleManualSave}
+          disabled={saving || !(person?.person_id || userID)}
+          sx={{
+            position: "absolute",
+            right: 16,
+            backgroundColor: mainButtonColor,
+            textTransform: "none",
+            fontWeight: "bold",
+            "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+          }}
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </Box>
 
 
 
@@ -1280,7 +1326,6 @@ const AdminDashboard3 = () => {
                     value={person.schoolLevel ?? ""}
                     label="Educational Attainment"
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                   >
                     <MenuItem value="">
                       <em>Select School Level</em>
@@ -1312,7 +1357,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter School Last Attended"
                   value={person.schoolLastAttended || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
                   error={errors.schoolLastAttended}
                   helperText={
                     errors.schoolLastAttended ? "This field is required." : ""
@@ -1340,7 +1384,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your School Address"
                   value={person.schoolAddress || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
                   error={errors.schoolAddress}
                   helperText={errors.schoolAddress ? "This field is required." : ""}
                 />
@@ -1362,7 +1405,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your Course Program"
                   value={person.courseProgram || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
                   error={errors.courseProgram}
                   helperText={errors.courseProgram ? "This field is required." : ""}
                 />
@@ -1390,7 +1432,6 @@ const AdminDashboard3 = () => {
                   value={person.honor || ""}
                   placeholder="Enter your Honor"
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
 
                   error={errors.honor}
                   helperText={errors.honor ? "This field is required." : ""}
@@ -1411,7 +1452,6 @@ const AdminDashboard3 = () => {
                   value={person.generalAverage || ""}
                   placeholder="Enter your General Average"
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
 
                   error={errors.generalAverage}
                   helperText={errors.generalAverage ? "This field is required." : ""}
@@ -1432,7 +1472,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your Year Graduated"
                   value={person.yearGraduated || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
 
                   error={errors.yearGraduated}
                   helperText={errors.yearGraduated ? "This field is required." : ""}
@@ -1471,7 +1510,6 @@ const AdminDashboard3 = () => {
                     value={person.schoolLevel1 ?? ""}
                     label="Educational Attainment"
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                   >
                     <MenuItem value="">
                       <em>Select School Level</em>
@@ -1504,7 +1542,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter School Last Attended"
                   value={person.schoolLastAttended1 || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
                   error={errors.schoolLastAttended1}
                   helperText={errors.schoolLastAttended1 ? "This field is required." : ""}
                 />
@@ -1530,7 +1567,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your School Address"
                   value={person.schoolAddress1 || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
                   error={errors.schoolAddress1}
                   helperText={errors.schoolAddress1 ? "This field is required." : ""}
                 />
@@ -1552,7 +1588,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your Course Program"
                   value={person.courseProgram1 || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
                   error={errors.courseProgram1}
                   helperText={errors.courseProgram1 ? "This field is required." : ""}
                 />
@@ -1582,7 +1617,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your Honor"
                   value={person.honor1 || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
 
                   error={errors.honor1}
                   helperText={errors.honor1 ? "This field is required." : ""}
@@ -1604,7 +1638,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your General Average"
                   value={person.generalAverage1 || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
 
                   error={errors.generalAverage1}
                   helperText={errors.generalAverage1 ? "This field is required." : ""}
@@ -1626,7 +1659,6 @@ const AdminDashboard3 = () => {
                   placeholder="Enter your Year Graduated"
                   value={person.yearGraduated1 || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
 
                   error={errors.yearGraduated1}
                   helperText={errors.yearGraduated1 ? "This field is required." : ""}
@@ -1652,7 +1684,6 @@ const AdminDashboard3 = () => {
                 value={person.strand ?? ""}
                 label="Strand"
                 onChange={handleChange}
-                onBlur={handleBlur}
               >
                 <MenuItem value="">
                   <em>Select Strand</em>
@@ -1881,6 +1912,22 @@ const AdminDashboard3 = () => {
 
           </Container>
         </form>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
       </Container>
     </Box>
   );

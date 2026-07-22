@@ -696,7 +696,7 @@ const SideBar = ({
             { title: "Applicant Online Requirements", link: "/admission_online_requirements", icon: FolderCopy, page_id: 61 },
             { title: "Verify Document Schedule Management", link: "/verify_document_schedule_management", icon: EditCalendar, page_id: 115 },
             { title: "Entrance Exam Schedule Management", link: "/entrance_exam_schedule_management", icon: EditCalendar, page_id: 11 },
-            { title: "Examination Permit / Change Course", link: "/examination_permit_change_course", icon: Badge, page_id: 48 },
+            { title: "Examination Permit / Change Course / Form Process", link: "/examination_permit_change_course", icon: Badge, page_id: 48 },
             { title: "Entrance Examination Scoring", link: "/applicant_entrance_exam_score", icon: Score, page_id: 8 },
             { title: "Verify Document Room Assignment", link: "/verify_document_room_assignment ", icon: AccessTimeIcon, page_id: 118 },
             { title: "Evaluator Applicant List", link: "/evaluator_schedule_room_list", icon: People, page_id: 120 },

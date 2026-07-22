@@ -189,7 +189,7 @@ const SuperAdminStudentDashboard5 = () => {
 
     const fetchByPersonId = async (personID) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/person/${personID}`);
+            const res = await axios.get(`${API_BASE_URL}/api/enrollment_person/${personID}`);
             setPerson(res.data);
             setSelectedPerson(res.data);
             if (res.data?.applicant_number) {
@@ -267,49 +267,59 @@ const SuperAdminStudentDashboard5 = () => {
         }, 2000);
     };
 
-    // Do not alter
-    const handleUpdate = async () => {
+    // Saves only when Save Changes is clicked
+    const handleUpdate = async (updatedPerson) => {
+        const payload = updatedPerson || person;
         const currentDate = new Date();
-        const formattedDate = currentDate.toLocaleDateString('en-GB'); // Format: DD/MM/YYYY
+        const formattedDate = currentDate.toLocaleDateString("en-GB");
 
-        const updatedPerson = {
-            ...person,
-            created_at: person.created_at || formattedDate // Only add if not already set
+        const dataToSave = {
+            ...payload,
+            created_at: payload.created_at || formattedDate,
         };
 
         try {
-            await axios.put(`${API_BASE_URL}/api/person/${userID}`, updatedPerson, getAuditHeaders());
-            console.log("Auto-saved with created_at:", updatedPerson.created_at);
+            await axios.put(
+                `${API_BASE_URL}/api/enrollment/person/${userID}`,
+                dataToSave,
+                getAuditHeaders(),
+            );
+            console.log("✅ Saved to ENROLLMENT DB3");
         } catch (error) {
-            console.error("Auto-save failed:", error);
+            console.error("❌ Save failed:", error);
+            throw error;
         }
     };
 
-
-    // ⌨️ Triggered on every character change
+    // Local form updates only (no auto-save)
     const handleChange = (e) => {
         const { name, type, checked, value } = e.target;
         const updatedValue = type === "checkbox" ? (checked ? 1 : 0) : value;
 
         const updatedPerson = { ...person, [name]: updatedValue };
 
-        // Auto-update dependent fields
         if (name === "classifiedAs" && value === "Freshman (First Year)") {
             updatedPerson.yearLevel = "First Year";
         }
 
         setPerson(updatedPerson);
-        handleUpdate(updatedPerson); // 🔥 Real-time save to ENROLLMENT
     };
 
-
-    // 🖱️ Triggered when input loses focus (safety net)
-    const handleBlur = async () => {
+    const [saving, setSaving] = useState(false);
+    const handleManualSave = async () => {
+        if (!userID) {
+            setSnackbar({ open: true, message: "No student selected.", severity: "warning" });
+            return;
+        }
         try {
-            await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, person, getAuditHeaders());
-            console.log("✅ Auto-saved (on blur) to ENROLLMENT DB3");
+            setSaving(true);
+            await handleUpdate(person);
+            sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+            setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
         } catch (err) {
-            console.error("❌ Auto-save failed (on blur):", err);
+            setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -734,17 +744,44 @@ const SuperAdminStudentDashboard5 = () => {
                 </Box>
             </Box>
 
-            <h1
-                style={{
-                    fontSize: "30px",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    color: "black",
-                    marginTop: "25px",
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: "25px",
+                    px: 2,
+                    position: "relative",
                 }}
             >
-                PRINTABLE DOCUMENTS
-            </h1>
+                <h1
+                    style={{
+                        fontSize: "30px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        color: "black",
+                        margin: 0,
+                    }}
+                >
+                    PRINTABLE DOCUMENTS
+                </h1>
+                <Button
+                    variant="contained"
+                    onClick={handleManualSave}
+                    disabled={saving || !userID}
+                    sx={{
+                        position: "absolute",
+                        right: 16,
+                        backgroundColor: mainButtonColor,
+                        textTransform: "none",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+                    }}
+                >
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+            </Box>
 
 
 
@@ -989,7 +1026,6 @@ const SuperAdminStudentDashboard5 = () => {
                                         name="termsOfAgreement"
                                         checked={person.termsOfAgreement === 1}
                                         onChange={handleChange}
-                                        onBlur={handleBlur}
                                     />
                                 }
                                 label="I agree Terms of Agreement"
@@ -1064,18 +1100,24 @@ const SuperAdminStudentDashboard5 = () => {
                             <Button
                                 variant="contained"
                                 onClick={async () => {
-                                    handleUpdate(person);
-
-                                    setSnack({
-                                        open: true,
-                                        message:
-                                            "Your account has been successfully registered! Wait for further announcement. Please upload your documents.",
-                                        severity: "success",
-                                    });
-
-                                    setTimeout(() => {
-                                        navigate("/student_online_requirements_admin");
-                                    }, 2000);
+                                    try {
+                                        await handleUpdate(person);
+                                        setSnack({
+                                            open: true,
+                                            message:
+                                                "Your account has been successfully registered! Wait for further announcement. Please upload your documents.",
+                                            severity: "success",
+                                        });
+                                        setTimeout(() => {
+                                            navigate("/student_online_requirements_admin");
+                                        }, 2000);
+                                    } catch (err) {
+                                        setSnack({
+                                            open: true,
+                                            message: "Failed to save changes.",
+                                            severity: "error",
+                                        });
+                                    }
                                 }}
                                 endIcon={
                                     <FolderIcon

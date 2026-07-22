@@ -709,18 +709,13 @@ const FacultyMasterList = () => {
         selectedSemester?.semester_description ||
         meta.semester_description ||
         "",
-      subjectCode: meta.course_code || "",
+      programCode: meta.course_code || "",
       classSection: `${meta.program_code || ""} ${meta.section_description || ""}`
         .replace(/\s+/g, " ")
         .trim(),
-      subjectTitle: meta.course_description || "",
+      programDescription: meta.course_description || "",
       yearLevel: meta.year_level_description || "",
-      academicUnits: meta.course_unit ?? "0",
-      labUnits: meta.lab_unit ?? "0",
-      creditUnits: meta.course_unit ?? "0",
-      labHours: "0",
-      scheduleLines,
-      mode: "",
+      departmentName: meta.dprtmnt_name || "",
       facultyName,
       students: groupedList.map(mapStudentToPrintRow),
       printInfoLeft: printTimestamp,

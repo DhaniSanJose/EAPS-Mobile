@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { Button, Box, TextField, Container, Card, TableContainer, Paper, Table, TableHead, TableRow, Modal, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, CircularProgress, } from "@mui/material";
+import { Button, Box, TextField, Container, Card, TableContainer, Paper, Table, TableHead, TableRow, Modal, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, CircularProgress, Snackbar, Alert, } from "@mui/material";
 import { Link } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
@@ -320,10 +320,12 @@ const AdminDashboard5 = () => {
     try {
       await axios.put(`${API_BASE_URL}/api/person/${person.person_id}`, updatedData);
     } catch (error) {
-      console.error("❌ Auto-save failed:", error);
+      console.error("❌ Save failed:", error);
+      throw error;
     }
   };
-  // Real-time save on every character typed
+
+  // Local form updates only (no auto-save)
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
     const updatedPerson = {
@@ -331,7 +333,25 @@ const AdminDashboard5 = () => {
       [name]: type === "checkbox" ? (checked ? 1 : 0) : value,
     };
     setPerson(updatedPerson);
-    handleUpdate(updatedPerson); // No delay, real-time save
+  };
+
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [saving, setSaving] = useState(false);
+  const handleManualSave = async () => {
+    const targetId = selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+    if (!targetId) {
+      setSnackbar({ open: true, message: "No applicant selected.", severity: "warning" });
+      return;
+    }
+    try {
+      setSaving(true);
+      await handleUpdate(person);
+      setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
+    } catch (err) {
+      setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ✅ Safe handleBlur for SuperAdmin — updates correct applicant only
@@ -935,17 +955,44 @@ const AdminDashboard5 = () => {
         </Box>
       </Box>
 
-      <h1
-        style={{
-          fontSize: "30px",
-          fontWeight: "bold",
-          textAlign: "center",
-          color: "black",
-          marginTop: "25px",
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2,
+          mt: "25px",
+          px: 2,
+          position: "relative",
         }}
       >
-        PRINTABLE DOCUMENTS
-      </h1>
+        <h1
+          style={{
+            fontSize: "30px",
+            fontWeight: "bold",
+            textAlign: "center",
+            color: "black",
+            margin: 0,
+          }}
+        >
+          PRINTABLE DOCUMENTS
+        </h1>
+        <Button
+          variant="contained"
+          onClick={handleManualSave}
+          disabled={saving || !(person?.person_id || userID)}
+          sx={{
+            position: "absolute",
+            right: 16,
+            backgroundColor: mainButtonColor,
+            textTransform: "none",
+            fontWeight: "bold",
+            "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+          }}
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </Box>
 
 
 
@@ -1213,7 +1260,6 @@ const AdminDashboard5 = () => {
                     disabled
                     checked={person.termsOfAgreement === 1}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                   />
                 }
                 label="I agree Terms of Agreement"
@@ -1435,6 +1481,20 @@ const AdminDashboard5 = () => {
 
       </Container>
 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
     </Box>
 

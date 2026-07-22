@@ -349,7 +349,7 @@ const SuperAdminApplicantDashboard2 = () => {
             }
 
             // ✅ Send update request
-            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, getAuditHeaders());
 
             console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
         } catch (error) {
@@ -358,10 +358,11 @@ const SuperAdminApplicantDashboard2 = () => {
                 status: error.response?.status,
                 details: error.response?.data || error,
             });
+            throw error;
         }
     };
 
-    // Real-time save on every character typed
+    // Local form updates only (no auto-save)
     const handleChange = (e) => {
         const { name, type, checked, value } = e.target;
 
@@ -395,7 +396,25 @@ const SuperAdminApplicantDashboard2 = () => {
         }
 
         setPerson(updatedPerson);
-        handleUpdate(updatedPerson); // No delay, real-time save
+    };
+
+    const [saving, setSaving] = useState(false);
+    const handleManualSave = async () => {
+        const targetId = selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+        if (!targetId) {
+            setSnackbar({ open: true, message: "No applicant selected.", severity: "warning" });
+            return;
+        }
+        try {
+            setSaving(true);
+            await handleUpdate(person);
+            sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+            setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
+        } catch (err) {
+            setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+        } finally {
+            setSaving(false);
+        }
     };
 
 
@@ -954,17 +973,44 @@ const SuperAdminApplicantDashboard2 = () => {
                 </Box>
             </Box>
 
-            <h1
-                style={{
-                    fontSize: "30px",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    color: "black",
-                    marginTop: "25px",
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: "25px",
+                    px: 2,
+                    position: "relative",
                 }}
             >
-                PRINTABLE DOCUMENTS
-            </h1>
+                <h1
+                    style={{
+                        fontSize: "30px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        color: "black",
+                        margin: 0,
+                    }}
+                >
+                    PRINTABLE DOCUMENTS
+                </h1>
+                <Button
+                    variant="contained"
+                    onClick={handleManualSave}
+                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                    sx={{
+                        position: "absolute",
+                        right: 16,
+                        backgroundColor: mainButtonColor,
+                        textTransform: "none",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+                    }}
+                >
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+            </Box>
 
 
 
@@ -1204,9 +1250,8 @@ const SuperAdminApplicantDashboard2 = () => {
                                         };
 
                                         setPerson(newPerson);
-                                        handleUpdate(newPerson); // Save immediately
+
                                     }}
-                                    onBlur={handleBlur}
                                     sx={{ width: 25, height: 25 }}
                                 />
                                 <label style={{ fontFamily: "Poppins, sans-serif" }}>Solo Parent</label>
@@ -1230,7 +1275,7 @@ const SuperAdminApplicantDashboard2 = () => {
                                             };
 
                                             setPerson(updatedPerson);
-                                            handleUpdate(updatedPerson);
+
                                         }}
                                     >
                                         <MenuItem value="Father">Father</MenuItem>
@@ -1270,7 +1315,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 father_deceased: checked ? 1 : 0,
                                             }));
                                         }}
-                                        onBlur={handleBlur}
                                     />
                                 }
                                 label="Father Seperated / Deceased"
@@ -1292,7 +1336,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 name="father_family_name"
                                                 value={person.father_family_name ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.father_family_name} helperText={errors.father_family_name ? "This field is required." : ""}
                                             />
                                         </Box>
@@ -1306,7 +1349,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter Father First Name"
                                                 value={person.father_given_name ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.father_given_name} helperText={errors.father_given_name ? "This field is required." : ""}
                                             />
                                         </Box>
@@ -1320,7 +1362,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter Father Middle Name"
                                                 value={person.father_middle_name ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.father_middle_name} helperText={errors.father_middle_name ? "This field is required." : ""}
                                             />
                                         </Box>
@@ -1335,7 +1376,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     value={person.father_ext || ""}
                                                     label="Extension"
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                 >
                                                     <MenuItem value=""><em>Select Extension</em></MenuItem>
                                                     <MenuItem value="Jr.">Jr.</MenuItem>
@@ -1362,7 +1402,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter Father Nickname"
                                                 value={person.father_nickname ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.father_nickname} helperText={errors.father_nickname ? "This field is required." : ""}
                                             />
                                         </Box>
@@ -1396,9 +1435,8 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 };
 
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson); // Immediate update (optional)
+
                                             }}
-                                            onBlur={handleBlur}
                                             sx={{ width: 25, height: 25 }}
                                         />
                                         <label style={{ fontFamily: "Poppins, sans-serif" }}>Father's education not applicable</label>
@@ -1419,7 +1457,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     name="father_education_level"
                                                     value={person.father_education_level ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.father_education_level}
                                                     helperText={errors.father_education_level ? "This field is required." : ""}
                                                 />
@@ -1434,7 +1471,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter Father Last School"
                                                     value={person.father_last_school ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.father_last_school}
                                                     helperText={errors.father_last_school ? "This field is required." : ""}
                                                 />
@@ -1449,7 +1485,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter Father Course"
                                                     value={person.father_course ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.father_course}
                                                     helperText={errors.father_course ? "This field is required." : ""}
                                                 />
@@ -1465,7 +1500,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter Father Year Graduated"
                                                     value={person.father_year_graduated ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.father_year_graduated}
                                                     helperText={errors.father_year_graduated ? "This field is required." : ""}
                                                 />
@@ -1480,7 +1514,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter Father School Address"
                                                     value={person.father_school_address ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.father_school_address}
                                                     helperText={errors.father_school_address ? "This field is required." : ""}
                                                 />
@@ -1509,7 +1542,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 name="father_contact"
                                                 placeholder="9XXXXXXXXX"
                                                 value={person.father_contact || ""}
-                                                onBlur={() => handleUpdate(person)}
                                                 onChange={(e) => {
                                                     const onlyNumbers = e.target.value.replace(/\D/g, "");
                                                     handleChange({
@@ -1543,7 +1575,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 value={person.father_occupation || ""}
                                                 placeholder="Enter Father Occupation"
                                                 onChange={handleChange}
-                                                onBlur={() => handleUpdate(person)}
                                                 error={errors.father_occupation}
                                                 helperText={errors.father_occupation ? "This field is required." : ""}
                                             />
@@ -1562,7 +1593,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter Father Employer"
                                                 value={person.father_employer || ""}
                                                 onChange={handleChange}
-                                                onBlur={() => handleUpdate(person)}
                                                 error={errors.father_employer}
                                                 helperText={errors.father_employer ? "This field is required." : ""}
                                             />
@@ -1589,7 +1619,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                         },
                                                     });
                                                 }}
-                                                onBlur={() => handleUpdate(person)}
                                                 error={errors.father_income}
                                                 helperText={errors.father_income ? "This field is required." : ""}
                                             />
@@ -1623,7 +1652,7 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 handleChange({
                                                     target: { name: "father_email", value }
                                                 });
-                                                handleUpdate(person);
+
                                             }}
                                             error={errors.father_email}
                                             helperText={errors.father_email ? "Please enter a valid email address." : ""}
@@ -1659,7 +1688,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 mother_deceased: checked ? 1 : 0,
                                             }));
                                         }}
-                                        onBlur={handleBlur}
                                     />
                                 }
                                 label="Mother / Seperated Deceased"
@@ -1681,7 +1709,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother Last Name"
                                                 value={person.mother_family_name ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_family_name}
                                                 helperText={errors.mother_family_name ? "This field is required." : ""}
                                             />
@@ -1697,7 +1724,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother First Name"
                                                 value={person.mother_given_name ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_given_name}
                                                 helperText={errors.mother_given_name ? "This field is required." : ""}
                                             />
@@ -1713,7 +1739,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother Middle Name"
                                                 value={person.mother_middle_name ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_middle_name}
                                                 helperText={errors.mother_middle_name ? "This field is required." : ""}
                                             />
@@ -1731,7 +1756,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     value={person.mother_ext || ""}
                                                     label="Extension"
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                 >
                                                     <MenuItem value=""><em>Select Extension</em></MenuItem>
                                                     <MenuItem value="Jr.">Jr.</MenuItem>
@@ -1757,7 +1781,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother Nickname"
                                                 value={person.mother_nickname ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_nickname}
                                                 helperText={errors.mother_nickname ? "This field is required." : ""}
                                             />
@@ -1794,9 +1817,8 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 };
 
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson); // Optional: Immediate save
+
                                             }}
-                                            onBlur={handleBlur}
                                             sx={{ width: 25, height: 25 }}
                                         />
                                         <label style={{ fontFamily: "Poppins, sans-serif" }}>Mother's education not applicable</label>
@@ -1814,7 +1836,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter your Mother Education Level"
                                                     value={person.mother_education_level ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.mother_education_level}
                                                     helperText={errors.mother_education_level ? "This field is required." : ""}
                                                 />
@@ -1829,7 +1850,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter your Mother Last School Attended"
                                                     value={person.mother_last_school ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.mother_last_school}
                                                     helperText={errors.mother_last_school ? "This field is required." : ""}
                                                 />
@@ -1844,7 +1864,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter your Mother Course"
                                                     value={person.mother_course ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.mother_course}
                                                     helperText={errors.mother_course ? "This field is required." : ""}
                                                 />
@@ -1860,7 +1879,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter your Mother Year Graduated"
                                                     value={person.mother_year_graduated ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.mother_year_graduated}
                                                     helperText={errors.mother_year_graduated ? "This field is required." : ""}
                                                 />
@@ -1875,7 +1893,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                     placeholder="Enter your Mother School Address"
                                                     value={person.mother_school_address ?? ""}
                                                     onChange={handleChange}
-                                                    onBlur={handleBlur}
                                                     error={errors.mother_school_address}
                                                     helperText={errors.mother_school_address ? "This field is required." : ""}
                                                 />
@@ -1900,7 +1917,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother Contact"
                                                 value={person.mother_contact ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_contact} helperText={errors.mother_contact ? "This field is required." : ""}
                                             />
                                         </Box>
@@ -1914,7 +1930,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother Occupation"
                                                 value={person.mother_occupation ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_occupation} helperText={errors.mother_occupation ? "This field is required." : ""}
                                             />
                                         </Box>
@@ -1928,7 +1943,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother Employer"
                                                 value={person.mother_employer ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_employer} helperText={errors.mother_employer ? "This field is required." : ""}
                                             />
                                         </Box>
@@ -1944,7 +1958,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                                 placeholder="Enter your Mother Income"
                                                 value={person.mother_income ?? ""}
                                                 onChange={handleChange}
-                                                onBlur={handleBlur}
                                                 error={errors.mother_income}
                                                 helperText={errors.mother_income ? "This field is required." : ""}
                                             />
@@ -1961,7 +1974,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                             placeholder="Enter your Mother Email Address (e.g., username@gmail.com)"
                                             value={person.mother_email ?? ""}
                                             onChange={handleChange}
-                                            onBlur={handleBlur}
 
                                         />
                                     </Box>
@@ -1985,7 +1997,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     value={person.guardian || ""}
                                     label="Guardian"
                                     onChange={handleGuardianChange}
-                                    onBlur={handleBlur}
                                 >
                                     <MenuItem value=""><em>Select Guardian</em></MenuItem>
                                     <MenuItem value="Father">Father</MenuItem>
@@ -2022,7 +2033,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     placeholder="Enter your Guardian Family Name"
                                     value={person.guardian_family_name ?? ""}
                                     onChange={handleChange}
-                                    onBlur={handleBlur}
                                     error={!!errors.guardian_family_name}
                                     helperText={errors.guardian_family_name ? "This field is required." : ""}
                                 />
@@ -2039,7 +2049,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     placeholder="Enter your Guardian First Name"
                                     value={person.guardian_given_name ?? ""}
                                     onChange={handleChange}
-                                    onBlur={handleBlur}
                                     error={!!errors.guardian_given_name}
                                     helperText={errors.guardian_given_name ? "This field is required." : ""}
                                 />
@@ -2056,7 +2065,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     placeholder="Enter your Guardian Middle Name"
                                     value={person.guardian_middle_name ?? ""}
                                     onChange={handleChange}
-                                    onBlur={handleBlur}
                                     error={!!errors.guardian_middle_name}
                                     helperText={errors.guardian_middle_name ? "This field is required." : ""}
                                 />
@@ -2074,7 +2082,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                         value={person.guardian_ext || ""}
                                         label="Extension"
                                         onChange={handleChange}
-                                        onBlur={handleBlur}
                                     >
                                         <MenuItem value=""><em>Select Extension</em></MenuItem>
                                         <MenuItem value="Jr.">Jr.</MenuItem>
@@ -2102,7 +2109,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     placeholder="Enter your Guardian Nickname"
                                     value={person.guardian_nickname ?? ""}
                                     onChange={handleChange}
-                                    onBlur={handleBlur}
                                     error={!!errors.guardian_nickname}
                                     helperText={errors.guardian_nickname ? "This field is required." : ""}
                                 />
@@ -2123,7 +2129,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                 placeholder="Enter your Guardian Address"
                                 value={person.guardian_address ?? ""}
                                 onChange={handleChange}
-                                onBlur={handleBlur}
                                 error={errors.guardian_address}
                                 helperText={errors.guardian_address ? "This field is required." : ""}
                             />
@@ -2140,7 +2145,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     placeholder="Enter your Guardian Contact Number"
                                     value={person.guardian_contact ?? ""}
                                     onChange={handleChange}
-                                    onBlur={handleBlur}
                                     error={errors.guardian_contact} helperText={errors.guardian_contact ? "This field is required." : ""}
                                 />
                             </Box>
@@ -2155,7 +2159,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     placeholder="Enter your Guardian Email Address (e.g., username@gmail.com)"
                                     value={person.guardian_email ?? ""}
                                     onChange={handleChange}
-                                    onBlur={handleBlur}
 
                                 />
                             </Box>
@@ -2176,7 +2179,6 @@ const SuperAdminApplicantDashboard2 = () => {
                                     value={person.annual_income || ""}
                                     label="Annual Income"
                                     onChange={handleChange}
-                                    onBlur={handleBlur}
                                 >
                                     <MenuItem value=""><em>Select Annual Income</em></MenuItem>
                                     <MenuItem value="80,000 and below">80,000 and below</MenuItem>
@@ -2330,7 +2332,7 @@ const SuperAdminApplicantDashboard2 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/applicant_admin_personal_information?person_id=${userID}`);
                                 }}
                                 startIcon={<ArrowBackIcon sx={{ color: "#000", transition: "color 0.3s" }} />}
@@ -2352,7 +2354,7 @@ const SuperAdminApplicantDashboard2 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/applicant_admin_educational_attainment?person_id=${userID}`);
                                 }}
                                 endIcon={<ArrowForwardIcon sx={{ color: "#fff", transition: "color 0.3s" }} />}

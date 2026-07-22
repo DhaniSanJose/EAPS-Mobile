@@ -151,12 +151,15 @@ router.get("/exam-schedule/:applicant_number", async (req, res) => {
         s.end_time,
         s.building_description,
         s.room_description,
+        rt.floor,
         s.proctor,
-       
         s.created_at AS schedule_created_at
       FROM exam_applicants ea
       JOIN entrance_exam_schedule s 
         ON ea.schedule_id = s.schedule_id
+      LEFT JOIN enrollment.room_table rt
+        ON rt.room_description = s.room_description
+        AND rt.building_description = s.building_description
       WHERE ea.applicant_id = ?
         AND COALESCE(ea.email_sent, 0) = 1
       LIMIT 1

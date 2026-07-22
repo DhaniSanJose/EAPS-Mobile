@@ -285,7 +285,7 @@ const SuperAdminApplicantDashboard4 = () => {
             }
 
             // ✅ Send update request
-            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, getAuditHeaders());
 
             console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
         } catch (error) {
@@ -294,11 +294,11 @@ const SuperAdminApplicantDashboard4 = () => {
                 status: error.response?.status,
                 details: error.response?.data || error,
             });
+            throw error;
         }
     };
 
-
-    // Real-time save on every character typed
+    // Local form updates only (no auto-save)
     const handleChange = (e) => {
         const { name, type, checked, value } = e.target;
         const updatedPerson = {
@@ -306,7 +306,25 @@ const SuperAdminApplicantDashboard4 = () => {
             [name]: type === "checkbox" ? (checked ? 1 : 0) : value,
         };
         setPerson(updatedPerson);
-        handleUpdate(updatedPerson); // No delay, real-time save
+    };
+
+    const [saving, setSaving] = useState(false);
+    const handleManualSave = async () => {
+        const targetId = selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+        if (!targetId) {
+            setSnackbar({ open: true, message: "No applicant selected.", severity: "warning" });
+            return;
+        }
+        try {
+            setSaving(true);
+            await handleUpdate(person);
+            sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+            setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
+        } catch (err) {
+            setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+        } finally {
+            setSaving(false);
+        }
     };
 
 
@@ -863,17 +881,44 @@ const SuperAdminApplicantDashboard4 = () => {
                 </Box>
             </Box>
 
-            <h1
-                style={{
-                    fontSize: "30px",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    color: "black",
-                    marginTop: "25px",
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: "25px",
+                    px: 2,
+                    position: "relative",
                 }}
             >
-                PRINTABLE DOCUMENTS
-            </h1>
+                <h1
+                    style={{
+                        fontSize: "30px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        color: "black",
+                        margin: 0,
+                    }}
+                >
+                    PRINTABLE DOCUMENTS
+                </h1>
+                <Button
+                    variant="contained"
+                    onClick={handleManualSave}
+                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                    sx={{
+                        position: "absolute",
+                        right: 16,
+                        backgroundColor: mainButtonColor,
+                        textTransform: "none",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+                    }}
+                >
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+            </Box>
 
 
 
@@ -1114,9 +1159,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                     [name]: checked ? 1 : 0,
                                                 };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                         />
                                     }
                                     label={symptom.charAt(0).toUpperCase() + symptom.slice(1)}
@@ -1192,9 +1236,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                                 [key]: person[key] === 1 ? null : 1,
                                                                             };
                                                                             setPerson(updatedPerson);
-                                                                            handleUpdate(updatedPerson);
+
                                                                         }}
-                                                                        onBlur={handleBlur}
                                                                     />
                                                                     <span style={{ fontSize: "15px", fontFamily: "Poppins, sans-serif" }}>Yes</span>
                                                                 </div>
@@ -1210,9 +1253,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                                 [key]: person[key] === 0 ? null : 0,
                                                                             };
                                                                             setPerson(updatedPerson);
-                                                                            handleUpdate(updatedPerson);
+
                                                                         }}
-                                                                        onBlur={handleBlur}
                                                                     />
                                                                     <span style={{ fontSize: "15px", fontFamily: "Poppins, sans-serif" }}>No</span>
                                                                 </div>
@@ -1250,9 +1292,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                             hospitalized: person.hospitalized === 1 ? null : 1,
                                                         };
                                                         setPerson(updatedPerson);
-                                                        handleUpdate(updatedPerson);
+
                                                     }}
-                                                    onBlur={handleBlur}
                                                 />
                                             }
                                             label="Yes"
@@ -1270,9 +1311,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                             hospitalized: person.hospitalized === 0 ? null : 0,
                                                         };
                                                         setPerson(updatedPerson);
-                                                        handleUpdate(updatedPerson);
+
                                                     }}
-                                                    onBlur={handleBlur}
                                                 />
                                             }
                                             label="No"
@@ -1305,9 +1345,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                         [name]: value,
                                     };
                                     setPerson(updatedPerson);
-                                    handleUpdate(updatedPerson);
+
                                 }}
-                                onBlur={handleBlur}
                             />
                         </Box>
 
@@ -1335,9 +1374,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                         [name]: value,
                                     };
                                     setPerson(updatedPerson);
-                                    handleUpdate(updatedPerson);
+
                                 }}
-                                onBlur={handleBlur}
                             />
                         </Box>
 
@@ -1383,9 +1421,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                 hadCovid: person.hadCovid === 1 ? null : 1,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Poppins, sans-serif" }}>YES</span>
                                                 </Box>
@@ -1401,9 +1438,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                 hadCovid: person.hadCovid === 0 ? null : 0,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Poppins, sans-serif" }}>NO</span>
 
@@ -1423,9 +1459,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                         covidDate: e.target.value,
                                                     };
                                                     setPerson(updatedPerson);
-                                                    handleUpdate(updatedPerson);
+
                                                 }}
-                                                onBlur={handleBlur}
                                                 style={{
                                                     width: "200px",
                                                     height: "50px",
@@ -1485,9 +1520,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                         [field]: e.target.value,
                                                                     };
                                                                     setPerson(updatedPerson);
-                                                                    handleUpdate(updatedPerson);
+
                                                                 }}
-                                                                onBlur={handleBlur}
                                                                 style={inputStyle}
                                                             />
                                                         </td>
@@ -1510,9 +1544,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                         [field]: e.target.value,
                                                                     };
                                                                     setPerson(updatedPerson);
-                                                                    handleUpdate(updatedPerson);
+
                                                                 }}
-                                                                onBlur={handleBlur}
                                                                 style={inputStyle}
                                                             />
                                                         </td>
@@ -1548,9 +1581,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1568,9 +1600,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1588,9 +1619,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1608,9 +1638,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1662,9 +1691,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                 symptomsToday: person.symptomsToday === 0 ? null : 0,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Poppins, sans-serif" }}>Physically Fit</span>
                                                 </div>
@@ -1680,9 +1708,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                                 symptomsToday: person.symptomsToday === 1 ? null : 1,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Poppins, sans-serif" }}>For Compliance</span>
                                                 </div>
@@ -1723,9 +1750,8 @@ const SuperAdminApplicantDashboard4 = () => {
                                                         remarks: e.target.value,
                                                     };
                                                     setPerson(updatedPerson);
-                                                    handleUpdate(updatedPerson);
+
                                                 }}
-                                                onBlur={handleBlur}
                                                 sx={{
                                                     backgroundColor: "white",
                                                     borderRadius: "8px",
@@ -1878,7 +1904,7 @@ const SuperAdminApplicantDashboard4 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/applicant_admin_educational_attainment?person_id=${userID}`);
                                 }}
                                 startIcon={<ArrowBackIcon sx={{ color: "#000", transition: "color 0.3s" }} />}
@@ -1899,7 +1925,7 @@ const SuperAdminApplicantDashboard4 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/applicant_admin_other_information?person_id=${userID}`);
                                 }}
                                 endIcon={<ArrowForwardIcon sx={{ color: "#fff", transition: "color 0.3s" }} />}

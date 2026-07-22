@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.50.55:5173",
+  "http://192.168.50.53:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -3234,11 +3234,11 @@ const updateActiveStudentCurriculumForCurrentSchoolYear = async ({
   personId,
   previousCurriculumId,
   nextCurriculumId,
+  fallbackCurriculumId,
 }) => {
-  const previousId = Number(previousCurriculumId || 0);
   const nextId = Number(nextCurriculumId || 0);
 
-  if (!previousId || !nextId || previousId === nextId) {
+  if (!nextId) {
     return {
       changed: false,
       reason: "No curriculum change detected",
@@ -3278,33 +3278,97 @@ const updateActiveStudentCurriculumForCurrentSchoolYear = async ({
     };
   }
 
-  const [statusResult] = await db3.query(
+  const studentNumber = studentRow.student_number;
+  const activeSchoolYearId = activeSchoolYear.id;
+
+  const [[statusRow]] = await db3.query(
     `
-    UPDATE student_status_table
-    SET active_curriculum = ?
+    SELECT id, active_curriculum, year_level_id, enrolled_status, control_status
+    FROM student_status_table
     WHERE student_number = ?
       AND active_school_year_id = ?
+    ORDER BY id DESC
+    LIMIT 1
     `,
-    [nextId, studentRow.student_number, activeSchoolYear.id],
+    [studentNumber, activeSchoolYearId],
   );
 
+  const previousId = Number(
+    previousCurriculumId ??
+      statusRow?.active_curriculum ??
+      fallbackCurriculumId ??
+      0,
+  );
+
+  if (previousId === nextId) {
+    return {
+      changed: false,
+      reason: "No curriculum change detected",
+    };
+  }
+
+  let updatedStatusRows = 0;
+
+  if (statusRow?.id) {
+    const [statusResult] = await db3.query(
+      `
+      UPDATE student_status_table
+      SET active_curriculum = ?
+      WHERE student_number = ?
+        AND active_school_year_id = ?
+      `,
+      [nextId, studentNumber, activeSchoolYearId],
+    );
+    updatedStatusRows = statusResult.affectedRows || 0;
+  } else {
+    const [[anyStatus]] = await db3.query(
+      `
+      SELECT year_level_id, enrolled_status, control_status
+      FROM student_status_table
+      WHERE student_number = ?
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [studentNumber],
+    );
+
+    const [insertResult] = await db3.query(
+      `
+      INSERT INTO student_status_table
+        (student_number, active_curriculum, enrolled_status, year_level_id, active_school_year_id, control_status)
+      VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [
+        studentNumber,
+        nextId,
+        anyStatus?.enrolled_status ?? 0,
+        anyStatus?.year_level_id ?? 0,
+        activeSchoolYearId,
+        anyStatus?.control_status ?? 0,
+      ],
+    );
+    updatedStatusRows = insertResult.affectedRows || 0;
+  }
+
   const [fromLabel, toLabel, studentName] = await Promise.all([
-    getApplicantCurriculumLabel(previousId),
+    previousId
+      ? getApplicantCurriculumLabel(previousId)
+      : Promise.resolve("N/A"),
     getApplicantCurriculumLabel(nextId),
-    getStudentNameByNumber(studentRow.student_number),
+    getStudentNameByNumber(studentNumber),
   ]);
 
   await logStudentHistoryFromRequest({
     req,
-    studentNumber: studentRow.student_number,
-    message: `Student (${studentRow.student_number}) ${studentName} shifted curriculum from ${fromLabel} to ${toLabel}.`,
+    studentNumber,
+    message: `Student (${studentNumber}) ${studentName} shifted curriculum from ${fromLabel} to ${toLabel}.`,
   });
 
   return {
     changed: true,
-    studentNumber: studentRow.student_number,
-    activeSchoolYearId: activeSchoolYear.id,
-    updatedStatusRows: statusResult.affectedRows || 0,
+    studentNumber,
+    activeSchoolYearId,
+    updatedStatusRows,
   };
 };
 
@@ -3547,7 +3611,25 @@ app.put("/api/enrollment/person/:person_id", async (req, res) => {
   const { person_id } = req.params;
   const updatedData = req.body;
 
-  const excludedFields = ["document_status", "evaluator", "program"];
+  // program is the current-term curriculum: update student_status_table only.
+  // person_table.program stays as the student's original course.
+  const requestedProgram = Object.prototype.hasOwnProperty.call(
+    updatedData,
+    "program",
+  )
+    ? updatedData.program
+    : undefined;
+
+  const excludedFields = [
+    "document_status",
+    "evaluator",
+    "program",
+    "original_program",
+    "current_program",
+    "active_curriculum",
+    "active_school_year_id",
+    "student_number",
+  ];
   const sanitizedData = Object.fromEntries(
     Object.entries(updatedData).filter(([key]) => !excludedFields.includes(key))
   );
@@ -3615,27 +3697,34 @@ app.put("/api/enrollment/person/:person_id", async (req, res) => {
       }
     }
 
-    const [result] = await db3.query(
-      "UPDATE person_table SET ? WHERE person_id = ?",
-      [sanitizedData, person_id],
-    );
+    let result = { affectedRows: 1 };
+    if (Object.keys(sanitizedData).length > 0) {
+      [result] = await db3.query(
+        "UPDATE person_table SET ? WHERE person_id = ?",
+        [sanitizedData, person_id],
+      );
 
-    if (result.affectedRows === 0)
-      return res
-        .status(404)
-        .json({ message: "Person not found in ENROLLMENT" });
+      if (result.affectedRows === 0)
+        return res
+          .status(404)
+          .json({ message: "Person not found in ENROLLMENT" });
+    }
 
     let curriculumShift = {
       changed: false,
       reason: "Program field was not updated",
     };
 
-    if (Object.prototype.hasOwnProperty.call(sanitizedData, "program")) {
+    if (
+      requestedProgram !== undefined &&
+      requestedProgram !== null &&
+      requestedProgram !== ""
+    ) {
       curriculumShift = await updateActiveStudentCurriculumForCurrentSchoolYear({
         req,
         personId: person_id,
-        previousCurriculumId: personBefore.program,
-        nextCurriculumId: sanitizedData.program,
+        nextCurriculumId: requestedProgram,
+        fallbackCurriculumId: personBefore.program,
       });
     }
 

@@ -85,13 +85,23 @@ router.get("/search-person-student", async (req, res) => {
   try {
     const [rows] = await db3.query(
       `
-      SELECT p.*, s.student_number
+      SELECT
+        p.*,
+        s.student_number,
+        p.program AS original_program,
+        COALESCE(NULLIF(sst.active_curriculum, 0), p.program) AS current_program,
+        asy.id AS active_school_year_id
       FROM student_numbering_table s
       JOIN person_table p ON s.person_id = p.person_id
+      LEFT JOIN active_school_year_table asy ON asy.astatus = 1
+      LEFT JOIN student_status_table sst
+        ON sst.student_number = s.student_number
+       AND sst.active_school_year_id = asy.id
       WHERE s.student_number LIKE ?
          OR p.last_name LIKE ?
          OR p.first_name LIKE ?
          OR p.emailAddress LIKE ?
+      ORDER BY sst.id DESC
       LIMIT 1
     `,
       [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`],
@@ -100,7 +110,9 @@ router.get("/search-person-student", async (req, res) => {
     if (!rows.length)
       return res.status(404).json({ message: "No matching student found" });
 
-    res.json(rows[0]);
+    const person = rows[0];
+    person.program = person.current_program ?? person.original_program ?? person.program;
+    res.json(person);
   } catch (err) {
     console.error("❌ Error searching person (db3):", err);
     res.status(500).json({ error: "Database error", details: err.message });

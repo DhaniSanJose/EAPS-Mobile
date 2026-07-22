@@ -178,14 +178,14 @@ export default function InactivityLogoutModal({
           </Box>
         </DialogTitle>
 
-        <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 3, pb: 1 }}>
+        <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 3, pb: 1, mt: 3 }}>
           <Box sx={{ textAlign: "center", mb: 2.5 }}>
             <Typography sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.65, mb: 2 }}>
               For your security, you'll be automatically logged out due to inactivity.
               Click below to stay signed in.
             </Typography>
 
-            <Typography sx={{ fontSize: 34, fontWeight: 800, color: accentColor, letterSpacing: "0.03em" }}>
+            <Typography sx={{ fontSize: 52, fontWeight: 800, color: accentColor, letterSpacing: "0.03em" }}>
               {formatTime(timeLeft)}
             </Typography>
             <Typography sx={{ fontSize: 11.5, color: "#888", mt: 0.5 }}>

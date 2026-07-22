@@ -8,6 +8,497 @@ import { Padding } from "@mui/icons-material";
 import { FcPrint } from "react-icons/fc";
 import API_BASE_URL from "../apiConfig";
 
+const FACULTY_WORKLOAD_STYLES = `
+/* Faculty Workload — vanilla CSS (converted from Tailwind) */
+
+/* ── Layout ── */
+.fw-flex { display: flex; }
+.fw-flex-col { display: flex; flex-direction: column; }
+.fw-items-center { align-items: center; }
+.fw-justify-center { justify-content: center; }
+.fw-shrink-0 { flex-shrink: 0; }
+.fw-flex-none { flex: none; }
+.fw-block { display: block; }
+.fw-relative { position: relative; }
+.fw-absolute { position: absolute; }
+.fw-inset-0 { inset: 0; }
+.fw-w-full { width: 100%; }
+.fw-h-full { height: 100%; }
+.fw-cursor-pointer { cursor: pointer; }
+
+/* ── Spacing ── */
+.fw-p-0 { padding: 0; }
+.fw-m-0 { margin: 0; }
+.fw-px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+.fw-ml-1 { margin-left: 0.25rem; }
+.fw-ml-2 { margin-left: 0.5rem; }
+.fw-ml-3px { margin-left: 3px; }
+
+/* ── Typography ── */
+.fw-text-center { text-align: center; }
+.fw-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fw-font-bold { font-weight: 700; }
+.fw-underline { text-decoration: underline; }
+.fw-leading-tight { line-height: 1.25; }
+
+.fw-text-8 { font-size: 8px; }
+.fw-text-9 { font-size: 9px; }
+.fw-text-9-5 { font-size: 9.5px; }
+.fw-text-10 { font-size: 10px; }
+.fw-text-10-5 { font-size: 10.5px; }
+.fw-text-11 { font-size: 11px; }
+.fw-text-11-5 { font-size: 11.5px; }
+.fw-text-12 { font-size: 12px; }
+.fw-text-14 { font-size: 14px; }
+.fw-text-18 { font-size: 18px; }
+.fw-text-20 { font-size: 20px; }
+
+.fw-tracking-tight { letter-spacing: -1px; }
+.fw-tracking-tight-05 { letter-spacing: -0.5px; }
+.fw-tracking-wide { letter-spacing: 0.5px; }
+.fw-font-400 { font-weight: 400; }
+.fw-font-500 { font-weight: 500; }
+.fw-font-600 { font-weight: 600; }
+
+/* ── Borders ── */
+.fw-border { border: 1px solid #000; }
+.fw-border-t-none { border-top: none; }
+.fw-border-l-none { border-left: none; }
+.fw-border-r-none { border-right: none; }
+.fw-border-b-none { border-bottom: none; }
+
+/* ── Margins (arbitrary) ── */
+.fw-mt-2rem { margin-top: 2rem; }
+.fw-mt-1rem { margin-top: 1rem; }
+.fw-mt-07rem { margin-top: 0.7rem; }
+.fw-mt-08rem { margin-top: 0.8rem; }
+.fw-mt-06rem { margin-top: 0.6rem; }
+.fw-mt-2rem-sig { margin-top: 2rem; }
+.fw-mt-neg04 { margin-top: -0.4rem; }
+.fw-mt-neg01 { margin-top: -0.1px; }
+.fw-mt-neg3px { margin-top: -3px; }
+.fw-mt-neg17 { margin-top: -1.7rem; }
+.fw-mt-neg2px { margin-top: -2px; }
+.fw-mb-16rem { margin-bottom: 16rem; }
+
+/* ── Heights ── */
+.fw-h-2rem { height: 2rem; }
+.fw-h-25rem { height: 2.5rem; }
+.fw-h-125rem { height: 1.25rem; }
+.fw-h-3rem { height: 3rem; }
+.fw-h-6rem { height: 6rem; }
+.fw-h-18rem { height: 1.8rem; }
+.fw-h-12rem { height: 1.2rem; }
+.fw-h-105rem { height: 1.05rem; }
+.fw-h-1rem { height: 1rem; }
+.fw-h-20px { height: 20px; }
+.fw-min-h-2rem { min-height: 2rem; }
+.fw-min-h-10rem { min-height: 10rem; }
+.fw-min-h-215rem { min-height: 2.15rem; }
+.fw-min-h-12rem { min-height: 1.2rem; }
+.fw-min-h-105rem { min-height: 1.05rem; }
+.fw-max-h-2rem { max-height: 2rem; }
+.fw-max-h-215rem { max-height: 2.15rem; }
+
+/* ── Widths ── */
+.fw-w-8rem { width: 8rem; }
+.fw-w-48rem { width: 48rem; }
+.fw-w-63rem { width: 63rem; }
+.fw-w-37rem { width: 37rem; }
+.fw-w-27rem { width: 27rem; }
+.fw-w-9rem { width: 9rem; }
+.fw-w-2rem { width: 2rem; }
+.fw-w-35rem { width: 3.5rem; }
+.fw-w-6rem { width: 6rem; }
+.fw-w-135rem { width: 13.5rem; }
+.fw-w-195rem { width: 19.5rem; }
+.fw-w-38rem { width: 3.8rem; }
+.fw-w-3rem { width: 3rem; }
+.fw-w-31rem { width: 3.1rem; }
+.fw-w-32rem { width: 3.2rem; }
+.fw-w-33rem { width: 3.3rem; }
+.fw-w-28rem { width: 2.8rem; }
+.fw-w-308rem { width: 3.08rem; }
+.fw-w-39rem { width: 3.9rem; }
+.fw-w-320rem { width: 3.20rem; }
+.fw-w-02rem { width: 0.2rem; padding: 0.2rem; }
+
+.fw-min-w-8rem { min-width: 8rem; }
+.fw-min-w-13rem { min-width: 13rem; }
+.fw-min-w-65rem { min-width: 6.5rem; }
+.fw-min-w-66rem { min-width: 6.6rem; }
+.fw-min-w-68rem { min-width: 6.8rem; }
+.fw-min-w-69rem { min-width: 6.9rem; }
+.fw-min-w-7rem { min-width: 7rem; }
+.fw-min-w-131rem { min-width: 13.1rem; }
+.fw-min-w-61rem { min-width: 61rem; }
+.fw-min-w-37rem { min-width: 37rem; }
+.fw-min-w-23rem { min-width: 23rem; }
+.fw-min-w-195rem { min-width: 19.5rem; }
+.fw-min-w-144rem { min-width: 14.4rem; }
+.fw-min-w-2rem { min-width: 2rem; }
+
+.fw-max-w-5rem { max-width: 5rem; }
+.fw-max-w-897rem { max-width: 8.97rem; }
+.fw-max-w-37rem { max-width: 37rem; }
+.fw-max-w-61rem { max-width: 61rem; }
+.fw-max-w-24rem { max-width: 24rem; }
+.fw-max-w-239rem { max-width: 23.9rem; }
+
+/* ── Padding (arbitrary) ── */
+.fw-px-07rem { padding-left: 0.7rem; padding-right: 0.7rem; }
+.fw-px-09rem { padding-left: 0.9rem; padding-right: 0.9rem; }
+.fw-px-04rem { padding-left: 0.4rem; padding-right: 0.4rem; }
+
+/* ── Background colors ── */
+.fw-bg-gray-300 { background-color: #d1d5db; }
+.fw-bg-eaeaea { background-color: #eaeaea; }
+.fw-bg-c0c0c0 { background-color: #c0c0c0; }
+.fw-bg-black { background-color: #000; }
+.fw-bg-white-text { color: #fff; }
+.fw-bg-yellow-300 { background-color: #fde047; }
+.fw-bg-ccffff { background-color: #ccffff; }
+.fw-bg-e6ccff { background-color: #e6ccff; }
+.fw-bg-ffd9b3 { background-color: #ffd9b3; }
+.fw-bg-99ccff { background-color: #99ccff; }
+.fw-bg-ccffcc { background-color: #ccffcc; }
+.fw-bg-fde5d6 { background-color: #fde5d6; }
+.fw-bg-f7caac { background-color: #f7caac; }
+
+.fw-text-white { color: #fff; }
+
+/* ── Workload table constants ── */
+.fw-workload-cell {
+  border: 1px solid #000;
+  border-left: none;
+  border-bottom: none;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.fw-h-day-header { height: 1.075rem; }
+.fw-h-regular { height: 1.075rem; }
+.fw-h-pair { height: 1rem; }
+.fw-h-other-fn { height: 1rem; }
+.fw-h-other-fn-group { height: 4rem; }
+.fw-h-total { height: 1.05rem; }
+
+.fw-w-label { width: 11rem; flex-shrink: 0; flex: none; }
+.fw-w-other-group { width: 4.3rem; flex-shrink: 0; flex: none; }
+.fw-w-other-sublabel { width: 6.7rem; flex-shrink: 0; flex: none; }
+
+.fw-day-mon { padding-left: 0.7rem; padding-right: 0.7rem; width: 3.2rem; flex-shrink: 0; flex: none; }
+.fw-day-tue { padding-left: 0.9rem; padding-right: 0.9rem; width: 3.1rem; flex-shrink: 0; flex: none; }
+.fw-day-wed { padding-left: 0.9rem; padding-right: 0.9rem; width: 3.3rem; flex-shrink: 0; flex: none; }
+.fw-day-thu { padding-left: 0.9rem; padding-right: 0.9rem; width: 3.08rem; flex-shrink: 0; flex: none; }
+.fw-day-fri { padding-left: 0.9rem; padding-right: 0.9rem; width: 2.8rem; flex-shrink: 0; flex: none; }
+.fw-day-sat { padding-left: 0.9rem; padding-right: 0.9rem; width: 3.20rem; flex-shrink: 0; flex: none; }
+.fw-day-sun { padding-left: 0.9rem; padding-right: 0.9rem; width: 3.3rem; flex-shrink: 0; flex: none; }
+.fw-day-total { border-right: none; padding-left: 0.9rem; padding-right: 0.9rem; width: 3.9rem; flex-shrink: 0; flex: none; }
+
+/* ── Schedule grid cells ── */
+.fw-slot {
+  height: 1.25rem;
+  border: 1px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fw-slot-top {
+  border-top: none;
+  border-left: none;
+}
+
+.fw-slot-bottom {
+  border-left: none;
+}
+
+.fw-schedule-row { display: flex; width: 100%; }
+.fw-schedule-tbody { display: flex; flex-direction: column; margin-top: -0.1px; }
+.fw-time-label {
+  height: 2.5rem;
+  background-color: #eaeaea;
+  border: 1px solid #000;
+  border-top: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fw-slot-wrapper { height: 2.5rem; padding: 0; margin: 0; }
+
+/* ── Extra teaching load rows ── */
+.fw-extra-row { display: flex; max-height: 2rem; }
+.fw-extra-cell {
+  border: 1px solid #000;
+  border-top: none;
+  border-left: none;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fw-extra-cell-r-none { border-right: none; }
+
+/* ── Header / designation / education ── */
+.fw-print-container { min-height: 10rem; margin-bottom: 16rem; }
+.fw-info-row { display: flex; align-items: center; }
+.fw-designation-title {
+  background-color: #d1d5db;
+  border: 1px solid #000;
+  min-width: 13rem;
+  border-right: none;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fw-designation-details {
+  width: 48rem;
+  border: 1px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fw-education-bg {
+  background-color: #d1d5db;
+  border: 1px solid #000;
+  width: 13rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fw-educ-row {
+  border: 1px solid #000;
+  border-bottom: none;
+  border-left: none;
+  width: 48rem;
+  height: 2rem;
+  padding: 0;
+  display: flex;
+}
+.fw-educ-row-last {
+  border: 1px solid #000;
+  border-left: none;
+  width: 48rem;
+  height: 2rem;
+  padding: 0;
+  display: flex;
+}
+.fw-educ-title {
+  font-size: 12px;
+  letter-spacing: -1px;
+  border: 1px solid #000;
+  margin: 0;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  border-bottom: none;
+  border-left: none;
+  border-top: none;
+  min-width: 8rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+.fw-educ-content {
+  font-size: 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  margin-left: 0.25rem;
+}
+
+/* ── Schedule table header ── */
+.fw-schedule-table { margin-top: 0.7rem; }
+.fw-thead-gray { background-color: #c0c0c0; }
+.fw-th-time {
+  min-width: 6.5rem;
+  min-height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #000;
+  font-size: 14px;
+}
+.fw-th-day-top {
+  text-align: center;
+  border: 1px solid #000;
+  border-left: none;
+  border-bottom: none;
+  font-size: 14px;
+}
+.fw-th-day-bottom {
+  height: 20px;
+  text-align: center;
+  border: 1px solid #000;
+  border-left: none;
+  font-size: 11.5px;
+  margin-top: -3px;
+}
+
+/* ── Summary section ── */
+.fw-summary-header {
+  background-color: #000;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  height: 1.8rem;
+  min-width: 61rem;
+  text-align: center;
+}
+.fw-summary-section-title {
+  text-align: center;
+  font-size: 11px;
+  background-color: #c0c0c0;
+  font-weight: 500;
+}
+.fw-workload-header-cell {
+  border: 1px solid #000;
+  border-left: none;
+  background-color: #eaeaea;
+  border-bottom: none;
+  font-size: 11px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fw-workload-header-cell-total {
+  border: 1px solid #000;
+  border-left: none;
+  background-color: #eaeaea;
+  border-bottom: none;
+  border-right: none;
+  font-size: 11px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fw-workload-label-cell {
+  border: 1px solid #000;
+  border-left: none;
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+.fw-workload-other-group-label {
+  border: 1px solid #000;
+  border-left: none;
+  border-bottom: none;
+  font-size: 10px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+.fw-honorarium-header-row { display: flex; max-height: 2.15rem; }
+.fw-honorarium-header-cell {
+  border: 1px solid #000;
+  border-left: none;
+  background-color: #eaeaea;
+  min-height: 2.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fw-honorarium-header-cell-r-none { border-right: none; }
+
+/* ── FTE calculator ── */
+.fw-fte-header-row { display: flex; min-height: 1.05rem; }
+.fw-fte-cell {
+  border: 1px solid #000;
+  border-left: none;
+  border-bottom: none;
+  background-color: #eaeaea;
+  text-align: center;
+}
+.fw-fte-data-cell {
+  border: 1px solid #000;
+  border-left: none;
+  border-bottom: none;
+  text-align: center;
+  height: 1rem;
+}
+
+/* ── Conforme / signatures ── */
+.fw-conforme-box {
+  border: 1px solid #000;
+  display: flex;
+  flex-direction: column;
+  background-color: #eaeaea;
+}
+.fw-conforme-code {
+  background-color: #000;
+  color: #fff;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13.5rem;
+}
+.fw-signature-col {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2rem;
+  width: 100%;
+  align-items: center;
+}
+
+/* ── Assignment title ── */
+.fw-assignment-title {
+  display: flex;
+  justify-content: center;
+  width: 63rem;
+  font-size: 20px;
+  font-weight: 700;
+}
+.fw-assignment-subtitle {
+  display: flex;
+  justify-content: center;
+  width: 63rem;
+  font-size: 14px;
+  letter-spacing: -0.5px;
+  margin-top: -0.4rem;
+}
+
+/* ── Existing semantic classes (kept) ── */
+.information { /* print styles reference this */ }
+.designation { /* print styles reference this */ }
+.educ-con { display: flex; }
+.educ-details { /* combined with fw-educ-row */ }
+.education-bg { /* combined with fw-education-bg */ }
+.prof-details { /* layout handled by fw-w-48rem fw-mt-08rem */ }
+.earist-logo { /* max-width handled by fw-max-w-5rem */ }
+.schedule-block { position: relative; width: 100%; height: 100%; cursor: pointer; text-align: center; }
+.schedule-block-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.schedule-text-main { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.schedule-text-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; }
+`;
+
 const WORKLOAD_DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 const WORKLOAD_CELL_BASE =
@@ -732,7 +1223,7 @@ const FacultyWorkload = () => {
       <br />
 
       <style>
-        {`
+        {`${FACULTY_WORKLOAD_STYLES}
                 @media print {
                     @page {
                         margin: 0; 

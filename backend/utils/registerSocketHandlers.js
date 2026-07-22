@@ -1382,43 +1382,6 @@ Click the link below to log in:
     }
   }
 
-
-
-  app.get("/api/exam-schedule/:applicant_number", async (req, res) => {
-    const { applicant_number } = req.params;
-
-    try {
-      const [rows] = await db.query(
-        `
-      SELECT
-        s.day_description AS date_of_exam,
-        s.start_time,
-        s.end_time,
-        s.building_description,
-        s.room_description,
-        s.proctor,
-        s.created_at AS schedule_created_at
-      FROM exam_applicants ea
-      JOIN entrance_exam_schedule s
-        ON ea.schedule_id = s.schedule_id
-      WHERE ea.applicant_id = ?
-        AND COALESCE(ea.email_sent, 0) = 1
-      LIMIT 1
-    `,
-        [applicant_number],
-      );
-
-      if (rows.length === 0) {
-        return res.status(404).json({ message: "No exam schedule found" });
-      }
-
-      res.json(rows[0]);
-    } catch (err) {
-      console.error("Error fetching exam schedule:", err);
-      res.status(500).json({ error: "Database error" });
-    }
-  });
-
   app.get("/api/day_list", async (req, res) => {
     try {
       const [results] = await db.query(
@@ -5793,24 +5756,183 @@ Click the link below to log in:
     }
   });
 
-  // 09/16/2025
+  // Class List — professor sections for active term
+  app.get("/api/class-list/professor-sections", async (req, res) => {
+    const { professorId, yearId, semesterId, departmentId } = req.query;
+
+    if (!professorId || !yearId || !semesterId) {
+      return res.status(400).json({
+        error: "professorId, yearId, and semesterId are required",
+      });
+    }
+
+    const filters = ["tt.professor_id = ?", "sy.year_id = ?", "sy.semester_id = ?"];
+    const params = [professorId, yearId, semesterId];
+
+    if (departmentId) {
+      filters.push("dct.dprtmnt_id = ?");
+      params.push(departmentId);
+    }
+
+    try {
+      const [rows] = await db3.query(
+        `
+        SELECT DISTINCT
+          tt.department_section_id,
+          ptbl.program_code,
+          ptbl.program_description,
+          st.description AS section_description,
+          dst.curriculum_id,
+          dct.dprtmnt_id
+        FROM time_table AS tt
+        INNER JOIN dprtmnt_section_table AS dst ON tt.department_section_id = dst.id
+        INNER JOIN section_table AS st ON dst.section_id = st.id
+        INNER JOIN curriculum_table AS ct ON dst.curriculum_id = ct.curriculum_id
+        INNER JOIN program_table AS ptbl ON ct.program_id = ptbl.program_id
+        INNER JOIN dprtmnt_curriculum_table AS dct ON ct.curriculum_id = dct.curriculum_id
+        INNER JOIN active_school_year_table AS sy ON tt.school_year_id = sy.id
+        WHERE ${filters.join(" AND ")}
+        ORDER BY ptbl.program_code ASC, st.description ASC
+        `,
+        params,
+      );
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching professor sections for class list:", error);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // Class List — student numbers for professor/section filters
+  app.get("/api/class-list/filter-student-numbers", async (req, res) => {
+    const { professorId, departmentSectionId, yearId, semesterId } = req.query;
+
+    if (!yearId || !semesterId) {
+      return res.status(400).json({
+        error: "yearId and semesterId are required",
+      });
+    }
+
+    if (!professorId && !departmentSectionId) {
+      return res.json([]);
+    }
+
+    try {
+      let rows = [];
+
+      if (departmentSectionId) {
+        [rows] = await db3.query(
+          `
+          SELECT DISTINCT es.student_number
+          FROM enrolled_subject AS es
+          INNER JOIN active_school_year_table AS sy
+            ON es.active_school_year_id = sy.id
+          WHERE es.department_section_id = ?
+            AND sy.year_id = ?
+            AND sy.semester_id = ?
+          `,
+          [departmentSectionId, yearId, semesterId],
+        );
+      } else if (professorId) {
+        [rows] = await db3.query(
+          `
+          SELECT DISTINCT es.student_number
+          FROM enrolled_subject AS es
+          INNER JOIN time_table AS tt
+            ON es.department_section_id = tt.department_section_id
+           AND es.course_id = tt.course_id
+           AND es.active_school_year_id = tt.school_year_id
+          INNER JOIN active_school_year_table AS sy
+            ON es.active_school_year_id = sy.id
+          WHERE tt.professor_id = ?
+            AND sy.year_id = ?
+            AND sy.semester_id = ?
+          `,
+          [professorId, yearId, semesterId],
+        );
+      }
+
+      res.json(rows.map((row) => String(row.student_number)));
+    } catch (error) {
+      console.error("Error fetching class list filter student numbers:", error);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  // 09/16/2025 — optimized: single query for multiple departments + optional term filter
   app.get("/api/student_number", async (req, res) => {
     try {
-      const { department_id, curriculum_id } = req.query;
-      const filters = [];
-      const params = [];
+      const {
+        department_id,
+        departmentIds: departmentIdsRaw,
+        curriculum_id,
+        yearId,
+        semesterId,
+      } = req.query;
 
-      if (department_id) {
-        filters.push("dct.dprtmnt_id = ?");
-        params.push(department_id);
+      const departmentIds = departmentIdsRaw
+        ? String(departmentIdsRaw)
+            .split(",")
+            .map((id) => id.trim())
+            .filter(Boolean)
+        : department_id
+          ? [String(department_id).trim()]
+          : [];
+
+      const innerFilters = [];
+      const innerParams = [];
+      const regStatsFilters = [];
+      const regStatsParams = [];
+
+      if (departmentIds.length === 1) {
+        innerFilters.push("dct.dprtmnt_id = ?");
+        innerParams.push(departmentIds[0]);
+        regStatsFilters.push("dct2.dprtmnt_id = ?");
+        regStatsParams.push(departmentIds[0]);
+      } else if (departmentIds.length > 1) {
+        const placeholders = departmentIds.map(() => "?").join(", ");
+        innerFilters.push(`dct.dprtmnt_id IN (${placeholders})`);
+        innerParams.push(...departmentIds);
+        regStatsFilters.push(`dct2.dprtmnt_id IN (${placeholders})`);
+        regStatsParams.push(...departmentIds);
       }
 
       if (curriculum_id) {
-        filters.push("es.curriculum_id = ?");
-        params.push(curriculum_id);
+        innerFilters.push("es.curriculum_id = ?");
+        innerParams.push(curriculum_id);
+        regStatsFilters.push("es2.curriculum_id = ?");
+        regStatsParams.push(curriculum_id);
       }
 
-      const innerWhereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+      let termJoinSql = "";
+      let regStatsTermJoin = "";
+
+      if (yearId && semesterId) {
+        termJoinSql = `
+        INNER JOIN active_school_year_table AS asyt_filter
+          ON es.active_school_year_id = asyt_filter.id
+        `;
+        regStatsTermJoin = `
+        INNER JOIN active_school_year_table AS asyt2
+          ON es2.active_school_year_id = asyt2.id
+        `;
+        innerFilters.push("asyt_filter.year_id = ?");
+        innerFilters.push("asyt_filter.semester_id = ?");
+        innerParams.push(yearId, semesterId);
+        regStatsFilters.push("asyt2.year_id = ?");
+        regStatsFilters.push("asyt2.semester_id = ?");
+        regStatsParams.push(yearId, semesterId);
+      }
+
+      const innerWhereClause = innerFilters.length
+        ? `WHERE ${innerFilters.join(" AND ")}`
+        : "";
+
+      const regStatsWhereClause = regStatsFilters.length
+        ? `WHERE ${regStatsFilters.join(" AND ")}`
+        : "";
+
+      const queryParams = [...innerParams, ...regStatsParams];
 
       const [rows] = await db3.execute(`
       SELECT
@@ -5837,7 +5959,10 @@ Click the link below to log in:
         sy.semester_id,
         es_base.en_remarks,
         ylt.year_level_description,
-        es_base.curriculum_id
+        ylt.year_level_id,
+        es_base.curriculum_id,
+        student_section.section_description,
+        student_section.section_program_code
       FROM (
         SELECT
           es.student_number,
@@ -5849,6 +5974,7 @@ Click the link below to log in:
         FROM enrolled_subject AS es
         INNER JOIN dprtmnt_curriculum_table AS dct
           ON es.curriculum_id = dct.curriculum_id
+        ${termJoinSql}
         ${innerWhereClause}
         GROUP BY es.student_number, es.active_school_year_id, es.curriculum_id
       ) AS es_base
@@ -5875,21 +6001,48 @@ Click the link below to log in:
           ON sst.year_level_id = ylt.year_level_id
         LEFT JOIN (
           SELECT
-            student_number,
-            active_school_year_id,
-            COUNT(is_regular) AS reg_count,
-            MIN(is_regular) AS min_is_regular
-          FROM enrolled_subject
-          GROUP BY student_number, active_school_year_id
+            es2.student_number,
+            es2.active_school_year_id,
+            COUNT(es2.is_regular) AS reg_count,
+            MIN(es2.is_regular) AS min_is_regular
+          FROM enrolled_subject AS es2
+          INNER JOIN dprtmnt_curriculum_table AS dct2
+            ON es2.curriculum_id = dct2.curriculum_id
+          ${regStatsTermJoin}
+          ${regStatsWhereClause}
+          GROUP BY es2.student_number, es2.active_school_year_id
         ) AS reg_stats
           ON es_base.student_number = reg_stats.student_number
          AND es_base.active_school_year_id = reg_stats.active_school_year_id
+        LEFT JOIN (
+          SELECT
+            pick.student_number,
+            pick.active_school_year_id,
+            st_sec.description AS section_description,
+            pt_sec.program_code AS section_program_code
+          FROM (
+            SELECT
+              es_sec.student_number,
+              es_sec.active_school_year_id,
+              MIN(es_sec.department_section_id) AS department_section_id
+            FROM enrolled_subject AS es_sec
+            WHERE es_sec.department_section_id IS NOT NULL
+              AND es_sec.department_section_id > 0
+            GROUP BY es_sec.student_number, es_sec.active_school_year_id
+          ) AS pick
+          INNER JOIN dprtmnt_section_table AS dst_sec
+            ON pick.department_section_id = dst_sec.id
+          INNER JOIN section_table AS st_sec
+            ON dst_sec.section_id = st_sec.id
+          INNER JOIN curriculum_table AS cct_sec
+            ON dst_sec.curriculum_id = cct_sec.curriculum_id
+          INNER JOIN program_table AS pt_sec
+            ON cct_sec.program_id = pt_sec.program_id
+        ) AS student_section
+          ON es_base.student_number = student_section.student_number
+         AND es_base.active_school_year_id = student_section.active_school_year_id
       ORDER BY pst.last_name ASC, pst.first_name ASC, snt.student_number ASC
-    `, params);
-
-      if (rows.length === 0) {
-        return res.status(404).json({ error: "No student data found" });
-      }
+    `, queryParams);
 
       res.json(rows);
     } catch (error) {
@@ -6666,10 +6819,19 @@ Click the link below to log in:
       const [rows] = await db3.query(
         `SELECT
          p.*,
-         sn.student_number
+         sn.student_number,
+         p.program AS original_program,
+         COALESCE(NULLIF(sst.active_curriculum, 0), p.program) AS current_program,
+         asy.id AS active_school_year_id
        FROM student_numbering_table sn
        JOIN person_table p ON p.person_id = sn.person_id
-       WHERE sn.student_number = ?`,
+       LEFT JOIN active_school_year_table asy ON asy.astatus = 1
+       LEFT JOIN student_status_table sst
+         ON sst.student_number = sn.student_number
+        AND sst.active_school_year_id = asy.id
+       WHERE sn.student_number = ?
+       ORDER BY sst.id DESC
+       LIMIT 1`,
         [req.params.student_number],
       );
 
@@ -6677,7 +6839,9 @@ Click the link below to log in:
         return res.status(404).json({ message: "Person not found" });
       }
 
-      res.json(rows[0]); //  full person data + student_number
+      const person = rows[0];
+      person.program = person.current_program ?? person.original_program ?? person.program;
+      res.json(person);
     } catch (err) {
       console.error("Error fetching person by student_number:", err);
       res.status(500).json({ message: "Server error" });
@@ -6710,10 +6874,28 @@ Click the link below to log in:
   });
 
   //  Get person by person_id (Enrollment DB)
+  // program = current-term curriculum from student_status_table (active SY)
+  // original_program = person_table.program (never overwritten by course shift)
   app.get("/api/enrollment_person/:person_id", async (req, res) => {
     try {
       const [rows] = await db3.query(
-        `SELECT * FROM person_table WHERE person_id = ?`,
+        `
+        SELECT
+          pt.*,
+          pt.program AS original_program,
+          COALESCE(NULLIF(sst.active_curriculum, 0), pt.program) AS current_program,
+          asy.id AS active_school_year_id,
+          snt.student_number
+        FROM person_table pt
+        LEFT JOIN student_numbering_table snt ON snt.person_id = pt.person_id
+        LEFT JOIN active_school_year_table asy ON asy.astatus = 1
+        LEFT JOIN student_status_table sst
+          ON sst.student_number = snt.student_number
+         AND sst.active_school_year_id = asy.id
+        WHERE pt.person_id = ?
+        ORDER BY sst.id DESC
+        LIMIT 1
+        `,
         [req.params.person_id],
       );
 
@@ -6721,7 +6903,9 @@ Click the link below to log in:
         return res.status(404).json({ message: "Person not found" });
       }
 
-      res.json(rows[0]);
+      const person = rows[0];
+      person.program = person.current_program ?? person.original_program ?? person.program;
+      res.json(person);
     } catch (err) {
       console.error("Error fetching enrollment person:", err);
       res.status(500).json({ message: "Server error" });

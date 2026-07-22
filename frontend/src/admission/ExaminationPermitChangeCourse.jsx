@@ -1101,17 +1101,21 @@ const ExaminationProfile = () => {
 
             <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
               <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Bldg. :</label>
+                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px", gap: "8px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Bldg. :</label>
                   <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {examSchedule?.building_description || ""}
+                  </span>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Floor :</label>
+                  <span style={{ minWidth: "40px", borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "center" }}>
+                    {examSchedule?.floor ? getOrdinal(Number(examSchedule.floor)) : ""}
                   </span>
                 </div>
               </td>
 
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", marginTop: "-130px" }}>
+                  <div style={{ display: "flex", alignItems: "center", marginTop: "-140px" }}>
                     <label style={{ fontWeight: "bold", marginRight: "10px", width: "80px" }}>Room No.:</label>
                     <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial", width: "150px" }}>
                       {examSchedule?.room_description || ""}

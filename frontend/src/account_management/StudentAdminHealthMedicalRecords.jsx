@@ -190,7 +190,7 @@ const SuperAdminStudentDashboard4 = () => {
 
     const fetchByPersonId = async (personID) => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/person/${personID}`);
+            const res = await axios.get(`${API_BASE_URL}/api/enrollment_person/${personID}`);
             setPerson(res.data);
             setSelectedPerson(res.data);
             if (res.data?.applicant_number) {
@@ -241,18 +241,22 @@ const SuperAdminStudentDashboard4 = () => {
 
 
 
-    // 🧠 Updates record in ENROLLMENT.person_table in real time
+    // Saves only when Save Changes is clicked
     const handleUpdate = async (updatedPerson) => {
         try {
-            // ✅ force the request to the enrollment route
-            await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, updatedPerson);
-            console.log("✅ Auto-saved to ENROLLMENT DB3");
+            await axios.put(
+                `${API_BASE_URL}/api/enrollment/person/${userID}`,
+                updatedPerson,
+                getAuditHeaders(),
+            );
+            console.log("✅ Saved to ENROLLMENT DB3");
         } catch (error) {
-            console.error("❌ Auto-save failed:", error);
+            console.error("❌ Save failed:", error);
+            throw error;
         }
     };
 
-    // Real-time save on every character typed
+    // Local form updates only (no auto-save)
     const handleChange = (e) => {
         const { name, type, checked, value } = e.target;
         const updatedPerson = {
@@ -260,19 +264,6 @@ const SuperAdminStudentDashboard4 = () => {
             [name]: type === "checkbox" ? (checked ? 1 : 0) : value,
         };
         setPerson(updatedPerson);
-        handleUpdate(updatedPerson); // No delay, real-time save
-    };
-
-
-
-    // 🖱️ Triggered when input loses focus (safety net)
-    const handleBlur = async () => {
-        try {
-            await axios.put(`${API_BASE_URL}/api/enrollment/person/${userID}`, person, getAuditHeaders());
-            console.log("✅ Auto-saved (on blur) to ENROLLMENT DB3");
-        } catch (err) {
-            console.error("❌ Auto-save failed (on blur):", err);
-        }
     };
 
     const [activeStep, setActiveStep] = useState(3);
@@ -289,6 +280,23 @@ const SuperAdminStudentDashboard4 = () => {
 
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
     const handleCloseSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }));
+    const [saving, setSaving] = useState(false);
+    const handleManualSave = async () => {
+        if (!userID) {
+            setSnackbar({ open: true, message: "No student selected.", severity: "warning" });
+            return;
+        }
+        try {
+            setSaving(true);
+            await handleUpdate(person);
+            sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+            setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
+        } catch (err) {
+            setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const handleStepClick = (index) => {
         setActiveStep(index);
@@ -731,17 +739,44 @@ const SuperAdminStudentDashboard4 = () => {
                 </Box>
             </Box>
 
-            <h1
-                style={{
-                    fontSize: "30px",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    color: "black",
-                    marginTop: "25px",
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: "25px",
+                    px: 2,
+                    position: "relative",
                 }}
             >
-                PRINTABLE DOCUMENTS
-            </h1>
+                <h1
+                    style={{
+                        fontSize: "30px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        color: "black",
+                        margin: 0,
+                    }}
+                >
+                    PRINTABLE DOCUMENTS
+                </h1>
+                <Button
+                    variant="contained"
+                    onClick={handleManualSave}
+                    disabled={saving || !userID}
+                    sx={{
+                        position: "absolute",
+                        right: 16,
+                        backgroundColor: mainButtonColor,
+                        textTransform: "none",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+                    }}
+                >
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+            </Box>
 
 
 
@@ -972,9 +1007,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                     [name]: checked ? 1 : 0,
                                                 };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                         />
                                     }
                                     label={symptom.charAt(0).toUpperCase() + symptom.slice(1)}
@@ -1050,9 +1084,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                                 [key]: person[key] === 1 ? null : 1,
                                                                             };
                                                                             setPerson(updatedPerson);
-                                                                            handleUpdate(updatedPerson);
+
                                                                         }}
-                                                                        onBlur={handleBlur}
                                                                     />
                                                                     <span style={{ fontSize: "15px", fontFamily: "Arial" }}>Yes</span>
                                                                 </div>
@@ -1068,9 +1101,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                                 [key]: person[key] === 0 ? null : 0,
                                                                             };
                                                                             setPerson(updatedPerson);
-                                                                            handleUpdate(updatedPerson);
+
                                                                         }}
-                                                                        onBlur={handleBlur}
                                                                     />
                                                                     <span style={{ fontSize: "15px", fontFamily: "Arial" }}>No</span>
                                                                 </div>
@@ -1108,9 +1140,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                             hospitalized: person.hospitalized === 1 ? null : 1,
                                                         };
                                                         setPerson(updatedPerson);
-                                                        handleUpdate(updatedPerson);
+
                                                     }}
-                                                    onBlur={handleBlur}
                                                 />
                                             }
                                             label="Yes"
@@ -1128,9 +1159,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                             hospitalized: person.hospitalized === 0 ? null : 0,
                                                         };
                                                         setPerson(updatedPerson);
-                                                        handleUpdate(updatedPerson);
+
                                                     }}
-                                                    onBlur={handleBlur}
                                                 />
                                             }
                                             label="No"
@@ -1163,9 +1193,8 @@ const SuperAdminStudentDashboard4 = () => {
                                         [name]: value,
                                     };
                                     setPerson(updatedPerson);
-                                    handleUpdate(updatedPerson);
+
                                 }}
-                                onBlur={handleBlur}
                             />
                         </Box>
 
@@ -1193,9 +1222,8 @@ const SuperAdminStudentDashboard4 = () => {
                                         [name]: value,
                                     };
                                     setPerson(updatedPerson);
-                                    handleUpdate(updatedPerson);
+
                                 }}
-                                onBlur={handleBlur}
                             />
                         </Box>
 
@@ -1241,9 +1269,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                 hadCovid: person.hadCovid === 1 ? null : 1,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Arial" }}>YES</span>
                                                 </Box>
@@ -1259,9 +1286,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                 hadCovid: person.hadCovid === 0 ? null : 0,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Arial" }}>NO</span>
 
@@ -1281,9 +1307,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                         covidDate: e.target.value,
                                                     };
                                                     setPerson(updatedPerson);
-                                                    handleUpdate(updatedPerson);
+
                                                 }}
-                                                onBlur={handleBlur}
                                                 style={{
                                                     width: "200px",
                                                     height: "50px",
@@ -1343,9 +1368,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                         [field]: e.target.value,
                                                                     };
                                                                     setPerson(updatedPerson);
-                                                                    handleUpdate(updatedPerson);
+
                                                                 }}
-                                                                onBlur={handleBlur}
                                                                 style={inputStyle}
                                                             />
                                                         </td>
@@ -1368,9 +1392,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                         [field]: e.target.value,
                                                                     };
                                                                     setPerson(updatedPerson);
-                                                                    handleUpdate(updatedPerson);
+
                                                                 }}
-                                                                onBlur={handleBlur}
                                                                 style={inputStyle}
                                                             />
                                                         </td>
@@ -1406,9 +1429,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1426,9 +1448,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1446,9 +1467,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1466,9 +1486,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                 const { name, value } = e.target;
                                                 const updatedPerson = { ...person, [name]: value };
                                                 setPerson(updatedPerson);
-                                                handleUpdate(updatedPerson);
+
                                             }}
-                                            onBlur={handleBlur}
                                             className="w-full border px-3 py-2 rounded"
                                         />
                                     </td>
@@ -1520,9 +1539,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                 symptomsToday: person.symptomsToday === 0 ? null : 0,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Arial" }}>Physically Fit</span>
                                                 </div>
@@ -1538,9 +1556,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                                 symptomsToday: person.symptomsToday === 1 ? null : 1,
                                                             };
                                                             setPerson(updatedPerson);
-                                                            handleUpdate(updatedPerson);
+
                                                         }}
-                                                        onBlur={handleBlur}
                                                     />
                                                     <span style={{ fontSize: "15px", fontFamily: "Arial" }}>For Compliance</span>
                                                 </div>
@@ -1581,9 +1598,8 @@ const SuperAdminStudentDashboard4 = () => {
                                                         remarks: e.target.value,
                                                     };
                                                     setPerson(updatedPerson);
-                                                    handleUpdate(updatedPerson);
+
                                                 }}
-                                                onBlur={handleBlur}
                                                 sx={{
                                                     backgroundColor: "white",
                                                     borderRadius: "8px",
@@ -1649,7 +1665,7 @@ const SuperAdminStudentDashboard4 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/student_admin_educational_attainment?person_id=${userID}`);
                                 }}
                                 startIcon={<ArrowBackIcon sx={{ color: "#000", transition: "color 0.3s" }} />}
@@ -1666,7 +1682,7 @@ const SuperAdminStudentDashboard4 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/student_admin_other_information?person_id=${userID}`);
                                 }}
                                 endIcon={<ArrowForwardIcon sx={{ color: "#fff", transition: "color 0.3s" }} />}

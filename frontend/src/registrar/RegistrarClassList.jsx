@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { SettingsContext } from "../App";
 import axios from 'axios';
 import {
@@ -42,6 +42,16 @@ import {
   mapStudentToPrintRow,
   resolveLogoDataUrl,
 } from "../utils/classListPrintLayout";
+import {
+  fetchClassListStudents,
+  resolveClassListDepartmentIds,
+} from "../utils/classListStudentFetch";
+import useClassListProfSectionFilters from "../hooks/useClassListProfSectionFilters";
+import {
+  formatProfessorLabel,
+  formatSectionLabel,
+  getSectionOptionId,
+} from "../utils/classListProfSection";
 
 // ✅ Ported from StudentListForEnrollment: dedupe by program_code + major
 // (NOT curriculum_id). The same program (e.g. "BSCS") can be stored under
@@ -53,6 +63,13 @@ import {
 // program_code.
 const programKey = (item) =>
   `${String(item.program_code ?? "").trim().toLowerCase()}|${String(item.major ?? "").trim().toLowerCase()}`;
+
+const formatStudentSection = (student) =>
+  formatSectionLabel({
+    program_code: student?.section_program_code || student?.program_code,
+    section_description: student?.section_description,
+    description: student?.section_description,
+  });
 
 const dedupeCurriculumOptions = (list) => {
   const seen = new Map();
@@ -102,6 +119,8 @@ const ClassRoster = () => {
   const scopeRevision = useRegistrarScopeRevision();
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("");
   const [selectedRemarkFilter, setSelectedRemarkFilter] = useState("");
+  const [selectedYearLevelFilter, setSelectedYearLevelFilter] = useState("");
+  const [yearLevels, setYearLevels] = useState([]);
   const [sortOrder, setSortOrder] = useState("asc");
 
   // ─── Pagination ───────────────────────────────────────────────────────────────
@@ -111,6 +130,9 @@ const ClassRoster = () => {
   // ─── Access control ───────────────────────────────────────────────────────────
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [activeTermReady, setActiveTermReady] = useState(false);
+  const studentsAbortRef = useRef(null);
   const pageId = 15;
   const location = useLocation();
   const navigate = useNavigate();
@@ -129,6 +151,33 @@ const ClassRoster = () => {
   const selectedProgramOption = curriculumOptions.find(
     (opt) => String(opt.curriculum_id) === String(selectedProgramFilter),
   );
+
+  const departmentIdsForSections = useMemo(
+    () =>
+      resolveClassListDepartmentIds({
+        selectedDepartmentFilter,
+        adminData,
+        department,
+      }),
+    [selectedDepartmentFilter, adminData, department],
+  );
+
+  const {
+    professors,
+    sections,
+    selectedProfessorFilter,
+    selectedSectionFilter,
+    handleProfessorChange,
+    handleSectionChange,
+    matchProfSectionFilter,
+  } = useClassListProfSectionFilters({
+    selectedDepartmentFilter,
+    departmentIds: departmentIdsForSections,
+    selectedProgramOption,
+    selectedSchoolYear,
+    selectedSchoolSemester,
+    setCurrentPage,
+  });
 
   // Staff: visiting Class List clears sticky selection (same as Student List)
   // and strips ?person_id= so this screen never auto-loads a student.
@@ -208,19 +257,17 @@ const ClassRoster = () => {
   }, [user]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STEP 3 — Fetch students for the selected department(s)
+  // STEP 3 — Fetch students for the selected department(s) in one request
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!activeTermReady) return;
+
     const scopedIds = getDepartmentIdsFromAdminData(adminData);
-    const departmentIdsToFetch = selectedDepartmentFilter
-      ? [selectedDepartmentFilter]
-      : scopedIds.length > 1
-        ? scopedIds
-        : scopedIds.length === 1
-          ? [scopedIds[0]]
-          : department.length > 0
-            ? department.map((dep) => dep.dprtmnt_id)
-            : [];
+    const departmentIdsToFetch = resolveClassListDepartmentIds({
+      selectedDepartmentFilter,
+      adminData,
+      department,
+    });
 
     if (!departmentIdsToFetch.length) {
       if (scopedIds.length > 1 && department.length === 0) return;
@@ -228,37 +275,54 @@ const ClassRoster = () => {
       return;
     }
 
-    const fetchStudents = async () => {
+    if (studentsAbortRef.current) {
+      studentsAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    studentsAbortRef.current = controller;
+
+    const loadStudents = async () => {
       try {
-        const responses = await Promise.all(
-          departmentIdsToFetch.map(async (departmentId) => {
-            const params = new URLSearchParams();
-            params.set("department_id", departmentId);
-            const url = `${API_BASE_URL}/api/student_number?${params.toString()}`;
-            const res = await axios.get(url);
-            return Array.isArray(res.data) ? res.data : [];
-          }),
-        );
-
-        const mergedStudents = [
-          ...new Map(
-            responses
-              .flat()
-              .map((student) => [
-                `${student.student_number}-${student.year_id}-${student.semester_id}-${student.curriculum_id}`,
-                student,
-              ]),
-          ).values(),
-        ];
-
-        setStudents(mergedStudents);
+        setStudentsLoading(true);
+        const mergedStudents = await fetchClassListStudents(API_BASE_URL, {
+          selectedDepartmentFilter,
+          adminData,
+          department,
+          yearId: selectedSchoolYear,
+          semesterId: selectedSchoolSemester,
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) {
+          setStudents(mergedStudents);
+        }
       } catch (err) {
-        console.error("Error fetching student data:", err);
+        if (err?.code !== "ERR_CANCELED" && err?.name !== "CanceledError") {
+          console.error("Error fetching student data:", err);
+        }
+        if (!controller.signal.aborted) {
+          setStudents([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setStudentsLoading(false);
+        }
       }
     };
 
-    fetchStudents();
-  }, [selectedDepartmentFilter, scopeRevision, adminData, department]);
+    loadStudents();
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    activeTermReady,
+    selectedDepartmentFilter,
+    selectedSchoolYear,
+    selectedSchoolSemester,
+    scopeRevision,
+    adminData,
+    department,
+  ]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STEP 5 — Fetch supporting data (departments, programs, years, semesters)
@@ -279,10 +343,22 @@ const ClassRoster = () => {
           setSelectedSchoolSemester(active.semester_id);
         }
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setActiveTermReady(true));
 
     axios.get(`${API_BASE_URL}/api/get_school_semester/`)
       .then(res => setSemesters(res.data))
+      .catch(console.error);
+
+    axios.get(`${API_BASE_URL}/api/get_year_level`)
+      .then((res) => {
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setYearLevels(
+          rows.filter(
+            (yl) => String(yl.level_type || "year").toLowerCase() === "year",
+          ),
+        );
+      })
       .catch(console.error);
   }, []);
 
@@ -415,6 +491,10 @@ const ClassRoster = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   const handleSchoolYearChange = e => { setSelectedSchoolYear(e.target.value); setCurrentPage(1); };
   const handleSchoolSemesterChange = e => { setSelectedSchoolSemester(e.target.value); setCurrentPage(1); };
+  const handleYearLevelChange = (e) => {
+    setSelectedYearLevelFilter(e.target.value);
+    setCurrentPage(1);
+  };
 
   // ✅ FIX: normalize to a string (matches StudentListForEnrollment's
   // handleDepartmentChange), and fix the curriculumOptions filter to compare
@@ -430,6 +510,7 @@ const ClassRoster = () => {
         : allCurriculums
     );
     if (!isProgramLocked) setSelectedProgramFilter("");
+    handleProfessorChange("");
     setCurrentPage(1);
   };
 
@@ -468,8 +549,12 @@ const ClassRoster = () => {
         || (selectedStatusFilter === "Regular" && getStudentRegularStatus(s) === 1)
         || (selectedStatusFilter === "Irregular" && getStudentRegularStatus(s) !== 1);
       const matchRemark = selectedRemarkFilter === "" || remarksMap[s.en_remarks] === selectedRemarkFilter;
+      const matchYearLevel =
+        selectedYearLevelFilter === "" ||
+        String(s.year_level_id) === String(selectedYearLevelFilter);
+      const matchProfSection = matchProfSectionFilter(s);
 
-      return matchDept && matchProgram && matchRegistrarScope && matchYear && matchSemester && matchStatus && matchRemark;
+      return matchDept && matchProgram && matchRegistrarScope && matchYear && matchSemester && matchStatus && matchRemark && matchYearLevel && matchProfSection;
     })
     .sort((a, b) => {
       const nameA = `${a.last_name} ${a.first_name}`.toLowerCase();
@@ -487,14 +572,56 @@ const ClassRoster = () => {
   // Export (Download Class List PDF)
   // ─────────────────────────────────────────────────────────────────────────────
   const handleExportClassListPdf = async () => {
+    const selectedDepartment = department.find(
+      (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
+    );
     const selectedDepartmentLabel =
-      department.find(
-        (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
-      )?.dprtmnt_name || "All Departments";
+      selectedDepartment?.dprtmnt_name || "All Departments";
 
     const selectedProgramLabel = selectedProgramFilter
       ? selectedProgramOption?.program_description || selectedProgramFilter
       : "All Programs";
+
+    const resolveAllProgramsCodeLabel = () => {
+      let deptCode = selectedDepartment?.dprtmnt_code || "";
+      if (!deptCode) {
+        const scopedIds = getDepartmentIdsFromAdminData(adminData);
+        if (scopedIds.length === 1) {
+          deptCode =
+            department.find(
+              (d) => String(d.dprtmnt_id) === String(scopedIds[0]),
+            )?.dprtmnt_code || "";
+        }
+      }
+      return deptCode ? `All ${deptCode}'s Programs` : "All Programs";
+    };
+
+    const programCode = selectedProgramFilter
+      ? selectedProgramOption?.program_code || "—"
+      : resolveAllProgramsCodeLabel();
+
+    const programDescription = selectedProgramLabel;
+
+    const selectedProfessor = professors.find(
+      (prof) => String(prof.prof_id) === String(selectedProfessorFilter),
+    );
+    const facultyName = selectedProfessor
+      ? formatProfessorLabel(selectedProfessor)
+      : "";
+
+    const selectedSection = sections.find(
+      (section) => getSectionOptionId(section) === String(selectedSectionFilter),
+    );
+    const classSectionLabel =
+      selectedSectionFilter && selectedSection
+        ? formatSectionLabel(selectedSection)
+        : "All Sections";
+
+    const selectedYearLevelLabel = selectedYearLevelFilter
+      ? yearLevels.find(
+          (yl) => String(yl.year_level_id) === String(selectedYearLevelFilter),
+        )?.year_level_description || "All Year Levels"
+      : "All Year Levels";
 
     const selectedYear = schoolYears.find(
       (sy) => String(sy.year_id) === String(selectedSchoolYear),
@@ -534,7 +661,11 @@ const ClassRoster = () => {
         campusAddress: campusAddress?.trim() || "Nagtahan Sampaloc Manila",
         logoUrl: logoDataUrl,
         departmentTitle: selectedDepartmentLabel,
-        programTitle: selectedProgramLabel,
+        programCode,
+        programDescription,
+        classSection: classSectionLabel,
+        facultyName,
+        yearLevel: selectedYearLevelLabel,
         academicYearLabel: yearLabel,
         semesterLabel: selectedSemesterLabel,
         students: filteredStudents.map(mapStudentToPrintRow),
@@ -582,6 +713,9 @@ const ClassRoster = () => {
   // Guards
   // ─────────────────────────────────────────────────────────────────────────────
   if (loading || hasAccess === null) return <LoadingOverlay open={loading} message="Loading..." />;
+  if (studentsLoading && students.length === 0) {
+    return <LoadingOverlay open message="Loading students..." />;
+  }
   if (!hasAccess) return <Unauthorized />;
 
   const scopedDepartmentIds = getDepartmentIdsFromAdminData(adminData);
@@ -808,6 +942,23 @@ const ClassRoster = () => {
                   </Select>
                 </FormControl>
               </Box>
+              <Box display="flex" alignItems="center" gap={1}>
+                <Typography fontSize={13} sx={{ minWidth: "100px" }}>Year Level:</Typography>
+                <FormControl size="small" sx={{ width: "200px" }}>
+                  <Select
+                    value={selectedYearLevelFilter}
+                    onChange={handleYearLevelChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="">All Year Levels</MenuItem>
+                    {yearLevels.map((yl) => (
+                      <MenuItem key={yl.year_level_id} value={String(yl.year_level_id)}>
+                        {yl.year_level_description}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
             </Box>
 
             {/* Right column — department locked for assigned admins */}
@@ -856,6 +1007,54 @@ const ClassRoster = () => {
             </Box>
 
           </Box>
+
+          {/* Row 2: professor / section */}
+          <Box display="flex" justifyContent="space-between">
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography fontSize={13} sx={{ minWidth: "100px" }}>Professor:</Typography>
+              <FormControl size="small" sx={{ width: "400px" }}>
+                <Select
+                  value={selectedProfessorFilter}
+                  onChange={(e) => handleProfessorChange(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="">All Professors</MenuItem>
+                  {professors.map((prof) => (
+                    <MenuItem key={prof.prof_id} value={String(prof.prof_id)}>
+                      {formatProfessorLabel(prof)}
+                      {prof.employee_id ? ` (${prof.employee_id})` : ""}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography fontSize={13} sx={{ minWidth: "100px" }}>Section:</Typography>
+              <FormControl size="small" sx={{ width: "400px" }}>
+                <Select
+                  value={selectedSectionFilter}
+                  onChange={(e) => handleSectionChange(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="">All Sections</MenuItem>
+                  {sections.length === 0 && (
+                    <MenuItem disabled value="__none__">
+                      No sections found for current filters
+                    </MenuItem>
+                  )}
+                  {sections.map((section) => {
+                    const sectionId = getSectionOptionId(section);
+                    return (
+                      <MenuItem key={sectionId} value={sectionId}>
+                        {formatSectionLabel(section)}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
         </Box>
       </TableContainer>
 
@@ -865,7 +1064,7 @@ const ClassRoster = () => {
           <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
             <TableRow>
               {["#", "Student Number", "Name", "Program Description", "Program Code",
-                "Year Level", "Semester", "Remarks", "Date Enrolled", "Student Status"].map(h => (
+                "Year Level", "Semester", "Remarks", "Section", "Student Status"].map(h => (
                   <TableCell key={h} sx={{ color: "white", textAlign: "center", fontSize: "12px", border: `1px solid ${borderColor}` }}>
                     {h}
                   </TableCell>
@@ -897,7 +1096,7 @@ const ClassRoster = () => {
                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{s.year_level_description}</TableCell>
                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{s.semester_description}</TableCell>
                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{remarksMap[s.en_remarks] || ""}</TableCell>
-                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{s.created_at || ""}</TableCell>
+                <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{formatStudentSection(s)}</TableCell>
                 <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
                   {getStudentRegularLabel(s)}
                 </TableCell>

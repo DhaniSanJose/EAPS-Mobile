@@ -400,10 +400,14 @@ const ExamPermit = ({ personId }) => {
                     {/* Bldg + Room + QR */}
                     <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
                         <td colSpan={20}>
-                            <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px" }}>
-                                <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Bldg.:</label>
+                            <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px", gap: "8px" }}>
+                                <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Bldg. :</label>
                                 <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                                     {examSchedule?.building_description || ""}
+                                </span>
+                                <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Floor :</label>
+                                <span style={{ minWidth: "40px", borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
+                                    {examSchedule?.floor || ""}
                                 </span>
                             </div>
                         </td>

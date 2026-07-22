@@ -289,7 +289,7 @@ const SuperAdminApplicantDashboard3 = () => {
             }
 
             // ✅ Send update request
-            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+            await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData, getAuditHeaders());
 
             console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
         } catch (error) {
@@ -298,11 +298,11 @@ const SuperAdminApplicantDashboard3 = () => {
                 status: error.response?.status,
                 details: error.response?.data || error,
             });
+            throw error;
         }
     };
 
-
-    // Real-time save on every character typed
+    // Local form updates only (no auto-save)
     const handleChange = (e) => {
         const { name, type, checked, value } = e.target;
         const updatedPerson = {
@@ -310,7 +310,25 @@ const SuperAdminApplicantDashboard3 = () => {
             [name]: type === "checkbox" ? (checked ? 1 : 0) : value,
         };
         setPerson(updatedPerson);
-        handleUpdate(updatedPerson); // No delay, real-time save
+    };
+
+    const [saving, setSaving] = useState(false);
+    const handleManualSave = async () => {
+        const targetId = selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+        if (!targetId) {
+            setSnackbar({ open: true, message: "No applicant selected.", severity: "warning" });
+            return;
+        }
+        try {
+            setSaving(true);
+            await handleUpdate(person);
+            sessionStorage.setItem("admin_edit_person_data", JSON.stringify(person));
+            setSnackbar({ open: true, message: "All changes saved successfully!", severity: "success" });
+        } catch (err) {
+            setSnackbar({ open: true, message: "Failed to save changes.", severity: "error" });
+        } finally {
+            setSaving(false);
+        }
     };
 
 
@@ -861,17 +879,44 @@ const SuperAdminApplicantDashboard3 = () => {
                 </Box>
             </Box>
 
-            <h1
-                style={{
-                    fontSize: "30px",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    color: "black",
-                    marginTop: "25px",
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    mt: "25px",
+                    px: 2,
+                    position: "relative",
                 }}
             >
-                PRINTABLE DOCUMENTS
-            </h1>
+                <h1
+                    style={{
+                        fontSize: "30px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                        color: "black",
+                        margin: 0,
+                    }}
+                >
+                    PRINTABLE DOCUMENTS
+                </h1>
+                <Button
+                    variant="contained"
+                    onClick={handleManualSave}
+                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                    sx={{
+                        position: "absolute",
+                        right: 16,
+                        backgroundColor: mainButtonColor,
+                        textTransform: "none",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+                    }}
+                >
+                    {saving ? "Saving..." : "Save Changes"}
+                </Button>
+            </Box>
 
 
 
@@ -1115,7 +1160,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                         value={person.schoolLevel ?? ""}
                                         label="Educational Attainment"
                                         onChange={handleChange}
-                                        onBlur={() => handleUpdate(person)}
                                     >
                                         <MenuItem value="">
                                             <em>Select School Level</em>
@@ -1145,7 +1189,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter School Last Attended"
                                     value={person.schoolLastAttended || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
                                     error={errors.schoolLastAttended}
                                     helperText={
                                         errors.schoolLastAttended ? "This field is required." : ""
@@ -1171,7 +1214,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your School Address"
                                     value={person.schoolAddress || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
                                     error={errors.schoolAddress}
                                     helperText={errors.schoolAddress ? "This field is required." : ""}
                                 />
@@ -1191,7 +1233,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your Course Program"
                                     value={person.courseProgram || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
                                     error={errors.courseProgram}
                                     helperText={errors.courseProgram ? "This field is required." : ""}
                                 />
@@ -1217,7 +1258,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     value={person.honor || ""}
                                     placeholder="Enter your Honor"
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
 
                                     error={errors.honor}
                                     helperText={errors.honor ? "This field is required." : ""}
@@ -1236,7 +1276,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     value={person.generalAverage || ""}
                                     placeholder="Enter your General Average"
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
 
                                     error={errors.generalAverage}
                                     helperText={errors.generalAverage ? "This field is required." : ""}
@@ -1255,7 +1294,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your Year Graduated"
                                     value={person.yearGraduated || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
 
                                     error={errors.yearGraduated}
                                     helperText={errors.yearGraduated ? "This field is required." : ""}
@@ -1296,7 +1334,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                         value={person.schoolLevel1 ?? ""}
                                         label="Educational Attainment"
                                         onChange={handleChange}
-                                        onBlur={() => handleUpdate(person)}
                                     >
                                         <MenuItem value="">
                                             <em>Select School Level</em>
@@ -1327,7 +1364,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter School Last Attended"
                                     value={person.schoolLastAttended1 || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
                                     error={errors.schoolLastAttended1}
                                     helperText={errors.schoolLastAttended1 ? "This field is required." : ""}
                                 />
@@ -1351,7 +1387,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your School Address"
                                     value={person.schoolAddress1 || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
                                     error={errors.schoolAddress1}
                                     helperText={errors.schoolAddress1 ? "This field is required." : ""}
                                 />
@@ -1371,7 +1406,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your Course Program"
                                     value={person.courseProgram1 || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
                                     error={errors.courseProgram1}
                                     helperText={errors.courseProgram1 ? "This field is required." : ""}
                                 />
@@ -1399,7 +1433,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your Honor"
                                     value={person.honor1 || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
 
                                     error={errors.honor1}
                                     helperText={errors.honor1 ? "This field is required." : ""}
@@ -1419,7 +1452,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your General Average"
                                     value={person.generalAverage1 || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
 
                                     error={errors.generalAverage1}
                                     helperText={errors.generalAverage1 ? "This field is required." : ""}
@@ -1439,7 +1471,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                     placeholder="Enter your Year Graduated"
                                     value={person.yearGraduated1 || ""}
                                     onChange={handleChange}
-                                    onBlur={() => handleUpdate(person)}
 
                                     error={errors.yearGraduated1}
                                     helperText={errors.yearGraduated1 ? "This field is required." : ""}
@@ -1463,7 +1494,6 @@ const SuperAdminApplicantDashboard3 = () => {
                                 value={person.strand ?? ""}
                                 label="Strand"
                                 onChange={handleChange}
-                                onBlur={handleBlur}
                             >
                                 <MenuItem value="">
                                     <em>Select Strand</em>
@@ -1629,7 +1659,7 @@ const SuperAdminApplicantDashboard3 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/applicant_admin_family_background?person_id=${userID}`);
                                 }}
                                 startIcon={<ArrowBackIcon sx={{ color: "#000", transition: "color 0.3s" }} />}
@@ -1650,7 +1680,7 @@ const SuperAdminApplicantDashboard3 = () => {
                             <Button
                                 variant="contained"
                                 onClick={() => {
-                                    handleUpdate(person);
+
                                     handleNavigateWithDelay(`/applicant_admin_health_medical_records?person_id=${userID}`);
                                 }}
                                 endIcon={<ArrowForwardIcon sx={{ color: "#fff", transition: "color 0.3s" }} />}

@@ -176,6 +176,11 @@ export const CLASS_LIST_PRINT_CSS = `
     border-right: none !important;
     font-weight: 600;
   }
+  .info-table .program-desc-val {
+    white-space: nowrap;
+    font-size: 10px;
+    letter-spacing: -0.2px;
+  }
   .info-table .lbl-open-left {
     white-space: nowrap;
     text-align: right;
@@ -350,16 +355,11 @@ export const buildClassListPrintHtml = ({
   departmentTitle = "",
   academicYearLabel = "",
   semesterLabel = "",
-  subjectCode = "",
+  programCode = "",
   classSection = "",
-  subjectTitle = "",
+  programDescription = "",
   yearLevel = "",
-  academicUnits = "0",
-  labUnits = "0",
-  creditUnits = "0",
-  labHours = "0",
-  scheduleLines = [],
-  mode = "",
+  departmentName = "",
   facultyName = "",
   students = [],
   showTotals = true,
@@ -370,25 +370,10 @@ export const buildClassListPrintHtml = ({
   const { firstLine, secondLine } = splitCompanyNameLines(companyName);
   const { male, female } = countStudentsByGender(students);
   const totalStudents = students.length;
-  const schedules = Array.isArray(scheduleLines)
-    ? scheduleLines.map((line) => String(line || "").trim()).filter(Boolean)
-    : [scheduleLines].filter(Boolean);
-  const scheduleLine1 = schedules[0] || "";
-  const scheduleLine2 = schedules[1] || "";
-  const scheduleLine3 = schedules[2] || "";
-
-  const formatUnit = (value) => {
-    if (value === "" || value == null) return "";
-    const num = Number(value);
-    if (!Number.isNaN(num)) {
-      return Number.isInteger(num) ? String(num) : String(num);
-    }
-    return String(value);
-  };
 
   const footerCenter =
     printInfoCenter ||
-    [subjectCode, subjectTitle].filter(Boolean).join(" - ");
+    [programCode, programDescription].filter(Boolean).join(" - ");
 
   const bannerHtml = `
     <div class="header-wrap">
@@ -418,51 +403,33 @@ export const buildClassListPrintHtml = ({
     <div class="info-box">
       <table class="info-table">
         <colgroup>
-          <col style="width:120px" />
-          <col style="width:36px" />
-          <col style="width:78px" />
-          <col style="width:36px" />
-          <col />
-          <col style="width:150px" />
+          <col style="width:18%" />
+          <col style="width:14%" />
+          <col style="width:14%" />
+          <col style="width:14%" />
+          <col style="width:14%" />
+          <col style="width:26%" />
         </colgroup>
         <tbody>
           <tr>
-            <td class="lbl-row1">Subject Code</td>
-            <td class="val-open-right" colspan="3">${escapeHtml(subjectCode)}</td>
+            <td class="lbl-row1">Program Code</td>
+            <td class="val-open-right" colspan="3">${escapeHtml(programCode)}</td>
             <td class="lbl-open-left">Class Section</td>
             <td class="section-val">${escapeHtml(classSection)}</td>
           </tr>
           <tr>
-            <td class="lbl">Subject Title</td>
-            <td class="val-open-right" colspan="3">${escapeHtml(subjectTitle)}</td>
+            <td class="lbl">Program Description</td>
+            <td class="val-open-right program-desc-val" colspan="3">${escapeHtml(programDescription)}</td>
             <td class="lbl-open-left">Year Level</td>
             <td class="section-val">${escapeHtml(yearLevel)}</td>
           </tr>
           <tr>
-            <td class="lbl">Academic Units</td>
-            <td class="unit-num">${escapeHtml(formatUnit(academicUnits))}</td>
-            <td class="lab-lbl">Lab Units</td>
-            <td class="unit-num">${escapeHtml(formatUnit(labUnits))}</td>
-            <td class="sched-lbl">Schedule(s)</td>
-            <td class="sched-val sched-val-first">${escapeHtml(scheduleLine1) || "&nbsp;"}</td>
-          </tr>
-          <tr>
-            <td class="lbl">Credit Units</td>
-            <td class="unit-num">${escapeHtml(formatUnit(creditUnits))}</td>
-            <td class="lab-lbl">Lab Hours</td>
-            <td class="unit-num">${escapeHtml(formatUnit(labHours))}</td>
-            <td class="sched-lbl">&nbsp;</td>
-            <td class="sched-val">${escapeHtml(scheduleLine2) || "&nbsp;"}</td>
-          </tr>
-          <tr>
-            <td class="lbl">Mode</td>
-            <td class="val" colspan="3">${escapeHtml(mode) || "&nbsp;"}</td>
-            <td class="sched-lbl">&nbsp;</td>
-            <td class="sched-val sched-val-last">${escapeHtml(scheduleLine3) || "&nbsp;"}</td>
+            <td class="lbl">Department</td>
+            <td class="val" colspan="5">${escapeHtml(departmentName) || "&nbsp;"}</td>
           </tr>
           <tr>
             <td class="lbl">Faculty</td>
-            <td class="val" colspan="5">${escapeHtml(facultyName)}</td>
+            <td class="val" colspan="5">${escapeHtml(facultyName) || "&nbsp;"}</td>
           </tr>
         </tbody>
       </table>
@@ -572,9 +539,13 @@ export const buildRegistrarClassListPrintHtml = ({
   campusAddress = "Nagtahan Sampaloc Manila",
   logoUrl = "",
   departmentTitle = "",
-  programTitle = "",
+  programCode = "",
+  programDescription = "",
+  classSection = "All Sections",
+  facultyName = "",
   academicYearLabel = "",
   semesterLabel = "",
+  yearLevel = "All Year Levels",
   students = [],
   printInfoLabel = "",
 }) =>
@@ -582,25 +553,20 @@ export const buildRegistrarClassListPrintHtml = ({
     companyName,
     campusAddress,
     logoUrl,
-    courseTitle: programTitle || "CLASS LIST",
+    courseTitle: programDescription || "CLASS LIST",
     departmentTitle,
     academicYearLabel,
     semesterLabel,
-    subjectCode: programTitle || "N/A",
-    classSection: departmentTitle || "N/A",
-    subjectTitle: programTitle || "Class List",
-    yearLevel: "All Year Levels",
-    academicUnits: "—",
-    labUnits: "—",
-    creditUnits: "—",
-    labHours: "—",
-    scheduleLines: [],
-    mode: "",
-    facultyName: "—",
+    programCode: programCode || "All Programs",
+    classSection: classSection || "All Sections",
+    programDescription: programDescription || "All Programs",
+    yearLevel,
+    departmentName: departmentTitle || "All Departments",
+    facultyName,
     students,
     showTotals: true,
     printInfoLeft: printInfoLabel,
-    printInfoCenter: programTitle || "Class List",
+    printInfoCenter: programDescription || "Class List",
   });
 
 export const printClassListDocument = (html, title = "Print") => {
