@@ -280,10 +280,12 @@ export const CLASS_PROGRAM_PRINT_CSS = `
     width: 64px;
     height: 64px;
     object-fit: contain;
+    margin-top: 50px;
   }
   .cp-header-text {
     text-align: center;
     line-height: 1.15;
+    margin-top: 50px;
   }
   .cp-republic {
     font-size: 11px;
