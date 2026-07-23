@@ -725,10 +725,23 @@ const AssignScheduleToApplicants = () => {
   const [finalPreview, setFinalPreview] = useState(""); // live full preview
 
   // ONLY editable part
-  const [customReminders, setCustomReminders] =
-    useState(`- Arrive at least 1 hour before your scheduled exam.
-- Bring your printed exam permit, a valid ID, your own pen, and all required documents.
-- Wear a plain white t-shirt on the exam day.`);
+  const [customReminders, setCustomReminders] = useState(`IMPORTANT REMINDERS FOR APPLICANTS:
+
+Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+
+Step 2: Bring all required items on the exam day:
+• Official Examination Permit with VERIFIED watermark
+• No. 2 Pencil (any brand)
+• 2 Short Bond Papers
+
+Step 3: Wear the proper attire:
+• Plain white T-shirt or plain white polo shirt (no prints, logos, or designs)
+• Pants (Shorts and ripped jeans are not allowed)
+• Closed shoes (Crocs, sandals, and slippers are not allowed)
+
+Step 4: Keep the two paper sheets attached to your examination permit.
+
+Step 5: Arrive at least 1 hour before your scheduled examination. Late applicants will NOT be allowed to enter once the examination room door has been closed.`);
 
   // Live-rebuild finalPreview whenever reminders or base message change
   useEffect(() => {
@@ -797,9 +810,24 @@ This printed permit must be presented to your proctor on the exam day to verify 
     setEmailMessage(defaultMessage);
 
     // reset editable reminders every time modal opens
-    setCustomReminders(`- Arrive at least 1 hour before your scheduled exam.
-- Bring your printed exam permit, a valid ID, your own pen, and all required documents.
-- Wear a plain white t-shirt on the exam day.`);
+    setCustomReminders(`IMPORTANT REMINDERS FOR APPLICANTS:
+
+Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+
+Step 2: Bring all required items on the exam day:
+• Official Examination Permit with VERIFIED watermark
+• No. 2 Pencil (any brand)
+• 2 Short Bond Papers
+
+Step 3: Wear the proper attire:
+• Plain white T-shirt or plain white polo shirt (no prints, logos, or designs)
+• Pants (Shorts and ripped jeans are not allowed)
+• Closed shoes (Crocs, sandals, and slippers are not allowed)
+
+Step 4: Keep the two paper sheets attached to your examination permit.
+
+Step 5: Arrive at least 1 hour before your scheduled examination. Late applicants will NOT be allowed to enter once the examination room door has been closed.`);
+
     setConfirmOpen(true);
   };
 
@@ -2128,10 +2156,25 @@ This printed permit must be presented to your proctor on the exam day to verify 
 `,
                               );
 
-                              setCustomReminders(`- Arrive at least 1 hour before your scheduled exam.
-- Bring your printed exam permit, a valid ID, your own pen, and all required documents.
-- Wear a plain white t-shirt on the exam day.`);
-                              setConfirmOpen(true);
+                           setCustomReminders(`IMPORTANT REMINDERS FOR APPLICANTS:
+
+Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+
+Step 2: Bring all required items on the exam day:
+• Official Examination Permit with VERIFIED watermark
+• No. 2 Pencil (any brand)
+• 2 Short Bond Papers
+
+Step 3: Wear the proper attire:
+• Plain white T-shirt or plain white polo shirt (no prints, logos, or designs)
+• Pants (Shorts and ripped jeans are not allowed)
+• Closed shoes (Crocs, sandals, and slippers are not allowed)
+
+Step 4: Keep the two paper sheets attached to your examination permit.
+
+Step 5: Arrive at least 1 hour before your scheduled examination. Late applicants will NOT be allowed to enter once the examination room door has been closed.`);
+
+setConfirmOpen(true);
                             }}
                           >
                             SEND EMAIL

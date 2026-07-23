@@ -685,11 +685,18 @@ const VerifyDocumentScheduleManagement = () => {
     );
 
 const [importantReminders, setImportantReminders] = useState(
-`• Arrive at least 1 hour before your scheduled time.
-• Bring all listed documents and a valid ID.
-• Ensure all documents are Certified True Copies with a dry seal from your school.
-• Place all documents in a long brown envelope with a transparent plastic cover.
-• Incomplete requirements may delay your verification process.`
+`Bring the original copies of:
+• Good Moral Certificate
+• Form 138 (Senior High School Report Card)
+• PSA Birth Certificate
+• Printed Online Admission Form/Personal Data Form with Applicant Number
+• For previous graduates or gap year applicants, present a School Certification confirming that your Form 137 has not been forwarded to any other school or university (Original and Xerox Copy).
+
+If you are a graduating SHS student with incomplete final grades, bring:
+• PSA Birth Certificate (Original)
+• Original Copy of 1st Semester Grades
+• 1st, 2nd & 3rd Grading Grades (Certified True Copy and sealed by the school)
+• Good Moral Certificate (Sealed by the school)`
 );
 
     const [finalEmailMessage, setFinalEmailMessage] = useState("");

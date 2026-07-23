@@ -620,6 +620,79 @@ const getWorkloadCategory = (entry) => {
   return "regular";
 };
 
+// ── Workload color palette (sourced from WorkloadManagement / workload_type) ──
+// Each internal workload category is matched to a `workload_type` row by
+// comparing a normalized token against the row's `workload_description`
+// (e.g. category "research" -> token "RESEARCH" -> matches "Research").
+const normalizeForMatch = (value) =>
+  String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+
+const CATEGORY_MATCH_TOKENS = {
+  regular: "REGULARTEACHINGLOAD",
+  overload: "OVERLOAD",
+  emergencyLoad: "EMERGENCYLOAD",
+  temporarySubstitution: "TEMPORARYSUBSTITUTION",
+  designation: "DESIGNATION",
+  research: "RESEARCH",
+  extension: "EXTENSION",
+  production: "PRODUCTION",
+  accreditation: "ACCREDITATION",
+  consultation: "CONSULTATION",
+  lessonPreparation: "LESSONPREPARATION",
+};
+
+// Fallback colors used only when WorkloadManagement doesn't (yet) have a
+// matching workload_type row, or that row has no color set.
+const DEFAULT_CATEGORY_COLORS = {
+  regular: "#fde047",
+  overload: "#ccffff",
+  emergencyLoad: "#e6ccff",
+  temporarySubstitution: "#ffd9b3",
+  designation: "#99ccff",
+  research: "#ccffcc",
+  extension: "#ccffcc",
+  production: "#ccffcc",
+  accreditation: "#ccffcc",
+  consultation: "#fde5d6",
+  lessonPreparation: "#f7caac",
+};
+
+const findWorkloadTypeByToken = (workloadTypes, token) => {
+  if (!token || !Array.isArray(workloadTypes)) return null;
+
+  // 1) exact match: normalized workload_description === token
+  const exact = workloadTypes.find(
+    (wt) => normalizeForMatch(wt.workload_description) === token
+  );
+  if (exact) return exact;
+
+  // 2) loose match: token is contained in (or contains) the description,
+  //    e.g. "LESSONPREPARATION" vs "LESSONPREPARATIONOFFCAMPUS"
+  return (
+    workloadTypes.find((wt) => {
+      const normalizedDescription = normalizeForMatch(wt.workload_description);
+      return (
+        normalizedDescription.length > 0 &&
+        (normalizedDescription.includes(token) || token.includes(normalizedDescription))
+      );
+    }) || null
+  );
+};
+
+const buildWorkloadColorMap = (workloadTypes) => {
+  const colorMap = {};
+
+  Object.entries(CATEGORY_MATCH_TOKENS).forEach(([categoryKey, token]) => {
+    const match = findWorkloadTypeByToken(workloadTypes, token);
+    const matchedColor = match?.workload_color && match.workload_color.trim();
+    colorMap[categoryKey] = matchedColor || DEFAULT_CATEGORY_COLORS[categoryKey];
+  });
+
+  return colorMap;
+};
+
 const buildDailyWorkloadDistribution = (scheduleEntries) => {
   const distribution = {
     regular: createEmptyWorkloadRow(),
@@ -715,6 +788,30 @@ const FacultyWorkload = () => {
     current_year: "",
     next_year: "",
   });
+
+  // Workload types (description / code / color) managed on the
+  // WorkloadManagement page — this is the single source of truth for
+  // all the colors used throughout this page.
+  const [workloadTypes, setWorkloadTypes] = useState([]);
+
+  useEffect(() => {
+    const fetchWorkloadTypes = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/workload`);
+        setWorkloadTypes(res.data || []);
+      } catch (err) {
+        console.error("Error fetching workload types:", err);
+        setWorkloadTypes([]);
+      }
+    };
+
+    fetchWorkloadTypes();
+  }, []);
+
+  const workloadColorMap = useMemo(
+    () => buildWorkloadColorMap(workloadTypes),
+    [workloadTypes]
+  );
 
   useEffect(() => {
     axios
@@ -869,15 +966,17 @@ const FacultyWorkload = () => {
     );
   };
 
-  const renderWorkloadCells = (categoryKey, backgroundClass, options = {}) => {
+  const renderWorkloadCells = (categoryKey, options = {}) => {
     const { totalClassName = "", rowHeight = WORKLOAD_HEIGHT_PAIR } = options;
+    const backgroundColor = workloadColorMap[categoryKey] || "";
 
     return WORKLOAD_DAY_COLUMNS.map(({ key, className }) => (
       <div
         key={`${categoryKey}-${key}`}
-        className={`${className} ${rowHeight} ${backgroundClass} ${
+        className={`${className} ${rowHeight} ${
           key === "TOTAL" ? totalClassName : ""
         }`}
+        style={{ backgroundColor }}
       >
         {formatWorkloadHours(dailyWorkload[categoryKey][key])}
       </div>
@@ -934,30 +1033,6 @@ const FacultyWorkload = () => {
     return `${formatTime(earliest)} - ${formatTime(latest)}`;
   };
 
-  const officeDutyConversionColor = (course_code) => {
-    if (!course_code) return "";
-
-    // STEP 2: Normalize the course code
-    const normalized = course_code.toUpperCase().replace(/[^A-Z]/g, ""); // remove spaces, numbers, special characters
-
-    // STEP 3 + 4: Match to category and return color
-    if (normalized === "DESIGNATION") return "#99ccff";
-
-    if (
-      ["RESEARCH", "PRODUCTION", "EXTENSION", "ACCREDITATION"].includes(
-        normalized,
-      )
-    ) {
-      return "#ccffcc";
-    }
-
-    if (normalized === "CONSULTATION") return "#fde5d6";
-
-    if (normalized === "LESSONPREPARATION") return "#f7caac";
-
-    return ""; // default if unmatched
-  };
-
   const getDutyColor = (start, day) => {
     const parseTime = (t) => new Date(`1970-01-01 ${t}`);
     const slotStart = parseTime(start);
@@ -969,19 +1044,17 @@ const FacultyWorkload = () => {
       const schedEnd = parseTime(entry.school_time_end);
 
       if (slotStart >= schedStart && slotStart < schedEnd) {
-        if (isHonorariumEntry(entry)) {
-          return "#ccffff";
-        }
-        if (isServiceCreditEntry(entry)) {
-          return "#e6ccff";
-        }
-        if (isTemporarySubstitutionEntry(entry)) {
-          return "#ffd9b3";
-        }
+        // If the schedule row already carries an explicit color
+        // (e.g. joined server-side from workload_type), honor it first.
         if (entry.workload_color) {
           return entry.workload_color;
         }
-        return officeDutyConversionColor(entry.course_code);
+
+        // Otherwise resolve the color from WorkloadManagement's palette
+        // using the same category classification used for the summary
+        // table (regular / overload / emergencyLoad / designation / etc.)
+        const category = getWorkloadCategory(entry);
+        return workloadColorMap[category] || "";
       }
     }
 
@@ -3262,93 +3335,129 @@ const FacultyWorkload = () => {
                   </div>
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border border-black border-l-0 border-b-0 text-[10px] bg-yellow-300 flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_REGULAR}`}>
+                      <div
+                        className={`border border border-black border-l-0 border-b-0 text-[10px] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_REGULAR}`}
+                        style={{ backgroundColor: workloadColorMap.regular }}
+                      >
                         REGULAR TEACHING LOAD
                       </div>
-                      {renderWorkloadCells("regular", "bg-yellow-300", {
+                      {renderWorkloadCells("regular", {
                         rowHeight: WORKLOAD_HEIGHT_REGULAR,
                       })}
                     </div>
                   </div>
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border border-black border-l-0 border-b-0 text-[10px] bg-[#ccffff] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}>
+                      <div
+                        className={`border border border-black border-l-0 border-b-0 text-[10px] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}
+                        style={{ backgroundColor: workloadColorMap.overload }}
+                      >
                         OVERLOAD (OL)
                       </div>
-                      {renderWorkloadCells("overload", "bg-[#ccffff]")}
+                      {renderWorkloadCells("overload")}
                     </div>
                   </div>
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border border-black border-l-0 border-b-0 text-[10px] bg-[#e6ccff] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}>
+                      <div
+                        className={`border border border-black border-l-0 border-b-0 text-[10px] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}
+                        style={{ backgroundColor: workloadColorMap.emergencyLoad }}
+                      >
                         EMERGENCY LOAD (EL)
                       </div>
-                      {renderWorkloadCells("emergencyLoad", "bg-[#e6ccff]")}
+                      {renderWorkloadCells("emergencyLoad")}
                     </div>
                   </div>
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border border-black border-l-0 bg-[#ffd9b3] border-b-0 text-[9.5px] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}>
+                      <div
+                        className={`border border border-black border-l-0 border-b-0 text-[9.5px] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}
+                        style={{ backgroundColor: workloadColorMap.temporarySubstitution }}
+                      >
                         TEMPORARY SUBSTITUTION (TS)
                       </div>
-                      {renderWorkloadCells("temporarySubstitution", "bg-[#ffd9b3]")}
+                      {renderWorkloadCells("temporarySubstitution")}
                     </div>
                   </div>
 
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border border-black border-l-0 border-b-0 text-[10px] bg-[#99ccff] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}>
+                      <div
+                        className={`border border border-black border-l-0 border-b-0 text-[10px] flex items-center justify-center px-1 ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}
+                        style={{ backgroundColor: workloadColorMap.designation }}
+                      >
                         DESIGNATION
                       </div>
-                      {renderWorkloadCells("designation", "bg-[#99ccff]")}
+                      {renderWorkloadCells("designation")}
                     </div>
                   </div>
                   <div className="flex">
-                    <div className={`border border-black border-l-0 border-b-0 text-[10px] text-center flex items-center justify-center px-[0.4rem] bg-[#ccffcc] ${WORKLOAD_OTHER_GROUP_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS_GROUP}`}>
+                    <div
+                      className={`border border-black border-l-0 border-b-0 text-[10px] text-center flex items-center justify-center px-[0.4rem] ${WORKLOAD_OTHER_GROUP_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS_GROUP}`}
+                      style={{ backgroundColor: workloadColorMap.research }}
+                    >
                       OTHER <br /> FUNCTIONS
                     </div>
                     <div className="shrink-0 flex-none">
                       <div className="flex">
-                        <div className={`border border border-black border-l-0 bg-[#ccffcc] border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}>
+                        <div
+                          className={`border border border-black border-l-0 border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}
+                          style={{ backgroundColor: workloadColorMap.research }}
+                        >
                           <i>Research</i>
                         </div>
-                        {renderWorkloadCells("research", "bg-[#ccffcc]")}
+                        {renderWorkloadCells("research")}
                       </div>
                       <div className="flex">
-                        <div className={`border border border-black border-l-0 bg-[#ccffcc] border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}>
+                        <div
+                          className={`border border border-black border-l-0 border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}
+                          style={{ backgroundColor: workloadColorMap.extension }}
+                        >
                           <i>Extension</i>
                         </div>
-                        {renderWorkloadCells("extension", "bg-[#ccffcc]")}
+                        {renderWorkloadCells("extension")}
                       </div>
                       <div className="flex">
-                        <div className={`border border border-black border-l-0 bg-[#ccffcc] border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}>
+                        <div
+                          className={`border border border-black border-l-0 border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}
+                          style={{ backgroundColor: workloadColorMap.production }}
+                        >
                           <i>Production</i>
                         </div>
-                        {renderWorkloadCells("production", "bg-[#ccffcc]")}
+                        {renderWorkloadCells("production")}
                       </div>
                       <div className="flex">
-                        <div className={`border border border-black border-l-0 bg-[#ccffcc] border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}>
+                        <div
+                          className={`border border border-black border-l-0 border-b-0 text-[9px] text-center font-[600] flex items-center justify-center ${WORKLOAD_OTHER_SUBLABEL_WIDTH} ${WORKLOAD_HEIGHT_OTHER_FUNCTIONS}`}
+                          style={{ backgroundColor: workloadColorMap.accreditation }}
+                        >
                           <i>Accreditation</i>
                         </div>
-                        {renderWorkloadCells("accreditation", "bg-[#ccffcc]")}
+                        {renderWorkloadCells("accreditation")}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border bg-[#fde5d6] border-black border-l-0 border-b-0 text-[9px] flex items-center justify-center font-[600] ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}>
+                      <div
+                        className={`border border border-black border-l-0 border-b-0 text-[9px] flex items-center justify-center font-[600] ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}
+                        style={{ backgroundColor: workloadColorMap.consultation }}
+                      >
                         <i>Consultation</i>
                       </div>
-                      {renderWorkloadCells("consultation", "bg-[#fde5d6]")}
+                      {renderWorkloadCells("consultation")}
                     </div>
                   </div>
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border border-black bg-[#f7caac] border-l-0 border-b-0 text-[8px] flex items-center justify-center font-[400] px-1 text-center ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}>
+                      <div
+                        className={`border border border-black border-l-0 border-b-0 text-[8px] flex items-center justify-center font-[400] px-1 text-center ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_PAIR}`}
+                        style={{ backgroundColor: workloadColorMap.lessonPreparation }}
+                      >
                         <i>Lesson Preparation ( Off-Campus )</i>
                       </div>
-                      {renderWorkloadCells("lessonPreparation", "bg-[#f7caac]")}
+                      {renderWorkloadCells("lessonPreparation")}
                     </div>
                   </div>
                   <div className="flex flex-col">
@@ -3356,7 +3465,7 @@ const FacultyWorkload = () => {
                       <div className={`border border border-black border-l-0 border-b-0 text-[8px] flex items-center justify-center font-[400] ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_TOTAL}`}>
                         <i className="font-bold">Total</i>
                       </div>
-                      {renderWorkloadCells("grandTotal", "", {
+                      {renderWorkloadCells("grandTotal", {
                         rowHeight: WORKLOAD_HEIGHT_TOTAL,
                       })}
                     </div>
@@ -3466,37 +3575,7 @@ const FacultyWorkload = () => {
                       <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
                     </div>
                   </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
 
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
                   <div className="flex flex-col">
                     <div className="flex">
                       <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>

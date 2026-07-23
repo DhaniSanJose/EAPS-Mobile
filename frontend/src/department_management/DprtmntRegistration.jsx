@@ -25,8 +25,10 @@ import {
   MenuItem,
   TableContainer,
   CircularProgress,
+  FormControl,
 } from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from "@mui/icons-material/Search";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
@@ -353,7 +355,35 @@ const DepartmentRegistration = () => {
     }));
   };
 
+  // 🔎 Search
+  const [searchQuery, setSearchQuery] = useState("");
 
+  const filteredDepartments = departmentList.filter((dept) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      dept.dprtmnt_name?.toLowerCase().includes(q) ||
+      dept.dprtmnt_code?.toLowerCase().includes(q) ||
+      String(dept.dept_number ?? "").toLowerCase().includes(q) ||
+      getBranchName(dept.components).toLowerCase().includes(q)
+    );
+  });
+
+  // 📄 Pagination (same behavior as Program Panel)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage) || 1;
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDepartments = filteredDepartments.slice(
+    indexOfFirstItem,
+    indexOfLastItem,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   // Put this at the very bottom before the return 
   if (loading || hasAccess === null) {
@@ -395,8 +425,9 @@ const DepartmentRegistration = () => {
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
-          gap: 4,
-          alignItems: 'stretch',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2,
           mb: 2,
         }}
       >
@@ -410,65 +441,249 @@ const DepartmentRegistration = () => {
         >
           DEPARTMENT REGISTRATION
         </Typography>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          <TextField
+            variant="outlined"
+            placeholder="Search Department Name / Code / Branch"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{
+              width: 450,
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+        </Box>
       </Box>
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
       <br />
       <br />
 
-      <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, }}>
-        <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", }}>
+      {/* Total Records + Pagination Bar (same style as Program Panel) */}
+      <TableContainer component={Paper} sx={{ width: '100%' }}>
+        <Table size="small">
+          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
             <TableRow>
-              <TableCell sx={{ color: 'white', textAlign: "Center" }}>Department Management</TableCell>
+              <TableCell
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  py: 0.5,
+                  backgroundColor: settings?.header_color || "#1976d2",
+                  color: "white",
+                }}
+              >
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  flexWrap="wrap"
+                  sx={{ padding: "6px" }}
+                >
+                  {/* LEFT SIDE - TOTAL DEPARTMENTS */}
+                  <Typography fontSize="14px" fontWeight="bold" color="white">
+                    Total Department Records: {filteredDepartments.length}
+                  </Typography>
+
+                  {/* RIGHT SIDE - PAGINATION */}
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                    <Button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      Prev
+                    </Button>
+
+                    {/* Page Dropdown */}
+                    <FormControl size="small" sx={{ minWidth: 80 }}>
+                      <Select
+                        value={currentPage}
+                        onChange={(e) => setCurrentPage(Number(e.target.value))}
+                        displayEmpty
+                        sx={{
+                          fontSize: "12px",
+                          height: 36,
+                          color: "white",
+                          border: "1px solid white",
+                          backgroundColor: "transparent",
+                          ".MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "& svg": {
+                            color: "white",
+                          },
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              maxHeight: 200,
+                              backgroundColor: "#fff",
+                            },
+                          },
+                        }}
+                      >
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <MenuItem key={i + 1} value={i + 1}>
+                            Page {i + 1}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Typography fontSize="11px" color="white">
+                      of {totalPages} page{totalPages > 1 ? "s" : ""}
+                    </Typography>
+
+                    {/* Next & Last */}
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      Last
+                    </Button>
+
+                    {showCreateActions && (
+                      <Button
+                        variant="contained"
+                        sx={{
+                          backgroundColor: "#1976d2",
+                          color: "#fff",
+                          fontWeight: "bold",
+                          borderRadius: "8px",
+                          width: "250px",
+                          textTransform: "none",
+                          px: 2,
+                          mr: "15px",
+                          "&:hover": {
+                            backgroundColor: "#1565c0",
+                          },
+                        }}
+                        onClick={() => {
+                          setEditMode(false);
+                          setDepartment({
+                            dep_name: "",
+                            dep_code: "",
+                            dept_number: "",
+                            components: "",
+                          });
+                          setOpenModal(true);
+                        }}
+                      >
+                        + Add Department
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+              </TableCell>
             </TableRow>
           </TableHead>
         </Table>
       </TableContainer>
-
-      <Paper
-        elevation={3}
-        sx={{
-          p: 3,
-          border: `1px solid ${borderColor}`,
-        }}
-      >
-        <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <Grid item>
-            <Typography variant="body1" fontWeight="bold">
-              Departments:
-            </Typography>
-          </Grid>
-
-          {showCreateActions && (
-            <Grid item>
-              <Button
-                variant="contained"
-                startIcon={<EditIcon sx={{ display: 'none' }} />}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 3,
-                  borderRadius: 2,
-                  "&:hover": { opacity: 0.9 },
-                }}
-                onClick={() => {
-                  setEditMode(false);
-                  setDepartment({
-                    dep_name: "",
-                    dep_code: "",
-                    dept_number: "",
-                    components: "",
-                  });
-                  setOpenModal(true);
-                }}
-              >
-                + Add Department
-              </Button>
-            </Grid>
-          )}
-        </Grid>
-      </Paper>
 
       <Box>
         {departmentLoading ? (
@@ -478,19 +693,19 @@ const DepartmentRegistration = () => {
             <TableHead>
               <TableRow style={{
                 border: `1px solid ${borderColor}`,
-                backgroundColor: settings?.header_color || "#1976d2",
-                color: "#fff",
+                backgroundColor: "#F5F5F5",
+                color: "#000",
                 width: "10%",
                 textAlign: "center",
               }}>
-                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>#</TableCell>
-                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Department Name</TableCell>
-                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Code</TableCell>
-                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Dept No.</TableCell>
-                <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Branch</TableCell>
+                <TableCell sx={{ color: "#000", border: `1px solid ${borderColor}`, textAlign: "center", }}>#</TableCell>
+                <TableCell sx={{ color: "#000", border: `1px solid ${borderColor}`, textAlign: "center", }}>Department Name</TableCell>
+                <TableCell sx={{ color: "#000", border: `1px solid ${borderColor}`, textAlign: "center", }}>Code</TableCell>
+                <TableCell sx={{ color: "#000", border: `1px solid ${borderColor}`, textAlign: "center", }}>Dept No.</TableCell>
+                <TableCell sx={{ color: "#000", border: `1px solid ${borderColor}`, textAlign: "center", }}>Branch</TableCell>
 
                 {showActionColumn && (
-                  <TableCell sx={{ color: "#fff", border: `1px solid ${borderColor}`, textAlign: "center", }}>Action</TableCell>
+                  <TableCell sx={{ color: "#000", border: `1px solid ${borderColor}`, textAlign: "center", }}>Action</TableCell>
                 )}
               </TableRow>
             </TableHead>
@@ -506,14 +721,14 @@ const DepartmentRegistration = () => {
                 },
               }}
             >
-              {departmentList.length === 0 ? (
+              {currentDepartments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6}><em>No Department</em></TableCell>
                 </TableRow>
               ) : (
-                departmentList.map((dept, index) => (
+                currentDepartments.map((dept, index) => (
                   <TableRow key={dept.dprtmnt_id}>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{index + 1}</TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{indexOfFirstItem + index + 1}</TableCell>
 
                     <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                       {dept.dprtmnt_name}
@@ -609,7 +824,189 @@ const DepartmentRegistration = () => {
             </TableBody>
           </Table>
         )}
+        {departmentList.length === 0 && !departmentLoading && <p>No departments available.</p>}
       </Box>
+
+      {/* Total Records + Pagination Bar (same style as Program Panel) */}
+      <TableContainer component={Paper} sx={{ width: '100%' }}>
+        <Table size="small">
+          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+            <TableRow>
+              <TableCell
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  py: 0.5,
+                  backgroundColor: settings?.header_color || "#1976d2",
+                  color: "white",
+                }}
+              >
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  flexWrap="wrap"
+                  sx={{ padding: "6px" }}
+                >
+                  {/* LEFT SIDE - TOTAL DEPARTMENTS */}
+                  <Typography fontSize="14px" fontWeight="bold" color="white">
+                    Total Department Records: {filteredDepartments.length}
+                  </Typography>
+
+                  {/* RIGHT SIDE - PAGINATION */}
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                    <Button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      Prev
+                    </Button>
+
+                    {/* Page Dropdown */}
+                    <FormControl size="small" sx={{ minWidth: 80 }}>
+                      <Select
+                        value={currentPage}
+                        onChange={(e) => setCurrentPage(Number(e.target.value))}
+                        displayEmpty
+                        sx={{
+                          fontSize: "12px",
+                          height: 36,
+                          color: "white",
+                          border: "1px solid white",
+                          backgroundColor: "transparent",
+                          ".MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "& svg": {
+                            color: "white",
+                          },
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              maxHeight: 200,
+                              backgroundColor: "#fff",
+                            },
+                          },
+                        }}
+                      >
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <MenuItem key={i + 1} value={i + 1}>
+                            Page {i + 1}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Typography fontSize="11px" color="white">
+                      of {totalPages} page{totalPages > 1 ? "s" : ""}
+                    </Typography>
+
+                    {/* Next & Last */}
+                    <Button
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      Last
+                    </Button>
+
+                
+                  </Box>
+                </Box>
+              </TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </TableContainer>
+
 
       <Dialog
         open={openModal}

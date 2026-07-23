@@ -51,7 +51,7 @@ const generateTempPassword = () => {
     chars.charAt(Math.floor(Math.random() * chars.length))
   ).join("");
 };
- 
+
 // Looks up an account by ID (student number, or employee ID for
 // registrar/faculty) and returns its type + email + current totp state.
 // Does NOT verify email here — caller compares it.
@@ -143,7 +143,7 @@ async function resolveForgotPasswordAccount(identifier) {
 
   return null;
 }
- 
+
 const TYPE_TABLE_MAP = {
   student: { table: "user_accounts", idColumn: "id", db: db3 },
   registrar: { table: "user_accounts", idColumn: "id", db: db3 },
@@ -522,6 +522,12 @@ router.post("/register", async (req, res) => {
     [normalizedEmail]
   );
 
+  const [[company]] = await db.query(
+    "SELECT short_term FROM company_settings WHERE id = 1"
+  );
+
+  const issuer = company?.short_term || "School";
+
 
   if (existingEmail.length > 0) {
     return res
@@ -572,8 +578,7 @@ router.post("/register", async (req, res) => {
       if (exam.length > 0 && exam[0].email_sent === 1) {
         return res.status(400).json({
           success: false,
-          message:
-            "This applicant is already scheduled for examination. Duplicate registration is not allowed.",
+          message: `We are sorry to inform you that you are no longer allowed to take the ${issuer} College Admission Test (ECAT). Based on our records, you have already taken the examination.`,
         });
       }
     }
@@ -2048,7 +2053,7 @@ router.get("/check-domain-mx", async (req, res) => {
   }
 });
 
- 
+
 // ────────────────────────────────────────────────────────────────────────────
 //  STEP 2: verify the new code, THEN swap the secret in + reset password
 // ────────────────────────────────────────────────────────────────────────────
@@ -2230,7 +2235,7 @@ router.post("/forgot-password-init", async (req, res) => {
       !account || account.type !== "applicant"
         ? true
         : String(account.birthOfDate || "").slice(0, 10) ===
-          String(birthdate || "").slice(0, 10);
+        String(birthdate || "").slice(0, 10);
 
     if (!account || !emailMatches || !birthdateMatches) {
       await insertAuditLogAdmission({

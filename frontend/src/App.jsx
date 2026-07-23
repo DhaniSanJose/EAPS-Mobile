@@ -274,7 +274,7 @@ const StudentScholarshipList = lazy(() => import("./system_management/StudentSch
 const TOSFCrud = lazy(() => import("./system_management/TOSFCrud"));
 const YearLevelPanel = lazy(() => import("./system_management/YearLevelPanel"));
 const YearPanel = lazy(() => import("./system_management/YearPanel"));
-const WorkloadManagement = lazy(() => import("./system_management/WorkloadManagement"));
+const WorkloadManagement = lazy(() => import("./department_management/WorkloadManagement"));
 
 function App() {
   const getCachedSettings = () => {

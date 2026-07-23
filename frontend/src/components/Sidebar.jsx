@@ -786,7 +786,7 @@ const SideBar = ({
             { title: "Slot Monitoring Panel", link: "/section_slot_monitoring", icon: MeetingRoom, page_id: 123 },
             { title: "Department Curriculum Panel", link: "/department_curriculum_panel", icon: MenuBook, page_id: 107 },
             { title: "College Schedule Plotting", link: "/college_schedule_plotting", icon: EventNote, page_id: 108 },
-            { title: "Workload Management", link: "/workload_management", icon: EventNote },
+            { title: "Workload Management", link: "/workload_management", icon: EventNote, page_id: 171 },
         ]
     }];
 

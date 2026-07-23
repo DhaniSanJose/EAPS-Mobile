@@ -8,7 +8,6 @@ import {
   Snackbar,
   Alert,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   TextField,
@@ -24,10 +23,15 @@ import {
   Paper,
   Button,
   Autocomplete,
+  Chip,
+  Divider,
+  Tooltip,
 } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import AutorenewIcon from "@mui/icons-material/Autorenew";
 import API_BASE_URL from "../apiConfig";
 import {
   getScheduleTimeValidationError,
@@ -36,7 +40,6 @@ import {
   SCHEDULE_TIME_INPUT_MAX,
   SCHEDULE_TIME_INPUT_STEP,
 } from "../utils/scheduleTimeValidation";
-import SearchIcon from "@mui/icons-material/Search";
 import { postAuditEvent } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import {
@@ -47,6 +50,123 @@ import { downloadClassProgramPdf } from "../utils/classProgramPrintLayout";
 import EaristLogo from "../assets/EaristLogo.png";
 import { FcPrint } from "react-icons/fc";
 
+const isDesignationEntry = (entry) =>
+  entry?.department_section_id == null ||
+  entry?.department_section_id === "" ||
+  Number(entry?.department_section_id) === 0;
+
+// ---------------------------------------------------------------------------
+// Shared transaction confirm dialog — same component used in
+// CollegeScheduleChecker so both pages share one visual language for every
+// yes/no confirmation (delete, honorarium, service credit, substitution).
+// ---------------------------------------------------------------------------
+const TransactionConfirmDialog = ({
+  open,
+  onClose,
+  onConfirm,
+  icon = "✅",
+  title,
+  children,
+  confirmLabel = "Yes, Confirm",
+  headerColor,
+}) => (
+  <Dialog
+    open={open}
+    onClose={onClose}
+    fullWidth
+    maxWidth="sm"
+    PaperProps={{ sx: { borderRadius: 3 } }}
+  >
+    <DialogTitle
+      sx={{
+        background: headerColor || "#9E0000",
+        color: "#fff",
+        fontWeight: 700,
+        fontSize: "1.2rem",
+        py: 2,
+      }}
+    >
+      {icon} {title}
+    </DialogTitle>
+
+    <DialogContent sx={{ maxHeight: 400, overflowY: "auto", p: 3, mt: 2 }}>
+      <Box
+        sx={{
+          backgroundColor: "#fdfdfd",
+          borderRadius: "8px",
+          px: 2,
+          py: 2,
+          border: "1px solid #ddd",
+          fontSize: "0.95rem",
+          lineHeight: 1.8,
+        }}
+      >
+        {children}
+      </Box>
+    </DialogContent>
+
+    <DialogActions sx={{ px: 3, pb: 2 }}>
+      <Button color="error" variant="outlined" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button
+        variant="contained"
+        onClick={onConfirm}
+        sx={{
+          backgroundColor: headerColor || "#9E0000",
+          "&:hover": {
+            backgroundColor: headerColor ? `${headerColor}cc` : "#7a0000",
+          },
+        }}
+      >
+        {confirmLabel}
+      </Button>
+    </DialogActions>
+  </Dialog>
+);
+
+// ---------------------------------------------------------------------------
+// Time-grid configuration — same generator used in CollegeScheduleChecker.
+// Replaces the previous ~1,400 lines of hand-copied JSX (one block per hour,
+// duplicated 14 times) with a single loop over HOUR_BLOCKS.
+// ---------------------------------------------------------------------------
+const TIME_POINTS = [
+  "7:00 AM", "7:30 AM", "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM",
+  "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
+  "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
+  "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM", "6:00 PM", "6:30 PM",
+  "7:00 PM", "7:30 PM", "8:00 PM", "8:30 PM", "9:00 PM",
+];
+
+const HOUR_HEADER_LABELS = [
+  "07:00 AM - 08:00 AM", "08:00 AM - 09:00 AM", "09:00 AM - 10:00 AM",
+  "10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM", "12:00 PM - 01:00 PM",
+  "01:00 PM - 02:00 PM", "02:00 PM - 03:00 PM", "03:00 PM - 04:00 PM",
+  "04:00 PM - 05:00 PM", "05:00 PM - 06:00 PM", "06:00 PM - 07:00 PM",
+  "07:00 PM - 08:00 PM", "08:00 PM - 09:00 PM",
+];
+
+const HOUR_BLOCKS = HOUR_HEADER_LABELS.map((label, i) => ({
+  label,
+  start: TIME_POINTS[i * 2],
+  mid: TIME_POINTS[i * 2 + 1],
+  end: TIME_POINTS[i * 2 + 2],
+}));
+
+const SCHEDULE_DAY_ORDER = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const DAY_DISPLAY_NAMES = {
+  MON: "MONDAY",
+  TUE: "TUESDAY",
+  WED: "WEDNESDAY",
+  THU: "THURSDAY",
+  FRI: "FRIDAY",
+  SAT: "SATURDAY",
+  SUN: "SUNDAY",
+};
+
+const getDayColWidthClass = (day) =>
+  day === "WED" ? "min-w-[7rem]" : day === "THU" ? "min-w-[6.9rem]" : "min-w-[6.8rem]";
+
 const ScheduleChecker = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
@@ -54,8 +174,8 @@ const ScheduleChecker = () => {
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
+  const [stepperColor, setStepperColor] = useState("#000000");
 
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
@@ -65,30 +185,24 @@ const ScheduleChecker = () => {
   useEffect(() => {
     if (!settings) return;
 
-    // 🎨 Colors
     if (settings.title_color) setTitleColor(settings.title_color);
     if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
     if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);   // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);           // ✅ NEW
+    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
+    if (settings.stepper_color) setStepperColor(settings.stepper_color);
 
-    // 🏫 Logo
     if (settings.logo_url) {
       setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
-    // 🏷️ School Information
     if (settings.company_name) setCompanyName(settings.company_name);
     if (settings.short_term) setShortTerm(settings.short_term);
     if (settings.campus_address) setCampusAddress(settings.campus_address);
-
   }, [settings]);
 
-
-  // Also put it at the very top
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
@@ -98,12 +212,9 @@ const ScheduleChecker = () => {
   const [loading, setLoading] = useState(false);
   const [isGeneratingClassProgramPdf, setIsGeneratingClassProgramPdf] = useState(false);
 
-
   const pageId = 53;
 
-  //Put this After putting the code of the past code
   useEffect(() => {
-
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const storedID = localStorage.getItem("person_id");
@@ -153,8 +264,6 @@ const ScheduleChecker = () => {
   const [selectedEndTime, setSelectedEndTime] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("");
   const [selectedProf, setSelectedProf] = useState("");
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [value, setValue] = useState("");
   const [message, setMessage] = useState("");
   const [roomList, setRoomList] = useState([]);
   const [courseList, setCourseList] = useState([]);
@@ -176,8 +285,7 @@ const ScheduleChecker = () => {
   const [isServiceCredit, setIsServiceCredit] = useState(false);
   const [isTemporarySubstitution, setIsTemporarySubstitution] = useState(false);
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
-  const [openServiceCreditConfirmDialog, setOpenServiceCreditConfirmDialog] =
-    useState(false);
+  const [openServiceCreditConfirmDialog, setOpenServiceCreditConfirmDialog] = useState(false);
   const [openUpdateConfirmDialog, setOpenUpdateConfirmDialog] = useState(false);
   const [schoolYears, setSchoolYears] = useState([]);
   const [semesters, setSchoolSemester] = useState([]);
@@ -192,7 +300,22 @@ const ScheduleChecker = () => {
   const [reviewSchedules, setReviewSchedules] = useState([]);
   const [reviewScheduleLoading, setReviewScheduleLoading] = useState(false);
   const [professorSchedule, setProfessorSchedule] = useState([]);
+
+  // Workload types, fetched straight from the DB (`workload_type` table) so
+  // the legend is never hard-coded and always reflects what's configured.
+  const [workloadTypeList, setWorkloadTypeList] = useState([]);
+
   const { dprtmnt_id } = useParams();
+
+  const fetchWorkloadTypeList = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/workload`);
+      setWorkloadTypeList(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.log(error);
+      setWorkloadTypeList([]);
+    }
+  };
 
   const fetchRoom = async () => {
     try {
@@ -285,7 +408,6 @@ const ScheduleChecker = () => {
       );
       setSchedule(response.data);
     } catch (error) {
-
       if (error.response && error.response.status === 404) {
         setMessage(
           "Schedule not found. Please assign a schedule."
@@ -550,6 +672,7 @@ const ScheduleChecker = () => {
     fetchCourseList();
     fetchSchoolYearList();
     fetchDayList();
+    fetchWorkloadTypeList();
   }, []);
 
   useEffect(() => {
@@ -620,6 +743,36 @@ const ScheduleChecker = () => {
     }
   }, [schoolYearList]);
 
+  // 🔒 Disable right-click and DevTools shortcuts. Moved into a mount-only
+  // effect (with cleanup) instead of running on every render, which was
+  // stacking a fresh set of document-level listeners on each re-render.
+  useEffect(() => {
+    const blockContextMenu = (e) => e.preventDefault();
+    const blockDevToolsShortcuts = (e) => {
+      const isBlockedKey =
+        e.key === "F12" ||
+        e.key === "F11" ||
+        (e.ctrlKey &&
+          e.shiftKey &&
+          (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+        (e.ctrlKey && e.key.toLowerCase() === "u") ||
+        (e.ctrlKey && e.key.toLowerCase() === "p");
+
+      if (isBlockedKey) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener("contextmenu", blockContextMenu);
+    document.addEventListener("keydown", blockDevToolsShortcuts);
+
+    return () => {
+      document.removeEventListener("contextmenu", blockContextMenu);
+      document.removeEventListener("keydown", blockDevToolsShortcuts);
+    };
+  }, []);
+
   const insertAuditLog = async (eventType, details = {}) => {
     try {
       await postAuditEvent(eventType, details);
@@ -661,7 +814,6 @@ const ScheduleChecker = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
-    console.log(selectedSection);
 
     if (editingScheduleId) {
       if (isTemporarySubstitution) {
@@ -944,11 +1096,9 @@ const ScheduleChecker = () => {
     }
   };
 
-  // HERE THE CHECK CONFLICT FOR DESIGNATION
   const handleCheckConflictDesignation = async (e) => {
     e.preventDefault();
     setMessage("");
-    console.log(selectedSection);
 
     try {
       if (!ensureScheduleFormComplete()) return;
@@ -1015,7 +1165,6 @@ const ScheduleChecker = () => {
     }
   };
 
-  // HERE THE SUBMIT BUTTON FOR DESIGNATION SCHEDULING
   const handleInsertDesignation = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -1117,11 +1266,6 @@ const ScheduleChecker = () => {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
 
-  const isDesignationEntry = (entry) =>
-    entry.department_section_id == null ||
-    entry.department_section_id === "" ||
-    Number(entry.department_section_id) === 0;
-
   const getDesignationPlotSchedule = () => {
     if (!selectedProf) return [];
 
@@ -1175,7 +1319,6 @@ const ScheduleChecker = () => {
 
   const isTimeInSchedule = (start, end, day, scheduleEntries = schedule) => {
     const parseTime = (timeStr) => {
-      // Converts "5:00 PM" into a Date object
       return new Date(`1970-01-01 ${timeStr}`);
     };
 
@@ -1193,19 +1336,11 @@ const ScheduleChecker = () => {
 
   const filteredScheduleList = allschedules
     .filter((sched) => {
-      // PROGRAM FILTER
       if (programFilter !== "all" && sched.program_id !== programFilter) return false;
-
-      // ROOM FILTER
       if (roomFilter !== "all" && sched.room_id !== roomFilter) return false;
-
-      // ACADEMIC YEAR FILTER
       if (selectedAcademicSchoolYear && sched.year_id !== selectedAcademicSchoolYear) return false;
-
-      // SEMESTER FILTER
       if (selectedAcademicSchoolSemester && sched.semester_id !== selectedAcademicSchoolSemester) return false;
 
-      // SEARCH FILTER
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const fullName = `${sched.fname || ""} ${sched.mname?.[0] || ""} ${sched.lname || ""}`.toLowerCase();
@@ -1216,8 +1351,7 @@ const ScheduleChecker = () => {
 
       return true;
     })
-    // SORT BY NAME (or any other property)
-     .sort((a, b) => {
+    .sort((a, b) => {
       if (sortOrder === "asc") {
         return (a.fname || "").localeCompare(b.fname || "");
       } else {
@@ -1226,7 +1360,7 @@ const ScheduleChecker = () => {
     });
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20; // 👈 only 20 now
+  const itemsPerPage = 20;
 
   const totalPages = Math.ceil(filteredScheduleList.length / itemsPerPage);
 
@@ -1237,7 +1371,7 @@ const ScheduleChecker = () => {
     indexOfFirstItem,
     indexOfLastItem
   );
- 
+
   const daySortOrder = {
     MON: 1,
     TUE: 2,
@@ -1289,16 +1423,13 @@ const ScheduleChecker = () => {
     sortOrder,
   ]);
 
-
   const officeDutyConversionColor = (course_code) => {
     if (!course_code) return "";
 
-    // STEP 2: Normalize the course code
     const normalized = course_code
       .toUpperCase()
-      .replace(/[^A-Z]/g, "");   // remove spaces, numbers, special characters
+      .replace(/[^A-Z]/g, "");
 
-    // STEP 3 + 4: Match to category and return color
     if (normalized === "DESIGNATION") return "#99ccff";
 
     if (
@@ -1311,7 +1442,7 @@ const ScheduleChecker = () => {
 
     if (normalized === "LESSONPREPARATION") return "#f7caac";
 
-    return ""; // default if unmatched
+    return "";
   };
 
   const getDutyColor = (start, day, scheduleEntries = schedule) => {
@@ -1341,7 +1472,7 @@ const ScheduleChecker = () => {
       }
     }
 
-    return ""; // no color
+    return "";
   };
 
   const hasAdjacentSchedule = (start, end, day, direction = "top", scheduleEntries = schedule) => {
@@ -1350,7 +1481,6 @@ const ScheduleChecker = () => {
     const slotStart = parseTime(start);
     const slotEnd = parseTime(end);
 
-    // Find the current schedule block
     const currentEntry = scheduleEntries.find((entry) => {
       if (entry.day_description !== day) return false;
       const schedStart = parseTime(entry.school_time_start);
@@ -1364,10 +1494,8 @@ const ScheduleChecker = () => {
     const schedEnd = parseTime(currentEntry.school_time_end);
 
     if (direction === "top") {
-      // Only merge if slotStart > schedStart (inside the same block)
       return slotStart > schedStart ? "same" : "different";
     } else {
-      // Only merge if slotEnd < schedEnd (inside the same block)
       return slotEnd < schedEnd ? "same" : "different";
     }
   };
@@ -1544,9 +1672,9 @@ const ScheduleChecker = () => {
     e.preventDefault();
 
     if (isDesignationMode) {
-      return handleCheckConflictDesignation(e); // your designation check
+      return handleCheckConflictDesignation(e);
     } else {
-      return handleSubmit(e); // your regular-load check
+      return handleSubmit(e);
     }
   };
 
@@ -1601,15 +1729,109 @@ const ScheduleChecker = () => {
     e.preventDefault();
 
     if (isDesignationMode) {
-      return handleInsertDesignation(e); // your designation insert
+      return handleInsertDesignation(e);
     }
     if (editingScheduleId) {
       return handleUpdateSchedule(e);
     }
-    return handleInsert(e); // your regular insert
+    return handleInsert(e);
   };
 
-  // Put this at the very bottom before the return 
+  // ---------------------------------------------------------------------
+  // Grid renderer — same generator as CollegeScheduleChecker: a single
+  // loop over HOUR_BLOCKS instead of ~1,400 lines of duplicated JSX.
+  // ---------------------------------------------------------------------
+  const renderScheduleGrid = (plotSchedule, enableEdit, gridKey) => (
+    <table className="mt-[0.7rem] mb-6">
+      <thead className="bg-[#c0c0c0]">
+        <tr className="min-w-[6.5rem] min-h-[2.2rem] flex items-center justify-center border border-black border-b-0 text-[14px] font-semibold">
+          {gridKey === "designation"
+            ? "Designation Schedule Plotted"
+            : "Regular Load Schedule Plotted"}
+        </tr>
+        <tr className="flex align-center">
+          <td className="min-w-[6.5rem] min-h-[2.2rem] flex items-center justify-center border border-black text-[14px]">
+            TIME
+          </td>
+          <td className="p-0 m-0">
+            <div className="min-w-[6.6rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
+              DAY
+            </div>
+            <p className="min-w-[6.6rem] text-center border border-black border-l-0 text-[11.5px] font-bold mt-[-3px]">
+              Official Time
+            </p>
+          </td>
+          {SCHEDULE_DAY_ORDER.map((day) => (
+            <td key={day} className="p-0 m-0">
+              <div
+                className={`${getDayColWidthClass(day)} text-center border border-black border-l-0 border-b-0 text-[14px]`}
+              >
+                {DAY_DISPLAY_NAMES[day]}
+              </div>
+              <p
+                className={`h-[20px] ${getDayColWidthClass(day)} text-center border border-black border-l-0 text-[11.5px] mt-[-3px]`}
+              >
+                {getDayScheduleRange(day, plotSchedule)}
+              </p>
+            </td>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="flex flex-col mt-[-0.1px]">
+        {HOUR_BLOCKS.map((block) => (
+          <tr key={block.label} className="flex w-full">
+            <td className="m-0 p-0 min-w-[13.1rem]">
+              <div className="bg-[#eaeaea] h-[2.5rem] border border-black border-t-0 text-[14px] flex items-center justify-center">
+                {block.label}
+              </div>
+            </td>
+
+            {SCHEDULE_DAY_ORDER.map((day) => (
+              <td key={day} className={`m-0 p-0 ${getDayColWidthClass(day)}`}>
+                <div className="h-[2.5rem] p-0 m-0">
+                  {[
+                    { start: block.start, end: block.mid, isTop: true },
+                    { start: block.mid, end: block.end, isTop: false },
+                  ].map(({ start, end, isTop }) => {
+                    const inSchedule = isTimeInSchedule(start, end, day, plotSchedule);
+                    const mergeTop =
+                      inSchedule &&
+                      hasAdjacentSchedule(start, end, day, "top", plotSchedule) === "same";
+                    const mergeBottom =
+                      inSchedule &&
+                      hasAdjacentSchedule(start, end, day, "bottom", plotSchedule) === "same";
+
+                    return (
+                      <div
+                        key={start}
+                        style={{
+                          borderTop: isTop ? undefined : "none",
+                          backgroundColor: getScheduleSlotBackground(
+                            start,
+                            end,
+                            day,
+                            plotSchedule,
+                            gridKey === "designation",
+                          ),
+                        }}
+                        className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
+                          ${isTop ? "border-t-0" : ""}
+                          ${mergeTop ? "border-t-0" : ""}
+                          ${mergeBottom ? "border-b-0" : ""}`}
+                      >
+                        {getCenterText(start, day, plotSchedule, enableEdit)}
+                      </div>
+                    );
+                  })}
+                </div>
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
   }
@@ -1655,55 +1877,18 @@ const ScheduleChecker = () => {
     </div>
   ) : null;
 
-  const filterControlSX = {
-    minWidth: 120,
-    height: 36,
-    fontSize: "12px",
-    color: "white",
-    border: "1px solid white",
-    backgroundColor: "transparent",
-    "&:hover": {
-      backgroundColor: "rgba(255,255,255,0.1)",
-    },
-    "&.Mui-focused": {
-      backgroundColor: "transparent",
-    },
-    ".MuiOutlinedInput-notchedOutline": {
-      borderColor: "white",
-    },
-    "& svg": {
-      color: "white",
-    },
-  };
-
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
-
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
-
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+      {/* ---------------------------------------------------------------- */}
+      {/* Header                                                          */}
+      {/* ---------------------------------------------------------------- */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
+          gap: 2,
           mb: 2,
         }}
       >
@@ -1717,11 +1902,124 @@ const ScheduleChecker = () => {
         >
           SCHEDULE CHECKER
         </Typography>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          <Button
+            variant="outlined"
+            onClick={() => {
+              const newMode = !isDesignationMode;
+              clearEditMode();
+              clearScheduleLoadTypes();
+              setSelectedProf("");
+              setIsDesignationMode(newMode);
+
+              if (newMode) {
+                fetchDesignationList();
+              } else {
+                fetchCourseList();
+              }
+            }}
+            startIcon={<AutorenewIcon />}
+            sx={{
+              height: "40px",
+              borderRadius: "8px",
+              textTransform: "none",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {isDesignationMode ? "Assign Regular Load" : "Assign Designation"}
+          </Button>
+
+          <Button
+            variant="outlined"
+            onClick={() => setOpenReviewDialog(true)}
+            startIcon={<VisibilityIcon />}
+            sx={{
+              height: "40px",
+              borderRadius: "8px",
+              textTransform: "none",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            View Schedule
+          </Button>
+
+          <Tooltip title={!selectedSection ? "Select a section first" : "Download the printable class program"}>
+            <span>
+              <Button
+                variant="contained"
+                onClick={handleDownloadClassSchedule}
+                disabled={isGeneratingClassProgramPdf || isDesignationMode}
+                startIcon={<FcPrint size={20} />}
+                sx={{
+                  minWidth: "220px",
+                  whiteSpace: "nowrap",
+                  height: "40px",
+                  px: "20px",
+                  py: "5px",
+                  border: "2px solid black",
+                  borderRadius: "8px",
+                  backgroundColor: "#f0f0f0",
+                  color: "black",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  textTransform: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  userSelect: "none",
+                  boxShadow: "none",
+                  transition: "background-color 0.3s, transform 0.2s",
+
+                  "&:hover": {
+                    backgroundColor: "#d3d3d3",
+                    boxShadow: "none",
+                  },
+
+                  "&:active": {
+                    transform: "scale(0.95)",
+                  },
+
+                  "&.Mui-disabled": {
+                    backgroundColor: "#f0f0f0",
+                    color: "#888",
+                    border: "2px solid #999",
+                  },
+                }}
+              >
+                {isGeneratingClassProgramPdf ? "Generating PDF..." : "Download Class Schedule"}
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
+
+        <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+        <br />
       </Box>
 
-      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
-      <br />
+      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, borderRadius: 2, overflow: "hidden" }}>
+        <Table>
+          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+            <TableRow>
+              <TableCell sx={{ color: "white", textAlign: "center", fontWeight: 600, letterSpacing: 0.3 }}>
+                College Schedule Plotting and Management
+              </TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </TableContainer>
+      <Box sx={{ mb: 2 }} />
+
       {message && (
         <Snackbar
           open={openSnackbar}
@@ -1741,6 +2039,7 @@ const ScheduleChecker = () => {
               width: "100%",
               whiteSpace: "pre-line",
               alignItems: "center",
+              borderRadius: 2,
             }}
           >
             {message}
@@ -1748,18 +2047,10 @@ const ScheduleChecker = () => {
         </Snackbar>
       )}
 
-      <br />
-      <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}` }}>
-        <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", }}>
-            <TableRow>
-              <TableCell sx={{ color: 'white', textAlign: "Center" }}>College Schedule Plotting and Management</TableCell>
-            </TableRow>
-          </TableHead>
-        </Table>
-      </TableContainer>
-
-      <Box sx={{ display: "flex", gap: "1rem" }}>
+      {/* ---------------------------------------------------------------- */}
+      {/* Main content: form + grid                                       */}
+      {/* ---------------------------------------------------------------- */}
+      <Box sx={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
         <Box>
           <form
             onSubmit={handleInsertWrapper}
@@ -1767,13 +2058,21 @@ const ScheduleChecker = () => {
               width: "100%",
               maxWidth: "600px",
               border: `1px solid ${borderColor}`,
+              borderRadius: "12px",
               backgroundColor: "white",
               padding: "2rem",
-              marginTop: "1rem",
-              boxShadow: "0px 0px 10px rgba(0,0,0,0.1)",
-
+              boxShadow: "0px 2px 12px rgba(0,0,0,0.08)",
             }}
           >
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: titleColor }}>
+              {editingScheduleId
+                ? "Update Selected Schedule"
+                : isDesignationMode
+                  ? "Plot a Designation"
+                  : "Plot a Regular Class"}
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+
             {/* Day */}
             <div className="flex mb-2 mt-2">
               <div className="p-2 w-[12rem]">Day:</div>
@@ -1819,7 +2118,6 @@ const ScheduleChecker = () => {
                     const input = inputValue.trim().toLowerCase();
                     if (!input) return options;
 
-                    // Exact/starts-with match first, then fallback to includes
                     const exact = options.filter((o) =>
                       `${o.description || ""} ${o.program_code || ""}`
                         .toLowerCase()
@@ -1845,7 +2143,6 @@ const ScheduleChecker = () => {
               </div>
             )}
 
-
             {/* Room */}
             {!isDesignationMode && (
               <div className="flex mb-2">
@@ -1866,7 +2163,7 @@ const ScheduleChecker = () => {
                 </select>
               </div>
             )}
-            {/* Search Course & Course Select */}
+
             {/* Search Course & Course Select */}
             <div className="flex flex-col mb-2 w-full">
               <div className="flex mb-1 items-center">
@@ -1961,7 +2258,6 @@ const ScheduleChecker = () => {
               />
             </div>
 
-
             {/* School Year */}
             <div className="flex mb-2">
               <div className="p-2 w-[12rem]">School Year:</div>
@@ -2006,9 +2302,10 @@ const ScheduleChecker = () => {
             {!editingScheduleId && loadTypeSection}
             <div className="flex justify-between items-center gap-2">
               {editingScheduleId && (
-                <button
+                <Button
+                  color="error"
+                  variant="outlined"
                   type="button"
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
                   onClick={() => {
                     clearEditMode();
                     clearScheduleLoadTypes();
@@ -2016,19 +2313,19 @@ const ScheduleChecker = () => {
                   }}
                 >
                   Cancel Edit
-                </button>
+                </Button>
               )}
               <div className="flex gap-2 ml-auto">
                 <button
                   type="button"
-                  className="bg-[#800000] hover:bg-red-900 text-white px-6 py-2 rounded"
+                  className="bg-[#800000] hover:bg-red-900 text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   style={{ backgroundColor: mainButtonColor }}
                   onClick={handleSubmitWrapper}
                 >
                   Check Schedule
                 </button>
                 <button
-                  className="bg-[#1967d2] hover:bg-[#000000] text-white px-6 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-[#1967d2] hover:bg-[#000000] text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   type="submit"
                   disabled={Boolean(editingScheduleId) && !hasValidUpdate()}
                 >
@@ -2038,1066 +2335,90 @@ const ScheduleChecker = () => {
             </div>
           </form>
         </Box>
-        <Box sx={{ display: "flex", flexDirection: "column", marginTop: "1rem", gap: "0.4rem" }}>
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Button
-              className="hover:bg-[#000000] text-white px-6 py-2 rounded w-[200px]"
-              variant="contained"
-              onClick={() => {
-                const newMode = !isDesignationMode;
-                clearEditMode();
-                clearScheduleLoadTypes();
-                setSelectedProf("");
-                setIsDesignationMode(newMode);
 
-                if (newMode) {
-                  // switched FROM regular → designation
-                  fetchDesignationList();
-                } else {
-                  // switched FROM designation → regular
-                  fetchCourseList();
-                }
-              }}
-            >
-              {isDesignationMode ? "Assign Regular Load" : "Assign Designation"}
-            </Button>
-            <Button
-              className="hover:bg-[#000000] text-white px-6 py-2 rounded w-[200px]"
-              variant="contained"
-              onClick={() => setOpenReviewDialog(true)}
-            >
-              Review Schedule
-            </Button>
-            <Button
-              className="hover:bg-[#000000] text-white px-6 py-2 rounded"
-              variant="contained"
-              onClick={handleDownloadClassSchedule}
-              disabled={isGeneratingClassProgramPdf || isDesignationMode}
-              startIcon={<FcPrint />}
-              sx={{ minWidth: "220px", whiteSpace: "nowrap" }}
-            >
-              {isGeneratingClassProgramPdf
-                ? "Generating PDF..."
-                : "Download Class Schedule"}
-            </Button>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "0.6rem", flex: 1, minWidth: 300 }}>
+          {/* -------------------------------------------------------------- */}
+          {/* Legend — built from the workload_type table via /api/workload, */}
+          {/* not hard-coded. "Regular Load" stays fixed since it's just the */}
+          {/* default fallback color, not a workload_type row.              */}
+          {/* -------------------------------------------------------------- */}
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              flexWrap: "wrap",
+              alignItems: "center",
+              p: 1.25,
+              backgroundColor: "white",
+              border: `1px solid ${borderColor}`,
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 700, color: subtitleColor, mr: 1 }}>
+              LEGEND
+            </Typography>
+
+  
+
+            {workloadTypeList.map((item) => (
+              <Chip
+                key={item.id}
+                size="small"
+                label={item.workload_description}
+                sx={{
+                  backgroundColor: item.workload_color || "#eeeeee",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  fontSize: "11px",
+                }}
+              />
+            ))}
           </Box>
-          {[
-            {
-              key: "regular",
-              plotSchedule: schedule.filter((entry) => !isDesignationEntry(entry)),
-              title: "Regular Load Schedule Plotted",
-              enableEdit: !isDesignationMode,
-            },
-            {
-              key: "designation",
-              plotSchedule: getDesignationPlotSchedule(),
-              title: "Designation Schedule Plotted",
-              enableEdit: isDesignationMode,
-            },
-          ].filter((plot) =>
-            isDesignationMode ? plot.key === "designation" : plot.key === "regular"
-          ).map(({ key, plotSchedule, title, enableEdit }) => (
-          <table key={key} className="mt-[0.7rem] mb-6">
-            <thead className="bg-[#c0c0c0]">
-              <tr className="min-w-[6.5rem] min-h-[2.2rem] flex items-center justify-center border border-black border-b-0 text-[14px] font-semibold">
-                {title}
-              </tr>
-              <tr className="flex align-center">
-                <td className="min-w-[6.5rem] min-h-[2.2rem] flex items-center justify-center border border-black text-[14px] ">
-                  TIME
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[6.6rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    DAY
-                  </div>
-                  <p className="min-w-[6.6rem] text-center border border-black border-l-0 text-[11.5px] font-bold mt-[-3px]">
-                    Official Time
-                  </p>
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[6.8rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    MONDAY
-                  </div>
-                  <p className="h-[20px] min-w-[6.8rem] text-center border border-black border-l-0 text-[11.5px] mt-[-3px]">
-                    {getDayScheduleRange('MON', plotSchedule)}
-                  </p>
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[6.8rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    TUESDAY
-                  </div>
-                  <p className="h-[20px] min-w-[6.8rem] text-center border border-black border-l-0 text-[11.5px] mt-[-3px]">
-                    {getDayScheduleRange('TUE', plotSchedule)}
-                  </p>
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[7rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    WEDNESDAY
-                  </div>
-                  <p className="h-[20px] min-w-[7rem] text-center border border-black border-l-0 text-[11.5px] mt-[-3px]">
-                    {getDayScheduleRange('WED', plotSchedule)}
-                  </p>
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[6.9rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    THURSDAY
-                  </div>
-                  <p className="h-[20px] min-w-[6.9rem] text-center border border-black border-l-0 text-[11.5px] mt-[-3px]">
-                    {getDayScheduleRange('THU', plotSchedule)}
-                  </p>
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[6.8rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    FRIDAY
-                  </div>
-                  <p className="h-[20px] min-w-[6.8rem] text-center border border-black border-l-0 text-[11.5px] mt-[-3px]">
-                    {getDayScheduleRange('FRI', plotSchedule)}
-                  </p>
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[6.8rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    SATUDAY
-                  </div>
-                  <p className="h-[20px] min-w-[6.8rem] text-center border border-black border-l-0 text-[11.5px] mt-[-3px]">
-                    {getDayScheduleRange('SAT', plotSchedule)}
-                  </p>
-                </td>
-                <td className="p-0 m-0">
-                  <div className="min-w-[6.8rem] text-center border border-black border-l-0 border-b-0 text-[14px]">
-                    SUNDAY
-                  </div>
-                  <p className="h-[20px] min-w-[6.8rem] text-center border border-black border-l-0 text-[11.5px] mt-[-3px]">
-                    {getDayScheduleRange('SUN', plotSchedule)}
-                  </p>
-                </td>
-              </tr>
-            </thead>
-            <tbody className="flex flex-col mt-[-0.1px]">
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="bg-[#eaeaea] h-[2.5rem] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    07:00 AM - 08:00 AM
-                  </div>
-                </td>
 
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("7:00 AM", "7:30 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("7:00 AM", "7:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:00 AM", "7:30 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("7:00 AM", "7:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:00 AM", "7:30 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("7:00 AM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("7:30 AM", "8:00 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("7:30 AM", "8:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:30 AM", "8:00 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("7:30 AM", "8:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:30 AM", "8:00 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("7:30 AM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    08:00 AM - 09:00 AM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("8:00 AM", "8:30 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("8:00 AM", "8:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:00 AM", "8:30 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("8:00 AM", "8:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:00 AM", "8:30 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("8:00 AM", day, plotSchedule, enableEdit)}
-                        </div>
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("8:30 AM", "9:00 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("8:30 AM", "9:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:30 AM", "9:00 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("8:30 AM", "9:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:30 AM", "9:00 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("8:30 AM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    09:00 AM - 10:00 AM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("9:00 AM", "9:30 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("9:00 AM", "9:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("9:00 AM", "9:30 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("9:00 AM", "9:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("9:00 AM", "9:30 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("9:00 AM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("9:30 AM", "10:00 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("9:30 AM", "10:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("9:30 AM", "10:00 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("9:30 AM", "10:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("9:30 AM", "10:00 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("9:30 AM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    10:00 AM - 11:00 AM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("10:00 AM", "10:30 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("10:00 AM", "10:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("10:00 AM", "10:30 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("10:00 AM", "10:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("10:00 AM", "10:30 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("10:00 AM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("10:30 AM", "11:00 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("10:30 AM", "11:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("10:30 AM", "11:00 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("10:30 AM", "11:00 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("10:30 AM", "11:00 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("10:30 AM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    11:00 AM - 12:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("11:00 AM", "11:30 AM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("11:00 AM", "11:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("11:00 AM", "11:30 AM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("11:00 AM", "11:30 AM", day, plotSchedule) &&
-                              hasAdjacentSchedule("11:00 AM", "11:30 AM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("11:00 AM", day, plotSchedule, enableEdit)}
-                        </div>
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("11:30 AM", "12:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("11:30 AM", "12:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("11:30 AM", "12:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("11:30 AM", "12:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("11:30 AM", "12:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("11:30 AM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    12:00 PM - 01:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("12:00 PM", "12:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("12:00 PM", "12:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("12:00 PM", "12:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("12:00 PM", "12:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("12:00 PM", "12:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("12:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("12:30 PM", "1:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("12:30 PM", "1:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("12:30 PM", "1:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("12:30 PM", "1:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("12:30 PM", "1:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("12:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] border bg-[#eaeaea] border-black border-t-0 text-[14px] flex items-center justify-center">
-                    01:00 PM - 02:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("1:00 PM", "1:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("1:00 PM", "1:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("1:00 PM", "1:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("1:00 PM", "1:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("1:00 PM", "1:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("1:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("1:30 PM", "2:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("1:30 PM", "2:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("1:30 PM", "2:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("1:30 PM", "2:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("1:30 PM", "2:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("1:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    02:00 PM - 03:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("2:00 PM", "2:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("2:00 PM", "2:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("2:00 PM", "2:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("2:00 PM", "2:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("2:00 PM", "2:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("2:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("2:30 PM", "3:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("2:30 PM", "3:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("2:30 PM", "3:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("2:30 PM", "3:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("2:30 PM", "3:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("2:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    03:00 PM - 04:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("3:00 PM", "3:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("3:00 PM", "3:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("3:00 PM", "3:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("3:00 PM", "3:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("3:00 PM", "3:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("3:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("3:30 PM", "4:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("3:30 PM", "4:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("3:30 PM", "4:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("3:30 PM", "4:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("3:30 PM", "4:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("3:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    04:00 PM - 05:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("4:00 PM", "4:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("4:00 PM", "4:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("4:00 PM", "4:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("4:00 PM", "4:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("4:00 PM", "4:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("4:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("4:30 PM", "5:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("4:30 PM", "5:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("4:30 PM", "5:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("4:30 PM", "5:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("4:30 PM", "5:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("4:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    05:00 PM - 06:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("5:00 PM", "5:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("5:00 PM", "5:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("5:00 PM", "5:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("5:00 PM", "5:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("5:00 PM", "5:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("5:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("5:30 PM", "6:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("5:30 PM", "6:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("5:30 PM", "6:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("5:30 PM", "6:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("5:30 PM", "6:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("5:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    06:00 PM - 07:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("6:00 PM", "6:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("6:00 PM", "6:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("6:00 PM", "6:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("6:00 PM", "6:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("6:00 PM", "6:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("6:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("6:30 PM", "7:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("6:30 PM", "7:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("6:30 PM", "7:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("6:30 PM", "7:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("6:30 PM", "7:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("6:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] bg-[#eaeaea] border border-black border-t-0 text-[14px] flex items-center justify-center">
-                    07:00 PM - 08:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("7:00 PM", "7:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("7:00 PM", "7:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:00 PM", "7:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("7:00 PM", "7:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:00 PM", "7:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("7:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("7:30 PM", "8:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                    ${isTimeInSchedule("7:30 PM", "8:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:30 PM", "8:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                    ${isTimeInSchedule("7:30 PM", "8:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("7:30 PM", "8:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                                    `}
-                        >
-                          {getCenterText("7:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-
-              <tr className="flex w-full">
-                <td className="m-0 p-0 min-w-[13.1rem]">
-                  <div className="h-[2.5rem] border bg-[#eaeaea] border-black border-t-0 text-[14px] flex items-center justify-center">
-                    08:00 PM - 09:00 PM
-                  </div>
-                </td>
-
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                  (day, i) => (
-                    <td
-                      key={day}
-                      className={`m-0 p-0 ${day === "WED"
-                        ? "min-w-[7rem]"
-                        : day === "THU"
-                          ? "min-w-[6.9rem]"
-                          : "min-w-[6.8rem]"
-                        }`}
-                    >
-                      <div className="h-[2.5rem] p-0 m-0">
-                        <div
-                          style={{
-                            backgroundColor: getScheduleSlotBackground("8:00 PM", "8:30 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-t-0 border-l-0 flex items-center justify-center
-                              ${isTimeInSchedule("8:00 PM", "8:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:00 PM", "8:30 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                              ${isTimeInSchedule("8:00 PM", "8:30 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:00 PM", "8:30 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                        `}
-                        >
-                          {getCenterText("8:00 PM", day, plotSchedule, enableEdit)}
-                        </div>
-
-                        <div
-                          style={{
-                            borderTop: "none",
-                            backgroundColor: getScheduleSlotBackground("8:30 PM", "9:00 PM", day, plotSchedule, key === "designation")
-                          }}
-                          className={`h-[1.25rem] border border-black border-l-0 flex items-center justify-center
-                                                        ${isTimeInSchedule("8:30 PM", "9:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:30 PM", "9:00 PM", day, "top", plotSchedule) === "same"
-                              ? "border-t-0"
-                              : ""
-                            }
-                                                        ${isTimeInSchedule("8:30 PM", "9:00 PM", day, plotSchedule) &&
-                              hasAdjacentSchedule("8:30 PM", "9:00 PM", day, "bottom", plotSchedule) === "same"
-                              ? "border-b-0"
-                              : ""
-                            }
-                                             `}
-                        >
-                          {getCenterText("8:30 PM", day, plotSchedule, enableEdit)}
-                        </div>
-                      </div>
-                    </td>
-                  )
-                )}
-              </tr>
-            </tbody>
-          </table>
-          ))}
+          <Box
+            sx={{
+              backgroundColor: "white",
+              border: `1px solid ${borderColor}`,
+              borderRadius: 2,
+              p: 1,
+              overflowX: "auto",
+              boxShadow: "0px 2px 12px rgba(0,0,0,0.06)",
+            }}
+          >
+            {isDesignationMode
+              ? renderScheduleGrid(getDesignationPlotSchedule(), true, "designation")
+              : renderScheduleGrid(schedule.filter((entry) => !isDesignationEntry(entry)), true, "regular")}
+          </Box>
         </Box>
       </Box>
 
+      {/* -------------------------------------------------------------- */}
+      {/* Review Schedule dialog                                        */}
+      {/* -------------------------------------------------------------- */}
       <Dialog
         open={openReviewDialog}
         onClose={() => setOpenReviewDialog(false)}
         fullWidth
         maxWidth="lg"
+        PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle>Review Schedule</DialogTitle>
+        <DialogTitle
+          sx={{
+            background: settings?.header_color || "#1976d2",
+            color: "#fff",
+            fontWeight: 700,
+          }}
+        >
+          Review Schedule
+        </DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 1, mb: 2 }}>
+          <Box sx={{ mt: 3, mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+              Professor
+            </Typography>
             <Autocomplete
               options={profList}
               fullWidth
+              size="small"
               getOptionLabel={(option) =>
                 `${option.employee_id || ""} - ${option.fname || ""} ${option.mname?.charAt(0) || ""}${option.mname ? "." : ""} ${option.lname || ""}`.trim()
               }
@@ -3113,11 +2434,7 @@ const ScheduleChecker = () => {
                 String(option.employee_id) === String(value.employee_id)
               }
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Professor"
-                  size="small"
-                />
+                <TextField {...params} size="small" />
               )}
             />
           </Box>
@@ -3130,22 +2447,25 @@ const ScheduleChecker = () => {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>#</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Employee ID</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Professor Name</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Course Assigned</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Section Assigned</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Day</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Time Start</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Time End</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Room</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Types</td>
-                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", fontWeight: "600" }}>Academic Year</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>#</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Employee ID</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Professor Name</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Course Assigned</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Section Assigned</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Day</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Time Start</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Time End</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Room</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Types</td>
+                  <td style={{ border: "solid black 1px", padding: "5px 0px", textAlign: "center", fontSize: "0.9rem", backgroundColor: "#f5f5f5", fontWeight: "600" }}>Academic Year</td>
                 </tr>
               </thead>
               <tbody>
                 {reviewedProfessorSchedules.map((row, index) => (
-                  <tr key={`${row.employee_id}-${row.day}-${row.school_time_start}-${row.school_time_end}-${index}`}>
+                  <tr
+                    key={`${row.employee_id}-${row.day}-${row.school_time_start}-${row.school_time_end}-${index}`}
+                    style={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "lightgray" }}
+                  >
                     <td style={{ textAlign: "center", border: "solid black 1px", padding: "4px", fontSize: "0.85rem" }}>{index + 1}</td>
                     <td style={{ textAlign: "center", border: "solid black 1px", padding: "4px", fontSize: "0.85rem" }}>{row.employee_id}</td>
                     <td style={{ border: "solid black 1px", padding: "4px 8px", fontSize: "0.85rem" }}>
@@ -3183,124 +2503,103 @@ const ScheduleChecker = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenReviewDialog(false)}>Close</Button>
+          <Button onClick={() => setOpenReviewDialog(false)} color="error" variant="outlined">
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog
+      {/* -------------------------------------------------------------- */}
+      {/* Delete confirmation                                            */}
+      {/* -------------------------------------------------------------- */}
+      <TransactionConfirmDialog
         open={openDialogue}
         onClose={() => {
           setOpenDialogue(false);
           setSelectedScheduleId(null);
         }}
+        onConfirm={async () => {
+          if (selectedScheduleId) {
+            await handleDelete(selectedScheduleId);
+          }
+        }}
+        icon="🗑️"
+        title="Confirm Deletion"
+        confirmLabel="Yes, Delete"
+        headerColor={settings?.header_color}
       >
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
+        <Typography>
           Are you sure you want to delete this schedule?
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setOpenDialogue(false);
-              setSelectedScheduleId(null);
-            }}
-            color="error"
-            variant="outlined"
+          <br />
+          Deleted by: <strong>{localStorage.getItem("username") || user}</strong>
+        </Typography>
+      </TransactionConfirmDialog>
 
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={async () => {
-              if (selectedScheduleId) {
-                await handleDelete(selectedScheduleId);
-              }
-            }}
-            color="error"
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
+      {/* -------------------------------------------------------------- */}
+      {/* Professor substitution update                                  */}
+      {/* -------------------------------------------------------------- */}
+      <TransactionConfirmDialog
         open={openUpdateConfirmDialog}
         onClose={() => setOpenUpdateConfirmDialog(false)}
+        onConfirm={executeUpdateSchedule}
+        icon="🔄"
+        title="Confirm Professor Change"
+        confirmLabel="Yes, Update"
+        headerColor={settings?.header_color}
       >
-        <DialogTitle>Confirm Professor Change</DialogTitle>
-        <DialogContent>
+        <Typography>
           Are you sure you want to change the professor of the selected schedule to{" "}
           <strong>{getProfessorNameById(selectedProf)}</strong>?
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="outlined"
-            onClick={() => setOpenUpdateConfirmDialog(false)}
-          >
-            Cancel
-          </Button>
-          <Button onClick={executeUpdateSchedule} variant="contained">
-            Yes, Update
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
+          <br />
+          Updated by: <strong>{localStorage.getItem("username") || user}</strong>
+        </Typography>
+      </TransactionConfirmDialog>
+
+      {/* -------------------------------------------------------------- */}
+      {/* Honorarium confirmation                                        */}
+      {/* -------------------------------------------------------------- */}
+      <TransactionConfirmDialog
         open={openConfirmDialog}
         onClose={() => setOpenConfirmDialog(false)}
+        onConfirm={() => {
+          setIsHonorarium(true);
+          setIsServiceCredit(false);
+          setIsTemporarySubstitution(false);
+          setOpenConfirmDialog(false);
+        }}
+        icon="💰"
+        title="Confirm Honorarium Load"
+        headerColor={settings?.header_color}
       >
-        <DialogTitle>Confirm Honorarium Load</DialogTitle>
-        <DialogContent>
-          Are you sure you want to assign this schedule as Honorarium Load?
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="outlined"
-            onClick={() => setOpenConfirmDialog(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              setIsHonorarium(true);
-              setIsServiceCredit(false);
-              setIsTemporarySubstitution(false);
-              setOpenConfirmDialog(false);
-            }}
-            variant="contained"
-          >
-            Yes
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
+        <Typography>
+          Are you sure you want to assign this schedule as <strong>Honorarium Load</strong>?
+          <br />
+          Assigned by: <strong>{localStorage.getItem("username") || user}</strong>
+        </Typography>
+      </TransactionConfirmDialog>
+
+      {/* -------------------------------------------------------------- */}
+      {/* Service credit confirmation                                    */}
+      {/* -------------------------------------------------------------- */}
+      <TransactionConfirmDialog
         open={openServiceCreditConfirmDialog}
         onClose={() => setOpenServiceCreditConfirmDialog(false)}
+        onConfirm={() => {
+          setIsHonorarium(false);
+          setIsServiceCredit(true);
+          setIsTemporarySubstitution(false);
+          setOpenServiceCreditConfirmDialog(false);
+        }}
+        icon="📋"
+        title="Confirm Service Credit"
+        headerColor={settings?.header_color}
       >
-        <DialogTitle>Confirm Service Credit</DialogTitle>
-        <DialogContent>
-          Are you sure you want to assign this schedule as Service Credit?
-        </DialogContent>
-        <DialogActions>
-          <Button
-            color="error"
-            variant="outlined"
-            onClick={() => setOpenServiceCreditConfirmDialog(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              setIsHonorarium(false);
-              setIsServiceCredit(true);
-              setIsTemporarySubstitution(false);
-              setOpenServiceCreditConfirmDialog(false);
-            }}
-            variant="contained"
-          >
-            Yes
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Typography>
+          Are you sure you want to assign this schedule as <strong>Service Credit</strong>?
+          <br />
+          Assigned by: <strong>{localStorage.getItem("username") || user}</strong>
+        </Typography>
+      </TransactionConfirmDialog>
     </Box>
   );
 };
