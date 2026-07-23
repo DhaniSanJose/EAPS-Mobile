@@ -2513,6 +2513,156 @@ router.post("/generate-class-list-pdf", async (req, res) => {
   }
 });
 
+router.post("/generate-class-program-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, styles, section_label = "", program_code = "" } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Letter landscape: 11in wide x 8.5in tall
+    await page.setViewport({
+      width: 1056,
+      height: 816,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    const safeStyles = typeof styles === "string" ? styles : "";
+
+    // Fixed landscape layout (no max-content scale-to-fit). That approach
+    // crushed this schedule table into a thin strip because width:100%
+    // inside width:max-content measured incorrectly.
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    ${safeStyles}
+
+    @page {
+      size: Letter landscape;
+      margin: 0.2in;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .print-container {
+      width: 10.5in;
+      margin: 0 auto;
+    }
+
+    button {
+      display: none !important;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    img {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">${html}</div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "Letter",
+      landscape: true,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: {
+        top: "0.2in",
+        bottom: "0.2in",
+        left: "0.2in",
+        right: "0.2in",
+      },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeSection = String(section_label || program_code || "Section")
+      .trim()
+      .replace(/[^\w\-]+/g, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 60);
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fileName = `Class_Program_${safeSection || "Section"}_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Class Program",
+      legacyAction: "CLASS_PROGRAM_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Class Program PDF${
+          section_label ? ` for ${section_label}` : ""
+        }.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Class Program PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 router.post("/generate-medical-certificate-pdf", async (req, res) => {
   let browser;
 

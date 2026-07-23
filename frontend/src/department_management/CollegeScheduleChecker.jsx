@@ -31,6 +31,7 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import API_BASE_URL from "../apiConfig";
+
 import {
   getScheduleTimeValidationError,
   validateScheduleTimeRange,
@@ -55,6 +56,9 @@ import {
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import { DEPARTMENT_PLOTTING_ACCESS_EVENT } from "../pages/SchedulePlottingFilter";
+import { downloadClassProgramPdf } from "../utils/classProgramPrintLayout";
+import EaristLogo from "../assets/EaristLogo.png";
+import { FcPrint } from "react-icons/fc";
 
 const PLOTTING_DISABLED_MESSAGE =
   "The administrator has turned off schedule plotting for all enrolling officers in this department.";
@@ -128,6 +132,7 @@ const CollegeScheduleChecker = () => {
   const scopeRevision = useRegistrarScopeRevision();
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isGeneratingClassProgramPdf, setIsGeneratingClassProgramPdf] = useState(false);
 
 
   const pageId = 108;
@@ -2258,6 +2263,61 @@ const CollegeScheduleChecker = () => {
     }
   };
 
+  const handleDownloadClassSchedule = async () => {
+    if (isGeneratingClassProgramPdf) return;
+
+    if (!selectedSection) {
+      setMessage("Please select a Section before downloading the class schedule.");
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
+      return;
+    }
+
+    const sectionMeta =
+      sectionList.find(
+        (section) => String(section.dep_section_id) === String(selectedSection),
+      ) || {};
+
+    const collegeFromMap =
+      (sectionMeta.dprtmnt_id &&
+        departmentAccessMap[String(sectionMeta.dprtmnt_id)]?.dprtmnt_name) ||
+      allDepartments.find(
+        (dept) => String(dept.dprtmnt_id) === String(sectionMeta.dprtmnt_id),
+      )?.dprtmnt_name ||
+      "";
+
+    setIsGeneratingClassProgramPdf(true);
+    try {
+      await downloadClassProgramPdf({
+        apiBaseUrl: API_BASE_URL,
+        sectionId: selectedSection,
+        sectionMeta,
+        companyName,
+        campusAddress,
+        logoUrl: fetchedLogo || EaristLogo,
+        collegeName: collegeFromMap,
+        signatures: {
+          preparedByTitle: "Department Head",
+          certifiedByTitle: "Dean",
+        },
+      });
+      setMessage("Class schedule downloaded successfully.");
+      setSnackbarSeverity("success");
+      setOpenSnackbar(true);
+    } catch (error) {
+      console.error("Failed to download class schedule:", error);
+      setMessage(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to download class schedule. Please try again.",
+      );
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
+    } finally {
+      setIsGeneratingClassProgramPdf(false);
+    }
+  };
+
   const handleInsertWrapper = (e) => {
     e.preventDefault();
     if (rejectPlottingIfDisabled()) return;
@@ -2740,7 +2800,7 @@ const CollegeScheduleChecker = () => {
           </fieldset>
         </Box>
         <Box sx={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          <Box sx={{ display: "flex", gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button
               className="hover:bg-[#000000] text-white px-6 py-2 rounded w-[200px]"
               variant="contained"
@@ -2769,6 +2829,18 @@ const CollegeScheduleChecker = () => {
               onClick={handleOpenReviewDialog}
             >
               View Schedule
+            </Button>
+            <Button
+              className="hover:bg-[#000000] text-white px-6 py-2 rounded"
+              variant="contained"
+              onClick={handleDownloadClassSchedule}
+              disabled={isGeneratingClassProgramPdf || isDesignationMode}
+              startIcon={<FcPrint />}
+              sx={{ minWidth: "220px", whiteSpace: "nowrap" }}
+            >
+              {isGeneratingClassProgramPdf
+                ? "Generating PDF..."
+                : "Download Class Schedule"}
             </Button>
           </Box>
 

@@ -8943,6 +8943,80 @@ Click the link below to log in:
       res.status(500).json({ error: "Server error" });
     }
   });
+
+  // Class Program (section-based weekly schedule) for PDF download
+  app.get("/api/get/section_schedule/:department_section_id", async (req, res) => {
+    const { department_section_id } = req.params;
+
+    if (!department_section_id) {
+      return res.status(400).json({ error: "Department section ID is required" });
+    }
+
+    try {
+      const sql = `
+      SELECT
+        tt.id,
+        tt.room_day,
+        tt.department_section_id,
+        tt.course_id,
+        tt.professor_id,
+        tt.department_room_id,
+        tt.school_year_id,
+        rdt.description AS day_description,
+        tt.school_time_start,
+        tt.school_time_end,
+        pft.lname AS prof_lastname,
+        pft.fname AS prof_firstname,
+        pft.mname AS prof_middlename,
+        COALESCE(cst.course_code, wt.workload_code) AS course_code,
+        cst.course_description,
+        cst.lec_unit,
+        cst.lab_unit,
+        wt.workload_color,
+        rmt.room_description,
+        pgt.program_code,
+        pgt.program_description,
+        pgt.program_id,
+        dct.dprtmnt_id,
+        dt.dprtmnt_name,
+        dt.dprtmnt_code,
+        pft.employee_id,
+        tt.ishonorarium,
+        tt.is_servicecredit,
+        tt.is_temporary_substitution,
+        yt.year_description AS current_year,
+        yt.year_description + 1 AS next_year,
+        smt.semester_description,
+        st.description AS section_description
+      FROM time_table AS tt
+        LEFT JOIN room_day_table AS rdt ON tt.room_day = rdt.id
+        LEFT JOIN dprtmnt_section_table AS dst ON tt.department_section_id = dst.id
+        LEFT JOIN curriculum_table AS cct ON dst.curriculum_id = cct.curriculum_id
+        LEFT JOIN dprtmnt_curriculum_table AS dct ON dst.curriculum_id = dct.curriculum_id
+        LEFT JOIN dprtmnt_table AS dt ON dct.dprtmnt_id = dt.dprtmnt_id
+        LEFT JOIN program_table AS pgt ON cct.program_id = pgt.program_id
+        LEFT JOIN course_table AS cst ON tt.course_id = cst.course_id AND tt.department_section_id IS NOT NULL
+        LEFT JOIN workload_type AS wt ON tt.course_id = wt.id AND tt.department_section_id IS NULL
+        LEFT JOIN prof_table AS pft ON tt.professor_id = pft.prof_id
+        LEFT JOIN room_table AS rmt ON tt.department_room_id = rmt.room_id
+        LEFT JOIN section_table AS st ON dst.section_id = st.id
+        INNER JOIN active_school_year_table AS sy ON tt.school_year_id = sy.id
+        LEFT JOIN year_table AS yt ON sy.year_id = yt.year_id
+        LEFT JOIN semester_table AS smt ON sy.semester_id = smt.semester_id
+      WHERE tt.department_section_id = ?
+        AND sy.astatus = 1
+      ORDER BY FIELD(rdt.description, 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'),
+               tt.school_time_start,
+               tt.school_time_end
+    `;
+
+      const [rows] = await db3.execute(sql, [department_section_id]);
+      res.json(rows || []);
+    } catch (err) {
+      console.error("Error fetching section schedule:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
   //----------------------------prereq end
 
   app.get("/api/prof_dropdown", async (req, res) => {
