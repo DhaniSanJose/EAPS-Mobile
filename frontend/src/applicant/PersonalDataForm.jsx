@@ -67,7 +67,10 @@ const PersonalDataForm = forwardRef((props, ref) => {
 
     }, [settings]);
 
-
+    const words = companyName.trim().split(" ");
+    const middle = Math.ceil(words.length / 2);
+    const firstLine = words.slice(0, middle).join(" ");
+    const secondLine = words.slice(middle).join(" ");
 
     const [userID, setUserID] = useState("");
     const [user, setUser] = useState("");
@@ -140,6 +143,7 @@ const PersonalDataForm = forwardRef((props, ref) => {
         generalAverage1: "",
         yearGraduated1: "",
         strand: "",
+        created_at: "",
     });
 
 
@@ -380,78 +384,148 @@ const PersonalDataForm = forwardRef((props, ref) => {
                         <div
                             className="student-table"
                             style={{
-
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center", // Center horizontally
+                                justifyContent: "center",
                                 padding: "10px 20px",
                                 width: "100%",
-
                                 boxSizing: "border-box"
                             }}>
-                            {/* Wrapper to contain logo and text side by side without stretching */}
-                            <div style={{
-                                display: "flex",
-
-                                alignItems: "center"
-                            }}>
-                                {/* Logo */}
-                                <div style={{ flexShrink: 0, marginRight: "20px" }}>
+                            {/* Wrapper: Logo | Text | Profile Photo */}
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    width: "100%",
+                                    maxWidth: "760px",
+                                }}
+                            >
+                                {/* Logo (left) */}
+                                <div
+                                    style={{
+                                        width: "120px",
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        flexShrink: 0,
+                                    }}
+                                >
                                     <img
                                         src={fetchedLogo}
                                         alt="School Logo"
                                         style={{
                                             width: "120px",
                                             height: "120px",
-                                            objectFit: "cover",   // ✅ ensures image fills the circle cleanly
-                                            borderRadius: "50%",  // ✅ makes it circular
-
-                                            marginLeft: "10px",
-                                            marginTop: "-25px",
+                                            objectFit: "cover",
+                                            borderRadius: "50%",
+                                            display: "block",
                                         }}
                                     />
                                 </div>
 
-
-                                <div>
-                                    {/* Top Line: Republic */}
-                                    <div style={{
-                                        fontSize: "13px",
-                                        fontFamily: "Arial",
-                                        textAlign: "left",
-                                        marginBottom: "5px"
-                                    }}>
+                                {/* School Name (center) */}
+                                <div
+                                    style={{
+                                        flex: 1,
+                                        textAlign: "center",
+                                        padding: "0 20px",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontFamily: "Arial",
+                                            fontSize: "13px",
+                                        }}
+                                    >
                                         Republic of the Philippines
                                     </div>
 
-                                    {/* Institute Name */}
-                                    <div style={{
-                                        textAlign: "center",
-                                        letterSpacing: "1px",
-                                        fontWeight: "bold",
-                                        fontFamily: "Arial",
-                                        fontSize: "18px",
-                                        marginBottom: "5px"
-                                    }}>
-                                        {companyName}
+                                    <div
+                                        style={{
+                                            fontWeight: "bold",
+                                            fontFamily: "Arial",
+                                            fontSize: "20px",
+                                        }}
+                                    >
+                                        {firstLine}
                                     </div>
 
-                                    {/* Horizontal Line */}
-                                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "5px" }}>
-                                        <hr style={{ width: "100%", maxWidth: "700px", border: "1px solid #000", margin: 0 }} />
-                                    </div>
-                                    <br />
-                                    {/* Office Name */}
-                                    <div style={{
-                                        textAlign: "center",
-                                        fontSize: "12px",
-                                        fontWeight: "bold",
-                                        fontFamily: "Arial",
-                                        marginLeft: "-130px",
-                                        marginTop: "-10px"
-                                    }}>
+                                    {secondLine && (
+                                        <div
+                                            style={{
+                                                fontWeight: "bold",
+                                                fontFamily: "Arial",
+                                                fontSize: "20px",
+                                            }}
+                                        >
+                                            {secondLine}
+                                        </div>
+                                    )}
+
+                                    {campusAddress && (
+                                        <div
+                                            style={{
+                                                fontFamily: "Arial",
+                                                fontSize: "13px",
+                                            }}
+                                        >
+                                            {campusAddress}
+                                        </div>
+                                    )}
+
+                                    <div
+                                        style={{
+                                            textAlign: "center",
+                                            fontSize: "12px",
+                                            fontWeight: "bold",
+                                            fontFamily: "Arial",
+                                        }}
+                                    >
                                         OFFICE OF STUDENT AFFAIRS AND SERVICES
                                     </div>
+                                </div>
+
+                                {/* Applicant Photo (right) */}
+                                <div
+                                    style={{
+                                        width: "120px",
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    {person.profile_img ? (
+                                        <img
+                                            src={`${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`}
+                                            alt="Applicant Photo"
+                                            style={{
+                                                width: "120px",
+                                                height: "120px",
+                                                objectFit: "cover",
+                                                border: "1px solid black",
+                                                display: "block",
+                                            }}
+                                        />
+                                    ) : (
+                                        <div
+                                            style={{
+                                                width: "120px",
+                                                height: "120px",
+                                                border: "1px solid black",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: "10px",
+                                                fontFamily: "Arial",
+                                                textAlign: "center",
+                                                color: "#888",
+                                            }}
+                                        >
+                                            No Photo
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -585,7 +659,13 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                                     marginBottom: "2px",
                                                 })}
                                             >
-                                                {shortDate}
+                                                {person.created_at
+                                                    ? new Date(person.created_at).toLocaleDateString("en-US", {
+                                                        year: "numeric",
+                                                        month: "long",
+                                                        day: "numeric",
+                                                    })
+                                                    : ""}
                                             </div>
                                             <div style={{ fontWeight: "bold", textAlign: "center" }}>
                                                 Date of Registration
@@ -1375,11 +1455,12 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                     <td colSpan={10}
                                         style={{
                                             border: "1px solid black",
-                                            textAlign: "left",
+                                            textAlign: "center",
                                             paddingLeft: "10px",
                                             fontWeight: "bold",
                                             fontFamily: "Arial",
-                                            fontSize: "12px"
+                                            fontSize: "12px",
+
                                         }}>
                                         FATHER'S NAME
 
@@ -1455,7 +1536,7 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                     <td colSpan={10}
                                         style={{
                                             border: "1px solid black",
-                                            textAlign: "left",
+                                            textAlign: "center",
                                             paddingLeft: "10px",
                                             fontWeight: "bold",
                                             fontSize: "12px",
@@ -1549,538 +1630,121 @@ const PersonalDataForm = forwardRef((props, ref) => {
 
                                 {/* HEADER ROW */}
                                 <tr>
-                                    <td colSpan={20} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "8px",
-                                        fontWeight: "bold",
-                                        fontFamily: "Arial",
-                                        fontSize: "12px",
-                                        verticalAlign: "top"
-                                    }}>
+                                    <td colSpan={15} style={{ border: "1px solid black", textAlign: "left", padding: "8px", fontWeight: "bold", fontFamily: "Arial", fontSize: "12px", verticalAlign: "top" }}>
                                         NAME OF FAMILY MEMBER
-
                                     </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "8px",
-                                        fontWeight: "bold",
-                                        fontSize: "12px",
-                                        verticalAlign: "top",
-                                        fontFamily: "Arial",
-                                    }}>
+                                    <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "8px", fontWeight: "bold", fontSize: "12px", verticalAlign: "top", fontFamily: "Arial" }}>
                                         OCCUPATION
-
                                     </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "8px",
-                                        fontWeight: "bold",
-                                        fontSize: "12px",
-                                        verticalAlign: "top",
-                                        fontFamily: "Arial",
-                                    }}>
+                                    <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "8px", fontWeight: "bold", fontSize: "12px", verticalAlign: "top", fontFamily: "Arial" }}>
+                                        CONTACT NUMBER
+                                    </td>
+                                    <td colSpan={9} style={{ border: "1px solid black", textAlign: "left", padding: "8px", fontWeight: "bold", fontSize: "12px", verticalAlign: "top", fontFamily: "Arial" }}>
                                         MONTHLY INCOME
-
                                     </td>
                                 </tr>
 
                                 <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "center",
-                                        padding: "2px",
-                                        fontWeight: "bold",
-                                        fontSize: "12px",
-                                        fontFamily: "Arial"
-                                    }}>
-                                        Father
-
-                                    </td>
-
-
-                                    <td colSpan={13}
-
-                                        style={{
-                                            border: "1px solid black",
-                                            textAlign: "left",
-                                            padding: "2px",
-                                            fontFamily: "Arial",
-                                            fontSize: "12px"
-                                        }}>
-                                        <div
-                                            style={dataFieldStyle({
-                                                marginTop: "5px",
-                                                fontSize: "15px",
-                                            })}
-                                        >
+                                    <td colSpan={5} style={{ border: "1px solid black", textAlign: "center", padding: "2px", fontWeight: "bold", fontSize: "12px", fontFamily: "Arial" }}>Father</td>
+                                    <td colSpan={10} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px", whiteSpace: "normal", wordBreak: "break-word" })}>
                                             {`${person.father_given_name || ""} ${person.father_middle_name || ""} ${person.father_family_name || ""}`}
                                         </div>
                                     </td>
-
-
-                                    <td colSpan={10}
-                                        style={{
-                                            border: "1px solid black",
-                                            textAlign: "left",
-                                            padding: "2px",
-                                            fontFamily: "Arial",
-                                            fontSize: "12px"
-                                        }}>
-                                        <div
-                                            style={dataFieldStyle({
-                                                marginTop: "5px",
-                                                fontSize: "15px",
-                                            })}
-                                        >
+                                    <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px", whiteSpace: "normal", wordBreak: "break-word" })}>
                                             {person.father_occupation || ""}
                                         </div>
                                     </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",
-                                        fontFamily: "Arial",
-                                        fontSize: "12px"
-                                    }}>
-                                        <div
-                                            style={dataFieldStyle({
-                                                marginTop: "5px",
-                                                fontSize: "15px",
-                                            })}
-                                        >
+                                    <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px" })}>
+                                            {person.father_contact ? `+63${person.father_contact}` : ""}
+                                        </div>
+                                    </td>
+                                    <td colSpan={9} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px" })}>
                                             {person.father_income || ""}
                                         </div>
                                     </td>
                                 </tr>
 
                                 <tr style={{ height: "5px" }}>
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "center",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontFamily: "Arial",
-                                        fontSize: "12px"
-                                    }}>
-                                        Mother
-
-                                    </td>
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontFamily: "Arial",
-                                        fontSize: "12px"
-                                    }}>
-                                        <div
-                                            style={dataFieldStyle({
-                                                marginTop: "5px",
-                                                fontSize: "15px",
-                                            })}
-                                        >
+                                    <td colSpan={5} style={{ border: "1px solid black", textAlign: "center", padding: "2px", fontWeight: "bold", fontFamily: "Arial", fontSize: "12px" }}>Mother</td>
+                                    <td colSpan={10} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px", whiteSpace: "normal", wordBreak: "break-word" })}>
                                             {`${person.mother_given_name || ""} ${person.mother_middle_name || ""} ${person.mother_family_name || ""}`}
                                         </div>
                                     </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontFamily: "Arial",
-                                        fontSize: "12px"
-                                    }}>
-                                        <div
-                                            style={dataFieldStyle({
-                                                marginTop: "5px",
-                                                fontSize: "15px",
-                                            })}
-                                        >
+                                    <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px", whiteSpace: "normal", wordBreak: "break-word" })}>
                                             {person.mother_occupation || ""}
                                         </div>
                                     </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontFamily: "Arial",
-                                        fontSize: "12px"
-                                    }}>
-                                        <div
-                                            style={dataFieldStyle({
-                                                marginTop: "5px",
-                                                fontSize: "15px",
-                                            })}
-                                        >
+                                    <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px" })}>
+                                            {person.mother_contact ? `+63${person.mother_contact}` : ""}
+                                        </div>
+                                    </td>
+                                    <td colSpan={9} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px" }}>
+                                        <div style={dataFieldStyle({ marginTop: "5px", fontSize: "14px" })}>
                                             {person.mother_income || ""}
                                         </div>
                                     </td>
                                 </tr>
 
+                                <tr style={{ height: "5px" }}>
+                                    <td colSpan={5} style={{ border: "1px solid black", textAlign: "center", padding: "2px", fontWeight: "bold", fontSize: "12px", fontFamily: "Arial" }}>Siblings</td>
+                                    <td colSpan={10} style={{ border: "1px solid black" }}></td>
+                                    <td colSpan={8} style={{ border: "1px solid black" }}></td>
+                                    <td colSpan={8} style={{ border: "1px solid black" }}></td>
+                                    <td colSpan={9} style={{ border: "1px solid black" }}></td>
+                                </tr>
 
+                                {/* Dynamic sibling rows from person.siblings. Long names wrap to the next
+    line (whiteSpace:"normal" + wordBreak:"break-word") instead of clipping. */}
+                                {(person.siblings && person.siblings.length > 0
+                                    ? person.siblings
+                                    : Array.from({ length: 5 })
+                                ).map((sibling, idx) => (
+                                    <tr style={{ height: "5px" }} key={sibling?.id || idx}>
+                                        <td colSpan={5} style={{ border: "1px solid black", textAlign: "right", fontFamily: "Arial", padding: "2px", fontWeight: "bold", fontSize: "15px", verticalAlign: "top" }}>
+                                            {idx + 1}.
+                                        </td>
+                                        <td colSpan={10} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px", verticalAlign: "top" }}>
+                                            <div style={dataFieldStyle({ fontSize: "13px", whiteSpace: "normal", wordBreak: "break-word", minHeight: "auto", overflow: "visible" })}>
+                                                {sibling?.name ? sibling.name.toUpperCase() : ""}
+                                            </div>
+                                        </td>
+                                        <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px", verticalAlign: "top" }}>
+                                            <div style={dataFieldStyle({ fontSize: "13px", whiteSpace: "normal", wordBreak: "break-word", minHeight: "auto", overflow: "visible" })}>
+                                                {sibling?.occupation || ""}
+                                            </div>
+                                        </td>
+                                        <td colSpan={8} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px", verticalAlign: "top" }}>
+                                            <div style={dataFieldStyle({ fontSize: "13px", whiteSpace: "normal", wordBreak: "break-word", minHeight: "auto", overflow: "visible" })}>
+                                                {sibling?.contact ? `+63${sibling.contact}` : ""}
+                                            </div>
+                                        </td>
+                                        <td colSpan={9} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontFamily: "Arial", fontSize: "12px", verticalAlign: "top" }}>
+                                            <div style={dataFieldStyle({ fontSize: "13px" })}>
+                                                {sibling?.monthlyIncome || ""}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
 
                                 <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "center",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px",
-                                        fontFamily: "Arial",
-                                    }}>
-                                        Siblings
-
-                                    </td>
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-
-
+                                    <td colSpan={5} style={{ border: "1px solid black" }}></td>
+                                    <td colSpan={10} style={{ border: "1px solid black" }}></td>
+                                    <td colSpan={8} style={{ border: "1px solid black" }}></td>
+                                    <td colSpan={8} style={{ border: "1px solid black" }}></td>
+                                    <td colSpan={9} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontSize: "15px", fontFamily: "Arial" }}>
+                                        Total: ₱{(Number(person.father_income || 0) + Number(person.mother_income || 0)).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                 </tr>
 
 
 
-                                <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "right",
-                                        fontFamily: "Arial",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-                                        1.
-
-                                    </td>
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-                                </tr>
-
-
-
-                                <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "right",
-                                        fontFamily: "Arial",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-                                        2.
-
-                                    </td>
-
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-                                </tr>
-
-
-
-                                <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "right",
-                                        fontFamily: "Arial",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-                                        3.
-
-                                    </td>
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-                                </tr>
-
-
-
-                                <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "right",
-                                        fontFamily: "Arial",
-                                        padding: "2px",
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-                                        4.
-
-                                    </td>
-
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-                                </tr>
-
-
-                                <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "right",
-                                        fontFamily: "Arial",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-                                        5.
-
-                                    </td>
-
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                </tr>
-
-
-                                <tr style={{ height: "5px" }}>
-
-                                    <td colSpan={7} style={{
-                                        border: "1px solid black",
-                                        textAlign: "right",
-                                        fontFamily: "Arial",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "15px"
-                                    }}>
-
-                                    </td>
-
-
-                                    <td colSpan={13} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",  // Reduced padding to fit in 10px height
-                                        fontWeight: "bold",
-                                        fontSize: "12px"
-                                    }}>
-
-
-                                    </td>
-
-
-                                    <td colSpan={10} style={{
-                                        border: "1px solid black",
-                                        textAlign: "left",
-                                        padding: "2px",
-
-                                        fontSize: "15px",
-                                        fontFamily: "Arial",
-                                    }}>
-                                        Total: ₱{(Number(person.father_income || 0) + Number(person.mother_income || 0)).toLocaleString("en-PH", {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2
-                                        })}
-                                    </td>
-                                </tr>
 
 
 
@@ -2112,7 +1776,7 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                 {/* Other table rows here... */}
 
                                 <tr>
-                                    <td colSpan={40} style={{ paddingTop: '5px' }}>
+                                    <td colSpan={40} style={{ paddingTop: '50px', }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                             <div
                                                 style={{

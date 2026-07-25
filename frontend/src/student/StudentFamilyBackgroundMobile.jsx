@@ -293,6 +293,8 @@ const StudentDashboard2Mobile = () => {
     guardian_contact: "",
     guardian_email: "",
     annual_income: "",
+    has_no_siblings: 0,
+    siblings: [],
   });
 
   // ── Snackbar ───────────────────────────────────────────────────────────────
@@ -326,7 +328,7 @@ const StudentDashboard2Mobile = () => {
     axios
       .get(`${API_BASE_URL}/api/student_data_as_applicant/${userID}`)
       .then((res) => {
-        if (res.data) setPerson(res.data);
+        if (res.data) setPerson(normalizePersonSiblings(res.data));
       })
       .catch(console.error);
   }, [userID]);
@@ -491,6 +493,25 @@ const StudentDashboard2Mobile = () => {
         isValid = false;
       }
     });
+
+    if (person.has_no_siblings !== 1) {
+      const siblings = person.siblings || [];
+      if (siblings.length === 0) {
+        newErrors.siblings = true;
+        isValid = false;
+      } else {
+        siblings.forEach((sib, idx) => {
+          if (!sib.name || !sib.name.toString().trim()) {
+            newErrors[`sibling_name_${idx}`] = true;
+            isValid = false;
+          }
+          if (!sib.age || !sib.age.toString().trim()) {
+            newErrors[`sibling_age_${idx}`] = true;
+            isValid = false;
+          }
+        });
+      }
+    }
 
     setErrors(newErrors);
     return isValid;
@@ -1827,6 +1848,75 @@ const StudentDashboard2Mobile = () => {
                 />
               </Field>
             </div>
+          </Box>
+        </Box>
+
+        {/* ── Siblings ───────────────────────────────────────────────────── */}
+        <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
+          <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
+            Siblings (Mga Kapatid Mo)
+          </Box>
+          <Box sx={{ p: { xs: "14px", md: "20px" } }}>
+            <CheckRow checked={person.has_no_siblings === 1} onChange={handleNoSiblingsCheck}>
+              Check if there's no siblings
+            </CheckRow>
+
+            {errors.siblings && (
+              <div style={{ color: "#d32f2f", fontSize: 12, marginBottom: 10 }}>
+                Please add at least one sibling, or check "no siblings" above.
+              </div>
+            )}
+
+            {person.has_no_siblings !== 1 && (
+              <>
+                {(person.siblings || []).map((sibling, index) => (
+                  <Box key={sibling.id || index} sx={{ border: `1px solid ${borderColor}`, borderRadius: 2, p: { xs: 1.5, md: 2 }, mb: 2, backgroundColor: "#fafafa" }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>Sibling {index + 1}</Typography>
+                      <Button size="small" variant="outlined" color="error" onClick={() => removeSibling(index)} sx={{ minWidth: 32, fontSize: 12, textTransform: "none" }}>
+                        − Remove
+                      </Button>
+                    </Box>
+
+                    <div style={gridCols2}>
+                      <Field label="Name of Sibling" required error={errors[`sibling_name_${index}`]} helperText="This field is required.">
+                        <MInput value={sibling.name || ""} onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)} onBlur={handleSiblingFieldBlur} error={errors[`sibling_name_${index}`]} placeholder="Enter Sibling Name" />
+                      </Field>
+                      <Field label="Age" required error={errors[`sibling_age_${index}`]} helperText="This field is required.">
+                        <MInput type="number" value={sibling.age || ""} onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)} onBlur={handleSiblingFieldBlur} error={errors[`sibling_age_${index}`]} placeholder="Age" />
+                      </Field>
+                    </div>
+
+                    <div style={gridCols2}>
+                      <Field label="School Level">
+                        <MInput value={sibling.schoolLevel || ""} onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="e.g. College" />
+                      </Field>
+                      <Field label="School Last Attended">
+                        <MInput value={sibling.schoolLastAttended || ""} onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter School Last Attended" />
+                      </Field>
+                    </div>
+
+                    <Field label="School Address">
+                      <MInput value={sibling.schoolAddress || ""} onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter School Address" />
+                    </Field>
+
+                    <div style={gridCols2}>
+                      <Field label="Occupation">
+                        <MInput value={sibling.occupation || ""} onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter Occupation" />
+                      </Field>
+                      <Field label="Monthly Income">
+                        <MInput type="number" value={sibling.monthlyIncome || ""} onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter Monthly Income" />
+                      </Field>
+                    </div>
+                  </Box>
+                ))}
+
+                <Button fullWidth={isPhone} variant="contained" onClick={addSibling}
+                  sx={{ backgroundColor: mainButtonColor, border: `1px solid ${borderColor}`, color: "#fff", textTransform: "none", fontWeight: 600, "&:hover": { backgroundColor: "#000" } }}>
+                  + Add Sibling
+                </Button>
+              </>
+            )}
           </Box>
         </Box>
 

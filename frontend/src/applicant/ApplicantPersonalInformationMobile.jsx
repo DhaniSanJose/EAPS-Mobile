@@ -222,6 +222,8 @@ const ApplicantPersonalInformationResponsive = () => {
     citizenship: "",
     religion: "",
     civilStatus: "",
+    spouse: "",
+    facebook_account: "",
     tribeEthnicGroup: "",
     cellphoneNumber: "",
     emailAddress: "",
@@ -480,6 +482,18 @@ const ApplicantPersonalInformationResponsive = () => {
       updatedPerson.program = "";
     }
 
+    if (name === "campus" || name === "academicProgram") {
+      updatedPerson.program = "";
+    }
+
+    // ✅ NEW — clear spouse if civil status changes away from Married
+    if (name === "civilStatus" && value !== "Married") {
+      updatedPerson.spouse = "";
+    }
+
+    setPerson(updatedPerson);
+    handleUpdate(updatedPerson);
+
     setPerson(updatedPerson);
     handleUpdate(updatedPerson);
   };
@@ -729,6 +743,7 @@ const ApplicantPersonalInformationResponsive = () => {
       "tribeEthnicGroup",
       "cellphoneNumber",
       "emailAddress",
+      "facebook_account",
       "presentStreet",
       "presentZipCode",
       "presentRegion",
@@ -782,6 +797,11 @@ const ApplicantPersonalInformationResponsive = () => {
         isValid = false;
       }
     }
+
+    if (person.civilStatus === "Married") {
+      requiredFields.push("spouse");
+    }
+
 
     if (person.permanentDswdChecked === 1) {
       const value = person.permanentDswdHouseholdNumber?.trim();
@@ -1764,6 +1784,20 @@ const ApplicantPersonalInformationResponsive = () => {
                   ))}
                 </MSelect>
               </Field>
+              {person.civilStatus === "Married" && (
+                <Box sx={{ maxWidth: { md: 480 } }}>
+                  <Field label="Spouse" required error={errors.spouse} helperText="This field is required.">
+                    <MInput
+                      name="spouse"
+                      value={person.spouse || ""}
+                      onChange={handleChange}
+                      onBlur={() => handleUpdate(person)}
+                      error={errors.spouse}
+                      placeholder="Enter Spouse Name"
+                    />
+                  </Field>
+                </Box>
+              )}
               <Field label="Tribe / Ethnic Group" required error={errors.tribeEthnicGroup} helperText="Required">
                 <MSelect name="tribeEthnicGroup" value={person.tribeEthnicGroup || ""} onChange={handleChange} error={errors.tribeEthnicGroup}>
                   <option value="">Select</option>
@@ -1782,6 +1816,9 @@ const ApplicantPersonalInformationResponsive = () => {
                 </MSelect>
               </Field>
             </div>
+
+            {/* ✅ NEW — Spouse, only shown when Married */}
+
           </Box>
         </Box>
 
@@ -1812,6 +1849,20 @@ const ApplicantPersonalInformationResponsive = () => {
                 <MInput name="emailAddress" value={person.emailAddress || ""} readOnly style={{ backgroundColor: "#f0f0f0" }} placeholder="Enter your Email Address" />
               </Field>
             </div>
+
+            {/* ✅ NEW — Facebook Account */}
+            <Box sx={{ maxWidth: { md: 480 } }}>
+              <Field label="Facebook Account" required error={errors.facebook_account} helperText="This field is required.">
+                <MInput
+                  name="facebook_account"
+                  value={person.facebook_account || ""}
+                  onChange={handleChange}
+                  onBlur={() => handleUpdate(person)}
+                  error={errors.facebook_account}
+                  placeholder="Enter Facebook Profile Name/Link"
+                />
+              </Field>
+            </Box>
           </Box>
         </Box>
 

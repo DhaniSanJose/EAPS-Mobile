@@ -125,6 +125,8 @@ const ApplicantPersonalInformation = (props) => {
     citizenship: "",
     religion: "",
     civilStatus: "",
+    spouse: "",
+    facebook_account: "",
     tribeEthnicGroup: "",
     cellphoneNumber: "",
     emailAddress: "",
@@ -852,6 +854,7 @@ const ApplicantPersonalInformation = (props) => {
       "tribeEthnicGroup",
       "cellphoneNumber",
       "emailAddress",
+      "facebook_account", // ✅ NEW — always required
       "presentStreet",
       "presentZipCode",
       "presentRegion",
@@ -865,6 +868,11 @@ const ApplicantPersonalInformation = (props) => {
       "permanentMunicipality",
       "permanentBarangay",
     ];
+
+    // ✅ NEW — Spouse required only when Civil Status is Married
+    if (person.civilStatus === "Married") {
+      requiredFields.push("spouse");
+    }
 
     let newErrors = {};
     let isValid = true;
@@ -2552,7 +2560,7 @@ const ApplicantPersonalInformation = (props) => {
                     value={person.citizenship || ""}
                     onChange={handleChange}
                     onBlur={() => handleUpdate(person)}
-                    label="Citizenship" // Required for floating label
+                    label="Citizenship"
                   >
                     <MenuItem value="">
                       <em>Select Citizenship</em>
@@ -2699,7 +2707,7 @@ const ApplicantPersonalInformation = (props) => {
                     value={person.religion || ""}
                     onChange={handleChange}
                     onBlur={() => handleUpdate(person)}
-                    label="Religion" // Enables floating label
+                    label="Religion"
                   >
                     <MenuItem value="">
                       <em>Select Religion</em>
@@ -2739,6 +2747,7 @@ const ApplicantPersonalInformation = (props) => {
                   )}
                 </FormControl>
               </Box>
+
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
                   Civil Status<span style={{ color: "red" }}> *</span>
@@ -2775,6 +2784,26 @@ const ApplicantPersonalInformation = (props) => {
                   )}
                 </FormControl>
               </Box>
+
+              {person.civilStatus === "Married" && (
+                <Box flex={1}>
+                  <Typography mb={1} fontWeight="medium">
+                    Spouse<span style={{ color: "red" }}> *</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    name="spouse"
+                    placeholder="Enter Spouse Name"
+                    value={person.spouse || ""}
+                    onChange={handleChange}
+                    onBlur={() => handleUpdate(person)}
+                    error={!!errors.spouse}
+                    helperText={errors.spouse ? "This field is required." : ""}
+                  />
+                </Box>
+              )}
+
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
                   Tribe/Ethnic Group<span style={{ color: "red" }}> *</span>
@@ -2860,10 +2889,9 @@ const ApplicantPersonalInformation = (props) => {
             </Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
-
             <Box display="flex" gap={2} mb={2}>
-              <Box flex={1} display="flex" alignItems="center" gap={2}>
-                <Typography sx={{ width: 180 }} fontWeight="medium">
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
                   Contact Number:<span style={{ color: "red" }}> *</span>
                 </Typography>
 
@@ -2897,8 +2925,8 @@ const ApplicantPersonalInformation = (props) => {
                 />
               </Box>
 
-              <Box flex={1} display="flex" alignItems="center" gap={2}>
-                <Typography sx={{ width: 180 }} fontWeight="medium">
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
                   Email Address:<span style={{ color: "red" }}> *</span>
                 </Typography>
 
@@ -2915,6 +2943,24 @@ const ApplicantPersonalInformation = (props) => {
                   sx={{
                     backgroundColor: "#f0f0f0",
                   }}
+                />
+              </Box>
+
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Facebook Account:<span style={{ color: "red" }}> *</span>
+                </Typography>
+
+                <TextField
+                  fullWidth
+                  size="small"
+                  name="facebook_account"
+                  placeholder="Enter Facebook Profile Name/Link"
+                  value={person.facebook_account || ""}
+                  onChange={handleChange}
+                  onBlur={() => handleUpdate(person)}
+                  error={!!errors.facebook_account}
+                  helperText={errors.facebook_account ? "This field is required." : ""}
                 />
               </Box>
             </Box>

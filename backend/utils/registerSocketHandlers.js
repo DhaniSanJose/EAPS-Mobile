@@ -855,7 +855,9 @@ WHERE proctor LIKE ?
           person_data.languageDialectSpoken,    // 28 languageDialectSpoken
           person_data.citizenship,              // 29 citizenship
           person_data.religion,                 // 30 religion
-          person_data.civilStatus,              // 31 civilStatus
+          person_data.civilStatus, 
+          person_data.facebook_account,
+          person_data.spouse,             // 31 civilStatus
           person_data.tribeEthnicGroup,         // 32 tribeEthnicGroup
           person_data.cellphoneNumber,          // 33 cellphoneNumber
           person_data.emailAddress,             // 34 emailAddress
@@ -918,7 +920,9 @@ WHERE proctor LIKE ?
           person_data.guardian_address,         // 91 guardian_address
           person_data.guardian_contact,         // 92 guardian_contact
           person_data.guardian_email,           // 93 guardian_email
-          person_data.annual_income,            // 94 annual_income
+          person_data.annual_income,
+          person_data.has_no_siblings, 
+          person_data.siblings,             // 94 annual_income
           person_data.schoolLevel,              // 95 schoolLevel
           person_data.schoolLastAttended,       // 96 schoolLastAttended
           person_data.schoolAddress,            // 97 schoolAddress
@@ -984,7 +988,7 @@ WHERE proctor LIKE ?
         applyingAs, program, program2, program3, yearLevel, last_name, first_name,
         middle_name, extension, nickname, height, weight, lrnNumber, nolrnNumber,
         gender, pwdMember, pwdType, pwdId, birthOfDate, age, birthPlace,
-        languageDialectSpoken, citizenship, religion, civilStatus, tribeEthnicGroup,
+        languageDialectSpoken, citizenship, religion, civilStatus, spouse, facebook_account, tribeEthnicGroup,
         cellphoneNumber, emailAddress, presentStreet, presentBarangay, presentZipCode,
         presentRegion, presentProvince, presentMunicipality, presentDswdHouseholdNumber,
         sameAsPresentAddress, permanentStreet, permanentBarangay, permanentZipCode,
@@ -999,7 +1003,7 @@ WHERE proctor LIKE ?
         mother_year_graduated, mother_school_address, mother_contact, mother_occupation,
         mother_employer, mother_income, mother_email, guardian, guardian_family_name,
         guardian_given_name, guardian_middle_name, guardian_ext, guardian_nickname,
-        guardian_address, guardian_contact, guardian_email, annual_income, schoolLevel,
+        guardian_address, guardian_contact, guardian_email, annual_income, has_no_siblings, siblings, schoolLevel,
         schoolLastAttended, schoolAddress, courseProgram, honor, generalAverage,
         yearGraduated, schoolLevel1, schoolLastAttended1, schoolAddress1, courseProgram1,
         honor1, generalAverage1, yearGraduated1, strand, cough, colds, fever, asthma,

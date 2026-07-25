@@ -71,7 +71,8 @@ const StudentDashboard2 = () => {
     mother_occupation: "", mother_employer: "", mother_income: "", mother_email: "",
     guardian: "", guardian_family_name: "", guardian_given_name: "",
     guardian_middle_name: "", guardian_ext: "", guardian_nickname: "",
-    guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "",
+    guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "", has_no_siblings: 0,
+    siblings: [],
   });
 
   const navigate = useNavigate();
@@ -149,11 +150,28 @@ const StudentDashboard2 = () => {
     window.location.href = "/login";
   }, [queryPersonId, studentNumber]);
 
+  const normalizePersonSiblings = (data) => {
+    let siblingsVal = data.siblings;
+    if (typeof siblingsVal === "string") {
+      try {
+        siblingsVal = JSON.parse(siblingsVal);
+      } catch {
+        siblingsVal = [];
+      }
+    }
+    return {
+      ...data,
+      siblings: Array.isArray(siblingsVal) ? siblingsVal : [],
+      has_no_siblings: data.has_no_siblings === 1 ? 1 : 0,
+    };
+  };
+
   const fetchByPersonId = async (personID) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/enrollment_person/${personID}`);
-      setPerson(res.data);
-      setSelectedPerson(res.data);
+      const safePerson = normalizePersonSiblings(res.data);
+      setPerson(safePerson);
+      setSelectedPerson(safePerson);
     } catch (err) { console.error("❌ person fetch failed:", err); }
   };
 
@@ -181,7 +199,11 @@ const StudentDashboard2 = () => {
       if (!userID) return;
       try {
         const res = await axios.get(`${API_BASE_URL}/api/student_data_as_applicant/${userID}`);
-        if (res.data) { setPerson(res.data); setSelectedPerson(res.data); }
+        if (res.data) {
+          const safePerson = normalizePersonSiblings(res.data);
+          setPerson(safePerson);
+          setSelectedPerson(safePerson);
+        }
       } catch (err) { console.error("❌ Failed to fetch person by ID:", err); }
     };
     fetchPersonById();
@@ -260,6 +282,44 @@ const StudentDashboard2 = () => {
     setPerson(updatedPerson);
   };
 
+  const addSibling = () => {
+    const updatedSiblings = [
+      ...(person.siblings || []),
+      { id: Date.now(), name: "", age: "", schoolLevel: "", schoolLastAttended: "", schoolAddress: "", occupation: "", monthlyIncome: "" },
+    ];
+    const updatedPerson = { ...person, siblings: updatedSiblings };
+    setPerson(updatedPerson);
+    handleUpdate(updatedPerson);
+  };
+
+  const removeSibling = (index) => {
+    const updatedSiblings = (person.siblings || []).filter((_, i) => i !== index);
+    const updatedPerson = { ...person, siblings: updatedSiblings };
+    setPerson(updatedPerson);
+    handleUpdate(updatedPerson);
+  };
+
+  const handleSiblingFieldChange = (index, field, value) => {
+    const updatedSiblings = [...(person.siblings || [])];
+    updatedSiblings[index] = { ...updatedSiblings[index], [field]: value };
+    setPerson((prev) => ({ ...prev, siblings: updatedSiblings }));
+  };
+
+  const handleSiblingFieldBlur = () => {
+    handleUpdate(person);
+  };
+
+  const handleNoSiblingsCheck = (e) => {
+    const checked = e.target.checked;
+    const updatedPerson = {
+      ...person,
+      has_no_siblings: checked ? 1 : 0,
+      siblings: checked ? [] : person.siblings,
+    };
+    setPerson(updatedPerson);
+    handleUpdate(updatedPerson);
+  };
+
   const isFormValid = () => {
     const requiredFields = [];
     if (person.father_deceased !== 1) {
@@ -280,6 +340,25 @@ const StudentDashboard2 = () => {
     requiredFields.forEach((field) => {
       if (!person[field]?.toString().trim()) { newErrors[field] = true; isValid = false; }
     });
+
+    if (person.has_no_siblings !== 1) {
+      const siblings = person.siblings || [];
+      if (siblings.length === 0) {
+        newErrors.siblings = true;
+        isValid = false;
+      } else {
+        siblings.forEach((sib, idx) => {
+          if (!sib.name || !sib.name.toString().trim()) {
+            newErrors[`sibling_name_${idx}`] = true;
+            isValid = false;
+          }
+          if (!sib.age || !sib.age.toString().trim()) {
+            newErrors[`sibling_age_${idx}`] = true;
+            isValid = false;
+          }
+        });
+      }
+    }
     setErrors(newErrors);
     return isValid;
   };
@@ -1102,6 +1181,84 @@ const StudentDashboard2 = () => {
                 {errors.annual_income && <FormHelperText>This field is required.</FormHelperText>}
               </FormControl>
             </Box>
+
+            {/* ════ SIBLINGS ════ */}
+            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>
+              Siblings (Mga Kapatid Mo)
+            </Typography>
+            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+            <br />
+
+            <FormControlLabel
+              control={<Checkbox checked={person.has_no_siblings === 1} onChange={handleNoSiblingsCheck} />}
+              label="Check if there's no siblings"
+            />
+            <br /><br />
+
+            {person.has_no_siblings !== 1 && (
+              <>
+                {(person.siblings || []).map((sibling, index) => (
+                  <Box key={sibling.id || index} sx={{ border: `1px solid ${borderColor}`, borderRadius: 2, p: 2, mb: 2, backgroundColor: "#fff" }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography fontWeight="bold">Sibling {index + 1}</Typography>
+                      <Button size="small" variant="outlined" color="error" onClick={() => removeSibling(index)} sx={{ minWidth: 36 }}>
+                        − Remove
+                      </Button>
+                    </Box>
+
+                    <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
+                      <Box flex="1 1 30%">
+                        <Typography variant="subtitle2" mb={0.5}>Name of Sibling</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter Sibling Name" value={sibling.name || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)}
+                          onBlur={handleSiblingFieldBlur} error={errors[`sibling_name_${index}`]} />
+                      </Box>
+                      <Box flex="1 1 10%">
+                        <Typography variant="subtitle2" mb={0.5}>Age</Typography>
+                        <TextField fullWidth size="small" type="number" placeholder="Age" value={sibling.age || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)}
+                          onBlur={handleSiblingFieldBlur} error={errors[`sibling_age_${index}`]} />
+                      </Box>
+                      <Box flex="1 1 20%">
+                        <Typography variant="subtitle2" mb={0.5}>School Level</Typography>
+                        <TextField fullWidth size="small" placeholder="e.g. College" value={sibling.schoolLevel || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)}
+                          onBlur={handleSiblingFieldBlur} />
+                      </Box>
+                      <Box flex="1 1 30%">
+                        <Typography variant="subtitle2" mb={0.5}>School Last Attended</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter School Last Attended" value={sibling.schoolLastAttended || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)}
+                          onBlur={handleSiblingFieldBlur} />
+                      </Box>
+                      <Box flex="1 1 45%">
+                        <Typography variant="subtitle2" mb={0.5}>School Address</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter School Address" value={sibling.schoolAddress || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)}
+                          onBlur={handleSiblingFieldBlur} />
+                      </Box>
+                      <Box flex="1 1 25%">
+                        <Typography variant="subtitle2" mb={0.5}>Occupation</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter Occupation" value={sibling.occupation || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)}
+                          onBlur={handleSiblingFieldBlur} />
+                      </Box>
+                      <Box flex="1 1 25%">
+                        <Typography variant="subtitle2" mb={0.5}>Monthly Income</Typography>
+                        <TextField fullWidth size="small" type="number" placeholder="Enter Monthly Income" value={sibling.monthlyIncome || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)}
+                          onBlur={handleSiblingFieldBlur} />
+                      </Box>
+                    </Box>
+                  </Box>
+                ))}
+
+                <Button variant="contained" onClick={addSibling}
+                  sx={{ backgroundColor: mainButtonColor, border: `1px solid ${borderColor}`, color: "#fff", mb: 2, "&:hover": { backgroundColor: "#000" } }}>
+                  + Add Sibling
+                </Button>
+              </>
+            )}
 
             {/* Nav Buttons */}
             <Box display="flex" justifyContent="space-between" mt={4}>

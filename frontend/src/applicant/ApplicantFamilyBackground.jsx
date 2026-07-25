@@ -18,6 +18,7 @@ import {
   Checkbox,
   FormControlLabel,
   CircularProgress,
+  Modal,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
@@ -129,6 +130,8 @@ const ApplicantFamilyBackground = (props) => {
     guardian_contact: "",
     guardian_email: "",
     annual_income: "",
+    has_no_siblings: 0,      // ✅ NEW
+    siblings: [],            // ✅ NEW
   });
 
   // Add this state at the top if not already:
@@ -227,6 +230,9 @@ const ApplicantFamilyBackground = (props) => {
       });
     }
   };
+
+
+
   const handleGuardianChange = (e) => {
     const { value } = e.target;
 
@@ -265,24 +271,78 @@ const ApplicantFamilyBackground = (props) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
 
-      // Sanitize null values and set state
       const safePerson = Object.fromEntries(
         Object.entries(res.data).map(([key, val]) => [key, val ?? ""]),
       );
 
+      // ✅ NEW — siblings must always be an array in state
+      let siblingsVal = res.data.siblings;
+      if (typeof siblingsVal === "string") {
+        try {
+          siblingsVal = JSON.parse(siblingsVal);
+        } catch {
+          siblingsVal = [];
+        }
+      }
+      safePerson.siblings = Array.isArray(siblingsVal) ? siblingsVal : [];
+      safePerson.has_no_siblings = res.data.has_no_siblings === 1 ? 1 : 0;
+
       setPerson(safePerson);
 
-      // ✅ Set dropdown based on existing deceased values
       if (res.data.solo_parent === 1) {
-        if (res.data.father_deceased === 1) {
-          setSoloParentChoice("Mother");
-        } else if (res.data.mother_deceased === 1) {
-          setSoloParentChoice("Father");
-        }
+        if (res.data.father_deceased === 1) setSoloParentChoice("Mother");
+        else if (res.data.mother_deceased === 1) setSoloParentChoice("Father");
       }
     } catch (error) {
       console.error("Failed to fetch person data:", error);
     }
+  };
+
+  const addSibling = () => {
+    const updatedSiblings = [
+      ...(person.siblings || []),
+      {
+        id: Date.now(),
+        name: "",
+        age: "",
+        schoolLevel: "",
+        schoolLastAttended: "",
+        schoolAddress: "",
+        occupation: "",
+        monthlyIncome: "",
+      },
+    ];
+    const updatedPerson = { ...person, siblings: updatedSiblings };
+    setPerson(updatedPerson);
+    handleUpdate(updatedPerson);
+  };
+
+  const removeSibling = (index) => {
+    const updatedSiblings = (person.siblings || []).filter((_, i) => i !== index);
+    const updatedPerson = { ...person, siblings: updatedSiblings };
+    setPerson(updatedPerson);
+    handleUpdate(updatedPerson);
+  };
+
+  const handleSiblingFieldChange = (index, field, value) => {
+    const updatedSiblings = [...(person.siblings || [])];
+    updatedSiblings[index] = { ...updatedSiblings[index], [field]: value };
+    setPerson((prev) => ({ ...prev, siblings: updatedSiblings }));
+  };
+
+  const handleSiblingFieldBlur = () => {
+    handleUpdate(person);
+  };
+
+  const handleNoSiblingsCheck = (e) => {
+    const checked = e.target.checked;
+    const updatedPerson = {
+      ...person,
+      has_no_siblings: checked ? 1 : 0,
+      siblings: checked ? [] : person.siblings,
+    };
+    setPerson(updatedPerson);
+    handleUpdate(updatedPerson);
   };
 
   // Do not alter
@@ -461,6 +521,26 @@ const ApplicantFamilyBackground = (props) => {
         isValid = false;
       }
     });
+
+    if (person.has_no_siblings !== 1) {
+      const siblings = person.siblings || [];
+
+      if (siblings.length === 0) {
+        newErrors.siblings = true;
+        isValid = false;
+      } else {
+        siblings.forEach((sib, idx) => {
+          if (!sib.name || !sib.name.toString().trim()) {
+            newErrors[`sibling_name_${idx}`] = true;
+            isValid = false;
+          }
+          if (!sib.age || !sib.age.toString().trim()) {
+            newErrors[`sibling_age_${idx}`] = true;
+            isValid = false;
+          }
+        });
+      }
+    }
 
     setErrors(newErrors);
     return isValid;
@@ -729,24 +809,24 @@ const ApplicantFamilyBackground = (props) => {
   }, [userID]);
 
   // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
 
   // dot not alter
   return (
@@ -2421,6 +2501,157 @@ const ApplicantFamilyBackground = (props) => {
               </Box>
             </Box>
 
+            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>
+              Siblings (Mga Kapatid Mo)
+            </Typography>
+            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+            <br />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={person.has_no_siblings === 1}
+                  onChange={handleNoSiblingsCheck}
+                />
+              }
+              label="Check if there's no siblings"
+            />
+            <br /><br />
+
+            {person.has_no_siblings !== 1 && (
+              <>
+                {(person.siblings || []).map((sibling, index) => (
+                  <Box
+                    key={sibling.id || index}
+                    sx={{
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: 2,
+                      p: 2,
+                      mb: 2,
+                      backgroundColor: "#fff",
+                    }}
+                  >
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography fontWeight="bold">Sibling {index + 1}</Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => removeSibling(index)}
+                        sx={{ minWidth: 36 }}
+                      >
+                        − Remove
+                      </Button>
+                    </Box>
+
+                    <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
+                      <Box flex="1 1 30%">
+                        <Typography variant="subtitle2" mb={0.5}>Name of Sibling</Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Enter Sibling Name"
+                          value={sibling.name || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                        />
+                      </Box>
+
+                      <Box flex="1 1 10%">
+                        <Typography variant="subtitle2" mb={0.5}>Age</Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          placeholder="Age"
+                          value={sibling.age || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                        />
+                      </Box>
+
+                      <Box flex="1 1 20%">
+                        <Typography variant="subtitle2" mb={0.5}>School Level</Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="e.g. College"
+                          value={sibling.schoolLevel || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                        />
+                      </Box>
+
+                      <Box flex="1 1 30%">
+                        <Typography variant="subtitle2" mb={0.5}>School Last Attended</Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Enter School Last Attended"
+                          value={sibling.schoolLastAttended || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                        />
+                      </Box>
+
+                      <Box flex="1 1 45%">
+                        <Typography variant="subtitle2" mb={0.5}>School Address</Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Enter School Address"
+                          value={sibling.schoolAddress || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                        />
+                      </Box>
+
+                      <Box flex="1 1 25%">
+                        <Typography variant="subtitle2" mb={0.5}>Occupation</Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Enter Occupation"
+                          value={sibling.occupation || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                        />
+                      </Box>
+
+                      <Box flex="1 1 25%">
+                        <Typography variant="subtitle2" mb={0.5}>Monthly Income</Typography>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          placeholder="Enter Monthly Income"
+                          value={sibling.monthlyIncome || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                        />
+                      </Box>
+                    </Box>
+                  </Box>
+                ))}
+
+                <Button
+                  variant="contained"
+                  onClick={addSibling}
+                  sx={{
+                    backgroundColor: mainButtonColor,
+                    border: `1px solid ${borderColor}`,
+                    color: "#fff",
+                    mb: 2,
+                    "&:hover": { backgroundColor: "#000" },
+                  }}
+                >
+                  + Add Sibling
+                </Button>
+              </>
+            )}
+
+            <br />
+
             <Typography
               style={{
                 fontSize: "20px",
@@ -2478,6 +2709,10 @@ const ApplicantFamilyBackground = (props) => {
                 )}
               </FormControl>
             </Box>
+
+
+
+
 
             <Modal
               open={examPermitModalOpen}

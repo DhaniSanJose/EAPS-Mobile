@@ -32,7 +32,7 @@ const allowedFields = new Set([
   "middle_name", "extension", "nickname", "height", "weight", "lrnNumber",
   "nolrnNumber", "gender", "pwdMember", "pwdType", "pwdId", "birthOfDate",
   "age", "birthPlace", "languageDialectSpoken", "citizenship", "religion",
-  "civilStatus", "tribeEthnicGroup", "cellphoneNumber", "emailAddress",
+  "civilStatus", "spouse", "facebook_account",  "tribeEthnicGroup", "cellphoneNumber", "emailAddress",
   "presentStreet", "presentBarangay", "presentZipCode", "presentRegion",
   "presentProvince", "presentMunicipality", "presentDswdHouseholdNumber",
   "sameAsPresentAddress", "permanentStreet", "permanentBarangay",
@@ -50,7 +50,7 @@ const allowedFields = new Set([
   "mother_occupation", "mother_employer", "mother_income", "mother_email",
   "guardian", "guardian_family_name", "guardian_given_name",
   "guardian_middle_name", "guardian_ext", "guardian_nickname",
-  "guardian_address", "guardian_contact", "guardian_email", "annual_income",
+  "guardian_address", "guardian_contact", "guardian_email", "annual_income", "has_no_siblings", "siblings",
   "schoolLevel", "schoolLastAttended", "schoolAddress", "courseProgram",
   "honor", "generalAverage", "yearGraduated", "schoolLevel1",
   "schoolLastAttended1", "schoolAddress1", "courseProgram1", "honor1",
@@ -167,7 +167,20 @@ router.get("/person/:id", async (req, res) => {
       return res.status(404).json({ error: "Person not found" });
     }
 
-    res.json(rows[0]);
+    const person = rows[0];
+
+    // ✅ normalize siblings to always be an array
+    if (typeof person.siblings === "string") {
+      try {
+        person.siblings = JSON.parse(person.siblings);
+      } catch {
+        person.siblings = [];
+      }
+    } else if (!person.siblings) {
+      person.siblings = [];
+    }
+
+    res.json(person);
   } catch (error) {
     console.error("❌ Error fetching person:", error);
     res.status(500).json({ error: "Database error" });
@@ -186,7 +199,18 @@ router.put("/person/:id", async (req, res) => {
     const cleanedEntries = Object.entries(req.body)
       .filter(([key, value]) => allowedFields.has(key))
       .filter(([_, value]) => value !== undefined)
-      .map(([key, value]) => [key, value === "" ? null : value]);
+      .map(([key, value]) => {
+        // ✅ NEW — siblings is a JSON column, must be stored as a JSON string
+        if (key === "siblings") {
+          if (value == null) return [key, null];
+          try {
+            return [key, JSON.stringify(value)];
+          } catch {
+            return [key, null];
+          }
+        }
+        return [key, value === "" ? null : value];
+      });
 
     if (cleanedEntries.length === 0) {
       return res.status(400).json({ error: "No valid fields to update" });

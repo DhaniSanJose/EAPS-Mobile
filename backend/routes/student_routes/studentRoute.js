@@ -1003,9 +1003,10 @@ router.put("/student/update_person/:person_id", async (req, res) => {
       "languageDialectSpoken",
       "citizenship",
       "religion",
-      "civilStatus",
+      "spouse",
       "tribeEthnicGroup",
       "cellphoneNumber",
+      "facebook_account",
       "emailAddress",
       "presentStreet",
       "presentBarangay",
@@ -1067,6 +1068,8 @@ router.put("/student/update_person/:person_id", async (req, res) => {
       "guardian_contact",
       "guardian_email",
       "annual_income",
+      "has_no_siblings",
+      "siblings",
       "schoolLevel",
       "schoolLastAttended",
       "schoolAddress",
@@ -1796,7 +1799,7 @@ router.get("/student/:person_id/curriculum-subjects", async (req, res) => {
   try {
     const { person_id } = req.params;
 
-  const [rows] = await db3.query(`
+    const [rows] = await db3.query(`
   SELECT DISTINCT
     pt.person_id,
     snt.student_number,

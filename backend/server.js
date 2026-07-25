@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.50.89:5173",
+  "http://192.168.50.37:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -2036,7 +2036,7 @@ const toManilaIsoLike = (utcDate) => {
   if (!utcDate) return null;
   const d = new Date(utcDate);
   if (isNaN(d.getTime())) return null;
- 
+
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Manila",
     year: "numeric",
@@ -2047,7 +2047,7 @@ const toManilaIsoLike = (utcDate) => {
     second: "2-digit",
     hour12: false,
   }).formatToParts(d);
- 
+
   const get = (type) => parts.find((p) => p.type === type)?.value;
   const y = get("year");
   const mo = get("month");
@@ -2056,7 +2056,7 @@ const toManilaIsoLike = (utcDate) => {
   const mi = get("minute");
   const se = get("second");
   if (h === "24") h = "00"; // Intl can render midnight as "24" — normalize it
- 
+
   return `${y}-${mo}-${da}T${h}:${mi}:${se}.000Z`;
 };
 
@@ -2184,13 +2184,13 @@ app.get("/api/document-verification/:applicant_number", async (req, res) => {
       }
     }
 
-   res.json({
-    verified: true,
-    verified_at: toManilaIsoLike(latestRow.verified_at || latestRow.created_at),
-    verified_by: verifiedBy,
-    required_count: requiredIds.length,
-    verified_count: uploadRows.length,
-  });
+    res.json({
+      verified: true,
+      verified_at: toManilaIsoLike(latestRow.verified_at || latestRow.created_at),
+      verified_by: verifiedBy,
+      required_count: requiredIds.length,
+      verified_count: uploadRows.length,
+    });
   } catch (err) {
     console.error("Error fetching document verification info:", err);
     res.status(500).json({ message: "Server error" });
@@ -2624,8 +2624,10 @@ const allowedFields = new Set([
   "citizenship",
   "religion",
   "civilStatus",
+  "spouse",
   "tribeEthnicGroup",
   "cellphoneNumber",
+  "facebook_account",
   "emailAddress",
   "presentStreet",
   "presentBarangay",
@@ -2687,6 +2689,8 @@ const allowedFields = new Set([
   "guardian_contact",
   "guardian_email",
   "annual_income",
+  "has_no_siblings", 
+  "siblings",
   "schoolLevel",
   "schoolLastAttended",
   "schoolAddress",
@@ -3127,7 +3131,7 @@ app.post("/api/audit/event", async (req, res) => {
 
     const insertFn =
       auditEvent.eventType === "PRINTING_APPLICANT_DOCS" ||
-      auditEvent.eventType === "DOWNLOAD_EXAM_PDF"
+        auditEvent.eventType === "DOWNLOAD_EXAM_PDF"
         ? insertAuditLogAdmission
         : insertAuditLogEnrollment;
 
@@ -3141,7 +3145,7 @@ app.post("/api/audit/event", async (req, res) => {
         (auditEvent.eventType === "PRINTING_APPLICANT_DOCS" ||
           auditEvent.eventType === "PRINTING_STUDENT_DOCS" ||
           auditEvent.eventType === "DOWNLOAD_EXAM_PDF") &&
-        req.body?.details?.failed
+          req.body?.details?.failed
           ? "WARNING"
           : "INFO",
       message: auditEvent.message,
@@ -3295,9 +3299,9 @@ const updateActiveStudentCurriculumForCurrentSchoolYear = async ({
 
   const previousId = Number(
     previousCurriculumId ??
-      statusRow?.active_curriculum ??
-      fallbackCurriculumId ??
-      0,
+    statusRow?.active_curriculum ??
+    fallbackCurriculumId ??
+    0,
   );
 
   if (previousId === nextId) {
@@ -3794,14 +3798,14 @@ app.post("/api/student_edit_permissions", async (req, res) => {
     const rawBody = req.body || {};
     const permissions =
       rawBody.permissions &&
-      typeof rawBody.permissions === "object" &&
-      !Array.isArray(rawBody.permissions)
+        typeof rawBody.permissions === "object" &&
+        !Array.isArray(rawBody.permissions)
         ? rawBody.permissions
         : rawBody;
     const fieldSections =
       rawBody.field_sections &&
-      typeof rawBody.field_sections === "object" &&
-      !Array.isArray(rawBody.field_sections)
+        typeof rawBody.field_sections === "object" &&
+        !Array.isArray(rawBody.field_sections)
         ? rawBody.field_sections
         : {};
 
@@ -3885,8 +3889,8 @@ app.post("/api/student_edit_permissions", async (req, res) => {
       String(actor.accessDescription || "").trim() ||
       formatAuditActorRole(
         req.headers["x-audit-actor-role"] ||
-          req.body?.audit_actor_role ||
-          "registrar",
+        req.body?.audit_actor_role ||
+        "registrar",
       );
     const actorId = actor.id || "unknown";
     const actorName = actor.name || actor.email || actorId;
@@ -4405,7 +4409,7 @@ app.post("/api/update-requirement", async (req, res) => {
 const loginAttempts = new Map();
 
 const MAX_ATTEMPTS = 3;
-const LOCK_DURATION_MS = 3 * 60 * 1000; 
+const LOCK_DURATION_MS = 3 * 60 * 1000;
 
 app.get("/api/check-lock-status/:person_id", (req, res) => {
   const { person_id } = req.params;

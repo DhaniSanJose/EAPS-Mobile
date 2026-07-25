@@ -85,6 +85,7 @@ const StudentDashboard1 = () => {
     height: "", weight: "", lrnNumber: "", nolrnNumber: "", gender: "",
     pwdType: "", pwdId: "", birthOfDate: "", age: "", birthPlace: "",
     languageDialectSpoken: "", citizenship: "", religion: "", civilStatus: "",
+    spouse: "", facebook_account: "",
     tribeEthnicGroup: "", cellphoneNumber: "", emailAddress: "",
     presentStreet: "", presentBarangay: "", presentZipCode: "",
     presentRegion: "", presentProvince: "", presentMunicipality: "",
@@ -250,7 +251,7 @@ const StudentDashboard1 = () => {
         const res = await axios.get(`${API_BASE_URL}/api/person_id/${queryStudentNumber}`);
         setUserID(res.data.person_id);
         setStudentNumber(queryStudentNumber);
-        setPerson(res.data);
+        setPerson(normalizePerson(res.data));
         setSelectedPerson(res.data);
       } catch (err) { console.error("❌ Failed to fetch person_id:", err); }
     };
@@ -299,7 +300,7 @@ const StudentDashboard1 = () => {
       if (!userID) return;
       try {
         const res = await axios.get(`${API_BASE_URL}/api/student_data_as_applicant/${userID}`);
-        if (res.data) { setPerson(res.data); setSelectedPerson(res.data); }
+        if (res.data) { setPerson(normalizePerson(res.data)); setSelectedPerson(res.data); }
       } catch (err) { console.error("❌ Failed to fetch person by ID:", err); }
     };
     fetchPersonById();
@@ -345,7 +346,7 @@ const StudentDashboard1 = () => {
         const res = await axios.get(`${API_BASE_URL}/api/search-person`, { params: { query: searchQuery } });
         if (res.data && res.data.person_id) {
           const details = await axios.get(`${API_BASE_URL}/api/student_data_as_applicant/${res.data.person_id}`);
-          setPerson(details.data);
+          setPerson(normalizePerson(details.data));
           sessionStorage.setItem("student_edit_person_id", details.data.person_id);
           setUserID(details.data.person_id);
           setSearchError("");
@@ -356,10 +357,15 @@ const StudentDashboard1 = () => {
   }, [searchQuery]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+  const normalizePerson = (data) => {
+    if (!data) return data;
+    return { ...data };
+  };
+
   const fetchByPersonId = async (personID) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/enrollment_person/${personID}`);
-      setPerson(res.data);
+      setPerson(normalizePerson(res.data));
       setSelectedPerson(res.data);
     } catch (err) { console.error("❌ person_with_applicant failed:", err); }
   };
@@ -380,6 +386,7 @@ const StudentDashboard1 = () => {
     if (name === "birthOfDate") updatedPerson.age = calculateAge(value);
     if (name === "classifiedAs" && value === "Freshman (First Year)") updatedPerson.yearLevel = "First Year";
     if (name === "campus" || name === "academicProgram") updatedPerson.program = "";
+    if (name === "civilStatus" && value !== "Married") updatedPerson.spouse = "";
     setPerson(updatedPerson);
     handleUpdate(updatedPerson);
   };
@@ -450,9 +457,13 @@ const StudentDashboard1 = () => {
       "profile_img", "last_name", "first_name", "height", "weight", "gender",
       "birthOfDate", "age", "birthPlace", "languageDialectSpoken", "citizenship",
       "religion", "civilStatus", "tribeEthnicGroup", "cellphoneNumber", "emailAddress",
+      "facebook_account",
       "presentStreet", "presentZipCode", "presentRegion", "presentProvince", "presentMunicipality", "presentBarangay",
       "permanentStreet", "permanentZipCode", "permanentRegion", "permanentProvince", "permanentMunicipality", "permanentBarangay",
     ];
+    if (person.civilStatus === "Married") {
+      requiredFields.push("spouse");
+    }
     let newErrors = {};
     let isValid = true;
     requiredFields.forEach((field) => {
@@ -1186,6 +1197,29 @@ const StudentDashboard1 = () => {
                 </FormControl>
               </Box>
 
+              {/* Spouse — admin-controlled, only shown when Married */}
+              {person.civilStatus === "Married" && (
+                <Box flex={1}>
+                  <Typography mb={1} fontWeight="medium">
+                    Spouse<span style={{ color: "red" }}> *</span>
+                    {!canEdit("spouse") && <LockedBadge />}
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    name="spouse"
+                    placeholder="Enter Spouse Name"
+                    value={person.spouse || ""}
+                    onChange={canEdit("spouse") ? handleChange : undefined}
+                    onBlur={() => handleUpdate(person)}
+                    InputProps={{ readOnly: !canEdit("spouse") }}
+                    sx={!canEdit("spouse") ? { backgroundColor: "#f5f5f5" } : {}}
+                    error={!!errors.spouse}
+                    helperText={errors.spouse ? "This field is required." : ""}
+                  />
+                </Box>
+              )}
+
               {/* Tribe/Ethnic Group — admin-controlled */}
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
@@ -1220,6 +1254,29 @@ const StudentDashboard1 = () => {
               <Box flex={1} display="flex" alignItems="center" gap={2}>
                 <Typography sx={{ width: 180 }} fontWeight="medium">Email Address:<span style={{ color: "red" }}> *</span></Typography>
                 <TextField fullWidth size="small" name="emailAddress" required value={person.emailAddress || ""} placeholder="Your registered email" InputProps={{ readOnly: true }} sx={{ backgroundColor: "#f0f0f0" }} />
+              </Box>
+            </Box>
+
+            <Box display="flex" gap={2} mb={2}>
+              {/* Facebook Account — admin-controlled */}
+              <Box flex={1} display="flex" alignItems="center" gap={2}>
+                <Typography sx={{ width: 180 }} fontWeight="medium">
+                  Facebook Account:<span style={{ color: "red" }}> *</span>
+                  {!canEdit("facebook_account") && <LockedBadge />}
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  name="facebook_account"
+                  placeholder="Enter Facebook Profile Name/Link"
+                  value={person.facebook_account || ""}
+                  onChange={canEdit("facebook_account") ? handleChange : undefined}
+                  onBlur={() => handleUpdate(person)}
+                  InputProps={{ readOnly: !canEdit("facebook_account") }}
+                  sx={!canEdit("facebook_account") ? { backgroundColor: "#f5f5f5" } : {}}
+                  error={!!errors.facebook_account}
+                  helperText={errors.facebook_account ? "This field is required." : ""}
+                />
               </Box>
             </Box>
 

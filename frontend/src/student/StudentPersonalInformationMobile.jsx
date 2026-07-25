@@ -250,6 +250,8 @@ const StudentPersonalInformationResponsive = () => {
     citizenship: "",
     religion: "",
     civilStatus: "",
+    spouse: "",
+    facebook_account: "",
     tribeEthnicGroup: "",
     cellphoneNumber: "",
     emailAddress: "",
@@ -499,6 +501,9 @@ const StudentPersonalInformationResponsive = () => {
     if (name === "campus" || name === "academicProgram") {
       updatedPerson.program = "";
     }
+    if (name === "civilStatus" && value !== "Married") {
+      updatedPerson.spouse = "";
+    }
 
     setPerson(updatedPerson);
     handleUpdate(updatedPerson);
@@ -528,6 +533,7 @@ const StudentPersonalInformationResponsive = () => {
       "tribeEthnicGroup",
       "cellphoneNumber",
       "emailAddress",
+      "facebook_account",
       "presentStreet",
       "presentZipCode",
       "presentRegion",
@@ -541,6 +547,10 @@ const StudentPersonalInformationResponsive = () => {
       "permanentMunicipality",
       "permanentBarangay",
     ];
+
+    if (person.civilStatus === "Married") {
+      requiredFields.push("spouse");
+    }
 
     const newErrors = {};
     requiredFields.forEach((field) => {
@@ -1545,13 +1555,29 @@ const StudentPersonalInformationResponsive = () => {
                   ))}
                 </MSelect>
               </Field>
-              <Field
-                label="Tribe / Ethnic Group"
-                required
-                error={errors.tribeEthnicGroup}
-                helperText="Required"
-                lockedBadge={!canEdit("tribeEthnicGroup")}
-              >
+              {person.civilStatus === "Married" && (
+                <Box sx={{ maxWidth: { md: 480 } }}>
+                  <Field
+                    label="Spouse"
+                    required
+                    error={errors.spouse}
+                    helperText="This field is required."
+                    lockedBadge={!canEdit("spouse")}
+                  >
+                    <MInput
+                      name="spouse"
+                      value={person.spouse || ""}
+                      onChange={canEdit("spouse") ? handleChange : undefined}
+                      readOnly={!canEdit("spouse")}
+                      locked={!canEdit("spouse")}
+                      onBlur={() => handleUpdate(person)}
+                      error={errors.spouse}
+                      placeholder="Enter Spouse Name"
+                    />
+                  </Field>
+                </Box>
+              )}
+              <Field label="Tribe / Ethnic Group" required error={errors.tribeEthnicGroup} helperText="Required" lockedBadge={!canEdit("tribeEthnicGroup")}>
                 <MSelect
                   name="tribeEthnicGroup"
                   value={person.tribeEthnicGroup || ""}
@@ -1618,6 +1644,27 @@ const StudentPersonalInformationResponsive = () => {
                 <MInput name="emailAddress" value={person.emailAddress || ""} readOnly style={{ backgroundColor: "#f0f0f0" }} placeholder="Enter your Email Address" />
               </Field>
             </div>
+
+            <Box sx={{ maxWidth: { md: 480 } }}>
+              <Field
+                label="Facebook Account"
+                required
+                error={errors.facebook_account}
+                helperText="This field is required."
+                lockedBadge={!canEdit("facebook_account")}
+              >
+                <MInput
+                  name="facebook_account"
+                  value={person.facebook_account || ""}
+                  onChange={canEdit("facebook_account") ? handleChange : undefined}
+                  readOnly={!canEdit("facebook_account")}
+                  locked={!canEdit("facebook_account")}
+                  onBlur={() => handleUpdate(person)}
+                  error={errors.facebook_account}
+                  placeholder="Enter Facebook Profile Name/Link"
+                />
+              </Field>
+            </Box>
           </Box>
         </Box>
 
