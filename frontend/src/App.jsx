@@ -101,6 +101,7 @@ const ProctorApplicantList = lazy(() => import("./admission/ProctorApplicantList
 const ExaminationPermitChangeCourse = lazy(() => import("./admission/ExaminationPermitChangeCourse"));
 const RoomRegistration = lazy(() => import("./system_management/RoomRegistration"));
 const AdmissionOnlineRequirements = lazy(() => import("./admission/AdmissionOnlineRequirements"));
+const AdmissionContactManagement = lazy(() => import("./admission/AdmissionContactManagement"));
 const VerifyDocumentScheduleManagement = lazy(() => import("./admission/VerifyDocumentScheduleManagement"));
 const VerifyDocumentRoomAssignment = lazy(() => import("./admission/VerifyDocumentRoomAssignment"));
 const ApplicantServicesSurvey = lazy(() => import("./applicant/ApplicantServicesSurvey"));
@@ -764,6 +765,7 @@ function App() {
                       <Route path="/entrance_exam_room_assignment" element={<ProtectedRoute><EntranceExamRoomAssignment /></ProtectedRoute>} />
                       <Route path="/entrance_exam_schedule_management" element={<ProtectedRoute><EntranceExamScheduleManagement /></ProtectedRoute>} />
                       <Route path="/admission_schedule_room_list" element={<ProtectedRoute><AdmissionScheduleTile /></ProtectedRoute>} />
+                      <Route path="/admission_contact_management" element={<ProtectedRoute><AdmissionContactManagement /></ProtectedRoute>} />
                       <Route path="/qualifying_interview_room_assignment" element={<ProtectedRoute><QualifyingInterviewRoomAssignment /></ProtectedRoute>} />
                       <Route path="/applicant_entrance_exam_score" element={<ProtectedRoute><ApplicantEntranceExamScore /></ProtectedRoute>} />
                       <Route path="/applicant_exam_subjects" element={<ProtectedRoute><ApplicantExamSubjects /></ProtectedRoute>} />
@@ -968,4 +970,4 @@ function App() {
   );
 }
 
-export default App; 59
+export default App;

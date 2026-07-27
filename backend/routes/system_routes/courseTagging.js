@@ -1391,6 +1391,7 @@ router.get("/enrolled_courses/:userId/:currId", async (req, res) => {
         IFNULL(tt.school_time_end, 'TBA') AS school_time_end,
         IFNULL(rtbl.room_description, 'TBA') AS room_description,
         IFNULL(prof_table.lname, 'TBA') AS lname,
+        IFNULL(prof_table.fname, 'TBA') AS fname,
         COALESCE(es_count.number_of_enrolled, 0) AS number_of_enrolled
 
       FROM enrolled_subject AS es

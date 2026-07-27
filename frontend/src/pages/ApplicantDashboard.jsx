@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import "../styles/TempStyles.css";
 import axios from "axios";
+import { io } from "socket.io-client";
 import {
   Box,
   Grid,
@@ -19,6 +20,7 @@ import {
   FormControlLabel,
   Checkbox,
   Button,
+  Chip,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -38,6 +40,9 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import CheckIcon from "@mui/icons-material/Check";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
+import PhoneIcon from "@mui/icons-material/Phone";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import HeadsetMicIcon from "@mui/icons-material/HeadsetMic";
 import EaristLogo from "../assets/EaristLogo.png";
 import API_BASE_URL from "../apiConfig";
 import { useParams } from "react-router-dom";
@@ -49,14 +54,14 @@ import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import { ArrowBackIos, ArrowForwardIos, Campaign, } from "@mui/icons-material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-
+import FacebookIcon from "@mui/icons-material/Facebook";
 // ─────────────────────────────────────────────────────────────────────────
-// ✅ NEW: small presentational helpers used by the "Application Snapshot"
+// ✅ small presentational helpers used by the "Application Snapshot"
 // cards below (Application Progress / Details / Requirements Status).
 // Defined once, outside the component, so they aren't recreated every render.
 // ─────────────────────────────────────────────────────────────────────────
-const ProgressRing = ({ percentage, color = "#1976d2", size = 72 }) => {
-  const strokeWidth = 7;
+const ProgressRing = ({ percentage, color = "#1976d2", size = 96 }) => {
+  const strokeWidth = 9;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.min(Math.max(percentage, 0), 100);
@@ -81,7 +86,7 @@ const ProgressRing = ({ percentage, color = "#1976d2", size = 72 }) => {
         />
       </svg>
       <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#222" }}>{clamped}%</Typography>
+        <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#222" }}>{clamped}%</Typography>
       </Box>
     </Box>
   );
@@ -90,6 +95,63 @@ const ProgressRing = ({ percentage, color = "#1976d2", size = 72 }) => {
 const StatusDot = ({ state }) => {
   const color = state === "done" ? "#2e7d32" : state === "current" ? "#f5a623" : "#ccc";
   return <Box sx={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: color, flexShrink: 0 }} />;
+};
+
+// ✅ small calendar-style date badge (month on top, day number below)
+// used in "Important Reminders" for entrance-exam / interview schedules.
+// ✅ CHANGED: fixed to a 50px x 50px footprint per user request.
+const DateBadge = ({ dateString, color = "#8B0000" }) => {
+  const d = dateString ? new Date(dateString) : null;
+  const valid = d && !isNaN(d.getTime());
+  const month = valid ? d.toLocaleDateString("en-US", { month: "short" }).toUpperCase() : "TBA";
+  const day = valid ? d.getDate() : "--";
+  return (
+    <Box
+      sx={{
+        width: 50,
+        height: 50,
+        flexShrink: 0,
+        borderRadius: "8px",
+        overflow: "hidden",
+        border: "1px solid #e0e0e0",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box
+        sx={{
+          backgroundColor: color,
+          color: "#fff",
+          fontSize: 10,
+          fontWeight: 800,
+          textAlign: "center",
+          letterSpacing: "0.03em",
+          height: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {month}
+      </Box>
+      <Box
+        sx={{
+          backgroundColor: "#fff",
+          color: "#222",
+          fontSize: 18,
+          fontWeight: 800,
+          textAlign: "center",
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {day}
+      </Box>
+    </Box>
+  );
 };
 
 const ApplicantDashboard = (props) => {
@@ -107,6 +169,9 @@ const ApplicantDashboard = (props) => {
   const [companyName, setCompanyName] = useState("");
   const [shortTerm, setShortTerm] = useState("");
   const [campusAddress, setCampusAddress] = useState("");
+  // branches list (needed to label a curriculum's campus, same as
+  // ApplicantPersonalInformation's getBranchLabel).
+  const [branches, setBranches] = useState([]);
 
   useEffect(() => {
     if (!settings) return;
@@ -123,6 +188,13 @@ const ApplicantDashboard = (props) => {
     if (settings.company_name) setCompanyName(settings.company_name);
     if (settings.short_term) setShortTerm(settings.short_term);
     if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (settings.branches) {
+      setBranches(
+        typeof settings.branches === "string"
+          ? JSON.parse(settings.branches)
+          : settings.branches,
+      );
+    }
   }, [settings]);
 
   const { profileImage, setProfileImage } = props;
@@ -140,6 +212,40 @@ const ApplicantDashboard = (props) => {
     middle_name: "",
     extension: "",
   });
+  const [verifyDocSchedule, setVerifyDocSchedule] = useState(null);
+
+  const fetchVerifyDocumentSchedule = async (applicantNumber) => {
+    if (!applicantNumber) return;
+    try {
+      const { data } = await axios.get(
+        `${API_BASE_URL}/api/verify-document-schedule/${applicantNumber}`
+      );
+      if (data && Number(data.email_sent) === 1) {
+        setVerifyDocSchedule(normalizeSchedule(data));
+      } else {
+        setVerifyDocSchedule(null);
+      }
+    } catch (err) {
+      console.error("Error fetching verify document schedule:", err);
+      setVerifyDocSchedule(null);
+    }
+  };
+
+  const buildGmailComposeUrl = (toEmail) => {
+    if (!toEmail) return null;
+
+    const subject = `Admission Concern${applicantID ? ` — Applicant ID: ${applicantID}` : ""}`;
+
+    const params = new URLSearchParams({
+      view: "cm",
+      fs: "1",
+      to: toEmail,
+      su: subject,
+      body: "",
+    });
+
+    return `https://mail.google.com/mail/?${params.toString()}`;
+  };
 
   const [proctor, setProctor] = useState(null);
   const [applicantNumber, setApplicantNumber] = useState(null);
@@ -213,6 +319,74 @@ const ApplicantDashboard = (props) => {
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────
+  // curriculum options — same source ApplicantPersonalInformation
+  // uses to resolve "Course Applied" — so the dashboard's "Program Applied"
+  // shows the real course description instead of a raw id/N/A.
+  // ─────────────────────────────────────────────────────────────────────
+  const [curriculumOptions, setCurriculumOptions] = useState([]);
+
+  useEffect(() => {
+    const fetchCurriculums = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/applied_program`);
+        setCurriculumOptions(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("❌ Failed to fetch curriculum options:", err);
+      }
+    };
+    fetchCurriculums();
+  }, []);
+
+  // ✅ NEW: Academic Year — pull the currently-active school year (astatus = 1)
+  // from GET /api/active_school_year, the same endpoint the school-year
+  // router exposes, instead of relying on person.academic_year / settings
+  // fields which aren't always populated.
+  const [activeSchoolYear, setActiveSchoolYear] = useState(null);
+
+  useEffect(() => {
+    const fetchActiveSchoolYear = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+        const data = Array.isArray(res.data) ? res.data[0] : res.data;
+        setActiveSchoolYear(data || null);
+      } catch (err) {
+        console.error("❌ Failed to fetch active school year:", err);
+      }
+    };
+    fetchActiveSchoolYear();
+  }, []);
+
+  const [admissionContact, setAdmissionContact] = useState(null);
+
+  const formatContactTime = (time) => {
+    if (!time) return "";
+    const d = new Date(`1970-01-01T${time}`);
+    if (isNaN(d.getTime())) return time;
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  };
+
+  useEffect(() => {
+    if (!person?.campus) return; // wait until we know the applicant's branch
+    const fetchAdmissionContact = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/admission_contact/active`, {
+          params: { branch_id: person.campus },
+        });
+        setAdmissionContact(res.data || null);
+      } catch (err) {
+        console.error("❌ Failed to fetch admission contact:", err);
+        setAdmissionContact(null);
+      }
+    };
+    fetchAdmissionContact();
+  }, [person?.campus]);
+
+  const getBranchLabel = (branchId) => {
+    const branch = branches.find((item) => String(item.id) === String(branchId));
+    return branch?.branch || "";
+  };
+
   const [requirementsCompleted, setRequirementsCompleted] = useState(
     localStorage.getItem("requirementsCompleted") === "1",
   );
@@ -227,6 +401,7 @@ const ApplicantDashboard = (props) => {
         fetchEntranceExamScores(res.data.applicant_number);
         fetchProctorSchedule(res.data.applicant_number);
         fetchInterviewSchedule(res.data.applicant_number);
+        fetchVerifyDocumentSchedule(res.data.applicant_number);
         fetchCollegeApproval(res.data.applicant_number);
       }
     } catch (error) {
@@ -443,27 +618,41 @@ const ApplicantDashboard = (props) => {
   const [mainStatus, setMainStatus] = useState(null);
   const [registrarApproved, setRegistrarApproved] = useState(false);
 
-  // ✅ NEW: raw requirement rows, kept so we can derive reqStats below.
-  const [requirementRows, setRequirementRows] = useState([]);
+  // Requirement definitions + upload records fetched the same way
+  // ApplicantOnlineRequirements does, so the dashboard's numbers always
+  // match the Main Requirements page.
+  const [requirements, setRequirements] = useState([]);
+  const [uploads, setUploads] = useState([]);
 
-  const fetchDocumentsStatus = async () => {
+  const fetchRequirementsAndUploads = async () => {
+    if (!person_id) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applicant_uploaded_requirements/${person_id}`);
-      const rows = res.data;
+      const [reqRes, upRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/requirements/${person_id}`),
+        axios.get(`${API_BASE_URL}/api/uploads/${person_id}`),
+      ]);
 
-      setRequirementRows(Array.isArray(rows) ? rows : []); // ✅ NEW
+      const reqData = Array.isArray(reqRes.data) ? reqRes.data : [];
+      const upData = Array.isArray(upRes.data) ? upRes.data : [];
+      setRequirements(reqData);
+      setUploads(upData);
 
-      if (!rows || rows.length === 0) { setDocsCompleted(false); return; }
-      const uploaded = rows.filter((doc) => doc.file_path !== null);
-      const totalRequired = rows.length;
-      const submittedCount = uploaded.filter((doc) => Number(doc.submitted_documents) === 1).length;
-      const allSubmitted = submittedCount === totalRequired;
+      // Mirrors ApplicantOnlineRequirements' isFormValid(): only "Main"
+      // category requirements marked is_required === 1 must be uploaded.
+      const mainRequired = reqData.filter(
+        (r) => r.category === "Main" && Number(r.is_required) === 1,
+      );
+      const uploadedIds = new Set(upData.map((u) => Number(u.requirements_id)));
+      const allSubmitted =
+        mainRequired.length > 0 &&
+        mainRequired.every((r) => uploadedIds.has(Number(r.id)));
+
       setDocsCompleted(allSubmitted);
       if (allSubmitted) {
         setPerson((prev) => ({ ...prev, document_status: "Documents Verified & ECAT" }));
       }
     } catch (err) {
-      console.error("❌ Failed fetching document status:", err);
+      console.error("❌ Failed fetching requirements/uploads:", err);
     }
   };
 
@@ -478,7 +667,7 @@ const ApplicantDashboard = (props) => {
 
   useEffect(() => {
     if (person_id) {
-      fetchDocumentsStatus();
+      fetchRequirementsAndUploads();
       fetchRegistrarStatus();
     }
   }, [person_id]);
@@ -501,13 +690,26 @@ const ApplicantDashboard = (props) => {
     "Applicant Status",
   ];
 
+  const [hasStudentNumber, setHasStudentNumber] = useState(false);
+  const [studentNumber, setStudentNumber] = useState(null);
+
   const getCurrentStep = () => {
-    if (person?.final_status === "Accepted" || person?.final_status === "Rejected") return 5;
-    if (registrarApproved) return 4;
-    if (collegeApproval === "Accepted" || collegeApproval === "Rejected") return 3;
-    if (interviewSchedule || hasInterviewScores) return 2;
-    if (hasSchedule) return 1;
-    if (docsCompleted) return 0;
+    // ✅ CHANGED: a student number being issued means the applicant has
+    // already been accepted and processed, even if `final_status` wasn't
+    // explicitly set to "Accepted" yet — so treat it the same as reaching
+    // the final "Applicant Status" step (keeps the stepper icon "glowing"
+    // and the progress checklist in sync with the step-5 detail text).
+    if (
+      person?.final_status === "Accepted" ||
+      person?.final_status === "Rejected" ||
+      hasStudentNumber
+    )
+      return 5;
+    if (registrarApproved) return 5;       // Medical & Registrar done -> now waiting on final Applicant Status
+    if (collegeApproval === "Accepted" || collegeApproval === "Rejected") return 4; // College Approval done -> now on Medical And Dental Service
+    if (interviewSchedule || hasInterviewScores) return 3; // Interview/Qualifying done -> now on College Approval
+    if (hasSchedule) return 2;             // Entrance exam scheduled -> now on Interview/Qualifying step
+    if (docsCompleted) return 1;           // Documents submitted -> now on Admission Entrance Exam
     return 0;
   };
 
@@ -645,8 +847,7 @@ const ApplicantDashboard = (props) => {
     );
   };
 
-  const [hasStudentNumber, setHasStudentNumber] = useState(false);
-  const [studentNumber, setStudentNumber] = useState(null);
+
 
   const checkStudentNumber = async (personId) => {
     try {
@@ -777,12 +978,20 @@ const ApplicantDashboard = (props) => {
         </Typography>
       );
 
-      
+    // ✅ CHANGED: index 4 ("Medical And Dental Service") now keys off
+    // `collegeApproval` first — the moment College Approval has data
+    // (Accepted), the applicant is told they can proceed to the clinic,
+    // instead of staying stuck on "Apply For Medical Processing" until the
+    // separate `registrarApproved` flag (a different endpoint) comes back.
     if (index === 4) return (
       <Typography variant="body2" sx={{ color: "maroon", fontWeight: "bold", lineHeight: 1.6 }}>
         {registrarApproved
           ? "⬇️ Your documents have been verified. Please proceed to your respective college to finalize your schedule and subjects."
-          : "⏳ Apply For Medical Processing"}
+          : collegeApproval === "Accepted"
+            ? "🏥 You have been cleared by the College. Please proceed to the clinic to complete your Medical and Dental examination requirements."
+            : collegeApproval === "Rejected"
+              ? "❌ Medical and Dental processing is unavailable since your application was not approved by the College."
+              : "⏳ Apply For Medical Processing"}
       </Typography>
     );
 
@@ -808,36 +1017,75 @@ const ApplicantDashboard = (props) => {
   const [expandedStep, setExpandedStep] = useState(activeStep);
 
   // ─────────────────────────────────────────────────────────────────────
-  // ✅ NEW: derived values used by the "Application Snapshot" cards
+  // derived values used by the "Application Snapshot" cards
   // (Application Progress / Application Details / Requirements Status).
-  // These were previously referenced in JSX below without being defined
-  // anywhere, which crashed the render with "X is not defined".
   // ─────────────────────────────────────────────────────────────────────
+
+  // ✅ CHANGED: Requirements Status — based on "Main" category requirements.
+  //   • Total     -> count of Main requirements
+  //   • Submitted -> Main requirements that have an uploaded file at all
+  //                  ("the applicant just uploaded the documents"), OR — once
+  //                  the admin has already marked the whole application as
+  //                  verified via `person.document_status ===
+  //                  "Documents Verified & ECAT"` — every uploaded file counts
+  //                  as Submitted, since the admin's decision overrides the
+  //                  per-file status column.
+  //   • Pending   -> Main requirements with NO uploaded file yet.
+  //   • For Verification -> uploaded files still awaiting an individual
+  //                  admin decision (status null/undefined/0) while the
+  //                  overall application has not yet been marked verified.
   const reqStats = React.useMemo(() => {
-    const total = requirementRows.length;
-    const submitted = requirementRows.filter(
-      (r) => Number(r.submitted_documents) === 1,
-    ).length;
-    const forVerification = requirementRows.filter(
-      (r) => r.file_path && Number(r.submitted_documents) !== 1,
-    ).length;
+    const mainDocs = requirements.filter((r) => r.category === "Main");
+    const uploadedMap = new Map(uploads.map((u) => [Number(u.requirements_id), u]));
+    const isDocumentStatusVerified = person?.document_status === "Documents Verified & ECAT";
+
+    const total = mainDocs.length;
+    let submitted = 0;
+    let forVerification = 0;
+
+    mainDocs.forEach((doc) => {
+      const uploaded = uploadedMap.get(Number(doc.id));
+      if (!uploaded) return; // no file at all -> falls into "pending" below
+
+      if (isDocumentStatusVerified || Number(uploaded.status) === 1) {
+        // Admin already marked the whole application verified, or this
+        // particular file was individually verified.
+        submitted += 1;
+      } else {
+        // Uploaded, but still waiting on an admin decision.
+        forVerification += 1;
+      }
+    });
+
     const pending = Math.max(total - submitted - forVerification, 0);
     return { total, submitted, pending, forVerification };
-  }, [requirementRows]);
+  }, [requirements, uploads, person?.document_status]);
 
-  const progressChecklist = [
-    { label: "Documents Submitted", done: docsCompleted },
-    { label: "Entrance Exam", done: hasSchedule || hasScores },
-    { label: "Interview / Qualifying Exam", done: !!interviewSchedule || hasInterviewScores },
-    { label: "College Approval", done: collegeApproval === "Accepted" || collegeApproval === "Rejected" },
-    { label: "Medical & Registrar", done: registrarApproved },
-    { label: "Final Status", done: person?.final_status === "Accepted" || person?.final_status === "Rejected" },
-  ];
+  // Application Progress — mirrors the real "Application Status"
+  // stepper below (same `steps` labels, same `activeStep`, which is itself
+  // derived from person.final_status / registrarApproved / collegeApproval /
+  // schedules / docsCompleted), so the two can never disagree.
+  const progressChecklist = steps.map((label, idx) => {
+    const isFinalStep = idx === steps.length - 1;
+    // ✅ CHANGED: same reasoning as getCurrentStep — a student number means
+    // the applicant is fully accepted, so the last checklist item (and the
+    // 100% completion) shouldn't wait on `final_status` alone.
+    const done = isFinalStep
+      ? (person?.final_status === "Accepted" || person?.final_status === "Rejected" || hasStudentNumber)
+      : idx < activeStep;
+    return { label, done };
+  });
 
   const firstPendingIndex = progressChecklist.findIndex((item) => !item.done);
   const progressPercentage = Math.round(
     (progressChecklist.filter((item) => item.done).length / progressChecklist.length) * 100,
   );
+
+  // put this above `applicationDetails`
+  const resolvedExamStatus =
+    (examScore && examScore !== "PENDING" ? examScore : null) ||
+    (examScores.status && examScores.status !== "PENDING" ? examScores.status : null) ||
+    "Pending";
 
   const applicationDetails = [
     { label: "Applicant ID", value: applicantID || "N/A" },
@@ -848,30 +1096,120 @@ const ApplicantDashboard = (props) => {
         : "N/A",
     },
     { label: "Document Status", value: person?.document_status || "Pending" },
-    { label: "Exam Status", value: examScore || examScores.status || "Pending" },
+    { label: "Exam Status", value: resolvedExamStatus },
     { label: "College Status", value: collegeApproval || "Pending" },
     { label: "Student Number", value: studentNumber || "Not yet assigned" },
   ];
 
+  // ✅ CHANGED: header info-strip values (Academic Year / Program Applied /
+  // Date Applied / Status) — Academic Year now prefers the fetched active
+  // school year (e.g. "2025-2026 (1st Semester)") over the older
+  // person/settings fallback fields.
+  const academicYearValue = activeSchoolYear
+    ? `${activeSchoolYear.current_year}-${activeSchoolYear.next_year}${activeSchoolYear.semester_description ? ` (${activeSchoolYear.semester_description})` : ""
+    }`
+    : person?.academic_year || settings?.academic_year || "N/A";
+
+  // resolve "Program Applied" the same way
+  // ApplicantPersonalInformation resolves "Course Applied" — by matching
+  // person.program (a curriculum_id) against /api/applied_program.
+  const selectedCurriculum = curriculumOptions.find(
+    (item) => String(item.curriculum_id) === String(person?.program),
+  );
+  const programAppliedValue = selectedCurriculum
+    ? `(${selectedCurriculum.program_code}): ${selectedCurriculum.program_description}${selectedCurriculum.major ? ` (${selectedCurriculum.major})` : ""
+    }${getBranchLabel(selectedCurriculum.components)
+      ? ` — ${getBranchLabel(selectedCurriculum.components).toUpperCase()}`
+      : ""
+    }`
+    : (person?.program_applied || person?.program || "N/A");
+
+  const dateAppliedValue = formatDate(person?.date_applied || person?.created_at);
+  const overallStatusLabel =
+    person?.final_status === "Accepted" ? "Accepted" : person?.final_status === "Rejected" ? "Rejected" : "In Progress";
+  const overallStatusColor =
+    person?.final_status === "Accepted" ? "#2e7d32" : person?.final_status === "Rejected" ? "#c62828" : "#f5a623";
+
+  // Important Reminders — schedule reminders carry a `dateBadge` (rendered
+  // as the 50x50 calendar badge) instead of a plain icon, and no longer
+  // repeat the date inline in the subtitle text.
+  const reminders = [];
+  if (!docsCompleted) {
+    reminders.push({
+      icon: <WarningAmberIcon sx={{ color: "#fff", fontSize: 20 }} />,
+      iconBg: "#c62828",
+      title: "Please make sure to complete all required documents",
+      subtitle: "Incomplete requirements may delay your application.",
+    });
+  }
+  if (verifyDocSchedule) {
+    reminders.push({
+      dateBadge: verifyDocSchedule?.day_description,
+      dateBadgeColor: "#8B0000",
+      title: "Document Verification Schedule",
+      subtitle: `${formatTime(verifyDocSchedule?.start_time)} – ${formatTime(
+        verifyDocSchedule?.end_time
+      )} • ${verifyDocSchedule?.building_description || "TBA"}, ${verifyDocSchedule?.room_description || "TBA"
+        }`,
+    });
+  }
+  if (hasSchedule) {
+    reminders.push({
+      dateBadge: proctor?.day_description,
+      dateBadgeColor: "#1976d2",
+      title: "Entrance Examination Schedule",
+      subtitle: `${formatTime(proctor?.start_time)} – ${formatTime(
+        proctor?.end_time
+      )} • ${proctor?.building_description || "TBA"}, ${proctor?.room_description || "TBA"}`,
+    });
+  }
+  if (interviewSchedule) {
+    reminders.push({
+      dateBadge: interviewSchedule?.day_description,
+      dateBadgeColor: "#f5a623",
+      title: "Qualifying / Interview Schedule",
+      subtitle: `${formatTime(
+        interviewSchedule?.start_time
+      )} – ${formatTime(interviewSchedule?.end_time)} • ${interviewSchedule?.building_description || "TBA"}, ${interviewSchedule?.room_description || "TBA"
+        }`,
+    });
+  }
+  if (reminders.length === 0) {
+    reminders.push({
+      icon: <CheckCircleIcon sx={{ color: "#fff", fontSize: 20 }} />,
+      iconBg: "#2e7d32",
+      title: "You're all caught up",
+      subtitle: "No pending reminders at the moment.",
+    });
+  }
+
+  useEffect(() => {
+    const socket = io(API_BASE_URL, { path: "/api/socket.io", transports: ["websocket", "polling"] });
+    socket.on("schedule_updated", () => {
+      if (applicantNumber) fetchVerifyDocumentSchedule(applicantNumber);
+    });
+    return () => socket.disconnect();
+  }, [applicantNumber]);
+
   // 🔒 Disable right-click
-  // document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  // document.addEventListener("keydown", (e) => {
-  //   const isBlockedKey =
-  //     e.key === "F12" ||
-  //     e.key === "F11" ||
-  //     (e.ctrlKey &&
-  //       e.shiftKey &&
-  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
-  //     (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-  //   if (isBlockedKey) {
-  //     e.preventDefault();
-  //     e.stopPropagation();
-  //   }
-  // });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
     <Box
@@ -954,6 +1292,39 @@ const ApplicantDashboard = (props) => {
                       </Typography>
                     </Box>
                   </Stack>
+                </Box>
+
+                {/* info strip — Academic Year / Program Applied / Date Applied / Application Status */}
+                <Box
+                  sx={{
+                    backgroundColor: "lightgray",
+                    borderTop: "1px solid rgba(255,255,255,0.2)",
+                    px: 4,
+                    py: 1.5,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    rowGap: 1.5,
+                    columnGap: 6,
+                  }}
+                >
+                  {[
+                    ["ACADEMIC YEAR", academicYearValue],
+                    ["PROGRAM APPLIED", programAppliedValue],
+                    ["DATE APPLIED", dateAppliedValue],
+                  ].map(([label, value]) => (
+                    <Box key={label}>
+                      <Typography sx={{ fontSize: 10.5, opacity: 0.75, color: "#000", letterSpacing: "0.05em" }}>{label}</Typography>
+                      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#000", }}>{value}</Typography>
+                    </Box>
+                  ))}
+                  <Box>
+                    <Typography sx={{ fontSize: 10.5, opacity: 0.75, letterSpacing: "0.05em", color: "#000", }}>APPLICATION STATUS</Typography>
+                    <Chip
+                      label={overallStatusLabel}
+                      size="small"
+                      sx={{ backgroundColor: overallStatusColor, color: "#000", fontWeight: 700, fontSize: 11.5 }}
+                    />
+                  </Box>
                 </Box>
               </Box>
             </Grid>
@@ -1104,66 +1475,100 @@ const ApplicantDashboard = (props) => {
                     {/* DATE/TIME */}
 
                   </Box>
+
+                  {/* info strip (mobile) */}
+                  <Box
+                    sx={{
+                      backgroundColor: "lightgray",
+                      borderTop: "1px solid rgba(255,255,255,0.2)",
+                      mx: -2,
+                      px: 2,
+                      pt: 1.5,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      rowGap: 1.2,
+                      columnGap: 3,
+                    }}
+                  >
+                    {[
+                      ["ACADEMIC YEAR", academicYearValue],
+                      ["PROGRAM APPLIED", programAppliedValue],
+                      ["DATE APPLIED", dateAppliedValue],
+                    ].map(([label, value]) => (
+                      <Box key={label}>
+                        <Typography sx={{ fontSize: 9.5, color: "#000", opacity: 0.75, letterSpacing: "0.05em" }}>{label}</Typography>
+                        <Typography sx={{ fontSize: 12, color: "#000", fontWeight: 700 }}>{value}</Typography>
+                      </Box>
+                    ))}
+                    <Box>
+                      <Typography sx={{ fontSize: 9.5, opacity: 0.75, letterSpacing: "0.05em", color: "#000", }}>STATUS</Typography>
+                      <Chip
+                        label={overallStatusLabel}
+                        size="small"
+                        sx={{ backgroundColor: overallStatusColor, color: "#000", fontWeight: 700, fontSize: 10.5, height: 20 }}
+                      />
+                    </Box>
+                  </Box>
                 </Box>
               </Box>
             </Grid>
           )}
 
-          {/* ── ACTION CARDS + NOTICE ──────────────────────────────────────── */}
-          {/* DESKTOP: original fixed-width horizontal layout */}
+          {/* ── ACTION ROW (Application Progress card replaces the old Start/Upload cards) ─── */}
+          {/* DESKTOP */}
           {!isMobile && (
             <Grid container spacing={2} justifyContent="left" mt={2}>
               <Grid item>
                 <Grid container direction="column" spacing={2}>
                   <Grid item>
-                    <Grid container spacing={2}>
-                      {["Application Form", "Upload Requirements"].map((title, idx) => (
-                        <Grid item key={idx}>
-                          <Card
-                            sx={{
-                              borderRadius: 3, boxShadow: 3, p: 2, backgroundColor: "#fff9ec",
-                              transition: "transform 0.3s ease, box-shadow 0.3s ease",
-                              "&:hover": { transform: "scale(1.05)" },
-                              width: 263, height: 300,
-                              display: "flex", justifyContent: "center", alignItems: "center",
-                              border: `2px solid ${borderColor}`,
-                              marginLeft: idx === 0 ? "35px" : 0,
-                            }}
-                          >
-                            <CardContent sx={{ textAlign: "center" }}>
-                              <Typography variant="h6" gutterBottom>{title}</Typography>
-                              {title === "Application Form" && (
-                                <button
-                                  style={{ padding: "10px 20px", backgroundColor: mainButtonColor, border: `2px solid ${borderColor}`, color: "white", fontSize: "15px", borderRadius: "8px", cursor: "pointer", marginTop: "10px" }}
-                                  onClick={() => {
-                                    if (!localStorage.getItem("dashboardKeys")) {
-                                      const generateKey = () => Math.random().toString(36).substring(2, 10);
-                                      const dashboardKeys = { step1: generateKey(), step2: generateKey(), step3: generateKey(), step4: generateKey(), step5: generateKey() };
-                                      localStorage.setItem("dashboardKeys", JSON.stringify(dashboardKeys));
-                                    }
-                                    const keys = JSON.parse(localStorage.getItem("dashboardKeys"));
-                                    window.location.href = `/applicant_personal_information/${keys.step1}`;
-                                  }}
-                                >
-                                  Start Application
-                                </button>
-                              )}
-                              {title === "Upload Requirements" && (
-                                <button
-                                  style={{ padding: "10px 20px", backgroundColor: mainButtonColor, border: `2px solid ${borderColor}`, color: "white", fontSize: "15px", borderRadius: "8px", cursor: "pointer", marginTop: "10px" }}
-                                  onClick={() => { window.location.href = "/applicant_online_requirements"; }}
-                                >
-                                  Upload Now
-                                </button>
-                              )}
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                      ))}
-                    </Grid>
+                    <Card
+                      sx={{
+                        borderRadius: "14px",
+                        boxShadow: 3,
+                        border: `2px solid ${borderColor}`,
+                        width: 580,
+                        marginLeft: "25px",
+                        backgroundColor: "#fff",
+                      }}
+                    >
+                      <CardContent>
+                        <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222", mb: 1.5 }}>
+                          Application Progress
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, color: "#999", mb: 1 }}>Overall Completion</Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2.5, flexWrap: "wrap" }}>
+                          <ProgressRing percentage={progressPercentage} color={mainButtonColor} />
+                          <Stack spacing={0.6} sx={{ flex: 1, minWidth: 240 }}>
+                            {progressChecklist.map((item, idx) => {
+                              const state = item.done ? "done" : idx === firstPendingIndex ? "current" : "upcoming";
+                              return (
+                                <Box key={item.label} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <StatusDot state={state} />
+                                    <Typography sx={{ fontSize: 12, color: "#333" }}>{item.label}</Typography>
+                                  </Stack>
+                                  <Typography
+                                    sx={{
+                                      fontSize: 10.5,
+                                      fontWeight: 700,
+                                      color: state === "done" ? "#2e7d32" : state === "current" ? "#f5a623" : "#aaa",
+                                    }}
+                                  >
+                                    {state === "done" ? "Completed" : "Pending"}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </Stack>
+                        </Box>
+                        <Typography sx={{ fontSize: 11.5, color: "#888", mt: 1.5, fontStyle: "italic" }}>
+                          {progressPercentage === 100 ? "All done! Congratulations." : "Keep going! You're doing great."}
+                        </Typography>
+                      </CardContent>
+                    </Card>
                   </Grid>
                   <Grid item>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, p: 2, marginLeft: "35px", transition: "transform 0.2s ease", boxShadow: 3, "&:hover": { transform: "scale(1.03)" }, height: "90px", borderRadius: "10px", backgroundColor: "#fffaf5", border: `2px solid ${borderColor}`, boxShadow: "0px 2px 8px rgba(0,0,0,0.05)", width: "540px" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, p: 2, marginLeft: "25px", transition: "transform 0.2s ease", boxShadow: 3, "&:hover": { transform: "scale(1.03)" }, height: "90px", borderRadius: "10px", backgroundColor: "#fffaf5", border: `2px solid ${borderColor}`, boxShadow: "0px 2px 8px rgba(0,0,0,0.05)", width: "580px" }}>
                       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: mainButtonColor, borderRadius: "8px", width: 50, height: 50, flexShrink: 0 }}>
                         <WarningAmberIcon sx={{ color: "white", fontSize: 35 }} />
                       </Box>
@@ -1456,44 +1861,46 @@ const ApplicantDashboard = (props) => {
             </Grid>
           )}
 
-          {/* MOBILE: clean fluid grid layout (from doc 2 approach) */}
+          {/* MOBILE: clean fluid grid layout */}
           {isMobile && (
             <Grid item xs={12}>
               <Grid container spacing={2}>
-                {/* Application Form */}
-                <Grid item xs={6}>
-                  <Card sx={{ borderRadius: 3, boxShadow: 3, p: 1.5, backgroundColor: "#fff9ec", transition: "transform 0.3s ease", "&:hover": { transform: "scale(1.05)" }, width: "100%", minHeight: 160, display: "flex", justifyContent: "center", alignItems: "center", border: `2px solid ${borderColor}` }}>
-                    <CardContent sx={{ textAlign: "center", p: "8px !important" }}>
-                      <Typography variant="body1" fontWeight="bold" gutterBottom fontSize={13}>Application Form</Typography>
-                      <button
-                        style={{ padding: "10px 20px", width: "100px", backgroundColor: mainButtonColor, border: `2px solid ${borderColor}`, color: "white", fontSize: "15px", borderRadius: "8px", cursor: "pointer", marginTop: "8px" }}
-                        onClick={() => {
-                          if (!localStorage.getItem("dashboardKeys")) {
-                            const generateKey = () => Math.random().toString(36).substring(2, 10);
-                            const dashboardKeys = { step1: generateKey(), step2: generateKey(), step3: generateKey(), step4: generateKey(), step5: generateKey() };
-                            localStorage.setItem("dashboardKeys", JSON.stringify(dashboardKeys));
-                          }
-                          const keys = JSON.parse(localStorage.getItem("dashboardKeys"));
-                          window.location.href = `/applicant_personal_information/${keys.step1}`;
-                        }}
-                      >
-                        Start
-                      </button>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Upload Requirements */}
-                <Grid item xs={6}>
-                  <Card sx={{ borderRadius: 3, boxShadow: 3, p: 1.5, backgroundColor: "#fff9ec", transition: "transform 0.3s ease", "&:hover": { transform: "scale(1.05)" }, width: "100%", minHeight: 160, display: "flex", justifyContent: "center", alignItems: "center", border: `2px solid ${borderColor}` }}>
-                    <CardContent sx={{ textAlign: "center", p: "8px !important" }}>
-                      <Typography variant="body1" fontWeight="bold" gutterBottom fontSize={13}>Upload Requirements</Typography>
-                      <button
-                        style={{ padding: "10px 20px", width: "100px", backgroundColor: mainButtonColor, border: `2px solid ${borderColor}`, color: "white", fontSize: "15px", borderRadius: "8px", cursor: "pointer", marginTop: "8px" }}
-                        onClick={() => { window.location.href = "/applicant_online_requirements"; }}
-                      >
-                        Upload
-                      </button>
+                {/* Application Progress (replaces Application Form / Upload Requirements cards) */}
+                <Grid item xs={12}>
+                  <Card sx={{ borderRadius: "14px", boxShadow: 3, border: `2px solid ${borderColor}`, backgroundColor: "#fff" }}>
+                    <CardContent>
+                      <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#222", mb: 1.5 }}>
+                        Application Progress
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#999", mb: 1 }}>Overall Completion</Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                        <ProgressRing percentage={progressPercentage} color={mainButtonColor} size={160} />
+                        <Stack spacing={0.6} sx={{ flex: 1, minWidth: 160 }}>
+                          {progressChecklist.map((item, idx) => {
+                            const state = item.done ? "done" : idx === firstPendingIndex ? "current" : "upcoming";
+                            return (
+                              <Box key={item.label} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <StatusDot state={state} />
+                                  <Typography sx={{ fontSize: 11.5, color: "#333" }}>{item.label}</Typography>
+                                </Stack>
+                                <Typography
+                                  sx={{
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: state === "done" ? "#2e7d32" : state === "current" ? "#f5a623" : "#aaa",
+                                  }}
+                                >
+                                  {state === "done" ? "Completed" : "Pending"}
+                                </Typography>
+                              </Box>
+                            );
+                          })}
+                        </Stack>
+                      </Box>
+                      <Typography sx={{ fontSize: 11, color: "#888", mt: 1.5, fontStyle: "italic" }}>
+                        {progressPercentage === 100 ? "All done! Congratulations." : "Keep going! You're doing great."}
+                      </Typography>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -1513,7 +1920,6 @@ const ApplicantDashboard = (props) => {
                   </Box>
                 </Grid>
 
-                {/* Mobile: Announcements */}
                 {/* Mobile: Announcements */}
                 <Grid item xs={12}>
                   <Card
@@ -1733,6 +2139,7 @@ const ApplicantDashboard = (props) => {
                   </Card>
                 </Grid>
                 {/* Mobile: Calendar */}
+                {/* Mobile: Calendar */}
                 <Grid item xs={12}>
                   <Card
                     sx={{
@@ -1741,46 +2148,16 @@ const ApplicantDashboard = (props) => {
                       borderRadius: "10px",
                       width: "100%",
                       transition: "transform 0.2s ease",
-                      "&:hover": {
-                        transform: "scale(1.03)",
-                      },
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "flex-start",
-                      alignItems: "center",
+                      "&:hover": { transform: "scale(1.03)" },
                       overflow: "hidden",
                       backgroundColor: "#fff",
                     }}
                   >
-                    <CardContent
-                      sx={{
-                        p: 0,
-                        width: "100%",
-                      }}
-                    >
-                      {/* TOP TITLE */}
-                      <Box
-                        sx={{
-                          px: 2,
-                          py: 1.2,
-                          borderBottom: `1px solid ${borderColor}`,
-                          backgroundColor: "#fff",
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            fontSize: "16px",
-                            fontWeight: 800,
-                            textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                            color: "#111",
-                          }}
-                        >
-                          Calendar
-                        </Typography>
-                      </Box>
-
-                      {/* MONTH HEADER */}
+                    <CardContent sx={{ p: 0, width: "100%" }}>
+                      {/* Month header — no border/radius of its own; the Card's
+          border + overflow:hidden already frames and clips it, so
+          this just sits flush as one continuous outline instead of
+          a "frame within a frame". */}
                       <Grid
                         container
                         alignItems="center"
@@ -1788,61 +2165,29 @@ const ApplicantDashboard = (props) => {
                         sx={{
                           backgroundColor: settings?.header_color || "#1976d2",
                           color: "white",
-                          borderTop: `2px solid ${borderColor}`,
-                          borderBottom: `2px solid ${borderColor}`,
-                          padding: "8px 6px",
+                          padding: "10px 8px",
                         }}
                       >
                         <Grid item>
-                          <IconButton
-                            size="small"
-                            onClick={handlePrevMonth}
-                            sx={{
-                              color: "white",
-                            }}
-                          >
+                          <IconButton size="small" onClick={handlePrevMonth} sx={{ color: "white" }}>
                             <ArrowBackIos fontSize="small" />
                           </IconButton>
                         </Grid>
-
                         <Grid item>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{
-                              fontWeight: "bold",
-                              fontSize: "14px",
-                            }}
-                          >
+                          <Typography variant="subtitle1" sx={{ fontWeight: "bold", fontSize: "14px" }}>
                             {date.toLocaleString("default", { month: "long" })} {year}
                           </Typography>
                         </Grid>
-
                         <Grid item>
-                          <IconButton
-                            size="small"
-                            onClick={handleNextMonth}
-                            sx={{
-                              color: "white",
-                            }}
-                          >
+                          <IconButton size="small" onClick={handleNextMonth} sx={{ color: "white" }}>
                             <ArrowForwardIos fontSize="small" />
                           </IconButton>
                         </Grid>
                       </Grid>
 
-                      {/* CALENDAR */}
-                      <Box
-                        sx={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(7, 1fr)",
-                          borderLeft: `2px solid ${borderColor}`,
-                          borderRight: `2px solid ${borderColor}`,
-                          borderBottom: `2px solid ${borderColor}`,
-                          borderRadius: "0 0 8px 8px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {/* DAYS */}
+                      {/* Day-name row + date grid — no left/right/bottom border here
+          either; the Card is already the single boundary. */}
+                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
                         {days.map((day, idx) => (
                           <Box
                             key={idx}
@@ -1858,33 +2203,12 @@ const ApplicantDashboard = (props) => {
                             {day}
                           </Box>
                         ))}
-
-                        {/* DATES */}
                         {weeks.map((week, i) =>
                           week.map((day, j) => {
-                            if (!day)
-                              return (
-                                <Box
-                                  key={`${i}-${j}`}
-                                  sx={{
-                                    height: 42,
-                                    backgroundColor: "#fff",
-                                  }}
-                                />
-                              );
-
-                            const isToday =
-                              day === today &&
-                              month === thisMonth &&
-                              year === thisYear;
-
-                            const dateKey = `${year}-${String(month + 1).padStart(
-                              2,
-                              "0"
-                            )}-${String(day).padStart(2, "0")}`;
-
+                            if (!day) return <Box key={`${i}-${j}`} sx={{ height: 42, backgroundColor: "#fff" }} />;
+                            const isToday = day === today && month === thisMonth && year === thisYear;
+                            const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                             const isHoliday = holidays[dateKey];
-
                             const dayCell = (
                               <Box
                                 sx={{
@@ -1893,41 +2217,24 @@ const ApplicantDashboard = (props) => {
                                   alignItems: "center",
                                   justifyContent: "center",
                                   borderRadius: "50%",
-                                  margin: "2px",
-                                  backgroundColor: isToday
-                                    ? settings?.header_color || "#1976d2"
-                                    : isHoliday
-                                      ? "#E8C999"
-                                      : "#fff",
+                                  backgroundColor: isToday ? settings?.header_color || "#1976d2" : isHoliday ? "#E8C999" : "#fff",
                                   color: isToday ? "white" : "black",
                                   fontWeight: isHoliday ? "bold" : "500",
                                   cursor: isHoliday ? "pointer" : "default",
                                   fontSize: "12px",
-                                  transition: "all 0.2s ease",
-                                  "&:hover": {
-                                    backgroundColor: isHoliday
-                                      ? "#F5DFA6"
-                                      : "#000",
-                                    color: isHoliday ? "black" : "white",
-                                  },
+                                  "&:hover": { backgroundColor: isHoliday ? "#F5DFA6" : "#000", color: isHoliday ? "black" : "white" },
                                 }}
                               >
                                 {day}
                               </Box>
                             );
-
                             return isHoliday ? (
                               <Tooltip
                                 key={`${i}-${j}`}
                                 title={
                                   <>
-                                    <Typography fontWeight="bold">
-                                      {isHoliday.localName}
-                                    </Typography>
-
-                                    <Typography variant="caption">
-                                      {isHoliday.date}
-                                    </Typography>
+                                    <Typography fontWeight="bold">{isHoliday.localName}</Typography>
+                                    <Typography variant="caption">{isHoliday.date}</Typography>
                                   </>
                                 }
                                 arrow
@@ -1936,9 +2243,7 @@ const ApplicantDashboard = (props) => {
                                 {dayCell}
                               </Tooltip>
                             ) : (
-                              <React.Fragment key={`${i}-${j}`}>
-                                {dayCell}
-                              </React.Fragment>
+                              <React.Fragment key={`${i}-${j}`}>{dayCell}</React.Fragment>
                             );
                           })
                         )}
@@ -1950,61 +2255,11 @@ const ApplicantDashboard = (props) => {
             </Grid>
           )}
 
-          {/* ── APPLICATION SNAPSHOT (Progress / Details / Requirements) ──── */}
+          {/* ── APPLICATION SNAPSHOT (Details / Requirements / Reminders / Need Help) ──── */}
           <Grid item xs={12}>
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
-              {/* Application Progress */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Card
-                  sx={{
-                    borderRadius: "14px",
-                    boxShadow: 3,
-                    border: `2px solid ${borderColor}`,
-                    height: "100%",
-                    backgroundColor: "#fff",
-                    transition: "transform 0.2s ease",
-                    "&:hover": { transform: "scale(1.02)" },
-                  }}
-                >
-                  <CardContent>
-                    <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222", mb: 1.5 }}>
-                      Application Progress
-                    </Typography>
-                    <Typography sx={{ fontSize: 11, color: "#999", mb: 1 }}>Overall Completion</Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-                      <ProgressRing percentage={progressPercentage} color={mainButtonColor} />
-                      <Stack spacing={0.6} sx={{ flex: 1, minWidth: 140 }}>
-                        {progressChecklist.map((item, idx) => {
-                          const state = item.done ? "done" : idx === firstPendingIndex ? "current" : "upcoming";
-                          return (
-                            <Box key={item.label} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <StatusDot state={state} />
-                                <Typography sx={{ fontSize: 12, color: "#333" }}>{item.label}</Typography>
-                              </Stack>
-                              <Typography
-                                sx={{
-                                  fontSize: 10.5,
-                                  fontWeight: 700,
-                                  color: state === "done" ? "#2e7d32" : state === "current" ? "#f5a623" : "#aaa",
-                                }}
-                              >
-                                {state === "done" ? "Completed" : "Pending"}
-                              </Typography>
-                            </Box>
-                          );
-                        })}
-                      </Stack>
-                    </Box>
-                    <Typography sx={{ fontSize: 11.5, color: "#888", mt: 1.5, fontStyle: "italic" }}>
-                      {progressPercentage === 100 ? "All done! Congratulations." : "Keep going! You're doing great."}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-
               {/* Application Details */}
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={12} sm={6} md={3}>
                 <Card
                   sx={{
                     borderRadius: "14px",
@@ -2044,7 +2299,7 @@ const ApplicantDashboard = (props) => {
               </Grid>
 
               {/* Requirements Status */}
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={12} sm={6} md={3}>
                 <Card
                   sx={{
                     borderRadius: "14px",
@@ -2085,10 +2340,160 @@ const ApplicantDashboard = (props) => {
                   </CardContent>
                 </Card>
               </Grid>
+
+              {/* Important Reminders — schedule entries show the 50x50 calendar date-badge */}
+              <Grid item xs={12} sm={6} md={3}>
+                <Card
+                  sx={{
+                    borderRadius: "14px",
+                    boxShadow: 3,
+                    border: `2px solid ${borderColor}`,
+                    height: "100%",
+                    backgroundColor: "#fff",
+                    transition: "transform 0.2s ease",
+                    "&:hover": { transform: "scale(1.02)" },
+                  }}
+                >
+                  <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                      <Campaign sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Important Reminders</Typography>
+                    </Stack>
+                    <Stack divider={<Divider sx={{ my: 1 }} />} spacing={1}>
+                      {reminders.map((r, idx) => (
+                        <Stack key={idx} direction="row" spacing={1.5} alignItems="flex-start">
+                          {r.dateBadge ? (
+                            <DateBadge dateString={r.dateBadge} color={r.dateBadgeColor} />
+                          ) : (
+                            <Box
+                              sx={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: "8px",
+                                backgroundColor: r.iconBg,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {r.icon}
+                            </Box>
+                          )}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222", lineHeight: 1.35 }}>{r.title}</Typography>
+                            <Typography sx={{ fontSize: 11, color: "#888", lineHeight: 1.35 }}>{r.subtitle}</Typography>
+                          </Box>
+                        </Stack>
+                      ))}
+                    </Stack>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      onClick={() => (announcements.length ? openLightbox(0) : null)}
+                      sx={{ mt: 2, borderColor: mainButtonColor, color: mainButtonColor, textTransform: "none", fontWeight: 700, borderRadius: "8px" }}
+                    >
+                      View All Announcements
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Need Help? */}
+              <Grid item xs={12} sm={6} md={3}>
+                <Card
+                  sx={{
+                    borderRadius: "14px",
+                    boxShadow: 3,
+                    border: `2px solid ${borderColor}`,
+                    height: "100%",
+                    backgroundColor: "#fff",
+                    transition: "transform 0.2s ease",
+                    "&:hover": { transform: "scale(1.02)" },
+                  }}
+                >
+                  <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                      <HeadsetMicIcon sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Need Help?</Typography>
+                    </Stack>
+                    <Stack spacing={1.4}>
+                      <Stack direction="row" spacing={1.3} alignItems="flex-start">
+                        <PhoneIcon sx={{ color: mainButtonColor, fontSize: 20, mt: "1px" }} />
+                        <Box>
+                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222" }}>Admissions Office</Typography>
+                          <Typography sx={{ fontSize: 11, color: "#888" }}>
+                            {admissionContact?.contact_number || settings?.contact_number || "(032) 123-4567 loc. 100"}
+                          </Typography>
+                          <Typography
+                            component="a"
+                            href={buildGmailComposeUrl(
+                              admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph"
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{
+                              fontSize: 11,
+                              color: mainButtonColor,
+                              textDecoration: "none",
+                              cursor: "pointer",
+                              "&:hover": { textDecoration: "underline" },
+                            }}
+                          >
+                            {admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph"}
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      <Stack direction="row" spacing={1.3} alignItems="flex-start">
+                        <AccessTimeIcon sx={{ color: mainButtonColor, fontSize: 20, mt: "1px" }} />
+                        <Box>
+                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222" }}>Office Hours</Typography>
+                          <Typography sx={{ fontSize: 11, color: "#888" }}>
+                            {admissionContact
+                              ? `${admissionContact.office_days_start} – ${admissionContact.office_days_end}`
+                              : "Monday – Friday"}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#888" }}>
+                            {admissionContact
+                              ? `${formatContactTime(admissionContact.office_time_start)} – ${formatContactTime(admissionContact.office_time_end)}`
+                              : "8:00 AM – 5:00 PM"}
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      {admissionContact?.facebook_url && (
+                        <Stack direction="row" spacing={1.3} alignItems="flex-start">
+                          <FacebookIcon sx={{ color: mainButtonColor, fontSize: 20, mt: "1px" }} />
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222" }}>Facebook</Typography>
+                            <Typography
+                              component="a"
+                              href={admissionContact.facebook_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{ fontSize: 11, color: mainButtonColor, wordBreak: "break-all" }}
+                            >
+                              {admissionContact.facebook_url}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      )}
+                    </Stack>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={() => (window.location.href = "/help_center")}
+                      sx={{ mt: 2, backgroundColor: mainButtonColor, textTransform: "none", fontWeight: 700, borderRadius: "8px", "&:hover": { backgroundColor: mainButtonColor } }}
+                    >
+                      Visit Help Center
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
             </Grid>
           </Grid>
 
-          {/* ── LIGHTBOX (shared) ─────────────────────────────────────────── */}
           {/* ── LIGHTBOX (shared) ─────────────────────────────────────────── */}
           <AnimatePresence>
             {lightboxOpen && announcements[lightboxIndex] && (
@@ -2324,7 +2729,7 @@ const ApplicantDashboard = (props) => {
                 </>
               )}
 
-              {/* MOBILE: vertical accordion stepper (from doc 2) */}
+              {/* MOBILE: vertical accordion stepper */}
               {isMobile && (
                 <Box sx={{ px: 1 }}>
                   {steps.map((label, index) => {

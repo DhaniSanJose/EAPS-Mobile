@@ -41,7 +41,7 @@ const CORExportRender = () => {
     content.style.transform = "none";
     content.style.left = "0px";
     content.style.top = "0px";
-    content.style.width = "210mm";
+    content.style.width = "calc((210mm + 6.5rem) * 44 / 42 + 3rem)";
     content.style.height = "auto";
     content.style.transformOrigin = "top left";
 
@@ -185,7 +185,7 @@ const CORExportRender = () => {
       <div
         ref={contentRef}
         style={{
-          width: "210mm",
+          width: "calc((210mm + 6.5rem) * 44 / 42 + 3rem)",
           transformOrigin: "top left",
           position: "absolute",
           top: 0,

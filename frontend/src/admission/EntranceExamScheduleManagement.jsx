@@ -412,6 +412,19 @@ const AssignScheduleToApplicants = () => {
     }
   };
 
+  // AFTER (matches Verify's pattern exactly)
+  const [admissionContact, setAdmissionContact] = useState(null);
+  const [officeDays, setOfficeDays] = useState("");
+  const [officeTime, setOfficeTime] = useState("");
+
+  const formatContactTime = (time) => {
+    if (!time) return "";
+    const d = new Date(`1970-01-01T${time}`);
+    if (isNaN(d.getTime())) return time;
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  };
+
+
   // ================= FUNCTIONS =================
   const [customCount, setCustomCount] = useState(0);
 
@@ -745,9 +758,9 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
   useEffect(() => {
     if (!confirmOpen) return;
     setFinalPreview(
-      `${emailMessage}\n\u26a0\ufe0f Important Reminders:\n\n${customReminders}\n\nThank you and good luck!\n\nAdmission Office`,
+      `${emailMessage}\n\u26a0\ufe0f Important Reminders:\n\n${customReminders}\n\n🕘 Office Hours:\n${officeDays}\n${officeTime}\n\nThank you and good luck!\n\nAdmission Office`,
     );
-  }, [customReminders, emailMessage, confirmOpen]);
+  }, [customReminders, emailMessage, confirmOpen, officeDays, officeTime]);
 
   const handleSendEmails = () => {
     // 1️⃣ Validate schedule selection
@@ -962,6 +975,35 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
     setSelectedProgramFilter(curriculumId);
     setCurrentPage(1);
   };
+
+
+  useEffect(() => {
+    const branchId = selectedCampusFilter || "1"; // fallback to Manila until a schedule is picked
+    const fetchAdmissionContact = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/admission_contact/active`, {
+          params: { branch_id: branchId },
+        });
+        const contact = res.data || null;
+        setAdmissionContact(contact);
+
+        if (contact) {
+          setOfficeDays(`${contact.office_days_start} – ${contact.office_days_end}`);
+          setOfficeTime(
+            `${formatContactTime(contact.office_time_start)} – ${formatContactTime(contact.office_time_end)}`
+          );
+        } else {
+          setOfficeDays("Not set in Admission Contact Management");
+          setOfficeTime("Not set in Admission Contact Management");
+        }
+      } catch (err) {
+        console.error("Error fetching admission contact:", err);
+        setOfficeDays("Unable to load office days");
+        setOfficeTime("Unable to load office time");
+      }
+    };
+    fetchAdmissionContact();
+  }, [selectedCampusFilter]);
 
   // ✅ Step 1: Filtering
   const normalize = (value) =>
@@ -1503,7 +1545,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
               variant="contained"
               color="secondary"
               onClick={handleAssign40}
-              sx={{ minWidth: 150 }}
+              sx={{ minWidth: 150, height: "40px" }}
             >
               Assign Max
             </Button>
@@ -1515,7 +1557,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
               label="Custom Count"
               value={customCount}
               onChange={(e) => setCustomCount(Number(e.target.value))}
-              sx={{ width: 120 }}
+              sx={{ minWidth: 100, height: "40px" }}
             />
 
             {/* Assign Custom */}
@@ -1523,7 +1565,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
               variant="contained"
               color="warning"
               onClick={handleAssignCustom}
-              sx={{ minWidth: 150 }}
+              sx={{ minWidth: 150, height: "40px" }}
             >
               Assign Custom
             </Button>
@@ -1533,7 +1575,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
               variant="contained"
               color="error"
               onClick={handleUnassignAll}
-              sx={{ minWidth: 150 }}
+              sx={{ minWidth: 150, height: "40px" }}
             >
               Unassign All
             </Button>
@@ -1544,7 +1586,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
               color="success"
               size="small"
               onClick={handleSendEmails}
-              sx={{ minWidth: 150 }}
+              sx={{ minWidth: 150, height: "40px" }}
             >
               SEND EMAIL TO ALL
             </Button>
@@ -2152,7 +2194,7 @@ This printed permit must be presented to your proctor on the exam day to verify 
 `,
                               );
 
-                           setCustomReminders(`Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+                              setCustomReminders(`Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
 
 Step 2: Bring all required items on the exam day:
 • Official Examination Permit with VERIFIED watermark
@@ -2168,7 +2210,7 @@ Step 4: Keep the two paper sheets attached to your examination permit.
 
 Step 5: Arrive at least 1 hour before your scheduled examination. Late applicants will NOT be allowed to enter once the examination room door has been closed.`);
 
-setConfirmOpen(true);
+                              setConfirmOpen(true);
                             }}
                           >
                             SEND EMAIL
@@ -2465,6 +2507,39 @@ setConfirmOpen(true);
             <Box
               sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}
             >
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                fontWeight={600}
+              >
+                🕘 Office Hours:
+              </Typography>
+
+              {/* NEW — read-only, sourced from Admission Contact Management */}
+              <TextField
+                label="Office Days"
+                value={officeDays}
+                InputProps={{ readOnly: true }}
+                fullWidth
+                sx={{
+                  "& .MuiInputBase-root": {
+                    backgroundColor: "#f9f9f9",
+                  },
+                }}
+              />
+
+              <TextField
+                label="Office Time"
+                value={officeTime}
+                InputProps={{ readOnly: true }}
+                fullWidth
+                sx={{
+                  "& .MuiInputBase-root": {
+                    backgroundColor: "#f9f9f9",
+                  },
+                }}
+              />
+
               <Typography
                 variant="subtitle2"
                 color="text.secondary"

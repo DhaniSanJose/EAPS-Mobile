@@ -18,6 +18,10 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    LinearProgress,
 } from "@mui/material";
 import '../styles/Print.css'
 import CertificateOfRegistrationForCollege from "./CollegeCertificateOfRegistration";
@@ -64,6 +68,18 @@ const logCorSearchAudit = async (student, fallbackStudentNumber) => {
     } catch (err) {
         console.error("COR search audit failed:", err);
     }
+};
+
+// Small blob-download helper (same pattern used in CORExportingModule)
+const downloadBlob = (blob, fileName) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
 };
 
 const SearchCorForCollege = () => {
@@ -489,75 +505,90 @@ const SearchCorForCollege = () => {
     }, [debouncedStudentNumber, departmentLoading, selectedActiveSchoolYear]);
 
     const divToPrintRef = useRef();
+
+    // --- Job-based PDF generation (same pipeline as CORExportingModule) ---
     const [pdfLoading, setPdfLoading] = useState(false);
+    const [exportProgress, setExportProgress] = useState(0);
+    const [exportStatus, setExportStatus] = useState("");
 
     const handleGeneratePdf = async () => {
-        if (!divToPrintRef.current || pdfLoading) return;
+        if (pdfLoading) return;
+
+        if (!debouncedStudentNumber) {
+            showSnackbar("Please search for a student first.", "warning");
+            return;
+        }
 
         setPdfLoading(true);
+        setExportProgress(0);
+        setExportStatus("Starting export...");
 
         try {
-            const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <title>Certificate of Registration</title>
-          <style>
-            body {
-              margin: 0;
-              padding: 20px;
-              font-family: Arial;
-            }
-          </style>
-        </head>
-        <body>
-          ${divToPrintRef.current.innerHTML}
-        </body>
-      </html>
-    `;
+            // corPreload comes from resolveStudentRegistrarScope, which wraps
+            // the /api/student-tagging response. person_id2 is the typical field.
+            const personId =
+                corPreload?.person_id2 ||
+                corPreload?.person_id ||
+                selectedStudent?.person_id ||
+                "";
 
-            const res = await fetch(`${API_BASE_URL}/api/generate-cor-pdf`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ html }),
+            // 1) Create the export job
+            const startRes = await axios.post(`${API_BASE_URL}/api/cor-export/jobs`, {
+                students: [
+                    {
+                        student_number: debouncedStudentNumber,
+                        person_id: personId,
+                        preload: corPreload || null,
+                    },
+                ],
+                file_name: `${debouncedStudentNumber}_Certificate_Of_Registration`,
+                frontend_origin: window.location.origin,
             });
 
-            const contentType = res.headers.get("content-type");
+            const jobId = startRes.data?.job_id;
+            if (!jobId) throw new Error("Server did not return an export job id.");
 
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => null);
-                console.error("Backend error:", errorData);
-                throw new Error(errorData?.error || "PDF failed");
+            // 2) Poll status until done/error
+            let job = null;
+            while (true) {
+                await new Promise((resolve) => setTimeout(resolve, 500));
+                const statusRes = await axios.get(
+                    `${API_BASE_URL}/api/cor-export/jobs/${jobId}`
+                );
+                job = statusRes.data;
+
+                setExportProgress(Number(job.progress || 0));
+                setExportStatus(job.message || "Processing export...");
+
+                if (job.status === "done") break;
+                if (job.status === "error") {
+                    throw new Error(job.error || "Server export failed.");
+                }
             }
 
-            if (!contentType || !contentType.includes("application/pdf")) {
-                const text = await res.text();
-                console.error("Unexpected response:", text);
-                throw new Error("Server did not return a valid PDF");
-            }
+            // 3) Download the finished PDF
+            setExportStatus("Downloading PDF...");
+            const downloadRes = await axios.get(
+                `${API_BASE_URL}/api/cor-export/jobs/${jobId}/download`,
+                { responseType: "blob" }
+            );
 
-            const blob = await res.blob();
+            downloadBlob(
+                downloadRes.data,
+                job?.file_name ||
+                    `${debouncedStudentNumber}_Certificate_Of_Registration.pdf`
+            );
 
-            if (blob.size === 0) {
-                throw new Error("Generated PDF is empty");
-            }
-
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "certificate_of_registration.pdf";
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
+            setExportProgress(100);
+            setExportStatus("Download complete.");
+            showSnackbar("Certificate PDF generated successfully.", "success");
         } catch (err) {
             console.error("Generate PDF error:", err);
-            alert(err.message || "PDF failed");
+            showSnackbar(err.message || "PDF generation failed", "error");
         } finally {
             setPdfLoading(false);
+            setExportProgress(0);
+            setExportStatus("");
         }
     };
 
@@ -797,6 +828,7 @@ const SearchCorForCollege = () => {
 
             <button
                 onClick={handleGeneratePdf}
+                disabled={pdfLoading || !debouncedStudentNumber}
                 style={{
                     marginBottom: "1rem",
                     padding: "10px 20px",
@@ -805,9 +837,10 @@ const SearchCorForCollege = () => {
                     color: "black",
                     borderRadius: "5px",
                     marginTop: "20px",
-                    cursor: "pointer",
+                    cursor: pdfLoading || !debouncedStudentNumber ? "not-allowed" : "pointer",
                     fontSize: "16px",
                     fontWeight: "bold",
+                    opacity: pdfLoading || !debouncedStudentNumber ? 0.6 : 1,
                     transition: "background-color 0.3s, transform 0.2s",
                 }}
                 onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
@@ -817,7 +850,7 @@ const SearchCorForCollege = () => {
             >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FcPrint size={20} />
-                    Generate Certificate PDF
+                    {pdfLoading ? "Generating..." : "Generate Certificate PDF"}
                 </span>
             </button>
 

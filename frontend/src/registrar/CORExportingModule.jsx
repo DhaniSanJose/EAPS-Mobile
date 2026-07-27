@@ -431,7 +431,7 @@ const CORExportingModule = () => {
       overflow: el.style.overflow,
     };
     el.style.backgroundColor = "#ffffff";
-    el.style.width = "210mm"; // A4 width
+    el.style.width = "calc((210mm + 6.5rem) * 44 / 42 + 3rem)"; // Match COR content width
     el.style.minHeight = "297mm"; // A4 height
     el.style.height = "auto";
     el.style.visibility = "visible";
@@ -662,7 +662,7 @@ const CORExportingModule = () => {
 
         // Wait for content to be actually rendered
         const waitForContent = async () => {
-          const maxWait = 5000; // 5 seconds max
+          const maxWait = 3000; // 5 seconds max
           const startTime = Date.now();
 
           while (Date.now() - startTime < maxWait) {
@@ -765,8 +765,8 @@ const CORExportingModule = () => {
                 console.warn('Failed to inject reset style into cloned document', e);
               }
 
-              // Match A4 layout for PDF export
-              root.style.width = "210mm";
+              // Match COR content width for PDF export (A4 + Rules gap)
+              root.style.width = "calc((210mm + 6.5rem) * 44 / 42 + 3rem)";
               root.style.minHeight = "297mm";
               root.style.height = "auto";
               root.style.boxSizing = "border-box";
@@ -1002,7 +1002,7 @@ const CORExportingModule = () => {
             position: "fixed",
             left: "-10000px",
             top: 0,
-            width: "210mm",
+            width: "calc((210mm + 6.5rem) * 44 / 42 + 3rem)",
             backgroundColor: "#ffffff",
           }}
         >

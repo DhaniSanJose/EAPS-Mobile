@@ -13,6 +13,7 @@ import {
     ExpandLess, Menu, Grading
 } from "@mui/icons-material";
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ContactsIcon from '@mui/icons-material/Contacts';
 import PaymentIcon from "@mui/icons-material/Payment";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
@@ -705,6 +706,7 @@ const SideBar = ({
             { title: "Subject Management", link: "/applicant_exam_subjects", icon: SchoolIcon, page_id: 145 },
             { title: "Announcement", link: "/admission_announcement", icon: Campaign, page_id: 98 },
             { title: "Request Account Deletion", link: "/application_process_admin", icon: PersonAdd, page_id: 139 },
+            { title: "Admission Contact Management", link: "/admission_contact_management", icon: ContactsIcon, page_id: 172 },
         ]
     }];
     const enrollmentMenuGroups = [{

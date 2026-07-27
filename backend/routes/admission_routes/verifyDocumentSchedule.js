@@ -479,6 +479,41 @@ router.get("/verify_document_schedules_with_count", async (req, res) => {
   }
 });
 
+// GET /api/verify-document-schedule/:applicantNumber
+router.get("/verify-document-schedule/:applicantNumber", async (req, res) => {
+  const { applicantNumber } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `SELECT
+         va.id,
+         va.schedule_id,
+         va.applicant_id,
+         va.email_sent,
+         vds.schedule_date        AS day_description,
+         vds.building_description,
+         vds.room_description,
+         vds.start_time,
+         vds.end_time,
+         vds.evaluator,
+         vds.branch
+       FROM verify_applicants va
+       JOIN verify_document_schedule vds
+         ON vds.schedule_id = va.schedule_id
+       WHERE va.applicant_id = ?
+       LIMIT 1`,
+      [applicantNumber]
+    );
+
+    if (!rows.length) return res.json(null);
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error fetching verify document schedule:", err);
+    res.status(500).json({ error: "Failed to fetch verify document schedule" });
+  }
+});
+
 router.post("/mark-verify-email-sent", async (req, res) => {
   const { applicant_number } = req.body;
 
@@ -783,4 +818,3 @@ router.get("/verify_schedules_with_count/:yearId/:semesterId", async (req, res) 
 });
 
 module.exports = router;
-
