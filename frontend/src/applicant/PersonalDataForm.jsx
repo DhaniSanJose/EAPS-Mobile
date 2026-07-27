@@ -108,7 +108,7 @@ const PersonalDataForm = forwardRef((props, ref) => {
         cellphoneNumber: "",
         emailAddress: "",
         telephoneNumber: "",
-        facebookAccount: "",
+        facebook_account: "",
         presentStreet: "",
         presentBarangay: "",
         presentZipCode: "",
@@ -632,7 +632,7 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                         <style>
                                             {`
       .custom-checkbox:checked::after {
-        content: '✓';
+   
         position: absolute;
         top: -2px;
         left: 3px;
@@ -1149,93 +1149,49 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                                 paddingLeft: "50px",
                                             }}
                                         >
-                                            {/* Standard Civil Status Options */}
-                                            {["Single", "Married", "Widowed", "Separated", "Annulled"].map((status) => (
-                                                <label
-                                                    key={status}
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        width: "50%",
+                                            {(() => {
+                                                const civilStatusOptions = [
+                                                    { value: "single", label: "Single" },
+                                                    { value: "married", label: "Married" },
+                                                    { value: "widowed", label: "Widowed" },
+                                                    { value: "legally seperated", label: "Separated" },
+                                                    { value: "solo parent", label: "Solo Parent" },
+                                                ];
+                                                const normalizedStatus = (person.civilStatus || "").trim().toLowerCase();
+                                                const isStandard = civilStatusOptions.some((opt) => opt.value === normalizedStatus);
 
-                                                        fontSize: "15px",
-                                                        fontFamily: "Arial",
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={person.civilStatus === status}
-                                                        readOnly
-                                                        style={{
-                                                            width: "20px",
-                                                            height: "20px",
-                                                            border: "1px solid black",
-                                                            backgroundColor: "white",
-                                                            appearance: "none",
-                                                            WebkitAppearance: "none",
-                                                            MozAppearance: "none",
-                                                            display: "inline-block",
-                                                            position: "relative",
-                                                            marginRight: "5px",
-                                                        }}
-                                                        className="custom-checkbox"
-                                                    />
-                                                    {status}
-                                                </label>
-                                            ))}
-
-                                            {/* Others, specify */}
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    width: "100%",
-                                                    fontSize: "15px",
-                                                    fontFamily: "Arial",
-
-
-                                                }}
-                                            >
-                                                <label style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={
-                                                            person.civilStatus &&
-                                                            !["Single", "Married", "Widowed", "Separated", "Annulled"].includes(person.civilStatus)
-                                                        }
-                                                        readOnly
-                                                        style={{
-                                                            width: "20px",
-
-                                                            height: "20px",
-
-                                                            border: "1px solid black",
-                                                            backgroundColor: "white",
-                                                            appearance: "none",
-                                                            WebkitAppearance: "none",
-                                                            MozAppearance: "none",
-                                                            display: "inline-block",
-                                                            position: "relative",
-                                                            marginRight: "5px",
-                                                        }}
-                                                        className="custom-checkbox"
-                                                    />
-                                                    Others, specify:
-                                                </label>
-                                                <span
-                                                    style={{
-                                                        borderBottom: "1px solid black",
-                                                        width: "100px",
-                                                        display: "inline-block",
-                                                        marginTop: "10px",
-                                                    }}
-                                                >
-                                                    {person.civilStatus &&
-                                                        !["Single", "Married", "Widowed", "Separated", "Annulled"].includes(person.civilStatus)
-                                                        ? person.civilStatus
-                                                        : ""}
-                                                </span>
-                                            </div>
+                                                return (
+                                                    <>
+                                                        {civilStatusOptions.map(({ value, label }) => (
+                                                            <label key={value} style={{ display: "flex", alignItems: "center", width: "50%", fontSize: "15px", fontFamily: "Arial" }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={normalizedStatus === value}
+                                                                    readOnly
+                                                                    style={{ width: "20px", height: "20px", border: "1px solid black", backgroundColor: "white", appearance: "none", WebkitAppearance: "none", MozAppearance: "none", display: "inline-block", position: "relative", marginRight: "5px" }}
+                                                                    className="custom-checkbox"
+                                                                />
+                                                                {label}
+                                                            </label>
+                                                        ))}
+                                                        <div style={{ display: "flex", alignItems: "center", width: "100%", fontSize: "15px", fontFamily: "Arial" }}>
+                                                            <label style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={!!normalizedStatus && !isStandard}
+                                                                    readOnly
+                                                                    style={{ width: "20px", height: "20px", border: "1px solid black", backgroundColor: "white", appearance: "none", WebkitAppearance: "none", MozAppearance: "none", display: "inline-block", position: "relative", marginRight: "5px" }}
+                                                                    className="custom-checkbox"
+                                                                />
+                                                                Others, specify:
+                                                            </label>
+                                                            <span style={{ borderBottom: "1px solid black", width: "100px", display: "inline-block", marginTop: "10px" }}>
+                                                                {!isStandard ? (person.civilStatus || "").trim() : ""}
+                                                            </span>
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
 
 
@@ -1739,7 +1695,14 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                     <td colSpan={8} style={{ border: "1px solid black" }}></td>
                                     <td colSpan={8} style={{ border: "1px solid black" }}></td>
                                     <td colSpan={9} style={{ border: "1px solid black", textAlign: "left", padding: "2px", fontSize: "15px", fontFamily: "Arial" }}>
-                                        Total: ₱{(Number(person.father_income || 0) + Number(person.mother_income || 0)).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        Total: ₱{(
+                                            Number(person.father_income || 0) +
+                                            Number(person.mother_income || 0) +
+                                            (person.siblings || []).reduce(
+                                                (sum, sibling) => sum + Number(sibling?.monthlyIncome || 0),
+                                                0
+                                            )
+                                        ).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                 </tr>
 

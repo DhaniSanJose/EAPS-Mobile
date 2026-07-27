@@ -139,7 +139,6 @@ const StudentDashboard4 = () => {
     fever: "",
     asthma: "",
     faintingSpells: "",
-    fainting: "",
     heartDisease: "",
     tuberculosis: "",
     frequentHeadaches: "",
@@ -152,7 +151,6 @@ const StudentDashboard4 = () => {
     allergies: "",
     cancer: "",
     smokingCigarette: "",
-    smoking: "",
     alcoholDrinking: "",
     hospitalized: "",
     hospitalizationDetails: "",
@@ -479,10 +477,26 @@ const StudentDashboard4 = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — stamp the live "checked" DOM property onto a cloned copy
+      // of the node before reading innerHTML. Without this, checkboxes
+      // for gender/civilStatus/etc. always serialize as unchecked even
+      // though they render correctly on screen.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           person_id: userID || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",

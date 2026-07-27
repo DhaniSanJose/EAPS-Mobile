@@ -84,7 +84,8 @@ const OfficialStudentDashboard2 = () => {
         father_ext: "", father_nickname: "", father_education: "", father_education_level: "", father_last_school: "", father_course: "", father_year_graduated: "", father_school_address: "", father_contact: "", father_occupation: "", father_employer: "",
         father_income: "", father_email: "", mother_deceased: "", mother_family_name: "", mother_given_name: "", mother_middle_name: "", mother_ext: "", mother_nickname: "", mother_education: "", mother_education_level: "", mother_last_school: "", mother_course: "",
         mother_year_graduated: "", mother_school_address: "", mother_contact: "", mother_occupation: "", mother_employer: "", mother_income: "", mother_email: "", guardian: "", guardian_family_name: "", guardian_given_name: "",
-        guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "",
+        guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "", siblings: [],        // ✅ NEW
+        has_no_siblings: 0,  // ✅ NEW
     });
 
     const [hasAccess, setHasAccess] = useState(null);
@@ -213,8 +214,19 @@ const OfficialStudentDashboard2 = () => {
     const fetchByPersonId = async (personID) => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/person/${personID}`);
-            setPerson(res.data);
-            setSelectedPerson(res.data);
+
+            let siblingsVal = res.data.siblings;
+            if (typeof siblingsVal === "string") {
+                try { siblingsVal = JSON.parse(siblingsVal); } catch { siblingsVal = []; }
+            }
+            const safePerson = {
+                ...res.data,
+                siblings: Array.isArray(siblingsVal) ? siblingsVal : [],
+                has_no_siblings: res.data.has_no_siblings === 1 ? 1 : 0,
+            };
+
+            setPerson(safePerson);
+            setSelectedPerson(safePerson);
             if (res.data?.applicant_number) {
                 // optional: whatever logic you want
             }
@@ -222,7 +234,6 @@ const OfficialStudentDashboard2 = () => {
             console.error("❌ person (DB3) fetch failed:", err);
         }
     };
-
 
 
     const [activeStep, setActiveStep] = useState(1);
@@ -276,7 +287,33 @@ const OfficialStudentDashboard2 = () => {
         setPerson(updatedPerson);
     };
 
+    const addSibling = () => {
+        const updatedSiblings = [
+            ...(person.siblings || []),
+            { id: Date.now(), name: "", age: "", schoolLevel: "", schoolLastAttended: "", schoolAddress: "", occupation: "", monthlyIncome: "" },
+        ];
+        setPerson({ ...person, siblings: updatedSiblings });
+    };
 
+    const removeSibling = (index) => {
+        const updatedSiblings = (person.siblings || []).filter((_, i) => i !== index);
+        setPerson({ ...person, siblings: updatedSiblings });
+    };
+
+    const handleSiblingFieldChange = (index, field, value) => {
+        const updatedSiblings = [...(person.siblings || [])];
+        updatedSiblings[index] = { ...updatedSiblings[index], [field]: value };
+        setPerson((prev) => ({ ...prev, siblings: updatedSiblings }));
+    };
+
+    const handleNoSiblingsCheck = (e) => {
+        const checked = e.target.checked;
+        setPerson({
+            ...person,
+            has_no_siblings: checked ? 1 : 0,
+            siblings: checked ? [] : person.siblings,
+        });
+    };
 
     // Do not alter
     const handleUpdate = async (updatedPerson) => {
@@ -572,16 +609,32 @@ const OfficialStudentDashboard2 = () => {
             const node = hiddenFormRef.current;
             if (!node) throw new Error(`${config.label} did not render in time.`);
 
+            // ✅ FIX — React's `checked` is a DOM property, not an HTML attribute,
+            // so it never shows up in node.innerHTML. Clone the node and manually
+            // stamp "checked" onto the markup based on the live checkbox state
+            // before serializing, otherwise every checkbox renders unchecked in
+            // the generated PDF regardless of the actual database value.
+            const clonedNode = node.cloneNode(true);
+            const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+            const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+            liveCheckboxes.forEach((liveBox, i) => {
+                const clonedBox = clonedCheckboxes[i];
+                if (liveBox.checked) {
+                    clonedBox.setAttribute("checked", "checked");
+                } else {
+                    clonedBox.removeAttribute("checked");
+                }
+            });
+
             const response = await axios.post(
                 `${API_BASE_URL}${config.endpoint}`,
                 {
-                    html: node.innerHTML,
+                    html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
                     applicant_number: person?.applicant_number || "",
                     last_name: person?.last_name || "",
                     first_name: person?.first_name || "",
                     audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
                     audit_actor_role: userRole || "registrar",
-                    ...getLoginMacPayload(),
                 },
                 { responseType: "blob" },
             );
@@ -647,6 +700,19 @@ const OfficialStudentDashboard2 = () => {
 
     const [searchQuery, setSearchQuery] = useState("");
     const [searchError, setSearchError] = useState("");
+
+    const normalizeSiblings = (val) => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === "string") {
+            try {
+                const parsedVal = JSON.parse(val);
+                return Array.isArray(parsedVal) ? parsedVal : [];
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    };
 
     useEffect(() => {
         const savedPerson = sessionStorage.getItem("admin_edit_person_data");
@@ -2071,9 +2137,62 @@ const OfficialStudentDashboard2 = () => {
                             </Box>
                         </Box>
 
+                        <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>
+                            Siblings (Mga Kapatid Mo)
+                        </Typography>
+                        <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+                        <br />
+
+                        <FormControlLabel
+                            control={<Checkbox disabled checked={person.has_no_siblings === 1} />}
+                            label="Check if there's no siblings"
+                        />
+                        <br /><br />
+
+                        {person.has_no_siblings !== 1 && (person.siblings || []).map((sibling, index) => (
+                            <Box key={sibling.id || index} sx={{ border: `1px solid ${borderColor}`, borderRadius: 2, p: 2, mb: 2, backgroundColor: "#fff" }}>
+                                <Typography fontWeight="bold" mb={1}>Sibling {index + 1}</Typography>
+                                <Box display="flex" gap={2} flexWrap="wrap">
+                                    <Box flex="1 1 30%">
+                                        <Typography variant="subtitle2" mb={0.5}>Name of Sibling</Typography>
+                                        <TextField InputProps={{ readOnly: true }} fullWidth size="small" value={sibling.name || ""} />
+                                    </Box>
+                                    <Box flex="1 1 10%">
+                                        <Typography variant="subtitle2" mb={0.5}>Age</Typography>
+                                        <TextField InputProps={{ readOnly: true }} fullWidth size="small" value={sibling.age || ""} />
+                                    </Box>
+                                    <Box flex="1 1 20%">
+                                        <Typography variant="subtitle2" mb={0.5}>School Level</Typography>
+                                        <TextField InputProps={{ readOnly: true }} fullWidth size="small" value={sibling.schoolLevel || ""} />
+                                    </Box>
+                                    <Box flex="1 1 30%">
+                                        <Typography variant="subtitle2" mb={0.5}>School Last Attended</Typography>
+                                        <TextField InputProps={{ readOnly: true }} fullWidth size="small" value={sibling.schoolLastAttended || ""} />
+                                    </Box>
+                                    <Box flex="1 1 45%">
+                                        <Typography variant="subtitle2" mb={0.5}>School Address</Typography>
+                                        <TextField InputProps={{ readOnly: true }} fullWidth size="small" value={sibling.schoolAddress || ""} />
+                                    </Box>
+                                    <Box flex="1 1 25%">
+                                        <Typography variant="subtitle2" mb={0.5}>Occupation</Typography>
+                                        <TextField InputProps={{ readOnly: true }} fullWidth size="small" value={sibling.occupation || ""} />
+                                    </Box>
+                                    <Box flex="1 1 25%">
+                                        <Typography variant="subtitle2" mb={0.5}>Monthly Income</Typography>
+                                        <TextField InputProps={{ readOnly: true }} fullWidth size="small" value={sibling.monthlyIncome || ""} />
+                                    </Box>
+                                </Box>
+                            </Box>
+                        ))}
+
+                        {person.has_no_siblings !== 1 && (person.siblings || []).length === 0 && (
+                            <Typography sx={{ color: "#777", fontStyle: "italic", mb: 2 }}>No siblings on record.</Typography>
+                        )}
+
                         <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Family (Annual Income)</Typography>
                         <hr style={{ border: "1px solid #ccc", width: "100%" }} />
                         <br />
+
 
                         {/* Annual Income */}
                         <Box sx={{ width: '100%', mb: 2 }}>

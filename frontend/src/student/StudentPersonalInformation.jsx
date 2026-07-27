@@ -565,10 +565,26 @@ const StudentDashboard1 = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — stamp the live "checked" DOM property onto a cloned copy
+      // of the node before reading innerHTML. Without this, checkboxes
+      // for gender/civilStatus/etc. always serialize as unchecked even
+      // though they render correctly on screen.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           person_id: userID || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
@@ -621,24 +637,24 @@ const StudentDashboard1 = () => {
 
 
   // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
@@ -1155,54 +1171,253 @@ const StudentDashboard1 = () => {
             </Box>
 
             <Box display="flex" gap={2}>
-              {/* Citizenship — system-locked */}
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Citizenship<span style={{ color: "red" }}> *</span></Typography>
-                <FormControl fullWidth size="small" required error={!!errors.citizenship}>
+                <Typography mb={1} fontWeight="medium">
+                  Citizenship<span style={{ color: "red" }}> *</span>
+                </Typography>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.citizenship}
+                >
                   <InputLabel id="citizenship-label">Citizenship</InputLabel>
-                  <Select readOnly labelId="citizenship-label" name="citizenship" value={person.citizenship || ""} onChange={handleChange} onBlur={() => handleUpdate(person)} label="Citizenship">
-                    <MenuItem value=""><em>Select Citizenship</em></MenuItem>
-                    {["AFGHAN", "AUSTRALIAN", "CANADIAN", "CHINESE", "FILIPINO", "JAPANESE", "KOREAN", "MALAYSIAN", "UNITED STATES", "Others"].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                  <Select
+                    labelId="citizenship-label"
+                    id="citizenship"
+                    name="citizenship"
+                    value={person.citizenship || ""}
+                    onChange={handleChange}
+                    onBlur={() => handleUpdate(person)}
+                    label="Citizenship"
+                  >
+                    <MenuItem value="">
+                      <em>Select Citizenship</em>
+                    </MenuItem>
+                    <MenuItem value="AFGHAN">AFGHAN</MenuItem>
+                    <MenuItem value="ALBANIAN">ALBANIAN</MenuItem>
+                    <MenuItem value="ARAB">ARAB</MenuItem>
+                    <MenuItem value="ARGENTINIAN">ARGENTINIAN</MenuItem>
+                    <MenuItem value="AUSTRALIAN">AUSTRALIAN</MenuItem>
+                    <MenuItem value="AUSTRIAN">AUSTRIAN</MenuItem>
+                    <MenuItem value="BELGIAN">BELGIAN</MenuItem>
+                    <MenuItem value="BANGLADESHI">BANGLADESHI</MenuItem>
+                    <MenuItem value="BAHAMIAN">BAHAMIAN</MenuItem>
+                    <MenuItem value="BHUTANESE">BHUTANESE</MenuItem>
+                    <MenuItem value="BERMUDAN">BERMUDAN</MenuItem>
+                    <MenuItem value="BOLIVIAN">BOLIVIAN</MenuItem>
+                    <MenuItem value="BRAZILIAN">BRAZILIAN</MenuItem>
+                    <MenuItem value="BRUNEI">BRUNEI</MenuItem>
+                    <MenuItem value="BOTSWANIAN">BOTSWANIAN</MenuItem>
+                    <MenuItem value="CANADIAN">CANADIAN</MenuItem>
+                    <MenuItem value="CHILE">CHILE</MenuItem>
+                    <MenuItem value="CHINESE">CHINESE</MenuItem>
+                    <MenuItem value="COLOMBIAN">COLOMBIAN</MenuItem>
+                    <MenuItem value="COSTA RICAN">COSTA RICAN</MenuItem>
+                    <MenuItem value="CUBAN">CUBAN</MenuItem>
+                    <MenuItem value="CYPRIOT">CYPRIOT</MenuItem>
+                    <MenuItem value="CZECH">CZECH</MenuItem>
+                    <MenuItem value="DANISH">DANISH</MenuItem>
+                    <MenuItem value="DOMINICAN">DOMINICAN</MenuItem>
+                    <MenuItem value="ALGERIAN">ALGERIAN</MenuItem>
+                    <MenuItem value="EGYPTIAN">EGYPTIAN</MenuItem>
+                    <MenuItem value="SPANISH">SPANISH</MenuItem>
+                    <MenuItem value="ESTONIAN">ESTONIAN</MenuItem>
+                    <MenuItem value="ETHIOPIAN">ETHIOPIAN</MenuItem>
+                    <MenuItem value="FIJI">FIJI</MenuItem>
+                    <MenuItem value="FILIPINO">FILIPINO</MenuItem>
+                    <MenuItem value="FINISH">FINISH</MenuItem>
+                    <MenuItem value="FRENCH">FRENCH</MenuItem>
+                    <MenuItem value="BRITISH">BRITISH</MenuItem>
+                    <MenuItem value="GERMAN">GERMAN</MenuItem>
+                    <MenuItem value="GHANAIAN">GHANAIAN</MenuItem>
+                    <MenuItem value="GREEK">GREEK</MenuItem>
+                    <MenuItem value="GUAMANIAN">GUAMANIAN</MenuItem>
+                    <MenuItem value="GUATEMALAN">GUATEMALAN</MenuItem>
+                    <MenuItem value="HONG KONG">HONG KONG</MenuItem>
+                    <MenuItem value="CROATIAN">CROATIAN</MenuItem>
+                    <MenuItem value="HAITIAN">HAITIAN</MenuItem>
+                    <MenuItem value="HUNGARIAN">HUNGARIAN</MenuItem>
+                    <MenuItem value="INDONESIAN">INDONESIAN</MenuItem>
+                    <MenuItem value="INDIAN">INDIAN</MenuItem>
+                    <MenuItem value="IRANIAN">IRANIAN</MenuItem>
+                    <MenuItem value="IRAQI">IRAQI</MenuItem>
+                    <MenuItem value="IRISH">IRISH</MenuItem>
+                    <MenuItem value="ICELANDER">ICELANDER</MenuItem>
+                    <MenuItem value="ISRAELI">ISRAELI</MenuItem>
+                    <MenuItem value="ITALIAN">ITALIAN</MenuItem>
+                    <MenuItem value="JAMAICAN">JAMAICAN</MenuItem>
+                    <MenuItem value="JORDANIAN">JORDANIAN</MenuItem>
+                    <MenuItem value="JAPANESE">JAPANESE</MenuItem>
+                    <MenuItem value="CAMBODIAN">CAMBODIAN</MenuItem>
+                    <MenuItem value="KOREAN">KOREAN</MenuItem>
+                    <MenuItem value="KUWAITI">KUWAITI</MenuItem>
+                    <MenuItem value="KENYAN">KENYAN</MenuItem>
+                    <MenuItem value="LAOTIAN">LAOTIAN</MenuItem>
+                    <MenuItem value="LEBANESE">LEBANESE</MenuItem>
+                    <MenuItem value="LIBYAN">LIBYAN</MenuItem>
+                    <MenuItem value="LUXEMBURGER">LUXEMBURGER</MenuItem>
+                    <MenuItem value="MALAYSIAN">MALAYSIAN</MenuItem>
+                    <MenuItem value="MOROCCAN">MOROCCAN</MenuItem>
+                    <MenuItem value="MEXICAN">MEXICAN</MenuItem>
+                    <MenuItem value="BURMESE">BURMESE</MenuItem>
+                    <MenuItem value="MYANMAR">MYANMAR</MenuItem>
+                    <MenuItem value="NIGERIAN">NIGERIAN</MenuItem>
+                    <MenuItem value="NOT INDICATED">NOT INDICATED</MenuItem>
+                    <MenuItem value="DUTCH">DUTCH</MenuItem>
+                    <MenuItem value="NORWEGIAN">NORWEGIAN</MenuItem>
+                    <MenuItem value="NEPALI">NEPALI</MenuItem>
+                    <MenuItem value="NEW ZEALANDER">NEW ZEALANDER</MenuItem>
+                    <MenuItem value="OMANI">OMANI</MenuItem>
+                    <MenuItem value="PAKISTANI">PAKISTANI</MenuItem>
+                    <MenuItem value="PANAMANIAN">PANAMANIAN</MenuItem>
+                    <MenuItem value="PERUVIAN">PERUVIAN</MenuItem>
+                    <MenuItem value="PAPUAN">PAPUAN</MenuItem>
+                    <MenuItem value="POLISH">POLISH</MenuItem>
+                    <MenuItem value="PUERTO RICAN">PUERTO RICAN</MenuItem>
+                    <MenuItem value="PORTUGUESE">PORTUGUESE</MenuItem>
+                    <MenuItem value="PARAGUAYAN">PARAGUAYAN</MenuItem>
+                    <MenuItem value="PALESTINIAN">PALESTINIAN</MenuItem>
+                    <MenuItem value="QATARI">QATARI</MenuItem>
+                    <MenuItem value="ROMANIAN">ROMANIAN</MenuItem>
+                    <MenuItem value="RUSSIAN">RUSSIAN</MenuItem>
+                    <MenuItem value="RWANDAN">RWANDAN</MenuItem>
+                    <MenuItem value="SAUDI ARABIAN">SAUDI ARABIAN</MenuItem>
+                    <MenuItem value="SUDANESE">SUDANESE</MenuItem>
+                    <MenuItem value="SINGAPOREAN">SINGAPOREAN</MenuItem>
+                    <MenuItem value="SRI LANKAN">SRI LANKAN</MenuItem>
+                    <MenuItem value="EL SALVADORIAN">EL SALVADORIAN</MenuItem>
+                    <MenuItem value="SOMALIAN">SOMALIAN</MenuItem>
+                    <MenuItem value="SLOVAK">SLOVAK</MenuItem>
+                    <MenuItem value="SWEDISH">SWEDISH</MenuItem>
+                    <MenuItem value="SWISS">SWISS</MenuItem>
+                    <MenuItem value="SYRIAN">SYRIAN</MenuItem>
+                    <MenuItem value="THAI">THAI</MenuItem>
+                    <MenuItem value="TRINIDAD AND TOBAGO">
+                      TRINIDAD AND TOBAGO
+                    </MenuItem>
+                    <MenuItem value="TUNISIAN">TUNISIAN</MenuItem>
+                    <MenuItem value="TURKISH">TURKISH</MenuItem>
+                    <MenuItem value="TAIWANESE">TAIWANESE</MenuItem>
+                    <MenuItem value="UKRAINIAN">UKRAINIAN</MenuItem>
+                    <MenuItem value="URUGUYAN">URUGUYAN</MenuItem>
+                    <MenuItem value="UNITED STATES">UNITED STATES</MenuItem>
+                    <MenuItem value="VENEZUELAN">VENEZUELAN</MenuItem>
+                    <MenuItem value="VIRGIN ISLANDS">VIRGIN ISLANDS</MenuItem>
+                    <MenuItem value="VIETNAMESE">VIETNAMESE</MenuItem>
+                    <MenuItem value="YEMENI">YEMENI</MenuItem>
+                    <MenuItem value="YUGOSLAVIAN">YUGOSLAVIAN</MenuItem>
+                    <MenuItem value="SOUTH AFRICAN">SOUTH AFRICAN</MenuItem>
+                    <MenuItem value="ZAIREAN">ZAIREAN</MenuItem>
+                    <MenuItem value="ZIMBABWEAN">ZIMBABWEAN</MenuItem>
+                    <MenuItem value="Others">Others</MenuItem>
                   </Select>
-                  {errors.citizenship && <FormHelperText>This field is required.</FormHelperText>}
+                  {errors.citizenship && (
+                    <FormHelperText>This field is required.</FormHelperText>
+                  )}
                 </FormControl>
               </Box>
 
-              {/* Religion — admin-controlled */}
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
                   Religion<span style={{ color: "red" }}> *</span>
-                  {!canEdit("religion") && <LockedBadge />}
                 </Typography>
-                <FormControl fullWidth size="small" required error={!!errors.religion}>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.religion}
+                >
                   <InputLabel id="religion-label">Religion</InputLabel>
-                  <Select labelId="religion-label" name="religion" value={person.religion || ""} onChange={canEdit("religion") ? handleChange : undefined} inputProps={{ readOnly: !canEdit("religion") }} onBlur={() => handleUpdate(person)} label="Religion">
-                    <MenuItem value=""><em>Select Religion</em></MenuItem>
-                    {["Jehovah's Witness", "Buddist", "Catholic", "Dating Daan", "Pagano", "Atheist", "Born Again", "Adventis", "Baptist", "Mormons", "Free Methodist", "Christian", "Protestant", "Aglipay", "Islam", "LDS", "Seventh Day Adventist", "Iglesia Ni Cristo", "UCCP", "PMCC", "Baha'i Faith", "None", "Others"].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                  <Select
+                    labelId="religion-label"
+                    id="religion"
+                    name="religion"
+                    value={person.religion || ""}
+                    onChange={handleChange}
+                    onBlur={() => handleUpdate(person)}
+                    label="Religion"
+                  >
+                    <MenuItem value="">
+                      <em>Select Religion</em>
+                    </MenuItem>
+                    <MenuItem value="Jehovah's Witness">
+                      Jehovah's Witness
+                    </MenuItem>
+                    <MenuItem value="Buddist">Buddist</MenuItem>
+                    <MenuItem value="Catholic">Catholic</MenuItem>
+                    <MenuItem value="Dating Daan">Dating Daan</MenuItem>
+                    <MenuItem value="Pagano">Pagano</MenuItem>
+                    <MenuItem value="Atheist">Atheist</MenuItem>
+                    <MenuItem value="Born Again">Born Again</MenuItem>
+                    <MenuItem value="Adventis">Adventis</MenuItem>
+                    <MenuItem value="Baptist">Baptist</MenuItem>
+                    <MenuItem value="Mormons">Mormons</MenuItem>
+                    <MenuItem value="Free Methodist">Free Methodist</MenuItem>
+                    <MenuItem value="Christian">Christian</MenuItem>
+                    <MenuItem value="Protestant">Protestant</MenuItem>
+                    <MenuItem value="Aglipay">Aglipay</MenuItem>
+                    <MenuItem value="Islam">Islam</MenuItem>
+                    <MenuItem value="LDS">LDS</MenuItem>
+                    <MenuItem value="Seventh Day Adventist">
+                      Seventh Day Adventist
+                    </MenuItem>
+                    <MenuItem value="Iglesia Ni Cristo">
+                      Iglesia Ni Cristo
+                    </MenuItem>
+                    <MenuItem value="UCCP">UCCP</MenuItem>
+                    <MenuItem value="PMCC">PMCC</MenuItem>
+                    <MenuItem value="Baha'i Faith">Baha'i Faith</MenuItem>
+                    <MenuItem value="None">None</MenuItem>
+                    <MenuItem value="Others">Others</MenuItem>
                   </Select>
-                  {errors.religion && <FormHelperText>This field is required.</FormHelperText>}
+                  {errors.religion && (
+                    <FormHelperText>This field is required.</FormHelperText>
+                  )}
                 </FormControl>
               </Box>
 
-              {/* Civil Status — system-locked */}
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Civil Status<span style={{ color: "red" }}> *</span></Typography>
-                <FormControl fullWidth size="small" required error={!!errors.civilStatus}>
+                <Typography mb={1} fontWeight="medium">
+                  Civil Status<span style={{ color: "red" }}> *</span>
+                </Typography>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.civilStatus}
+                >
                   <InputLabel id="civil-status-label">Civil Status</InputLabel>
-                  <Select readOnly labelId="civil-status-label" name="civilStatus" value={person.civilStatus || ""} onChange={handleChange} onBlur={() => handleUpdate(person)} label="Civil Status">
-                    <MenuItem value=""><em>Select Status</em></MenuItem>
-                    {["Single", "Married", "Legally Seperated", "Widowed", "Solo Parent"].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                  <Select
+                    labelId="civil-status-label"
+                    id="civilStatus"
+                    name="civilStatus"
+                    value={person.civilStatus || ""}
+                    onChange={handleChange}
+                    onBlur={() => handleUpdate(person)}
+                    label="Civil Status"
+                  >
+                    <MenuItem value="">
+                      <em> Select Status </em>
+                    </MenuItem>
+                    <MenuItem value="Single">Single</MenuItem>
+                    <MenuItem value="Married">Married</MenuItem>
+                    <MenuItem value="Legally Seperated">
+                      Legally Seperated
+                    </MenuItem>
+                    <MenuItem value="Widowed">Widowed</MenuItem>
+                    <MenuItem value="Solo Parent">Solo Parent</MenuItem>
                   </Select>
-                  {errors.civilStatus && <FormHelperText>This field is required.</FormHelperText>}
+                  {errors.civilStatus && (
+                    <FormHelperText>This field is required.</FormHelperText>
+                  )}
                 </FormControl>
               </Box>
 
-              {/* Spouse — admin-controlled, only shown when Married */}
               {person.civilStatus === "Married" && (
                 <Box flex={1}>
                   <Typography mb={1} fontWeight="medium">
                     Spouse<span style={{ color: "red" }}> *</span>
-                    {!canEdit("spouse") && <LockedBadge />}
                   </Typography>
                   <TextField
                     fullWidth
@@ -1210,31 +1425,91 @@ const StudentDashboard1 = () => {
                     name="spouse"
                     placeholder="Enter Spouse Name"
                     value={person.spouse || ""}
-                    onChange={canEdit("spouse") ? handleChange : undefined}
+                    onChange={handleChange}
                     onBlur={() => handleUpdate(person)}
-                    InputProps={{ readOnly: !canEdit("spouse") }}
-                    sx={!canEdit("spouse") ? { backgroundColor: "#f5f5f5" } : {}}
                     error={!!errors.spouse}
                     helperText={errors.spouse ? "This field is required." : ""}
                   />
                 </Box>
               )}
 
-              {/* Tribe/Ethnic Group — admin-controlled */}
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
                   Tribe/Ethnic Group<span style={{ color: "red" }}> *</span>
-                  {!canEdit("tribeEthnicGroup") && <LockedBadge />}
                 </Typography>
-                <FormControl fullWidth size="small" required error={!!errors.tribeEthnicGroup}>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.tribeEthnicGroup}
+                >
                   <InputLabel id="tribe-label">Tribe/Ethnic Group</InputLabel>
-                  <Select labelId="tribe-label" name="tribeEthnicGroup" value={person.tribeEthnicGroup || ""} onChange={canEdit("tribeEthnicGroup") ? handleChange : undefined} inputProps={{ readOnly: !canEdit("tribeEthnicGroup") }} onBlur={() => handleUpdate(person)} label="Tribe/Ethnic Group">
-                    {["Agta", "Agutaynen", "Aklanon", "Alangan", "Alta", "Amersian", "Ati", "Atta", "Ayta", "B'laan", "Badjao", "Bagobo", "Balangao", "Balangingi", "Bangon", "Bantoanon", "Banwaon", "Batak", "Bicolano", "Binukid", "Bohalano", "Bolinao", "Bontoc", "Buhid", "Butuanon", "Cagyanen", "Caray-a", "Cebuano", "Cuyunon", "Dasen", "Ilocano", "Ilonggo", "Jamah Mapun", "Malay", "Mangyan", "Maranao", "Molbogs", "Palawano", "Panimusan", "Tagbanua", "Tao't", "Bato", "Tausug", "Waray", "None", "Others"].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+                  <Select
+                    labelId="tribe-label"
+                    id="tribeEthnicGroup"
+                    name="tribeEthnicGroup"
+                    value={person.tribeEthnicGroup || ""}
+                    onChange={handleChange}
+                    onBlur={() => handleUpdate(person)}
+                    label="Tribe/Ethnic Group"
+                  >
+                    <MenuItem value="">
+                      <em>Select Tribe/Ethnic Group</em>
+                    </MenuItem>
+                    <MenuItem value="Agta">Agta</MenuItem>
+                    <MenuItem value="Agutaynen">Agutaynen</MenuItem>
+                    <MenuItem value="Aklanon">Aklanon</MenuItem>
+                    <MenuItem value="Alangan">Alangan</MenuItem>
+                    <MenuItem value="Alta">Alta</MenuItem>
+                    <MenuItem value="Amersian">Amersian</MenuItem>
+                    <MenuItem value="Ati">Ati</MenuItem>
+                    <MenuItem value="Atta">Atta</MenuItem>
+                    <MenuItem value="Ayta">Ayta</MenuItem>
+                    <MenuItem value="B'laan">B'laan</MenuItem>
+                    <MenuItem value="Badjao">Badjao</MenuItem>
+                    <MenuItem value="Bagobo">Bagobo</MenuItem>
+                    <MenuItem value="Balangao">Balangao</MenuItem>
+                    <MenuItem value="Balangingi">Balangingi</MenuItem>
+                    <MenuItem value="Bangon">Bangon</MenuItem>
+                    <MenuItem value="Bantoanon">Bantoanon</MenuItem>
+                    <MenuItem value="Banwaon">Banwaon</MenuItem>
+                    <MenuItem value="Batak">Batak</MenuItem>
+                    <MenuItem value="Bicolano">Bicolano</MenuItem>
+                    <MenuItem value="Binukid">Binukid</MenuItem>
+                    <MenuItem value="Bohalano">Bohalano</MenuItem>
+                    <MenuItem value="Bolinao">Bolinao</MenuItem>
+                    <MenuItem value="Bontoc">Bontoc</MenuItem>
+                    <MenuItem value="Buhid">Buhid</MenuItem>
+                    <MenuItem value="Butuanon">Butuanon</MenuItem>
+                    <MenuItem value="Cagyanen">Cagyanen</MenuItem>
+                    <MenuItem value="Caray-a">Caray-a</MenuItem>
+                    <MenuItem value="Cebuano">Cebuano</MenuItem>
+                    <MenuItem value="Cuyunon">Cuyunon</MenuItem>
+                    <MenuItem value="Dasen">Dasen</MenuItem>
+                    <MenuItem value="Ilocano">Ilocano</MenuItem>
+                    <MenuItem value="Ilonggo">Ilonggo</MenuItem>
+                    <MenuItem value="Jamah Mapun">Jamah Mapun</MenuItem>
+                    <MenuItem value="Malay">Malay</MenuItem>
+                    <MenuItem value="Mangyan">Mangyan</MenuItem>
+                    <MenuItem value="Maranao">Maranao</MenuItem>
+                    <MenuItem value="Molbogs">Molbogs</MenuItem>
+                    <MenuItem value="Palawano">Palawano</MenuItem>
+                    <MenuItem value="Panimusan">Panimusan</MenuItem>
+                    <MenuItem value="Tagbanua">Tagbanua</MenuItem>
+                    <MenuItem value="Tao't">Tao't</MenuItem>
+                    <MenuItem value="Bato">Bato</MenuItem>
+                    <MenuItem value="Tausug">Tausug</MenuItem>
+                    <MenuItem value="Waray">Waray</MenuItem>
+                    <MenuItem value="None">None</MenuItem>
+                    <MenuItem value="Others">Others</MenuItem>
                   </Select>
-                  {errors.tribeEthnicGroup && <FormHelperText>This field is required.</FormHelperText>}
+                  {errors.tribeEthnicGroup && (
+                    <FormHelperText>This field is required.</FormHelperText>
+                  )}
                 </FormControl>
               </Box>
             </Box>
+
 
             <br />
             <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Contact Information:</Typography>

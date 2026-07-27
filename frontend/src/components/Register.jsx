@@ -590,6 +590,24 @@ const MobileAnnouncementBanner = ({ slides }) => {
   );
 };
 
+const SectionHeader = ({ icon, label, color }) => (
+  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1.25 }}>
+    <Box sx={{
+      width: 22, height: 22, borderRadius: "6px",
+      backgroundColor: `${color}1a`, // ~10% tint of mainButtonColor
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: 12, flexShrink: 0,
+    }}>
+      {icon}
+    </Box>
+    <Typography sx={{
+      fontSize: 12.5, fontWeight: 700, color,
+      textTransform: "uppercase", letterSpacing: "0.05em",
+    }}>
+      {label}
+    </Typography>
+  </Box>
+);
 /* ═══════════════════════════════════════════════════════════
    DATE FIELD
    Inlined here (previously ../components/DateField) so the
@@ -630,13 +648,20 @@ const DateField = React.forwardRef(function DateField(props, ref) {
   };
   const closeCalendar = () => setAnchorEl(null);
 
-  const handleSelect = (newValue) => {
+  const handleSelect = (newValue, selectionState) => {
     if (newValue && dayjs(newValue).isValid()) {
       const formatted = dayjs(newValue).format("YYYY-MM-DD");
       setText(dayjs(newValue).format(format));
       onChange?.({ target: { name, value: formatted } });
     }
-    closeCalendar();
+
+    // Only close the picker once the FULL date (year + month + day) is chosen.
+    // DateCalendar fires onChange with selectionState "partial" after just
+    // picking a year or month, and "finish" only after the final day pick —
+    // closing on every step was forcing you to reopen the picker between steps.
+    if (selectionState === "finish") {
+      closeCalendar();
+    }
   };
 
   const handleTextChange = (e) => {
@@ -707,12 +732,48 @@ const DateField = React.forwardRef(function DateField(props, ref) {
           onChange={handleSelect}
           minDate={minDate}
           maxDate={maxDate}
+          views={["year", "month", "day"]}   // explicit, so behavior is consistent everywhere
+          openTo="year"                       // nice UX bonus for birthdays — start at year picker
         />
       </Popover>
     </div>
   );
 });
 
+const parseBirthDate = (dateString) => {
+  if (!dateString) return null;
+  const [y, m, d] = dateString.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+
+const getManilaToday = () => {
+  const now = new Date();
+  const manilaString = now.toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const [month, day, year] = manilaString.split("/");
+  return new Date(`${year}-${month}-${day}`);
+};
+
+const calculateAge = (birthDateString) => {
+  const birthDate = parseBirthDate(birthDateString);
+  if (!birthDate) return "";
+
+  const today = getManilaToday();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  const dayDiff = today.getDate() - birthDate.getDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age--;
+  }
+
+  return age < 0 ? "" : age;
+};
 
 const passwordRules = [
   {
@@ -1443,6 +1504,7 @@ const ReviewApplicationModal = ({
         </Box>
 
         {/* Single summary card, matching the reference layout */}
+        {/* Single summary card, now organized into three clear sections */}
         <Box sx={{ border: `1.5px solid ${mainButtonColor}`, borderRadius: "12px", overflow: "hidden", mb: 1 }}>
           <Box sx={{ backgroundColor: mainButtonColor, px: 2, py: 1 }}>
             <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>
@@ -1451,12 +1513,14 @@ const ReviewApplicationModal = ({
           </Box>
 
           <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
-            {/* Campus */}
-            <Field label="Campus" value={data.campusLabel} size={14.5} />
 
-            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1.5 }} />
+            {/* ══════════════ PERSONAL INFORMATION ══════════════ */}
+            <SectionHeader icon="🧑" label="Personal Information" color={mainButtonColor} />
 
-            {/* Applicant name row — mirrors the reference's grouped name fields */}
+            <Box sx={{ mb: 1.5 }}>
+              <Field label="Campus" value={data.campusLabel} size={14.5} />
+            </Box>
+
             <Typography sx={{ fontSize: 12.5, color: "#000", mb: 0.25 }}>
               Applicant Name
             </Typography>
@@ -1471,16 +1535,33 @@ const ReviewApplicationModal = ({
                 <Field label="Last Name" value={data.lastName} />
               </Box>
             </Box>
-            <Field label="Birth Date" value={data.birthday} size={13.5} />
 
-            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1.5 }} />
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <Box sx={{ flex: "1 1 45%", minWidth: 130 }}>
+                <Field label="Birth Date" value={data.birthday} size={13.5} />
+              </Box>
+              <Box sx={{ flex: "1 1 45%", minWidth: 100 }}>
+                <Field label="Age" value={data.age} size={13.5} />
+              </Box>
+            </Box>
 
-            {/* Academic section — Program Level and Course are visually
-                separated (label + emphasis) so they no longer read as
-                a duplicate of each other */}
-            <Typography sx={{ fontSize: 12.5, color: "#000", mb: 0.5 }}>
-              Academic Details
-            </Typography>
+            {/* Birth Date / Age callout now lives right where the fields are */}
+            <Box sx={{
+              display: "flex", gap: 1, alignItems: "flex-start",
+              backgroundColor: "#fff3cd", border: "1px solid #d4a017",
+              borderRadius: "8px", p: 1.1, mt: 1,
+            }}>
+              <span style={{ fontSize: 13, flexShrink: 0 }}>🎂</span>
+              <Typography sx={{ fontSize: 11.5, color: "#5d4500", lineHeight: 1.45 }}>
+                Double-check your <strong>Birth Date</strong> and computed <strong>Age</strong> — used for eligibility checks and cannot be edited after submission.
+              </Typography>
+            </Box>
+
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 2 }} />
+
+            {/* ══════════════ ACADEMIC INFORMATION ══════════════ */}
+            <SectionHeader icon="🎓" label="Academic Information" color={mainButtonColor} />
+
             <Box sx={{ mb: 1 }}>
               <Field label="Program Level" value={data.academicProgramLabel} size={13.5} />
             </Box>
@@ -1488,14 +1569,9 @@ const ReviewApplicationModal = ({
               <Field label="Applying As" value={data.applyingAsLabel} size={13.5} />
             </Box>
 
-            {/* Course gets the highlighted dashed box — it's the field
-                most worth double-checking (slots, correct course, etc.) */}
             <Box sx={{
-              backgroundColor: "#fff3cd",
-              border: "1.5px dashed #d4a017",
-              borderRadius: "8px",
-              p: 1.25,
-              mb: 1.5,
+              backgroundColor: "#fff3cd", border: "1.5px dashed #d4a017",
+              borderRadius: "8px", p: 1.25,
             }}>
               <Typography sx={{ fontSize: 11, color: "#7a5c00", fontWeight: 700, letterSpacing: "0.04em" }}>
                 COURSE APPLIED FOR
@@ -1505,21 +1581,19 @@ const ReviewApplicationModal = ({
               </Typography>
             </Box>
 
-            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1.5 }} />
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 2 }} />
 
-            {/* Account */}
-            <Field label="Email Address" value={data.email} size={13.5} />
+            {/* ══════════════ ACCOUNT INFORMATION ══════════════ */}
+            <SectionHeader icon="🔐" label="Account Information" color={mainButtonColor} />
 
-            {/* Explains why no Applicant Number appears yet — it's only
-                generated by the server after Google Authenticator setup
-                completes on the next screen. */}
+            <Box sx={{ mb: 1.5 }}>
+              <Field label="Email Address" value={data.email} size={13.5} />
+            </Box>
+
             <Box sx={{
               display: "flex", gap: 1, alignItems: "flex-start",
-              backgroundColor: "#f0f7ff",
-              border: "1px solid #b3d4ff",
-              borderRadius: "8px",
-              p: 1.25,
-              mt: 1.5,
+              backgroundColor: "#f0f7ff", border: "1px solid #b3d4ff",
+              borderRadius: "8px", p: 1.25,
             }}>
               <span style={{ fontSize: 14, flexShrink: 0 }}>ℹ️</span>
               <Typography sx={{ fontSize: 12, color: "#1a237e", lineHeight: 1.5 }}>
@@ -1527,10 +1601,25 @@ const ReviewApplicationModal = ({
               </Typography>
             </Box>
 
-            <Typography sx={{ fontSize: 11.5, color: "#888", mt: 1.5, fontStyle: "italic", lineHeight: 1.5 }}>
+            <Typography sx={{ fontSize: 11.5, color: "#888", mt: 2, fontStyle: "italic", lineHeight: 1.5 }}>
               Please verify that everything above is correct before continuing.
             </Typography>
           </Box>
+        </Box>
+
+        {/* ✅ NEW — Birth Date / Age verification note */}
+        <Box sx={{
+          display: "flex", gap: 1, alignItems: "flex-start",
+          backgroundColor: "#fff3cd",
+          border: "1px solid #d4a017",
+          borderRadius: "8px",
+          p: 1.25,
+          mt: 1.5,
+        }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>🎂</span>
+          <Typography sx={{ fontSize: 12, color: "#5d4500", lineHeight: 1.5 }}>
+            Please double-check your <strong>Birth Date</strong> and computed <strong>Age</strong> above — this is used for eligibility checks and cannot be edited after your application is submitted.
+          </Typography>
         </Box>
       </DialogContent>
 
@@ -1583,6 +1672,7 @@ const RegistrationSuccessModal = ({
   middleName,
   lastName,
   birthday,
+  age,
   companyName,
   mainButtonColor,
   isMobile,
@@ -1690,6 +1780,12 @@ const RegistrationSuccessModal = ({
                   {birthday || "—"}
                 </Typography>
               </Box>
+              <Box sx={{ flex: "1 1 45%", minWidth: 100 }}>
+                <Typography sx={{ fontSize: 11.5, color: "#000" }}>Age</Typography>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#222" }}>
+                  {age || "—"}
+                </Typography>
+              </Box>
               <Box sx={{ flex: "1 1 100%" }}>
                 <Typography sx={{ fontSize: 11.5, color: "#000" }}>Email Address</Typography>
                 <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#222", wordBreak: "break-all" }}>
@@ -1703,6 +1799,7 @@ const RegistrationSuccessModal = ({
             </Typography>
           </Box>
         </Box>
+
       </DialogContent>
 
       <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2.5, pt: 1.5 }}>
@@ -1934,6 +2031,11 @@ const Register = () => {
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [birthday, setBirthday] = useState("");
+  const [age, setAge] = useState("");
+
+  useEffect(() => {
+    setAge(birthday ? calculateAge(birthday) : "");
+  }, [birthday]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [academicProgram, setAcademicProgram] = useState("");
   const [applyingAs, setApplyingAs] = useState("");
@@ -2073,6 +2175,7 @@ const Register = () => {
     firstName,
     middleName,
     birthday,
+    age,
     academicProgramLabel: selectedProgramForReview?.name || "",
     applyingAsLabel: applyingAsLabelMap[applyingAs] || "",
     curriculumLabel: selectedCurriculumForReview
@@ -2146,6 +2249,7 @@ const Register = () => {
         firstName,
         middleName,
         birthday,
+        age,
         academicProgram,
         applyingAs,
         program: selectedCurriculum,
@@ -2383,32 +2487,187 @@ const Register = () => {
                   {errors.firstName && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
                 </div>
 
-                <div className="TextField" style={{ position: "relative" }}>
-                  <label style={{ color: "black" }}>Middle Name (Optional)</label>
-                  <input type="text" placeholder="Enter your middle name" value={middleName} disabled={fieldDisabled}
-                    onChange={(e) => setMiddleName(e.target.value.toUpperCase())} onKeyDown={handleKeyDownRegister} className="border"
-                    style={{ paddingLeft: "2.80rem", height: inputH, fontSize: "16px", border: "2px solid black", width: "100%" }} />
-                  <PersonIcon style={{ position: "absolute", top: "2.80rem", left: "0.7rem", fontSize: "20px" }} />
-                </div>
 
-                <div className="TextField" style={{ position: "relative" }}>
-                  <label style={{ color: "black" }}>Birth Date<span style={{ color: "red" }}> *</span></label>
-                  <DateField
-                    required
-                    value={birthday}
-                    disabled={fieldDisabled}
-                    onChange={(e) => setBirthday(e.target.value)}
-                    style={{
-                      paddingLeft: "1rem",
-                      height: inputH,
 
-                      borderRadius: "10px",
-                      fontSize: "16px",
-                      border: errors.birthday ? "2px solid red" : "2px solid black",
-                      width: "100%",
-                    }}
-                  />
-                  {errors.birthday && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
+
+              </div>
+              <div className="TextField" style={{ position: "relative" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: isMobile ? "column" : "row",
+                    gap: isMobile ? "1rem" : "0.75rem",
+                  }}
+                >
+                  {/* Middle Name — full width on mobile, shares row on desktop */}
+                  <div style={{ flex: isMobile ? "none" : 2.2, position: "relative", display: "flex", flexDirection: "column" }}>
+                    <label
+                      style={{
+                        color: "black",
+                        height: "20px",
+                        display: "flex",
+                        alignItems: "center",
+                        whiteSpace: "nowrap",
+                        fontSize: "14px",
+                      }}
+                    >
+                      Middle Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter your middle name"
+                      value={middleName}
+                      disabled={fieldDisabled}
+                      onChange={(e) => setMiddleName(e.target.value.toUpperCase())}
+                      onKeyDown={handleKeyDownRegister}
+                      className="border"
+                      style={{
+                        paddingLeft: "2.80rem",
+                        height: inputH,
+                        fontSize: "16px",
+                        border: "2px solid black",
+                        width: "100%",
+                      }}
+                    />
+                    <PersonIcon style={{ position: "absolute", top: "calc(20px + 1.3rem)", left: "0.7rem", fontSize: "20px" }} />
+                  </div>
+
+                  {isMobile ? (
+                    // ── MOBILE: Birth Date + Age nested together, sharing their own row ──
+                    <div style={{ display: "flex", gap: "0.75rem" }}>
+                      <div style={{ flex: 2.3, display: "flex", flexDirection: "column" }}>
+                        <label
+                          style={{
+                            color: "black",
+                            height: "20px",
+                            display: "flex",
+                            alignItems: "center",
+                            whiteSpace: "nowrap",
+                            fontSize: "14px",
+                          }}
+                        >
+                          Birth Date<span style={{ color: "red" }}> *</span>
+                        </label>
+                        <DateField
+                          required
+                          value={birthday}
+                          disabled={fieldDisabled}
+                          onChange={(e) => setBirthday(e.target.value)}
+                          style={{
+                            paddingLeft: "1rem",
+                            height: inputH,
+                            borderRadius: "10px",
+                            fontSize: "14px",
+                            border: errors.birthday ? "2px solid red" : "2px solid black",
+                            width: "100%",
+                          }}
+                        />
+                        {errors.birthday && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
+                      </div>
+
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                        <label
+                          style={{
+                            color: "black",
+                            height: "20px",
+                            display: "flex",
+                            alignItems: "center",
+                            whiteSpace: "nowrap",
+                            fontSize: "14px",
+                          }}
+                        >
+                          Age
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={age}
+                          placeholder="—"
+                          className="border"
+                          style={{
+                            height: inputH,
+                            fontSize: "16px",
+                            textAlign: "center",
+                            border: "2px solid black",
+                            borderRadius: "10px",
+                            width: "100%",
+                            backgroundColor: "#f0f0f0",
+                            color: "#333",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    // ── DESKTOP: Birth Date and Age are flat siblings of Middle Name,
+                    //    same as the original working layout — no extra wrapper div,
+                    //    so their flex ratios (1.5 / 0.7) are relative to the full row,
+                    //    not squeezed by a content-sized "auto" wrapper. ──
+                    <>
+                      <div style={{ flex: 1.5, display: "flex", flexDirection: "column" }}>
+                        <label
+                          style={{
+                            color: "black",
+                            height: "20px",
+                            display: "flex",
+                            alignItems: "center",
+                            whiteSpace: "nowrap",
+                            fontSize: "14px",
+                          }}
+                        >
+                          Birth Date<span style={{ color: "red" }}> *</span>
+                        </label>
+                        <DateField
+                          required
+                          value={birthday}
+                          disabled={fieldDisabled}
+                          onChange={(e) => setBirthday(e.target.value)}
+                          style={{
+                            paddingLeft: "1rem",
+                            height: inputH,
+                            borderRadius: "10px",
+                            fontSize: "16px",
+                            border: errors.birthday ? "2px solid red" : "2px solid black",
+                            width: "100%",
+                          }}
+                        />
+                        {errors.birthday && <span style={{ color: "red", fontSize: "15px" }}>This field is required</span>}
+                      </div>
+
+                      <div style={{ flex: 0.7, display: "flex", flexDirection: "column" }}>
+                        <label
+                          style={{
+                            color: "black",
+                            height: "20px",
+                            display: "flex",
+                            alignItems: "center",
+                            whiteSpace: "nowrap",
+                            fontSize: "14px",
+                          }}
+                        >
+                          Age
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={age}
+                          placeholder="—"
+                          className="border"
+                          style={{
+                            height: inputH,
+                            fontSize: "16px",
+                            textAlign: "center",
+                            border: "2px solid black",
+                            borderRadius: "10px",
+                            width: "100%",
+                            backgroundColor: "#f0f0f0",
+                            color: "#333",
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -2764,6 +3023,7 @@ const Register = () => {
           middleName={middleName}
           lastName={lastName}
           birthday={birthday}
+          age={age}
           companyName={settings?.company_name}
           mainButtonColor={mainButtonColor}
           isMobile={isCompact}

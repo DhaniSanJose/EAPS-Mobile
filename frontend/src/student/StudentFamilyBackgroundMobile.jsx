@@ -378,6 +378,52 @@ const StudentDashboard2Mobile = () => {
     handleUpdate(updatedPerson);
   };
 
+  const normalizePersonSiblings = (data) => {
+    let siblingsVal = data.siblings;
+    if (typeof siblingsVal === "string") {
+      try { siblingsVal = JSON.parse(siblingsVal); } catch { siblingsVal = []; }
+    }
+    return {
+      ...data,
+      siblings: Array.isArray(siblingsVal) ? siblingsVal : [],
+      has_no_siblings: data.has_no_siblings === 1 ? 1 : 0,
+    };
+  };
+
+  const handleNoSiblingsCheck = (e) => {
+    if (!canEdit("siblings")) return;
+    const checked = e.target.checked;
+    const updated = { ...person, has_no_siblings: checked ? 1 : 0, siblings: checked ? [] : person.siblings };
+    setPerson(updated);
+    handleUpdate(updated);
+  };
+
+  const addSibling = () => {
+    if (!canEdit("siblings")) return;
+    const updated = {
+      ...person,
+      siblings: [...(person.siblings || []), { id: Date.now(), name: "", age: "", schoolLevel: "", schoolLastAttended: "", schoolAddress: "", occupation: "", monthlyIncome: "" }],
+    };
+    setPerson(updated);
+    handleUpdate(updated);
+  };
+
+  const removeSibling = (index) => {
+    if (!canEdit("siblings")) return;
+    const updated = { ...person, siblings: (person.siblings || []).filter((_, i) => i !== index) };
+    setPerson(updated);
+    handleUpdate(updated);
+  };
+
+  const handleSiblingFieldChange = (index, field, value) => {
+    if (!canEdit("siblings")) return;
+    const updatedSiblings = [...(person.siblings || [])];
+    updatedSiblings[index] = { ...updatedSiblings[index], [field]: value };
+    setPerson((prev) => ({ ...prev, siblings: updatedSiblings }));
+  };
+
+  const handleSiblingFieldBlur = () => handleUpdate(person);
+
   // ── Auto-save (student endpoint, unchanged) ─────────────────────────────────
   const handleUpdate = async (updated) => {
     try {
@@ -569,6 +615,8 @@ const StudentDashboard2Mobile = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
+  const [studentNumber, setStudentNumber] = useState("");
+
   const generateFormPdf = async (key) => {
     const config = FORM_CONFIGS[key];
     if (!config || generatingKey) return;
@@ -581,10 +629,26 @@ const StudentDashboard2Mobile = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — stamp the live "checked" DOM property onto a cloned copy
+      // of the node before reading innerHTML. Without this, checkboxes
+      // for gender/civilStatus/etc. always serialize as unchecked even
+      // though they render correctly on screen.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           person_id: userID || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
@@ -598,7 +662,7 @@ const StudentDashboard2Mobile = () => {
       const fileName = buildClientFilename(config.filenamePrefix, {
         lastName: person?.last_name,
         firstName: person?.first_name,
-        studentNo: userID,
+        studentNo: studentNumber,
       });
 
       const link = document.createElement("a");
@@ -1852,12 +1916,18 @@ const StudentDashboard2Mobile = () => {
         </Box>
 
         {/* ── Siblings ───────────────────────────────────────────────────── */}
+        {/* ── Siblings ───────────────────────────────────────────────────── */}
         <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
           <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
             Siblings (Mga Kapatid Mo)
           </Box>
           <Box sx={{ p: { xs: "14px", md: "20px" } }}>
-            <CheckRow checked={person.has_no_siblings === 1} onChange={handleNoSiblingsCheck}>
+            <CheckRow
+              checked={person.has_no_siblings === 1}
+              onChange={handleNoSiblingsCheck}
+              disabled={!canEdit("siblings")}
+              lockedBadge={!canEdit("siblings")}
+            >
               Check if there's no siblings
             </CheckRow>
 
@@ -1867,52 +1937,145 @@ const StudentDashboard2Mobile = () => {
               </div>
             )}
 
+            {!canEdit("siblings") && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: "#fce4ec",
+                  color: "#c62828",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "8px 10px",
+                  borderRadius: 6,
+                  marginBottom: 12,
+                }}
+              >
+                🔒 Siblings information is locked by admin.
+              </div>
+            )}
+
             {person.has_no_siblings !== 1 && (
               <>
                 {(person.siblings || []).map((sibling, index) => (
-                  <Box key={sibling.id || index} sx={{ border: `1px solid ${borderColor}`, borderRadius: 2, p: { xs: 1.5, md: 2 }, mb: 2, backgroundColor: "#fafafa" }}>
+                  <Box
+                    key={sibling.id || index}
+                    sx={{
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: 2,
+                      p: { xs: 1.5, md: 2 },
+                      mb: 2,
+                      backgroundColor: canEdit("siblings") ? "#fafafa" : "#f0f0f0",
+                    }}
+                  >
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
                       <Typography sx={{ fontWeight: 700, fontSize: 13 }}>Sibling {index + 1}</Typography>
-                      <Button size="small" variant="outlined" color="error" onClick={() => removeSibling(index)} sx={{ minWidth: 32, fontSize: 12, textTransform: "none" }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => removeSibling(index)}
+                        disabled={!canEdit("siblings")}
+                        sx={{ minWidth: 32, fontSize: 12, textTransform: "none" }}
+                      >
                         − Remove
                       </Button>
                     </Box>
 
                     <div style={gridCols2}>
                       <Field label="Name of Sibling" required error={errors[`sibling_name_${index}`]} helperText="This field is required.">
-                        <MInput value={sibling.name || ""} onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)} onBlur={handleSiblingFieldBlur} error={errors[`sibling_name_${index}`]} placeholder="Enter Sibling Name" />
+                        <MInput
+                          locked={!canEdit("siblings")}
+                          value={sibling.name || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                          error={errors[`sibling_name_${index}`]}
+                          placeholder="Enter Sibling Name"
+                        />
                       </Field>
                       <Field label="Age" required error={errors[`sibling_age_${index}`]} helperText="This field is required.">
-                        <MInput type="number" value={sibling.age || ""} onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)} onBlur={handleSiblingFieldBlur} error={errors[`sibling_age_${index}`]} placeholder="Age" />
+                        <MInput
+                          locked={!canEdit("siblings")}
+                          type="number"
+                          value={sibling.age || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                          error={errors[`sibling_age_${index}`]}
+                          placeholder="Age"
+                        />
                       </Field>
                     </div>
 
                     <div style={gridCols2}>
                       <Field label="School Level">
-                        <MInput value={sibling.schoolLevel || ""} onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="e.g. College" />
+                        <MInput
+                          locked={!canEdit("siblings")}
+                          value={sibling.schoolLevel || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                          placeholder="e.g. College"
+                        />
                       </Field>
                       <Field label="School Last Attended">
-                        <MInput value={sibling.schoolLastAttended || ""} onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter School Last Attended" />
+                        <MInput
+                          locked={!canEdit("siblings")}
+                          value={sibling.schoolLastAttended || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                          placeholder="Enter School Last Attended"
+                        />
                       </Field>
                     </div>
 
                     <Field label="School Address">
-                      <MInput value={sibling.schoolAddress || ""} onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter School Address" />
+                      <MInput
+                        locked={!canEdit("siblings")}
+                        value={sibling.schoolAddress || ""}
+                        onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)}
+                        onBlur={handleSiblingFieldBlur}
+                        placeholder="Enter School Address"
+                      />
                     </Field>
 
                     <div style={gridCols2}>
                       <Field label="Occupation">
-                        <MInput value={sibling.occupation || ""} onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter Occupation" />
+                        <MInput
+                          locked={!canEdit("siblings")}
+                          value={sibling.occupation || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                          placeholder="Enter Occupation"
+                        />
                       </Field>
                       <Field label="Monthly Income">
-                        <MInput type="number" value={sibling.monthlyIncome || ""} onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)} onBlur={handleSiblingFieldBlur} placeholder="Enter Monthly Income" />
+                        <MInput
+                          locked={!canEdit("siblings")}
+                          type="number"
+                          value={sibling.monthlyIncome || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)}
+                          onBlur={handleSiblingFieldBlur}
+                          placeholder="Enter Monthly Income"
+                        />
                       </Field>
                     </div>
                   </Box>
                 ))}
 
-                <Button fullWidth={isPhone} variant="contained" onClick={addSibling}
-                  sx={{ backgroundColor: mainButtonColor, border: `1px solid ${borderColor}`, color: "#fff", textTransform: "none", fontWeight: 600, "&:hover": { backgroundColor: "#000" } }}>
+                <Button
+                  fullWidth={isPhone}
+                  variant="contained"
+                  onClick={addSibling}
+                  disabled={!canEdit("siblings")}
+                  sx={{
+                    backgroundColor: mainButtonColor,
+                    border: `1px solid ${borderColor}`,
+                    color: "#fff",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    "&:hover": { backgroundColor: "#000" },
+                  }}
+                >
                   + Add Sibling
                 </Button>
               </>

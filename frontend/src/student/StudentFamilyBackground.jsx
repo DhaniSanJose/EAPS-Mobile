@@ -150,21 +150,6 @@ const StudentDashboard2 = () => {
     window.location.href = "/login";
   }, [queryPersonId, studentNumber]);
 
-  const normalizePersonSiblings = (data) => {
-    let siblingsVal = data.siblings;
-    if (typeof siblingsVal === "string") {
-      try {
-        siblingsVal = JSON.parse(siblingsVal);
-      } catch {
-        siblingsVal = [];
-      }
-    }
-    return {
-      ...data,
-      siblings: Array.isArray(siblingsVal) ? siblingsVal : [],
-      has_no_siblings: data.has_no_siblings === 1 ? 1 : 0,
-    };
-  };
 
   const fetchByPersonId = async (personID) => {
     try {
@@ -282,43 +267,51 @@ const StudentDashboard2 = () => {
     setPerson(updatedPerson);
   };
 
+   const normalizePersonSiblings = (data) => {
+    let siblingsVal = data.siblings;
+    if (typeof siblingsVal === "string") {
+      try { siblingsVal = JSON.parse(siblingsVal); } catch { siblingsVal = []; }
+    }
+    return {
+      ...data,
+      siblings: Array.isArray(siblingsVal) ? siblingsVal : [],
+      has_no_siblings: data.has_no_siblings === 1 ? 1 : 0,
+    };
+  };
+
+  const handleNoSiblingsCheck = (e) => {
+    if (!canEdit("siblings")) return;
+    const checked = e.target.checked;
+    const updated = { ...person, has_no_siblings: checked ? 1 : 0, siblings: checked ? [] : person.siblings };
+    setPerson(updated);
+    handleUpdate(updated);
+  };
+
   const addSibling = () => {
-    const updatedSiblings = [
-      ...(person.siblings || []),
-      { id: Date.now(), name: "", age: "", schoolLevel: "", schoolLastAttended: "", schoolAddress: "", occupation: "", monthlyIncome: "" },
-    ];
-    const updatedPerson = { ...person, siblings: updatedSiblings };
-    setPerson(updatedPerson);
-    handleUpdate(updatedPerson);
+    if (!canEdit("siblings")) return;
+    const updated = {
+      ...person,
+      siblings: [...(person.siblings || []), { id: Date.now(), name: "", age: "", schoolLevel: "", schoolLastAttended: "", schoolAddress: "", occupation: "", monthlyIncome: "" }],
+    };
+    setPerson(updated);
+    handleUpdate(updated);
   };
 
   const removeSibling = (index) => {
-    const updatedSiblings = (person.siblings || []).filter((_, i) => i !== index);
-    const updatedPerson = { ...person, siblings: updatedSiblings };
-    setPerson(updatedPerson);
-    handleUpdate(updatedPerson);
+    if (!canEdit("siblings")) return;
+    const updated = { ...person, siblings: (person.siblings || []).filter((_, i) => i !== index) };
+    setPerson(updated);
+    handleUpdate(updated);
   };
 
   const handleSiblingFieldChange = (index, field, value) => {
+    if (!canEdit("siblings")) return;
     const updatedSiblings = [...(person.siblings || [])];
     updatedSiblings[index] = { ...updatedSiblings[index], [field]: value };
     setPerson((prev) => ({ ...prev, siblings: updatedSiblings }));
   };
 
-  const handleSiblingFieldBlur = () => {
-    handleUpdate(person);
-  };
-
-  const handleNoSiblingsCheck = (e) => {
-    const checked = e.target.checked;
-    const updatedPerson = {
-      ...person,
-      has_no_siblings: checked ? 1 : 0,
-      siblings: checked ? [] : person.siblings,
-    };
-    setPerson(updatedPerson);
-    handleUpdate(updatedPerson);
-  };
+  const handleSiblingFieldBlur = () => handleUpdate(person);
 
   const isFormValid = () => {
     const requiredFields = [];
@@ -445,10 +438,26 @@ const StudentDashboard2 = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — stamp the live "checked" DOM property onto a cloned copy
+      // of the node before reading innerHTML. Without this, checkboxes
+      // for gender/civilStatus/etc. always serialize as unchecked even
+      // though they render correctly on screen.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           person_id: userID || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
@@ -1190,73 +1199,85 @@ const StudentDashboard2 = () => {
             <br />
 
             <FormControlLabel
-              control={<Checkbox checked={person.has_no_siblings === 1} onChange={handleNoSiblingsCheck} />}
-              label="Check if there's no siblings"
+              control={
+                <Checkbox
+                  checked={person.has_no_siblings === 1}
+                  onChange={handleNoSiblingsCheck}
+                  disabled={!canEdit("siblings")}
+                />
+              }
+              label={
+                <Box component="span" sx={{ display: "inline-flex", alignItems: "center" }}>
+                  Check if there's no siblings
+                  {!canEdit("siblings") && <LockedBadge />}
+                </Box>
+              }
             />
             <br /><br />
 
             {person.has_no_siblings !== 1 && (
               <>
                 {(person.siblings || []).map((sibling, index) => (
-                  <Box key={sibling.id || index} sx={{ border: `1px solid ${borderColor}`, borderRadius: 2, p: 2, mb: 2, backgroundColor: "#fff" }}>
+                  <Box
+                    key={sibling.id || index}
+                    sx={{
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: 2,
+                      p: 2,
+                      mb: 2,
+                      backgroundColor: canEdit("siblings") ? "#fff" : "#f5f5f5",
+                    }}
+                  >
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                       <Typography fontWeight="bold">Sibling {index + 1}</Typography>
-                      <Button size="small" variant="outlined" color="error" onClick={() => removeSibling(index)} sx={{ minWidth: 36 }}>
+                      <Button
+                        size="small" variant="outlined" color="error"
+                        onClick={() => removeSibling(index)}
+                        disabled={!canEdit("siblings")}
+                        sx={{ minWidth: 36 }}
+                      >
                         − Remove
                       </Button>
                     </Box>
 
                     <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
-                      <Box flex="1 1 30%">
-                        <Typography variant="subtitle2" mb={0.5}>Name of Sibling</Typography>
-                        <TextField fullWidth size="small" placeholder="Enter Sibling Name" value={sibling.name || ""}
-                          onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)}
-                          onBlur={handleSiblingFieldBlur} error={errors[`sibling_name_${index}`]} />
-                      </Box>
-                      <Box flex="1 1 10%">
-                        <Typography variant="subtitle2" mb={0.5}>Age</Typography>
-                        <TextField fullWidth size="small" type="number" placeholder="Age" value={sibling.age || ""}
-                          onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)}
-                          onBlur={handleSiblingFieldBlur} error={errors[`sibling_age_${index}`]} />
-                      </Box>
-                      <Box flex="1 1 20%">
-                        <Typography variant="subtitle2" mb={0.5}>School Level</Typography>
-                        <TextField fullWidth size="small" placeholder="e.g. College" value={sibling.schoolLevel || ""}
-                          onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)}
-                          onBlur={handleSiblingFieldBlur} />
-                      </Box>
-                      <Box flex="1 1 30%">
-                        <Typography variant="subtitle2" mb={0.5}>School Last Attended</Typography>
-                        <TextField fullWidth size="small" placeholder="Enter School Last Attended" value={sibling.schoolLastAttended || ""}
-                          onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)}
-                          onBlur={handleSiblingFieldBlur} />
-                      </Box>
-                      <Box flex="1 1 45%">
-                        <Typography variant="subtitle2" mb={0.5}>School Address</Typography>
-                        <TextField fullWidth size="small" placeholder="Enter School Address" value={sibling.schoolAddress || ""}
-                          onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)}
-                          onBlur={handleSiblingFieldBlur} />
-                      </Box>
-                      <Box flex="1 1 25%">
-                        <Typography variant="subtitle2" mb={0.5}>Occupation</Typography>
-                        <TextField fullWidth size="small" placeholder="Enter Occupation" value={sibling.occupation || ""}
-                          onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)}
-                          onBlur={handleSiblingFieldBlur} />
-                      </Box>
-                      <Box flex="1 1 25%">
-                        <Typography variant="subtitle2" mb={0.5}>Monthly Income</Typography>
-                        <TextField fullWidth size="small" type="number" placeholder="Enter Monthly Income" value={sibling.monthlyIncome || ""}
-                          onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)}
-                          onBlur={handleSiblingFieldBlur} />
-                      </Box>
+                      {[
+                        { key: "name", label: "Name of Sibling", basis: "30%", err: `sibling_name_${index}` },
+                        { key: "age", label: "Age", basis: "10%", err: `sibling_age_${index}`, type: "number" },
+                        { key: "schoolLevel", label: "School Level", basis: "20%" },
+                        { key: "schoolLastAttended", label: "School Last Attended", basis: "30%" },
+                        { key: "schoolAddress", label: "School Address", basis: "45%" },
+                        { key: "occupation", label: "Occupation", basis: "25%" },
+                        { key: "monthlyIncome", label: "Monthly Income", basis: "25%", type: "number" },
+                      ].map(({ key, label, basis, err, type }) => (
+                        <Box key={key} flex={`1 1 ${basis}`}>
+                          <Typography variant="subtitle2" mb={0.5}>{label}</Typography>
+                          <TextField
+                            fullWidth size="small" type={type || "text"}
+                            placeholder={`Enter ${label}`}
+                            value={sibling[key] || ""}
+                            onChange={(e) => handleSiblingFieldChange(index, key, e.target.value)}
+                            onBlur={handleSiblingFieldBlur}
+                            error={err ? errors[err] : undefined}
+                            InputProps={{ readOnly: !canEdit("siblings") }}
+                            sx={!canEdit("siblings") ? { backgroundColor: "#f5f5f5" } : {}}
+                          />
+                        </Box>
+                      ))}
                     </Box>
                   </Box>
                 ))}
 
-                <Button variant="contained" onClick={addSibling}
-                  sx={{ backgroundColor: mainButtonColor, border: `1px solid ${borderColor}`, color: "#fff", mb: 2, "&:hover": { backgroundColor: "#000" } }}>
-                  + Add Sibling
-                </Button>
+                {canEdit("siblings") ? (
+                  <Button variant="contained" onClick={addSibling}
+                    sx={{ backgroundColor: mainButtonColor, border: `1px solid ${borderColor}`, color: "#fff", mb: 2, "&:hover": { backgroundColor: "#000" } }}>
+                    + Add Sibling
+                  </Button>
+                ) : (
+                  <Typography variant="body2" sx={{ color: "#c62828", display: "flex", alignItems: "center" }}>
+                    <LockedBadge /> Siblings information is locked by admin.
+                  </Typography>
+                )}
               </>
             )}
 

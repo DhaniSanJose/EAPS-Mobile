@@ -562,13 +562,31 @@ const AdminDashboard3 = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — sync live checkbox "checked" property onto the cloned markup
+      // before serializing. node.innerHTML alone never reflects the DOM
+      // property React set, so PDFs generated from it always show unchecked
+      // boxes even when the database has values like gender/civilStatus set.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: config.label,
+          audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
           ...getLoginMacPayload(),
@@ -596,6 +614,8 @@ const AdminDashboard3 = () => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingApplicantDocs(config.label, { failed: true });
       setSnackbar({
         open: true,
         message: `⚠️ Unable to generate ${config.label} PDF right now.`,

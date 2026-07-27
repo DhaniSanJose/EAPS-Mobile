@@ -1342,65 +1342,7 @@ const QualifyingExamScore = () => {
   const debounceTimers = useRef({});
   const manualSaveRef = useRef({});
 
-  const saveResultStatusChange = async (person, field, value) => {
-    try {
-      const payload = buildPayload(
-        person,
-        { [field]: value },
-        { includeStatus: false },
-      );
 
-      const res = await axios.post(
-        `${API_BASE_URL}/api/interview/save`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        },
-      );
-
-      if (!res.data?.success) {
-        throw new Error("Saving failed");
-      }
-
-      setPersons((prev) =>
-        prev.map((p) =>
-          p.person_id === person.person_id ? { ...p, [field]: value } : p,
-        ),
-      );
-
-      setSnack({
-        open: true,
-        message: "Result status updated successfully.",
-        severity: "success",
-      });
-    } catch (err) {
-      console.error("Error updating result status:", err);
-
-      setEditScores((prev) => {
-        const next = { ...prev };
-        const row = { ...(next[person.person_id] || {}) };
-        delete row[field];
-
-        if (Object.keys(row).length === 0) {
-          delete next[person.person_id];
-        } else {
-          next[person.person_id] = row;
-        }
-
-        return next;
-      });
-
-      await fetchApplicants();
-
-      setSnack({
-        open: true,
-        message: "Failed to update result status.",
-        severity: "error",
-      });
-    }
-  };
 
   const handleScoreChange = (person, field, value) => {
     setEditScores((prev) => ({
@@ -1410,10 +1352,6 @@ const QualifyingExamScore = () => {
         [field]: value,
       },
     }));
-
-    if (field === "qualifying_status" || field === "interview_status_result") {
-      saveResultStatusChange(person, field, value);
-    }
   };
 
   const [customCount, setCustomCount] = useState(0);

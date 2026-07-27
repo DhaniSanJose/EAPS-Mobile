@@ -125,8 +125,19 @@ const AdminDashboard2 = () => {
   const fetchByPersonId = async (personID) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
-      setPerson(res.data);
-      setSelectedPerson(res.data);
+
+      let siblingsVal = res.data.siblings;
+      if (typeof siblingsVal === "string") {
+        try { siblingsVal = JSON.parse(siblingsVal); } catch { siblingsVal = []; }
+      }
+      const safePerson = {
+        ...res.data,
+        siblings: Array.isArray(siblingsVal) ? siblingsVal : [],
+        has_no_siblings: res.data.has_no_siblings === 1 ? 1 : 0,
+      };
+
+      setPerson(safePerson);
+      setSelectedPerson(safePerson);
       if (res.data?.applicant_number) {
       }
     } catch (err) {
@@ -156,7 +167,8 @@ const AdminDashboard2 = () => {
     father_ext: "", father_nickname: "", father_education: "", father_education_level: "", father_last_school: "", father_course: "", father_year_graduated: "", father_school_address: "", father_contact: "", father_occupation: "", father_employer: "",
     father_income: "", father_email: "", mother_deceased: "", mother_family_name: "", mother_given_name: "", mother_middle_name: "", mother_ext: "", mother_nickname: "", mother_education: "", mother_education_level: "", mother_last_school: "", mother_course: "",
     mother_year_graduated: "", mother_school_address: "", mother_contact: "", mother_occupation: "", mother_employer: "", mother_income: "", mother_email: "", guardian: "", guardian_family_name: "", guardian_given_name: "",
-    guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "",
+    guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "", siblings: [],
+    has_no_siblings: 0,
   });
   const [selectedPerson, setSelectedPerson] = useState(null);
 
@@ -312,27 +324,22 @@ const AdminDashboard2 = () => {
   const fetchPersonData = async (id) => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/person/${id}`);
-
-      // Sanitize null values and set state
-      const safePerson = Object.fromEntries(
-        Object.entries(res.data).map(([key, val]) => [key, val ?? ""])
+      const sanitizedData = Object.fromEntries(
+        Object.entries(res.data).map(([key, value]) => [key, value ?? ""])
       );
 
-      setPerson(safePerson);
-
-      // ✅ Set dropdown based on existing deceased values
-      if (res.data.solo_parent === 1) {
-        if (res.data.father_deceased === 1) {
-          setSoloParentChoice("Mother");
-        } else if (res.data.mother_deceased === 1) {
-          setSoloParentChoice("Father");
-        }
+      let siblingsVal = res.data.siblings;
+      if (typeof siblingsVal === "string") {
+        try { siblingsVal = JSON.parse(siblingsVal); } catch { siblingsVal = []; }
       }
+      sanitizedData.siblings = Array.isArray(siblingsVal) ? siblingsVal : [];
+      sanitizedData.has_no_siblings = res.data.has_no_siblings === 1 ? 1 : 0;
+
+      setPerson(sanitizedData);
     } catch (error) {
-      console.error("Failed to fetch person data:", error);
+      console.error(error);
     }
   };
-
 
   const [isFatherDeceased, setIsFatherDeceased] = useState(false);
   const [isMotherDeceased, setIsMotherDeceased] = useState(false);
@@ -495,6 +502,15 @@ const AdminDashboard2 = () => {
       setSnackbar({ open: true, message: "No applicant selected.", severity: "warning" });
       return;
     }
+
+    if (person.has_no_siblings !== 1) {
+      const siblings = person.siblings || [];
+      if (siblings.length === 0 || siblings.some(s => !s.name?.trim() || !s.age?.toString().trim())) {
+        setSnackbar({ open: true, message: "Please complete sibling name and age, or check 'no siblings'.", severity: "error" });
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       await handleUpdate(person);
@@ -634,6 +650,34 @@ const AdminDashboard2 = () => {
     setPerson(updatedPerson);
   };
 
+  const addSibling = () => {
+    const updatedSiblings = [
+      ...(person.siblings || []),
+      { id: Date.now(), name: "", age: "", schoolLevel: "", schoolLastAttended: "", schoolAddress: "", occupation: "", monthlyIncome: "" },
+    ];
+    setPerson({ ...person, siblings: updatedSiblings });
+  };
+
+  const removeSibling = (index) => {
+    const updatedSiblings = (person.siblings || []).filter((_, i) => i !== index);
+    setPerson({ ...person, siblings: updatedSiblings });
+  };
+
+  const handleSiblingFieldChange = (index, field, value) => {
+    const updatedSiblings = [...(person.siblings || [])];
+    updatedSiblings[index] = { ...updatedSiblings[index], [field]: value };
+    setPerson((prev) => ({ ...prev, siblings: updatedSiblings }));
+  };
+
+  const handleNoSiblingsCheck = (e) => {
+    const checked = e.target.checked;
+    setPerson({
+      ...person,
+      has_no_siblings: checked ? 1 : 0,
+      siblings: checked ? [] : person.siblings,
+    });
+  };
+
 
 
   const divToPrintRef = useRef();
@@ -750,13 +794,31 @@ const AdminDashboard2 = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — sync live checkbox "checked" property onto the cloned markup
+      // before serializing. node.innerHTML alone never reflects the DOM
+      // property React set, so PDFs generated from it always show unchecked
+      // boxes even when the database has values like gender/civilStatus set.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: config.label,
+          audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
           ...getLoginMacPayload(),
@@ -784,6 +846,8 @@ const AdminDashboard2 = () => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingApplicantDocs(config.label, { failed: true });
       setSnackbar({
         open: true,
         message: `⚠️ Unable to generate ${config.label} PDF right now.`,
@@ -2412,6 +2476,74 @@ const AdminDashboard2 = () => {
               </Box>
             </Box>
 
+            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>
+              Siblings (Mga Kapatid Mo)
+            </Typography>
+            <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+            <br />
+
+            <FormControlLabel
+              control={<Checkbox checked={person.has_no_siblings === 1} onChange={handleNoSiblingsCheck} />}
+              label="Check if there's no siblings"
+            />
+            <br /><br />
+
+            {person.has_no_siblings !== 1 && (
+              <>
+                {(person.siblings || []).map((sibling, index) => (
+                  <Box key={sibling.id || index} sx={{ border: `1px solid ${borderColor}`, borderRadius: 2, p: 2, mb: 2, backgroundColor: "#fff" }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography fontWeight="bold">Sibling {index + 1}</Typography>
+                      <Button size="small" variant="outlined" color="error" onClick={() => removeSibling(index)} sx={{ minWidth: 36 }}>
+                        − Remove
+                      </Button>
+                    </Box>
+                    <Box display="flex" gap={2} flexWrap="wrap">
+                      <Box flex="1 1 30%">
+                        <Typography variant="subtitle2" mb={0.5}>Name of Sibling</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter Sibling Name" value={sibling.name || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)} />
+                      </Box>
+                      <Box flex="1 1 10%">
+                        <Typography variant="subtitle2" mb={0.5}>Age</Typography>
+                        <TextField fullWidth size="small" type="number" placeholder="Age" value={sibling.age || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)} />
+                      </Box>
+                      <Box flex="1 1 20%">
+                        <Typography variant="subtitle2" mb={0.5}>School Level</Typography>
+                        <TextField fullWidth size="small" placeholder="e.g. College" value={sibling.schoolLevel || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)} />
+                      </Box>
+                      <Box flex="1 1 30%">
+                        <Typography variant="subtitle2" mb={0.5}>School Last Attended</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter School Last Attended" value={sibling.schoolLastAttended || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)} />
+                      </Box>
+                      <Box flex="1 1 45%">
+                        <Typography variant="subtitle2" mb={0.5}>School Address</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter School Address" value={sibling.schoolAddress || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)} />
+                      </Box>
+                      <Box flex="1 1 25%">
+                        <Typography variant="subtitle2" mb={0.5}>Occupation</Typography>
+                        <TextField fullWidth size="small" placeholder="Enter Occupation" value={sibling.occupation || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)} />
+                      </Box>
+                      <Box flex="1 1 25%">
+                        <Typography variant="subtitle2" mb={0.5}>Monthly Income</Typography>
+                        <TextField fullWidth size="small" type="number" placeholder="Enter Monthly Income" value={sibling.monthlyIncome || ""}
+                          onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)} />
+                      </Box>
+                    </Box>
+                  </Box>
+                ))}
+
+                <Button variant="contained" onClick={addSibling} sx={{ backgroundColor: mainButtonColor, border: `1px solid ${borderColor}`, color: "#fff", mb: 2, "&:hover": { backgroundColor: "#000" } }}>
+                  + Add Sibling
+                </Button>
+              </>
+            )}
+
             <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Family (Annual Income)</Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
@@ -2643,20 +2775,20 @@ const AdminDashboard2 = () => {
           </Container>
         </form>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          severity={snackbar.severity}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3000}
           onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-          sx={{ width: "100%" }}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+          <Alert
+            severity={snackbar.severity}
+            onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+            sx={{ width: "100%" }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
 
       </Container>
     </Box>

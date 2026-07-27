@@ -84,9 +84,9 @@ const OfficialStudentDashboard4 = () => {
     const [user, setUser] = useState("");
     const [userRole, setUserRole] = useState("");
     const [person, setPerson] = useState({
-        cough: "", colds: "", fever: "", asthma: "", fainting: "", heartDisease: "", tuberculosis: "",
+        cough: "", colds: "", fever: "", asthma: "", faintingSpells: "", heartDisease: "", tuberculosis: "",
         frequentHeadaches: "", hernia: "", chronicCough: "", headNeckInjury: "", hiv: "", highBloodPressure: "",
-        diabetesMellitus: "", allergies: "", cancer: "", smoking: "", alcoholDrinking: "", hospitalized: "",
+        diabetesMellitus: "", allergies: "", cancer: "", smokingCigarette: "", alcoholDrinking: "", hospitalized: "",
         hospitalizationDetails: "", medications: "", hadCovid: "", covidDate: "",
         vaccine1Brand: "", vaccine1Date: "", vaccine2Brand: "", vaccine2Date: "",
         booster1Brand: "", booster1Date: "", booster2Brand: "", booster2Date: "",
@@ -486,16 +486,32 @@ const OfficialStudentDashboard4 = () => {
             const node = hiddenFormRef.current;
             if (!node) throw new Error(`${config.label} did not render in time.`);
 
+            // ✅ FIX — React's `checked` is a DOM property, not an HTML attribute,
+            // so it never shows up in node.innerHTML. Clone the node and manually
+            // stamp "checked" onto the markup based on the live checkbox state
+            // before serializing, otherwise every checkbox renders unchecked in
+            // the generated PDF regardless of the actual database value.
+            const clonedNode = node.cloneNode(true);
+            const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+            const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+            liveCheckboxes.forEach((liveBox, i) => {
+                const clonedBox = clonedCheckboxes[i];
+                if (liveBox.checked) {
+                    clonedBox.setAttribute("checked", "checked");
+                } else {
+                    clonedBox.removeAttribute("checked");
+                }
+            });
+
             const response = await axios.post(
                 `${API_BASE_URL}${config.endpoint}`,
                 {
-                    html: node.innerHTML,
+                    html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
                     applicant_number: person?.applicant_number || "",
                     last_name: person?.last_name || "",
                     first_name: person?.first_name || "",
                     audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
                     audit_actor_role: userRole || "registrar",
-                    ...getLoginMacPayload(),
                 },
                 { responseType: "blob" },
             );

@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.50.37:5173",
+  "http://192.168.1.10:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -102,6 +102,7 @@ const applicantFormRoute = require("./routes/applicant_routes/applicantFormRoute
 const examPermit = require("./routes/applicant_routes/examPermitRoute");
 const requirementsUploaderRoute = require("./routes/applicant_routes/requirementsUploaderRoute");
 const studentRoute = require("./routes/student_routes/studentRoute");
+const studentEditInformation = require("./routes/student_routes/studentEditInformation");
 const adminRoute = require("./routes/admin_routes/registrarRoute");
 const signature = require("./routes/admin_routes/signature");
 const facultyRoute = require("./routes/faculty_routes/facultyRoute");
@@ -207,6 +208,7 @@ app.use("/api", QualifyingInterviewExam);
 app.use("/api", medicalExamRoute);
 app.use("/api", qrCodeForStudents);
 app.use("/api", receiptCounter);
+app.use("/api", studentEditInformation);
 app.use("/api", matriculationPayment);
 app.use("/api", studentPayment);
 app.use("/api", importRoutes);
@@ -3637,6 +3639,22 @@ app.put("/api/enrollment/person/:person_id", async (req, res) => {
   const sanitizedData = Object.fromEntries(
     Object.entries(updatedData).filter(([key]) => !excludedFields.includes(key))
   );
+
+  // ✅ FIX — mysql2's `SET ?` escaping mangles arrays/objects (e.g. `siblings`,
+  // which can arrive as a parsed JS array from the frontend instead of a
+  // JSON string). Left as-is, an array value like [{name:"A"},{name:"B"}]
+  // gets serialized as `siblings` = '[object Object]', '[object Object]'
+  // — a comma inside a single SET assignment — which breaks the whole
+  // UPDATE statement with a SQL syntax error. Stringify any non-null
+  // object/array value here so every field becomes a single scalar before
+  // it reaches the query builder, regardless of what shape the caller sent.
+  for (const key of Object.keys(sanitizedData)) {
+    const value = sanitizedData[key];
+    if (value !== null && typeof value === "object") {
+      sanitizedData[key] = JSON.stringify(value);
+    }
+  }
+
   if (typeof sanitizedData.emailAddress === "string") {
     sanitizedData.emailAddress = sanitizedData.emailAddress.trim().toLowerCase();
   }
@@ -3774,161 +3792,6 @@ app.put("/api/enrollment/person/:person_id", async (req, res) => {
   }
 });
 
-app.get("/api/student_edit_permissions", async (req, res) => {
-  try {
-    const [rows] = await db3.query("SELECT field_id, is_editable FROM student_edit_permissions");
-    const result = {};
-    rows.forEach((r) => { result[r.field_id] = r.is_editable === 1; });
-    res.json(result);
-  } catch (err) {
-    console.error("GET student_edit_permissions:", err);
-    res.status(500).json({ error: "Failed to fetch permissions" });
-  }
-});
-
-// POST /api/student_edit_permissions
-// Body: { fieldId: true/false, ... }
-//   or: {
-//         permissions: { fieldId: true/false },
-//         field_labels?: { fieldId: "Label" },
-//         field_sections?: { fieldId: "Section Title" }
-//       }
-app.post("/api/student_edit_permissions", async (req, res) => {
-  try {
-    const rawBody = req.body || {};
-    const permissions =
-      rawBody.permissions &&
-        typeof rawBody.permissions === "object" &&
-        !Array.isArray(rawBody.permissions)
-        ? rawBody.permissions
-        : rawBody;
-    const fieldSections =
-      rawBody.field_sections &&
-        typeof rawBody.field_sections === "object" &&
-        !Array.isArray(rawBody.field_sections)
-        ? rawBody.field_sections
-        : {};
-
-    const entries = Object.entries(permissions).filter(
-      ([key]) =>
-        key !== "permissions" &&
-        key !== "field_labels" &&
-        key !== "field_sections" &&
-        key !== "reset_to_defaults",
-    );
-    if (entries.length === 0) return res.json({ success: true });
-
-    const isResetToDefaults = Boolean(rawBody.reset_to_defaults);
-
-    const fieldIds = entries.map(([fieldId]) => fieldId);
-    const [existingRows] = await db3.query(
-      `SELECT field_id, is_editable
-       FROM student_edit_permissions
-       WHERE field_id IN (?)`,
-      [fieldIds],
-    );
-    const existingMap = {};
-    (existingRows || []).forEach((row) => {
-      existingMap[row.field_id] = Number(row.is_editable) === 1;
-    });
-
-    const turnedOnBySection = {};
-    const turnedOffBySection = {};
-    entries.forEach(([fieldId, val]) => {
-      const nextValue = Boolean(val);
-      const previousValue = Object.prototype.hasOwnProperty.call(existingMap, fieldId)
-        ? existingMap[fieldId]
-        : null;
-      if (previousValue === nextValue) return;
-
-      const sectionTitle =
-        String(fieldSections[fieldId] || "").trim() || "General";
-      if (nextValue) {
-        turnedOnBySection[sectionTitle] =
-          (turnedOnBySection[sectionTitle] || 0) + 1;
-      } else {
-        turnedOffBySection[sectionTitle] =
-          (turnedOffBySection[sectionTitle] || 0) + 1;
-      }
-    });
-
-    const formatTogglePhrase = (count, direction) => {
-      const noun = count === 1 ? "toggle" : "toggles";
-      const verb = count === 1 ? "was" : "were";
-      return `${count} ${noun} ${verb} turned ${direction}`;
-    };
-
-    const changedSections = [
-      ...new Set([
-        ...Object.keys(turnedOnBySection),
-        ...Object.keys(turnedOffBySection),
-      ]),
-    ];
-    const changeParts = changedSections.map((sectionTitle) => {
-      const phrases = [];
-      if (turnedOnBySection[sectionTitle]) {
-        phrases.push(formatTogglePhrase(turnedOnBySection[sectionTitle], "on"));
-      }
-      if (turnedOffBySection[sectionTitle]) {
-        phrases.push(formatTogglePhrase(turnedOffBySection[sectionTitle], "off"));
-      }
-      return `${sectionTitle} and ${phrases.join(" and ")}`;
-    });
-
-    // Build bulk upsert
-    const values = entries.map(([fieldId, val]) => [fieldId, val ? 1 : 0]);
-    await db3.query(
-      `INSERT INTO student_edit_permissions (field_id, is_editable)
-       VALUES ?
-       ON DUPLICATE KEY UPDATE is_editable = VALUES(is_editable)`,
-      [values]
-    );
-
-    const actor = await getAuditEventActorFromRequest(req);
-    const roleLabel =
-      String(actor.accessDescription || "").trim() ||
-      formatAuditActorRole(
-        req.headers["x-audit-actor-role"] ||
-        req.body?.audit_actor_role ||
-        "registrar",
-      );
-    const actorId = actor.id || "unknown";
-    const actorName = actor.name || actor.email || actorId;
-    const pageLabel =
-      String(req.headers["x-audit-change-section"] || "").trim() ||
-      "Student Edit Permissions";
-    const actorDisplay = `${roleLabel} ${actorName} (${actorId})`;
-    const lockedCount = entries.filter(([, val]) => !Boolean(val)).length;
-    const changeSummary =
-      changeParts.length > 0 ? changeParts.join("; ") : "no field changes";
-
-    const auditAction = isResetToDefaults
-      ? "STUDENT_EDIT_PERMISSIONS_RESET"
-      : "STUDENT_EDIT_PERMISSIONS_UPDATE";
-    const auditMessage = isResetToDefaults
-      ? `${actorDisplay} reset student edit permissions for ${pageLabel} to defaults (all fields locked${lockedCount ? `, ${lockedCount} toggle${lockedCount === 1 ? "" : "s"}` : ""}).`
-      : `${actorDisplay} updated student edit permissions for ${pageLabel}: ${changeSummary}.`;
-
-    await insertAuditLogEnrollment({
-      actorId,
-      role: roleLabel,
-      action: auditAction,
-      severity: "INFO",
-      message: auditMessage,
-    });
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error("POST student_edit_permissions:", err);
-    res.status(500).json({ error: "Failed to save permissions" });
-  }
-});
-
-
-// ===========================================================
-//  STUDENT  can update ONLY their own personal information
-//     (db3 ENROLLMENT person_table)
-// ===========================================================
 
 // GET for Dashboard1
 app.get("/api/dashboard1/:id", checkStepAccess(1), async (req, res) => {
@@ -4773,6 +4636,7 @@ app.post("/api/generate-cor-pdf", async (req, res) => {
     }
   }
 });
+
 
 app.get("/api/submitted-status/:person_id", async (req, res) => {
   const { person_id } = req.params;

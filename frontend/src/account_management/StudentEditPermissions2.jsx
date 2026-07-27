@@ -130,6 +130,15 @@ const SECTIONS = [
     ],
   },
   {
+    id: "siblings",
+    title: "Siblings",
+    icon: <PeopleIcon />,
+    fields: [
+      { id: "has_no_siblings", label: "No Siblings (checkbox)", system: false, defaultOn: true },
+      { id: "siblings", label: "Siblings Information", system: false, defaultOn: true },
+    ],
+  },
+  {
     id: "income",
     title: "Family Annual Income",
     icon: <AttachMoneyIcon />,

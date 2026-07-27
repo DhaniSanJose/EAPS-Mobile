@@ -48,7 +48,49 @@ import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import { ArrowBackIos, ArrowForwardIos, Campaign, } from "@mui/icons-material";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
+// ─────────────────────────────────────────────────────────────────────────
+// ✅ NEW: small presentational helpers used by the "Application Snapshot"
+// cards below (Application Progress / Details / Requirements Status).
+// Defined once, outside the component, so they aren't recreated every render.
+// ─────────────────────────────────────────────────────────────────────────
+const ProgressRing = ({ percentage, color = "#1976d2", size = 72 }) => {
+  const strokeWidth = 7;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.min(Math.max(percentage, 0), 100);
+  const offset = circumference - (clamped / 100) * circumference;
+
+  return (
+    <Box sx={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size}>
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="#eee" strokeWidth={strokeWidth} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{ transition: "stroke-dashoffset 0.4s ease" }}
+        />
+      </svg>
+      <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#222" }}>{clamped}%</Typography>
+      </Box>
+    </Box>
+  );
+};
+
+const StatusDot = ({ state }) => {
+  const color = state === "done" ? "#2e7d32" : state === "current" ? "#f5a623" : "#ccc";
+  return <Box sx={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: color, flexShrink: 0 }} />;
+};
 
 const ApplicantDashboard = (props) => {
   const settings = useContext(SettingsContext);
@@ -401,10 +443,16 @@ const ApplicantDashboard = (props) => {
   const [mainStatus, setMainStatus] = useState(null);
   const [registrarApproved, setRegistrarApproved] = useState(false);
 
+  // ✅ NEW: raw requirement rows, kept so we can derive reqStats below.
+  const [requirementRows, setRequirementRows] = useState([]);
+
   const fetchDocumentsStatus = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/applicant_uploaded_requirements/${person_id}`);
       const rows = res.data;
+
+      setRequirementRows(Array.isArray(rows) ? rows : []); // ✅ NEW
+
       if (!rows || rows.length === 0) { setDocsCompleted(false); return; }
       const uploaded = rows.filter((doc) => doc.file_path !== null);
       const totalRequired = rows.length;
@@ -759,25 +807,71 @@ const ApplicantDashboard = (props) => {
   // Mobile accordion state
   const [expandedStep, setExpandedStep] = useState(activeStep);
 
+  // ─────────────────────────────────────────────────────────────────────
+  // ✅ NEW: derived values used by the "Application Snapshot" cards
+  // (Application Progress / Application Details / Requirements Status).
+  // These were previously referenced in JSX below without being defined
+  // anywhere, which crashed the render with "X is not defined".
+  // ─────────────────────────────────────────────────────────────────────
+  const reqStats = React.useMemo(() => {
+    const total = requirementRows.length;
+    const submitted = requirementRows.filter(
+      (r) => Number(r.submitted_documents) === 1,
+    ).length;
+    const forVerification = requirementRows.filter(
+      (r) => r.file_path && Number(r.submitted_documents) !== 1,
+    ).length;
+    const pending = Math.max(total - submitted - forVerification, 0);
+    return { total, submitted, pending, forVerification };
+  }, [requirementRows]);
+
+  const progressChecklist = [
+    { label: "Documents Submitted", done: docsCompleted },
+    { label: "Entrance Exam", done: hasSchedule || hasScores },
+    { label: "Interview / Qualifying Exam", done: !!interviewSchedule || hasInterviewScores },
+    { label: "College Approval", done: collegeApproval === "Accepted" || collegeApproval === "Rejected" },
+    { label: "Medical & Registrar", done: registrarApproved },
+    { label: "Final Status", done: person?.final_status === "Accepted" || person?.final_status === "Rejected" },
+  ];
+
+  const firstPendingIndex = progressChecklist.findIndex((item) => !item.done);
+  const progressPercentage = Math.round(
+    (progressChecklist.filter((item) => item.done).length / progressChecklist.length) * 100,
+  );
+
+  const applicationDetails = [
+    { label: "Applicant ID", value: applicantID || "N/A" },
+    {
+      label: "Full Name",
+      value: person
+        ? `${person.last_name || ""}, ${person.first_name || ""} ${person.middle_name || ""}`.trim()
+        : "N/A",
+    },
+    { label: "Document Status", value: person?.document_status || "Pending" },
+    { label: "Exam Status", value: examScore || examScores.status || "Pending" },
+    { label: "College Status", value: collegeApproval || "Pending" },
+    { label: "Student Number", value: studentNumber || "Not yet assigned" },
+  ];
+
   // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
 
   return (
     <Box
@@ -1856,6 +1950,144 @@ const ApplicantDashboard = (props) => {
             </Grid>
           )}
 
+          {/* ── APPLICATION SNAPSHOT (Progress / Details / Requirements) ──── */}
+          <Grid item xs={12}>
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              {/* Application Progress */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card
+                  sx={{
+                    borderRadius: "14px",
+                    boxShadow: 3,
+                    border: `2px solid ${borderColor}`,
+                    height: "100%",
+                    backgroundColor: "#fff",
+                    transition: "transform 0.2s ease",
+                    "&:hover": { transform: "scale(1.02)" },
+                  }}
+                >
+                  <CardContent>
+                    <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222", mb: 1.5 }}>
+                      Application Progress
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, color: "#999", mb: 1 }}>Overall Completion</Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                      <ProgressRing percentage={progressPercentage} color={mainButtonColor} />
+                      <Stack spacing={0.6} sx={{ flex: 1, minWidth: 140 }}>
+                        {progressChecklist.map((item, idx) => {
+                          const state = item.done ? "done" : idx === firstPendingIndex ? "current" : "upcoming";
+                          return (
+                            <Box key={item.label} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <StatusDot state={state} />
+                                <Typography sx={{ fontSize: 12, color: "#333" }}>{item.label}</Typography>
+                              </Stack>
+                              <Typography
+                                sx={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  color: state === "done" ? "#2e7d32" : state === "current" ? "#f5a623" : "#aaa",
+                                }}
+                              >
+                                {state === "done" ? "Completed" : "Pending"}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                    <Typography sx={{ fontSize: 11.5, color: "#888", mt: 1.5, fontStyle: "italic" }}>
+                      {progressPercentage === 100 ? "All done! Congratulations." : "Keep going! You're doing great."}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Application Details */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card
+                  sx={{
+                    borderRadius: "14px",
+                    boxShadow: 3,
+                    border: `2px solid ${borderColor}`,
+                    height: "100%",
+                    backgroundColor: "#fff",
+                    transition: "transform 0.2s ease",
+                    "&:hover": { transform: "scale(1.02)" },
+                  }}
+                >
+                  <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                      <DescriptionIcon sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Application Details</Typography>
+                    </Stack>
+                    <Stack divider={<Divider sx={{ my: 0.6 }} />} spacing={0.6}>
+                      {applicationDetails.map((row) => (
+                        <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", py: 0.4 }}>
+                          <Typography sx={{ fontSize: 12, color: "#888" }}>{row.label}</Typography>
+                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222", textAlign: "right" }}>
+                            {row.value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      onClick={() => (window.location.href = "/applicant_profile")}
+                      sx={{ mt: 2, borderColor: mainButtonColor, color: mainButtonColor, textTransform: "none", fontWeight: 700, borderRadius: "8px" }}
+                    >
+                      View / Edit Profile
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Requirements Status */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card
+                  sx={{
+                    borderRadius: "14px",
+                    boxShadow: 3,
+                    border: `2px solid ${borderColor}`,
+                    height: "100%",
+                    backgroundColor: "#fff",
+                    transition: "transform 0.2s ease",
+                    "&:hover": { transform: "scale(1.02)" },
+                  }}
+                >
+                  <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                      <CloudUploadIcon sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Requirements Status</Typography>
+                    </Stack>
+                    <Stack divider={<Divider sx={{ my: 0.6 }} />} spacing={0.6}>
+                      {[
+                        ["Total Requirements", reqStats.total],
+                        ["Submitted", reqStats.submitted],
+                        ["Pending", reqStats.pending],
+                        ["For Verification", reqStats.forVerification],
+                      ].map(([label, value]) => (
+                        <Box key={label} sx={{ display: "flex", justifyContent: "space-between", py: 0.4 }}>
+                          <Typography sx={{ fontSize: 12, color: "#888" }}>{label}</Typography>
+                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222" }}>{value}</Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={() => (window.location.href = "/applicant_online_requirements")}
+                      sx={{ mt: 2, backgroundColor: mainButtonColor, textTransform: "none", fontWeight: 700, borderRadius: "8px", "&:hover": { backgroundColor: mainButtonColor } }}
+                    >
+                      Upload Requirements
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Grid>
+
           {/* ── LIGHTBOX (shared) ─────────────────────────────────────────── */}
           {/* ── LIGHTBOX (shared) ─────────────────────────────────────────── */}
           <AnimatePresence>
@@ -2124,184 +2356,21 @@ const ApplicantDashboard = (props) => {
                         </Box>
 
                         <AnimatePresence>
-                          {lightboxOpen && announcements[lightboxIndex] && (
+                          {isExpanded && (
                             <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
                               transition={{ duration: 0.25 }}
-                              onClick={closeLightbox}
                               style={{
-                                position: "fixed", inset: 0, zIndex: 9999,
-                                background: "rgba(0,0,0,0.92)",
-                                display: "flex", alignItems: "center", justifyContent: "center",
+                                overflow: "hidden",
+                                backgroundColor: "#fff9ec",
+                                border: `2px solid ${borderColor}`,
+                                borderTop: "none",
+                                borderRadius: "0 0 8px 8px",
                               }}
                             >
-                              {/* Prev */}
-                              <IconButton
-                                onClick={e => { e.stopPropagation(); lightboxPrev(); }}
-                                sx={{
-                                  position: "fixed", left: { xs: 4, sm: 16 }, top: "50%", transform: "translateY(-50%)",
-                                  zIndex: 10000, width: { xs: 44, sm: 60 }, height: { xs: 44, sm: 60 },
-                                  background: "rgba(255,255,255,0.15)", color: "#fff",
-                                  "&:hover": { background: "rgba(255,255,255,0.3)" },
-                                }}
-                              >
-                                <ArrowBackIosNewIcon sx={{ fontSize: { xs: 18, sm: 24 } }} />
-                              </IconButton>
-
-                              {/* Next */}
-                              <IconButton
-                                onClick={e => { e.stopPropagation(); lightboxNext(); }}
-                                sx={{
-                                  position: "fixed", right: { xs: 4, sm: 16 }, top: "50%", transform: "translateY(-50%)",
-                                  zIndex: 10000, width: { xs: 44, sm: 60 }, height: { xs: 44, sm: 60 },
-                                  background: "rgba(255,255,255,0.15)", color: "#fff",
-                                  "&:hover": { background: "rgba(255,255,255,0.3)" },
-                                }}
-                              >
-                                <ArrowForwardIosIcon sx={{ fontSize: { xs: 18, sm: 24 } }} />
-                              </IconButton>
-
-                              {/* Main card */}
-                              <motion.div
-                                key={announcements[lightboxIndex].id}
-                                initial={{ opacity: 0, scale: 0.96 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.96 }}
-                                transition={{ duration: 0.2 }}
-                                onClick={e => e.stopPropagation()}
-                                style={{
-                                  display: "flex",
-                                  flexDirection: window.innerWidth <= 768 ? "column" : "row",
-                                  width: window.innerWidth <= 768 ? "92vw" : "80vw",
-                                  maxWidth: "1200px",
-                                  maxHeight: window.innerWidth <= 768 ? "88vh" : "82vh",
-                                  borderRadius: "16px",
-                                  overflow: "hidden",
-                                  background: "#111",
-                                }}
-                              >
-                                {/* LEFT — image */}
-                                {announcements[lightboxIndex].file_path && (
-                                  <div style={{
-                                    flex: window.innerWidth <= 768 ? "0 0 auto" : "0 0 60%",
-                                    width: window.innerWidth <= 768 ? "100%" : "60%",
-                                    maxHeight: window.innerWidth <= 768 ? "45vh" : "82vh",
-                                    background: "#000",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    overflow: "hidden",
-                                  }}>
-                                    <AnimatePresence mode="wait">
-                                      <motion.img
-                                        key={announcements[lightboxIndex].id}
-                                        src={`${API_BASE_URL}/uploads/Announcement/${announcements[lightboxIndex].file_path}`}
-                                        alt={announcements[lightboxIndex].title}
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        transition={{ duration: 0.2 }}
-                                        style={{
-                                          width: "100%",
-                                          height: "100%",
-                                          objectFit: "contain",
-                                          display: "block",
-                                          userSelect: "none",
-                                        }}
-                                        draggable={false}
-                                      />
-                                    </AnimatePresence>
-                                  </div>
-                                )}
-
-                                {/* RIGHT — details */}
-                                <div style={{
-                                  flex: 1,
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)",
-                                  padding: window.innerWidth <= 768 ? "20px 16px" : "32px 28px",
-                                  overflowY: "auto",
-                                  scrollbarWidth: "thin",
-                                  scrollbarColor: "rgba(255,255,255,0.2) transparent",
-                                }}>
-                                  {/* Close button — top of details panel */}
-                                  <IconButton
-                                    onClick={e => { e.stopPropagation(); closeLightbox(); }}
-                                    sx={{
-                                      position: "fixed", top: 25, left: 50, zIndex: 10001,
-                                      width: 75, height: 75,
-                                      background: "rgba(255,255,255,0.15)", color: "#fff",
-                                      "&:hover": { background: "rgba(220,50,50,0.75)" },
-                                    }}
-                                  >
-                                    <CloseIcon sx={{ fontSize: 28 }} />
-                                  </IconButton>
-
-                                  {/* Title */}
-                                  <h2 style={{
-                                    margin: "0 0 4px",
-                                    color: "#fff",
-                                    fontSize: window.innerWidth <= 768 ? "16px" : "20px",
-                                    fontWeight: 700,
-                                    lineHeight: 1.4,
-                                  }}>
-                                    {announcements[lightboxIndex].title}
-                                  </h2>
-
-                                  {/* Divider */}
-                                  <div style={{
-                                    width: "40px", height: "3px",
-                                    background: "rgba(255,255,255,0.35)",
-                                    borderRadius: "2px",
-                                    margin: "10px 0 18px",
-                                  }} />
-
-                                  {/* Content */}
-                                  {/* Content */}
-                                  <div style={{ flex: 1 }}>
-                                    <FormattedContent text={announcements[lightboxIndex].content} />
-                                  </div>
-                                  {/* Expiry */}
-                                  <p style={{
-                                    margin: "12px 0 0",
-                                    color: "rgba(255,255,255,0.45)",
-                                    fontSize: "11px",
-                                  }}>
-                                    Expires: {new Date(announcements[lightboxIndex].expires_at).toLocaleDateString("en-US")}
-                                  </p>
-
-                                  {/* Slide counter dots */}
-                                  {announcements.length > 1 && (
-                                    <div style={{
-                                      marginTop: "20px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "6px",
-                                    }}>
-                                      {announcements.map((_, i) => (
-                                        <div
-                                          key={i}
-                                          onClick={e => { e.stopPropagation(); setLightboxIndex(i); }}
-                                          style={{
-                                            width: i === lightboxIndex ? 18 : 6,
-                                            height: 6,
-                                            borderRadius: 3,
-                                            background: i === lightboxIndex ? "#fff" : "rgba(255,255,255,0.3)",
-                                            transition: "all 0.3s",
-                                            cursor: "pointer",
-                                          }}
-                                        />
-                                      ))}
-                                      <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginLeft: "4px" }}>
-                                        {lightboxIndex + 1} / {announcements.length}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </motion.div>
+                              <Box sx={{ p: 2, fontSize: "13px" }}>{renderStepDetail(index)}</Box>
                             </motion.div>
                           )}
                         </AnimatePresence>

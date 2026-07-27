@@ -169,6 +169,8 @@ const OfficialStudentDashboard1 = () => {
     citizenship: "",
     religion: "",
     civilStatus: "",
+    spouse: "",
+    facebook_account: "",
     tribeEthnicGroup: "",
     cellphoneNumber: "",
     emailAddress: "",
@@ -1582,7 +1584,7 @@ const OfficialStudentDashboard1 = () => {
       const studentName = person?.last_name
         ? `${person.last_name}, ${person.first_name || ""}${middleInitial}`.trim()
         : [person?.first_name, person?.middle_name].filter(Boolean).join(" ") ||
-          "Unknown Student";
+        "Unknown Student";
 
       await postAuditEvent("PRINTING_STUDENT_DOCS", {
         document_label: documentLabel,
@@ -1625,16 +1627,32 @@ const OfficialStudentDashboard1 = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — React's `checked` is a DOM property, not an HTML attribute,
+      // so it never shows up in node.innerHTML. Clone the node and manually
+      // stamp "checked" onto the markup based on the live checkbox state
+      // before serializing, otherwise every checkbox renders unchecked in
+      // the generated PDF regardless of the actual database value.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
-          ...getLoginMacPayload(),
         },
         { responseType: "blob" },
       );
@@ -1657,7 +1675,6 @@ const OfficialStudentDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      await logPrintingStudentDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
       setSnack({
@@ -3066,7 +3083,7 @@ const OfficialStudentDashboard1 = () => {
             <Box display="flex" gap={2}>
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Citizenship
+                  Citizenship<span style={{ color: "red" }}> *</span>
                 </Typography>
                 <FormControl
                   fullWidth
@@ -3076,14 +3093,13 @@ const OfficialStudentDashboard1 = () => {
                 >
                   <InputLabel id="citizenship-label">Citizenship</InputLabel>
                   <Select
-                    readOnly
                     labelId="citizenship-label"
                     id="citizenship"
                     name="citizenship"
-                    value={person.citizenship ?? ""}
+                    value={person.citizenship || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
-                    label="Citizenship" // Required for floating label
+                    onBlur={() => handleUpdate(person)}
+                    label="Citizenship"
                   >
                     <MenuItem value="">
                       <em>Select Citizenship</em>
@@ -3214,7 +3230,7 @@ const OfficialStudentDashboard1 = () => {
 
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Religion
+                  Religion<span style={{ color: "red" }}> *</span>
                 </Typography>
                 <FormControl
                   fullWidth
@@ -3224,14 +3240,13 @@ const OfficialStudentDashboard1 = () => {
                 >
                   <InputLabel id="religion-label">Religion</InputLabel>
                   <Select
-                    readOnly
                     labelId="religion-label"
                     id="religion"
                     name="religion"
-                    value={person.religion ?? ""}
+                    value={person.religion || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
-                    label="Religion" // Enables floating label
+                    onBlur={() => handleUpdate(person)}
+                    label="Religion"
                   >
                     <MenuItem value="">
                       <em>Select Religion</em>
@@ -3271,9 +3286,10 @@ const OfficialStudentDashboard1 = () => {
                   )}
                 </FormControl>
               </Box>
+
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Civil Status
+                  Civil Status<span style={{ color: "red" }}> *</span>
                 </Typography>
                 <FormControl
                   fullWidth
@@ -3283,13 +3299,12 @@ const OfficialStudentDashboard1 = () => {
                 >
                   <InputLabel id="civil-status-label">Civil Status</InputLabel>
                   <Select
-                    readOnly
                     labelId="civil-status-label"
                     id="civilStatus"
                     name="civilStatus"
-                    value={person.civilStatus ?? ""}
+                    value={person.civilStatus || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
+                    onBlur={() => handleUpdate(person)}
                     label="Civil Status"
                   >
                     <MenuItem value="">
@@ -3308,9 +3323,29 @@ const OfficialStudentDashboard1 = () => {
                   )}
                 </FormControl>
               </Box>
+
+              {person.civilStatus === "Married" && (
+                <Box flex={1}>
+                  <Typography mb={1} fontWeight="medium">
+                    Spouse<span style={{ color: "red" }}> *</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    name="spouse"
+                    placeholder="Enter Spouse Name"
+                    value={person.spouse || ""}
+                    onChange={handleChange}
+                    onBlur={() => handleUpdate(person)}
+                    error={!!errors.spouse}
+                    helperText={errors.spouse ? "This field is required." : ""}
+                  />
+                </Box>
+              )}
+
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Tribe/Ethnic Group
+                  Tribe/Ethnic Group<span style={{ color: "red" }}> *</span>
                 </Typography>
                 <FormControl
                   fullWidth
@@ -3320,13 +3355,12 @@ const OfficialStudentDashboard1 = () => {
                 >
                   <InputLabel id="tribe-label">Tribe/Ethnic Group</InputLabel>
                   <Select
-                    readOnly
                     labelId="tribe-label"
                     id="tribeEthnicGroup"
                     name="tribeEthnicGroup"
-                    value={person.tribeEthnicGroup ?? ""}
+                    value={person.tribeEthnicGroup || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
+                    onBlur={() => handleUpdate(person)}
                     label="Tribe/Ethnic Group"
                   >
                     <MenuItem value="">
@@ -3386,6 +3420,7 @@ const OfficialStudentDashboard1 = () => {
               </Box>
             </Box>
 
+
             <br />
             <Typography
               style={{
@@ -3399,10 +3434,12 @@ const OfficialStudentDashboard1 = () => {
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
 
+
+
             <Box display="flex" gap={2} mb={2}>
-              <Box flex={1} display="flex" alignItems="center" gap={2}>
-                <Typography sx={{ width: 180 }} fontWeight="medium">
-                  Contact Number:
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Contact Number:<span style={{ color: "red" }}> *</span>
                 </Typography>
 
                 <TextField
@@ -3426,7 +3463,6 @@ const OfficialStudentDashboard1 = () => {
                     errors.cellphoneNumber && "This field is required."
                   }
                   InputProps={{
-                    readOnly: true,
                     startAdornment: (
                       <Typography sx={{ mr: 1, fontWeight: "bold" }}>
                         +63
@@ -3436,9 +3472,9 @@ const OfficialStudentDashboard1 = () => {
                 />
               </Box>
 
-              <Box flex={1} display="flex" alignItems="center" gap={2}>
-                <Typography sx={{ width: 180 }} fontWeight="medium">
-                  Email Address:
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Email Address:<span style={{ color: "red" }}> *</span>
                 </Typography>
 
                 <TextField
@@ -3447,29 +3483,35 @@ const OfficialStudentDashboard1 = () => {
                   name="emailAddress"
                   required
                   value={person.emailAddress || ""}
-                  placeholder="Enter your Gmail address"
-                  onBlur={() => handleUpdate(person)}
-                  error={!!errors.emailAddress}
-                  helperText={
-                    errors.emailAddress ? "This field is required." : ""
-                  }
-                  onChange={(e) => {
-                    let value = e.target.value.replace(/\s/g, "");
-
-                    value = value.replace(/@.*/, "");
-
-                    const finalValue = value === "" ? "" : value + "@gmail.com";
-
-                    handleChange({
-                      target: {
-                        name: "emailAddress",
-                        value: finalValue,
-                      },
-                    });
+                  placeholder="Your registered email"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  sx={{
+                    backgroundColor: "#f0f0f0",
                   }}
                 />
               </Box>
+
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Facebook Account:<span style={{ color: "red" }}> *</span>
+                </Typography>
+
+                <TextField
+                  fullWidth
+                  size="small"
+                  name="facebook_account"
+                  placeholder="Enter Facebook Profile Name/Link"
+                  value={person.facebook_account || ""}
+                  onChange={handleChange}
+                  onBlur={() => handleUpdate(person)}
+                  error={!!errors.facebook_account}
+                  helperText={errors.facebook_account ? "This field is required." : ""}
+                />
+              </Box>
             </Box>
+
 
             <Typography
               style={{

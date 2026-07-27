@@ -63,7 +63,7 @@ const allowedFields = new Set([
   "vaccine1Brand", "vaccine1Date", "vaccine2Brand", "vaccine2Date",
   "booster1Brand", "booster1Date", "booster2Brand", "booster2Date",
   "chestXray", "cbc", "urinalysis", "otherworkups", "symptomsToday",
-  "remarks", "termsOfAgreemen", "current_step"
+  "remarks", "termsOfAgreement", "current_step"
 ]);
 
 const courseFields = ["program", "program2", "program3"];

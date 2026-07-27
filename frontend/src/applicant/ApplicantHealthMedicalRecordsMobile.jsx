@@ -127,7 +127,7 @@ const ConditionRow = ({ label, fieldKey, person, onChange }) => (
 
 const medicalConditions = [
   { label: "Asthma", key: "asthma" },
-  { label: "Fainting Spells and Seizures", key: "fainting" },
+  { label: "Fainting Spells and Seizures", key: "faintingSpells" },
   { label: "Heart Disease", key: "heartDisease" },
   { label: "Tuberculosis", key: "tuberculosis" },
   { label: "Frequent Headaches", key: "frequentHeadaches" },
@@ -180,10 +180,10 @@ const ApplicantHealthMedicalRecordsResponsive = (props) => {
   const [userRole, setUserRole] = useState("");
   const [person, setPerson] = useState({
     cough: "", colds: "", fever: "",
-    asthma: "", fainting: "", heartDisease: "", tuberculosis: "",
+    asthma: "", faintingSpells: "", heartDisease: "", tuberculosis: "",
     frequentHeadaches: "", hernia: "", chronicCough: "", headNeckInjury: "",
     hiv: "", highBloodPressure: "", diabetesMellitus: "", allergies: "",
-    cancer: "", smoking: "", alcoholDrinking: "",
+    cancer: "", smokingCigarette: "", alcoholDrinking: "",
     hospitalized: "", hospitalizationDetails: "",
     medications: "",
     hadCovid: "", covidDate: "",
@@ -364,21 +364,49 @@ const ApplicantHealthMedicalRecordsResponsive = (props) => {
     const config = FORM_CONFIGS[key];
     if (!config || generatingKey) return; // ignore clicks while something's already generating
 
+    // ✅ NEW — block printing until Terms of Agreement step is completed
+    if (person.termsOfAgreement !== 1) {
+      setSnackbar({
+        open: true,
+        message:
+          "⚠️ Please complete all steps and accept the Terms of Agreement before printing your documents.",
+        severity: "warning",
+      });
+      return;
+    }
+
     setGeneratingKey(key);
 
     try {
       // Give the hidden component time to mount AND finish its own internal
       // fetches (person data, curriculum options, active school year, etc.)
-      // before we read its rendered HTML.
+      // before we read its rendered HTML — same trick as downloadExamPermitPDF.
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — React's `checked` is a DOM property, not an HTML attribute,
+      // so it never shows up in node.innerHTML. Clone the node and manually
+      // stamp "checked" onto the markup based on the live checkbox state
+      // before serializing, otherwise every checkbox renders unchecked in
+      // the generated PDF regardless of the actual database value.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
@@ -406,7 +434,11 @@ const ApplicantHealthMedicalRecordsResponsive = (props) => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
-      showSnackbar(`⚠️ Unable to generate ${config.label} PDF right now.`, "error");
+      setSnackbar({
+        open: true,
+        message: `⚠️ Unable to generate ${config.label} PDF right now.`,
+        severity: "error",
+      });
     } finally {
       setGeneratingKey(null);
     }

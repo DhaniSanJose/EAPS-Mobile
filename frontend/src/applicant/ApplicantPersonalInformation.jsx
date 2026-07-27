@@ -854,7 +854,7 @@ const ApplicantPersonalInformation = (props) => {
       "tribeEthnicGroup",
       "cellphoneNumber",
       "emailAddress",
-      "facebook_account", // ✅ NEW — always required
+      "facebook_account",
       "presentStreet",
       "presentZipCode",
       "presentRegion",
@@ -1031,6 +1031,17 @@ const ApplicantPersonalInformation = (props) => {
     const config = FORM_CONFIGS[key];
     if (!config || generatingKey) return; // ignore clicks while something's already generating
 
+    // ✅ NEW — block printing until Terms of Agreement step is completed
+    if (person.termsOfAgreement !== 1) {
+      setSnackbar({
+        open: true,
+        message:
+          "⚠️ Please complete all steps and accept the Terms of Agreement before printing your documents.",
+        severity: "warning",
+      });
+      return;
+    }
+
     setGeneratingKey(key);
 
     try {
@@ -1042,10 +1053,27 @@ const ApplicantPersonalInformation = (props) => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — React's `checked` is a DOM property, not an HTML attribute,
+      // so it never shows up in node.innerHTML. Clone the node and manually
+      // stamp "checked" onto the markup based on the live checkbox state
+      // before serializing, otherwise every checkbox renders unchecked in
+      // the generated PDF regardless of the actual database value.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
@@ -1082,7 +1110,6 @@ const ApplicantPersonalInformation = (props) => {
       setGeneratingKey(null);
     }
   };
-
   const downloadExamPermitPDF = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);

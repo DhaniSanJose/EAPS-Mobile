@@ -26,7 +26,7 @@ import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 const SuperAdminStudentDashboard4 = () => {
-  useAccountAuditMac();
+    useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
 
@@ -72,9 +72,9 @@ const SuperAdminStudentDashboard4 = () => {
     const [user, setUser] = useState("");
     const [userRole, setUserRole] = useState("");
     const [person, setPerson] = useState({
-        cough: "", colds: "", fever: "", asthma: "", fainting: "", heartDisease: "", tuberculosis: "",
+        cough: "", colds: "", fever: "", asthma: "", faintingSpells: "", heartDisease: "", tuberculosis: "",
         frequentHeadaches: "", hernia: "", chronicCough: "", headNeckInjury: "", hiv: "", highBloodPressure: "",
-        diabetesMellitus: "", allergies: "", cancer: "", smoking: "", alcoholDrinking: "", hospitalized: "",
+        diabetesMellitus: "", allergies: "", cancer: "", smokingCigarette: "", alcoholDrinking: "", hospitalized: "",
         hospitalizationDetails: "", medications: "", hadCovid: "", covidDate: "",
         vaccine1Brand: "", vaccine1Date: "", vaccine2Brand: "", vaccine2Date: "",
         booster1Brand: "", booster1Date: "", booster2Brand: "", booster2Date: "",
@@ -91,18 +91,18 @@ const SuperAdminStudentDashboard4 = () => {
     const [employeeID, setEmployeeID] = useState("");
 
     const getAuditHeaders = () =>
-    getAuditConfig({
-      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-page-id": pageId,
-      "x-audit-change-section": "health_information",
-      "x-audit-actor-id":
-        employeeID ||
-        localStorage.getItem("employee_id") ||
-        localStorage.getItem("person_id") ||
-        localStorage.getItem("email") ||
-        "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-    });
+        getAuditConfig({
+            "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+            "x-page-id": pageId,
+            "x-audit-change-section": "health_information",
+            "x-audit-actor-id":
+                employeeID ||
+                localStorage.getItem("employee_id") ||
+                localStorage.getItem("person_id") ||
+                localStorage.getItem("email") ||
+                "unknown",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+        });
 
     useEffect(() => {
 
@@ -470,10 +470,27 @@ const SuperAdminStudentDashboard4 = () => {
             const node = hiddenFormRef.current;
             if (!node) throw new Error(`${config.label} did not render in time.`);
 
+            // ✅ FIX — React's `checked` is a DOM property, not an HTML attribute,
+            // so it never shows up in node.innerHTML. Clone the node and manually
+            // stamp "checked" onto the markup based on the live checkbox state
+            // before serializing, otherwise every checkbox renders unchecked in
+            // the generated PDF regardless of the actual database value.
+            const clonedNode = node.cloneNode(true);
+            const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+            const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+            liveCheckboxes.forEach((liveBox, i) => {
+                const clonedBox = clonedCheckboxes[i];
+                if (liveBox.checked) {
+                    clonedBox.setAttribute("checked", "checked");
+                } else {
+                    clonedBox.removeAttribute("checked");
+                }
+            });
+
             const response = await axios.post(
                 `${API_BASE_URL}${config.endpoint}`,
                 {
-                    html: node.innerHTML,
+                    html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
                     applicant_number: person?.applicant_number || "",
                     last_name: person?.last_name || "",
                     first_name: person?.first_name || "",
@@ -783,100 +800,100 @@ const SuperAdminStudentDashboard4 = () => {
 
 
             {/* Cards Section */}
-    
 
-    <Box
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 2,
-          mt: 2,
-          pb: 1,
-          justifyContent: "center",
-        }}
-      >
-        {links.map((lnk, i) => {
-          const isGenerating = generatingKey === lnk.key;
-          const disabled = generatingKey !== null;
 
-          return (
-            <motion.div
-              key={i}
-              style={{ flex: "0 0 calc(30% - 16px)" }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.4 }}
-            >
-              <Card
+            <Box
                 sx={{
-                  minHeight: 60,
-                  borderRadius: 2,
-                  border: `1px solid ${borderColor}`,
-                  backgroundColor: "#fff",
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  p: 1.5,
-                  cursor: disabled ? "default" : "pointer",
-                  opacity: disabled && !isGenerating ? 0.5 : 1,
-                  pointerEvents: disabled ? "none" : "auto",
-                  transition: "all 0.3s ease-in-out",
-                  "&:hover": {
-                    transform: disabled ? "none" : "scale(1.05)",
-                    backgroundColor: disabled
-                      ? "#fff"
-                      : settings?.header_color || "#1976d2",
-
-                    "& .card-text": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                    "& .card-icon": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                  },
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 2,
+                    mt: 2,
+                    pb: 1,
+                    justifyContent: "center",
                 }}
-                onClick={() => {
-                  if (disabled) return;
+            >
+                {links.map((lnk, i) => {
+                    const isGenerating = generatingKey === lnk.key;
+                    const disabled = generatingKey !== null;
 
-                  if (lnk.onClick) {
-                    lnk.onClick();
-                  } else if (lnk.to) {
-                    navigate(lnk.to);
-                  }
-                }}
-              >
-                {/* Icon / Loading */}
-                {isGenerating ? (
-                  <CircularProgress
-                    size={26}
-                    sx={{ color: mainButtonColor, mr: 1.5 }}
-                  />
-                ) : (
-                  <PictureAsPdfIcon
-                    className="card-icon"
-                    sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
-                  />
-                )}
+                    return (
+                        <motion.div
+                            key={i}
+                            style={{ flex: "0 0 calc(30% - 16px)" }}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1, duration: 0.4 }}
+                        >
+                            <Card
+                                sx={{
+                                    minHeight: 60,
+                                    borderRadius: 2,
+                                    border: `1px solid ${borderColor}`,
+                                    backgroundColor: "#fff",
+                                    display: "flex",
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    textAlign: "center",
+                                    p: 1.5,
+                                    cursor: disabled ? "default" : "pointer",
+                                    opacity: disabled && !isGenerating ? 0.5 : 1,
+                                    pointerEvents: disabled ? "none" : "auto",
+                                    transition: "all 0.3s ease-in-out",
+                                    "&:hover": {
+                                        transform: disabled ? "none" : "scale(1.05)",
+                                        backgroundColor: disabled
+                                            ? "#fff"
+                                            : settings?.header_color || "#1976d2",
 
-                {/* Label */}
-                <Typography
-                  className="card-text"
-                  sx={{
-                    color: mainButtonColor,
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: "bold",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  {isGenerating ? "Generating PDF..." : lnk.label}
-                </Typography>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </Box>
+                                        "& .card-text": {
+                                            color: disabled ? mainButtonColor : "#fff",
+                                        },
+                                        "& .card-icon": {
+                                            color: disabled ? mainButtonColor : "#fff",
+                                        },
+                                    },
+                                }}
+                                onClick={() => {
+                                    if (disabled) return;
+
+                                    if (lnk.onClick) {
+                                        lnk.onClick();
+                                    } else if (lnk.to) {
+                                        navigate(lnk.to);
+                                    }
+                                }}
+                            >
+                                {/* Icon / Loading */}
+                                {isGenerating ? (
+                                    <CircularProgress
+                                        size={26}
+                                        sx={{ color: mainButtonColor, mr: 1.5 }}
+                                    />
+                                ) : (
+                                    <PictureAsPdfIcon
+                                        className="card-icon"
+                                        sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
+                                    />
+                                )}
+
+                                {/* Label */}
+                                <Typography
+                                    className="card-text"
+                                    sx={{
+                                        color: mainButtonColor,
+                                        fontFamily: "Poppins, sans-serif",
+                                        fontWeight: "bold",
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    {isGenerating ? "Generating PDF..." : lnk.label}
+                                </Typography>
+                            </Card>
+                        </motion.div>
+                    );
+                })}
+            </Box>
 
 
 

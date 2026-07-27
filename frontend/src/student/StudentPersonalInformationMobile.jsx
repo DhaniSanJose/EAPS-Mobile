@@ -413,6 +413,7 @@ const StudentPersonalInformationResponsive = () => {
   const [permanentProvince, setPermanentProvince] = useState("");
   const [permanentCity, setPermanentCity] = useState("");
   const [permanentBarangay, setPermanentBarangay] = useState("");
+   const [studentNumber, setStudentNumber] = useState("");
 
   useEffect(() => {
     setPermanentRegionList(regions);
@@ -715,7 +716,7 @@ const StudentPersonalInformationResponsive = () => {
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
-  const generateFormPdf = async (key) => {
+ const generateFormPdf = async (key) => {
     const config = FORM_CONFIGS[key];
     if (!config || generatingKey) return;
 
@@ -727,10 +728,26 @@ const StudentPersonalInformationResponsive = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — stamp the live "checked" DOM property onto a cloned copy
+      // of the node before reading innerHTML. Without this, checkboxes
+      // for gender/civilStatus/etc. always serialize as unchecked even
+      // though they render correctly on screen.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           person_id: userID || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
@@ -744,7 +761,7 @@ const StudentPersonalInformationResponsive = () => {
       const fileName = buildClientFilename(config.filenamePrefix, {
         lastName: person?.last_name,
         firstName: person?.first_name,
-        studentNo: userID,
+        studentNo: studentNumber,
       });
 
       const link = document.createElement("a");
@@ -766,6 +783,7 @@ const StudentPersonalInformationResponsive = () => {
     }
   };
 
+
   const links = [
     { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
     { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
@@ -774,24 +792,24 @@ const StudentPersonalInformationResponsive = () => {
   ];
 
   // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
 
 
   // Cards per row depending on viewport

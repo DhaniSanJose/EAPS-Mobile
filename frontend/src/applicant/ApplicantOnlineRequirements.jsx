@@ -697,6 +697,32 @@ const ApplicantOnlineRequirements = () => {
               </Typography>
             </Box>
           </Box>
+
+            <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 1.25,
+              backgroundColor: "#fdecea",
+              border: "1.5px solid #c62828",
+              borderRadius: "10px",
+              p: 1.5,
+              mb: 1,
+            }}
+          >
+            <ErrorIcon sx={{ color: "#c62828", fontSize: 22, flexShrink: 0, mt: "1px" }} />
+            <Box>
+              <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#c62828", letterSpacing: "0.02em" }}>
+                REQUIRED: PRINT YOUR PERSONAL DATA FORM
+              </Typography>
+              <Typography sx={{ fontSize: 12.5, color: "#7a1f1f", lineHeight: 1.55, mt: 0.25 }}>
+                Now that all your main requirements are uploaded, you must go to{" "}
+                <strong>Personal Information → Printable Documents</strong> and print your{" "}
+                <strong>Personal Data Form</strong>. Bring the printed copy with you for
+                submission/verification — your application is not complete without it.
+              </Typography>
+            </Box>
+          </Box>
           <Box sx={{ borderTop: "1px solid #e0e0e0", my: 2 }} />
           <Box sx={{ display: "flex", gap: 1.5, mb: 1, flexDirection: { xs: "column", sm: "row" } }}>
             {[

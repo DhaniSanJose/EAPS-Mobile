@@ -99,6 +99,7 @@ const SECTIONS = [
     icon: <PhoneIcon />,
     fields: [
       { id: "cellphoneNumber", label: "Contact Number", system: false, defaultOn: true },
+      { id: "facebook_account", label: "Facebook Account", system: false, defaultOn: true },
       { id: "emailAddress", label: "Email Address", system: true },
     ],
   },

@@ -725,9 +725,7 @@ const AssignScheduleToApplicants = () => {
   const [finalPreview, setFinalPreview] = useState(""); // live full preview
 
   // ONLY editable part
-  const [customReminders, setCustomReminders] = useState(`IMPORTANT REMINDERS FOR APPLICANTS:
-
-Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+  const [customReminders, setCustomReminders] = useState(`Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
 
 Step 2: Bring all required items on the exam day:
 • Official Examination Permit with VERIFIED watermark
@@ -810,9 +808,7 @@ This printed permit must be presented to your proctor on the exam day to verify 
     setEmailMessage(defaultMessage);
 
     // reset editable reminders every time modal opens
-    setCustomReminders(`IMPORTANT REMINDERS FOR APPLICANTS:
-
-Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+    setCustomReminders(`Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
 
 Step 2: Bring all required items on the exam day:
 • Official Examination Permit with VERIFIED watermark
@@ -2156,9 +2152,7 @@ This printed permit must be presented to your proctor on the exam day to verify 
 `,
                               );
 
-                           setCustomReminders(`IMPORTANT REMINDERS FOR APPLICANTS:
-
-Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+                           setCustomReminders(`Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
 
 Step 2: Bring all required items on the exam day:
 • Official Examination Permit with VERIFIED watermark

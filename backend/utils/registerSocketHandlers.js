@@ -855,9 +855,9 @@ WHERE proctor LIKE ?
           person_data.languageDialectSpoken,    // 28 languageDialectSpoken
           person_data.citizenship,              // 29 citizenship
           person_data.religion,                 // 30 religion
-          person_data.civilStatus, 
+          person_data.civilStatus,
+          person_data.spouse,          
           person_data.facebook_account,
-          person_data.spouse,             // 31 civilStatus
           person_data.tribeEthnicGroup,         // 32 tribeEthnicGroup
           person_data.cellphoneNumber,          // 33 cellphoneNumber
           person_data.emailAddress,             // 34 emailAddress
@@ -921,7 +921,7 @@ WHERE proctor LIKE ?
           person_data.guardian_contact,         // 92 guardian_contact
           person_data.guardian_email,           // 93 guardian_email
           person_data.annual_income,
-          person_data.has_no_siblings, 
+          person_data.has_no_siblings,
           person_data.siblings,             // 94 annual_income
           person_data.schoolLevel,              // 95 schoolLevel
           person_data.schoolLastAttended,       // 96 schoolLastAttended
@@ -5876,9 +5876,9 @@ Click the link below to log in:
 
       const departmentIds = departmentIdsRaw
         ? String(departmentIdsRaw)
-            .split(",")
-            .map((id) => id.trim())
-            .filter(Boolean)
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean)
         : department_id
           ? [String(department_id).trim()]
           : [];
@@ -6953,8 +6953,8 @@ Click the link below to log in:
     try {
       const [rows] = await db3.query(
         `SELECT snt.student_number, pt.* FROM student_numbering_table AS snt
-      LEFT JOIN person_table AS pt ON snt.person_id = pt.person_id
-      WHERE pt.person_id = ?`,
+       LEFT JOIN person_table AS pt ON snt.person_id = pt.person_id
+       WHERE pt.person_id = ?`,
         [id],
       );
 
@@ -6962,7 +6962,23 @@ Click the link below to log in:
         return res.status(404).json({ error: "Person not found" });
       }
 
-      res.json(rows[0]);
+      const raw = rows[0];
+      const person = {
+        ...raw,
+        // Normalize field names to match what the frontend expects.
+        // Adjust the left-hand raw.xxx to whatever your console.log shows.
+        civilStatus: raw.civilStatus ?? raw.civil_status ?? "",
+        gender: raw.gender ?? raw.sex ?? null,
+      };
+
+      // Normalize siblings (from earlier fix)
+      if (person.siblings && typeof person.siblings === "string") {
+        try { person.siblings = JSON.parse(person.siblings); } catch { person.siblings = []; }
+      } else if (!Array.isArray(person.siblings)) {
+        person.siblings = [];
+      }
+
+      res.json(person);
     } catch (err) {
       console.error("Error fetching person data:", err);
       res.status(500).json({ error: "Database error" });

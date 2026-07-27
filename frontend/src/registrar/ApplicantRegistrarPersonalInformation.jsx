@@ -159,6 +159,8 @@ const AdminDashboard1 = () => {
     citizenship: "",
     religion: "",
     civilStatus: "",
+    spouse: "",
+    facebook_account: "",
     tribeEthnicGroup: "",
     cellphoneNumber: "",
     emailAddress: "",
@@ -1268,13 +1270,31 @@ const AdminDashboard1 = () => {
       const node = hiddenFormRef.current;
       if (!node) throw new Error(`${config.label} did not render in time.`);
 
+      // ✅ FIX — sync live checkbox "checked" property onto the cloned markup
+      // before serializing. node.innerHTML alone never reflects the DOM
+      // property React set, so PDFs generated from it always show unchecked
+      // boxes even when the database has values like gender/civilStatus set.
+      const clonedNode = node.cloneNode(true);
+      const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      liveCheckboxes.forEach((liveBox, i) => {
+        const clonedBox = clonedCheckboxes[i];
+        if (liveBox.checked) {
+          clonedBox.setAttribute("checked", "checked");
+        } else {
+          clonedBox.removeAttribute("checked");
+        }
+      });
+
       const response = await axios.post(
         `${API_BASE_URL}${config.endpoint}`,
         {
-          html: node.innerHTML,
+          html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
           applicant_number: person?.applicant_number || "",
           last_name: person?.last_name || "",
           first_name: person?.first_name || "",
+          document_label: config.label,
+          audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
           ...getLoginMacPayload(),
@@ -1300,9 +1320,10 @@ const AdminDashboard1 = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      await logPrintingApplicantDocs(config.label);
     } catch (err) {
       console.error(`Error generating ${config.label} PDF:`, err);
+      // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
+      await logPrintingApplicantDocs(config.label, { failed: true });
       setSnackbar({
         open: true,
         message: `⚠️ Unable to generate ${config.label} PDF right now.`,
@@ -2667,23 +2688,25 @@ const AdminDashboard1 = () => {
 
 
             <Box display="flex" gap={2}>
-
-
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Citizenship
+                  Citizenship<span style={{ color: "red" }}> *</span>
                 </Typography>
-                <FormControl fullWidth size="small" required error={!!errors.citizenship}>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.citizenship}
+                >
                   <InputLabel id="citizenship-label">Citizenship</InputLabel>
                   <Select
-                    readOnly
                     labelId="citizenship-label"
                     id="citizenship"
                     name="citizenship"
-                    value={person.citizenship ?? ""}
+                    value={person.citizenship || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
-                    label="Citizenship" // Required for floating label
+                    onBlur={() => handleUpdate(person)}
+                    label="Citizenship"
                   >
                     <MenuItem value="">
                       <em>Select Citizenship</em>
@@ -2787,7 +2810,9 @@ const AdminDashboard1 = () => {
                     <MenuItem value="SWISS">SWISS</MenuItem>
                     <MenuItem value="SYRIAN">SYRIAN</MenuItem>
                     <MenuItem value="THAI">THAI</MenuItem>
-                    <MenuItem value="TRINIDAD AND TOBAGO">TRINIDAD AND TOBAGO</MenuItem>
+                    <MenuItem value="TRINIDAD AND TOBAGO">
+                      TRINIDAD AND TOBAGO
+                    </MenuItem>
                     <MenuItem value="TUNISIAN">TUNISIAN</MenuItem>
                     <MenuItem value="TURKISH">TURKISH</MenuItem>
                     <MenuItem value="TAIWANESE">TAIWANESE</MenuItem>
@@ -2808,29 +2833,34 @@ const AdminDashboard1 = () => {
                     <FormHelperText>This field is required.</FormHelperText>
                   )}
                 </FormControl>
-
               </Box>
 
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Religion
+                  Religion<span style={{ color: "red" }}> *</span>
                 </Typography>
-                <FormControl fullWidth size="small" required error={!!errors.religion}>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.religion}
+                >
                   <InputLabel id="religion-label">Religion</InputLabel>
                   <Select
-                    readOnly
                     labelId="religion-label"
                     id="religion"
                     name="religion"
-                    value={person.religion ?? ""}
+                    value={person.religion || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
-                    label="Religion" // Enables floating label
+                    onBlur={() => handleUpdate(person)}
+                    label="Religion"
                   >
                     <MenuItem value="">
                       <em>Select Religion</em>
                     </MenuItem>
-                    <MenuItem value="Jehovah's Witness">Jehovah's Witness</MenuItem>
+                    <MenuItem value="Jehovah's Witness">
+                      Jehovah's Witness
+                    </MenuItem>
                     <MenuItem value="Buddist">Buddist</MenuItem>
                     <MenuItem value="Catholic">Catholic</MenuItem>
                     <MenuItem value="Dating Daan">Dating Daan</MenuItem>
@@ -2846,8 +2876,12 @@ const AdminDashboard1 = () => {
                     <MenuItem value="Aglipay">Aglipay</MenuItem>
                     <MenuItem value="Islam">Islam</MenuItem>
                     <MenuItem value="LDS">LDS</MenuItem>
-                    <MenuItem value="Seventh Day Adventist">Seventh Day Adventist</MenuItem>
-                    <MenuItem value="Iglesia Ni Cristo">Iglesia Ni Cristo</MenuItem>
+                    <MenuItem value="Seventh Day Adventist">
+                      Seventh Day Adventist
+                    </MenuItem>
+                    <MenuItem value="Iglesia Ni Cristo">
+                      Iglesia Ni Cristo
+                    </MenuItem>
                     <MenuItem value="UCCP">UCCP</MenuItem>
                     <MenuItem value="PMCC">PMCC</MenuItem>
                     <MenuItem value="Baha'i Faith">Baha'i Faith</MenuItem>
@@ -2858,22 +2892,26 @@ const AdminDashboard1 = () => {
                     <FormHelperText>This field is required.</FormHelperText>
                   )}
                 </FormControl>
-
               </Box>
+
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Civil Status
+                  Civil Status<span style={{ color: "red" }}> *</span>
                 </Typography>
-                <FormControl fullWidth size="small" required error={!!errors.civilStatus}>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.civilStatus}
+                >
                   <InputLabel id="civil-status-label">Civil Status</InputLabel>
                   <Select
-                    readOnly
                     labelId="civil-status-label"
                     id="civilStatus"
                     name="civilStatus"
-                    value={person.civilStatus ?? ""}
+                    value={person.civilStatus || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
+                    onBlur={() => handleUpdate(person)}
                     label="Civil Status"
                   >
                     <MenuItem value="">
@@ -2881,7 +2919,9 @@ const AdminDashboard1 = () => {
                     </MenuItem>
                     <MenuItem value="Single">Single</MenuItem>
                     <MenuItem value="Married">Married</MenuItem>
-                    <MenuItem value="Legally Seperated">Legally Seperated</MenuItem>
+                    <MenuItem value="Legally Seperated">
+                      Legally Seperated
+                    </MenuItem>
                     <MenuItem value="Widowed">Widowed</MenuItem>
                     <MenuItem value="Solo Parent">Solo Parent</MenuItem>
                   </Select>
@@ -2889,26 +2929,49 @@ const AdminDashboard1 = () => {
                     <FormHelperText>This field is required.</FormHelperText>
                   )}
                 </FormControl>
-
               </Box>
+
+              {person.civilStatus === "Married" && (
+                <Box flex={1}>
+                  <Typography mb={1} fontWeight="medium">
+                    Spouse<span style={{ color: "red" }}> *</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    name="spouse"
+                    placeholder="Enter Spouse Name"
+                    value={person.spouse || ""}
+                    onChange={handleChange}
+                    onBlur={() => handleUpdate(person)}
+                    error={!!errors.spouse}
+                    helperText={errors.spouse ? "This field is required." : ""}
+                  />
+                </Box>
+              )}
+
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
-                  Tribe/Ethnic Group
+                  Tribe/Ethnic Group<span style={{ color: "red" }}> *</span>
                 </Typography>
-                <FormControl fullWidth size="small" required error={!!errors.tribeEthnicGroup}>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.tribeEthnicGroup}
+                >
                   <InputLabel id="tribe-label">Tribe/Ethnic Group</InputLabel>
                   <Select
-                    readOnly
                     labelId="tribe-label"
                     id="tribeEthnicGroup"
                     name="tribeEthnicGroup"
-                    value={person.tribeEthnicGroup ?? ""}
+                    value={person.tribeEthnicGroup || ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
+                    onBlur={() => handleUpdate(person)}
                     label="Tribe/Ethnic Group"
                   >
                     <MenuItem value="">
-                      <em>None</em>
+                      <em>Select Tribe/Ethnic Group</em>
                     </MenuItem>
                     <MenuItem value="Agta">Agta</MenuItem>
                     <MenuItem value="Agutaynen">Agutaynen</MenuItem>
@@ -2954,31 +3017,31 @@ const AdminDashboard1 = () => {
                     <MenuItem value="Bato">Bato</MenuItem>
                     <MenuItem value="Tausug">Tausug</MenuItem>
                     <MenuItem value="Waray">Waray</MenuItem>
-
+                    <MenuItem value="None">None</MenuItem>
                     <MenuItem value="Others">Others</MenuItem>
                   </Select>
                   {errors.tribeEthnicGroup && (
                     <FormHelperText>This field is required.</FormHelperText>
                   )}
                 </FormControl>
-
               </Box>
             </Box>
+
 
             <br />
             <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Contact Information:</Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
 
-            <Box display="flex" gap={2} mb={2}>
 
-              <Box flex={1} display="flex" alignItems="center" gap={2}>
-                <Typography sx={{ width: 180 }} fontWeight="medium">
-                  Contact Number:
+
+            <Box display="flex" gap={2} mb={2}>
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Contact Number:<span style={{ color: "red" }}> *</span>
                 </Typography>
 
                 <TextField
-
                   fullWidth
                   size="small"
                   name="cellphoneNumber"
@@ -2995,56 +3058,56 @@ const AdminDashboard1 = () => {
                     });
                   }}
                   error={!!errors.cellphoneNumber}
-                  helperText={errors.cellphoneNumber && "This field is required."}
+                  helperText={
+                    errors.cellphoneNumber && "This field is required."
+                  }
                   InputProps={{
-                    readOnly: true,
                     startAdornment: (
-                      <Typography sx={{ mr: 1, fontWeight: "bold" }}>+63</Typography>
+                      <Typography sx={{ mr: 1, fontWeight: "bold" }}>
+                        +63
+                      </Typography>
                     ),
                   }}
                 />
               </Box>
 
-
-              <Box flex={1} display="flex" alignItems="center" gap={2}>
-                <Typography sx={{ width: 180 }} fontWeight="medium">
-                  Email Address:
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Email Address:<span style={{ color: "red" }}> *</span>
                 </Typography>
 
                 <TextField
                   fullWidth
                   size="small"
-
                   name="emailAddress"
                   required
                   value={person.emailAddress || ""}
-                  placeholder="Enter your Email Address (e.g., username@gmail.com)"
-                  error={!!errors.emailAddress}
-                  helperText={errors.emailAddress ? "Please enter a valid email address." : ""}
-                  onChange={(e) => {
-                    const cleaned = e.target.value.replace(/\s/g, "");
-                    handleChange({
-                      target: { name: "emailAddress", value: cleaned }
-                    });
+                  placeholder="Your registered email"
+                  InputProps={{
+                    readOnly: true,
                   }}
-                  onBlur={(e) => {
-                    let value = e.target.value.trim();
-
-                    // If user typed "username" only → auto add domain
-                    if (value && !value.includes("@")) {
-                      value = value + "@gmail.com"; // ← YOU CAN CHANGE THIS DEFAULT DOMAIN
-                    }
-
-                    handleChange({
-                      target: { name: "emailAddress", value }
-                    });
-
-                    handleUpdate(person);
+                  sx={{
+                    backgroundColor: "#f0f0f0",
                   }}
                 />
+              </Box>
 
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Facebook Account:<span style={{ color: "red" }}> *</span>
+                </Typography>
 
-
+                <TextField
+                  fullWidth
+                  size="small"
+                  name="facebook_account"
+                  placeholder="Enter Facebook Profile Name/Link"
+                  value={person.facebook_account || ""}
+                  onChange={handleChange}
+                  onBlur={() => handleUpdate(person)}
+                  error={!!errors.facebook_account}
+                  helperText={errors.facebook_account ? "This field is required." : ""}
+                />
               </Box>
             </Box>
 

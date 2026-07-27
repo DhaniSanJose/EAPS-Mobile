@@ -29,6 +29,8 @@ const DateField = React.forwardRef(function DateField(props, ref) {
     slotProps,
     minDate,
     maxDate,
+    views = ["year", "month", "day"], // <-- select Year -> Month -> Date
+    openTo = "year",                  // <-- picker opens on the Year view first
     ...textFieldProps
   } = props;
 
@@ -98,6 +100,8 @@ const DateField = React.forwardRef(function DateField(props, ref) {
       readOnly={resolvedReadOnly}
       minDate={resolvedMinDate}
       maxDate={resolvedMaxDate}
+      views={views}
+      openTo={openTo}
       slotProps={{
         ...slotProps,
         textField: {

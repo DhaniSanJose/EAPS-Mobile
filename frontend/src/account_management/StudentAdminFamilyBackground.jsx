@@ -27,7 +27,7 @@ import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar"
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 
 const SuperAdminStudentDashboard2 = () => {
-  useAccountAuditMac();
+    useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
 
@@ -78,7 +78,8 @@ const SuperAdminStudentDashboard2 = () => {
         father_ext: "", father_nickname: "", father_education: "", father_education_level: "", father_last_school: "", father_course: "", father_year_graduated: "", father_school_address: "", father_contact: "", father_occupation: "", father_employer: "",
         father_income: "", father_email: "", mother_deceased: "", mother_family_name: "", mother_given_name: "", mother_middle_name: "", mother_ext: "", mother_nickname: "", mother_education: "", mother_education_level: "", mother_last_school: "", mother_course: "",
         mother_year_graduated: "", mother_school_address: "", mother_contact: "", mother_occupation: "", mother_employer: "", mother_income: "", mother_email: "", guardian: "", guardian_family_name: "", guardian_given_name: "",
-        guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "",
+        guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "", annual_income: "", siblings: [],        // ✅ NEW
+        has_no_siblings: 0,  // ✅ NEW
     });
 
 
@@ -91,18 +92,18 @@ const SuperAdminStudentDashboard2 = () => {
     const [employeeID, setEmployeeID] = useState("");
 
     const getAuditHeaders = () =>
-    getAuditConfig({
-      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-page-id": pageId,
-      "x-audit-change-section": "family_information",
-      "x-audit-actor-id":
-        employeeID ||
-        localStorage.getItem("employee_id") ||
-        localStorage.getItem("person_id") ||
-        localStorage.getItem("email") ||
-        "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
-    });
+        getAuditConfig({
+            "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+            "x-page-id": pageId,
+            "x-audit-change-section": "family_information",
+            "x-audit-actor-id":
+                employeeID ||
+                localStorage.getItem("employee_id") ||
+                localStorage.getItem("person_id") ||
+                localStorage.getItem("email") ||
+                "unknown",
+            "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+        });
 
     useEffect(() => {
 
@@ -194,8 +195,19 @@ const SuperAdminStudentDashboard2 = () => {
     const fetchByPersonId = async (personID) => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/enrollment_person/${personID}`);
-            setPerson(res.data);
-            setSelectedPerson(res.data);
+
+            let siblingsVal = res.data.siblings;
+            if (typeof siblingsVal === "string") {
+                try { siblingsVal = JSON.parse(siblingsVal); } catch { siblingsVal = []; }
+            }
+            const safePerson = {
+                ...res.data,
+                siblings: Array.isArray(siblingsVal) ? siblingsVal : [],
+                has_no_siblings: res.data.has_no_siblings === 1 ? 1 : 0,
+            };
+
+            setPerson(safePerson);
+            setSelectedPerson(safePerson);
             if (res.data?.applicant_number) {
                 // optional: whatever logic you want
             }
@@ -323,12 +335,49 @@ const SuperAdminStudentDashboard2 = () => {
         setPerson(updatedPerson);
     };
 
+    const addSibling = () => {
+        const updatedSiblings = [
+            ...(person.siblings || []),
+            { id: Date.now(), name: "", age: "", schoolLevel: "", schoolLastAttended: "", schoolAddress: "", occupation: "", monthlyIncome: "" },
+        ];
+        setPerson({ ...person, siblings: updatedSiblings });
+    };
+
+    const removeSibling = (index) => {
+        const updatedSiblings = (person.siblings || []).filter((_, i) => i !== index);
+        setPerson({ ...person, siblings: updatedSiblings });
+    };
+
+    const handleSiblingFieldChange = (index, field, value) => {
+        const updatedSiblings = [...(person.siblings || [])];
+        updatedSiblings[index] = { ...updatedSiblings[index], [field]: value };
+        setPerson((prev) => ({ ...prev, siblings: updatedSiblings }));
+    };
+
+    const handleNoSiblingsCheck = (e) => {
+        const checked = e.target.checked;
+        setPerson({
+            ...person,
+            has_no_siblings: checked ? 1 : 0,
+            siblings: checked ? [] : person.siblings,
+        });
+    };
+
     const [saving, setSaving] = useState(false);
     const handleManualSave = async () => {
         if (!userID) {
             setSnackbar({ open: true, message: "No student selected.", severity: "warning" });
             return;
         }
+
+        if (person.has_no_siblings !== 1) {
+            const siblings = person.siblings || [];
+            if (siblings.length === 0 || siblings.some(s => !s.name?.trim() || !s.age?.toString().trim())) {
+                setSnackbar({ open: true, message: "Please complete sibling name and age, or check 'no siblings'.", severity: "error" });
+                return;
+            }
+        }
+
         try {
             setSaving(true);
             await handleUpdate(person);
@@ -340,7 +389,6 @@ const SuperAdminStudentDashboard2 = () => {
             setSaving(false);
         }
     };
-
 
     const [isFatherDeceased, setIsFatherDeceased] = useState(false);
     const [isMotherDeceased, setIsMotherDeceased] = useState(false);
@@ -525,10 +573,27 @@ const SuperAdminStudentDashboard2 = () => {
             const node = hiddenFormRef.current;
             if (!node) throw new Error(`${config.label} did not render in time.`);
 
+            // ✅ FIX — React's `checked` is a DOM property, not an HTML attribute,
+            // so it never shows up in node.innerHTML. Clone the node and manually
+            // stamp "checked" onto the markup based on the live checkbox state
+            // before serializing, otherwise every checkbox renders unchecked in
+            // the generated PDF regardless of the actual database value.
+            const clonedNode = node.cloneNode(true);
+            const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
+            const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+            liveCheckboxes.forEach((liveBox, i) => {
+                const clonedBox = clonedCheckboxes[i];
+                if (liveBox.checked) {
+                    clonedBox.setAttribute("checked", "checked");
+                } else {
+                    clonedBox.removeAttribute("checked");
+                }
+            });
+
             const response = await axios.post(
                 `${API_BASE_URL}${config.endpoint}`,
                 {
-                    html: node.innerHTML,
+                    html: clonedNode.innerHTML, // ⬅️ was node.innerHTML
                     applicant_number: person?.applicant_number || "",
                     last_name: person?.last_name || "",
                     first_name: person?.first_name || "",
@@ -840,100 +905,100 @@ const SuperAdminStudentDashboard2 = () => {
 
 
             {/* Cards Section */}
-         
 
-    <Box
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 2,
-          mt: 2,
-          pb: 1,
-          justifyContent: "center",
-        }}
-      >
-        {links.map((lnk, i) => {
-          const isGenerating = generatingKey === lnk.key;
-          const disabled = generatingKey !== null;
 
-          return (
-            <motion.div
-              key={i}
-              style={{ flex: "0 0 calc(30% - 16px)" }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.4 }}
-            >
-              <Card
+            <Box
                 sx={{
-                  minHeight: 60,
-                  borderRadius: 2,
-                  border: `1px solid ${borderColor}`,
-                  backgroundColor: "#fff",
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  p: 1.5,
-                  cursor: disabled ? "default" : "pointer",
-                  opacity: disabled && !isGenerating ? 0.5 : 1,
-                  pointerEvents: disabled ? "none" : "auto",
-                  transition: "all 0.3s ease-in-out",
-                  "&:hover": {
-                    transform: disabled ? "none" : "scale(1.05)",
-                    backgroundColor: disabled
-                      ? "#fff"
-                      : settings?.header_color || "#1976d2",
-
-                    "& .card-text": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                    "& .card-icon": {
-                      color: disabled ? mainButtonColor : "#fff",
-                    },
-                  },
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 2,
+                    mt: 2,
+                    pb: 1,
+                    justifyContent: "center",
                 }}
-                onClick={() => {
-                  if (disabled) return;
+            >
+                {links.map((lnk, i) => {
+                    const isGenerating = generatingKey === lnk.key;
+                    const disabled = generatingKey !== null;
 
-                  if (lnk.onClick) {
-                    lnk.onClick();
-                  } else if (lnk.to) {
-                    navigate(lnk.to);
-                  }
-                }}
-              >
-                {/* Icon / Loading */}
-                {isGenerating ? (
-                  <CircularProgress
-                    size={26}
-                    sx={{ color: mainButtonColor, mr: 1.5 }}
-                  />
-                ) : (
-                  <PictureAsPdfIcon
-                    className="card-icon"
-                    sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
-                  />
-                )}
+                    return (
+                        <motion.div
+                            key={i}
+                            style={{ flex: "0 0 calc(30% - 16px)" }}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1, duration: 0.4 }}
+                        >
+                            <Card
+                                sx={{
+                                    minHeight: 60,
+                                    borderRadius: 2,
+                                    border: `1px solid ${borderColor}`,
+                                    backgroundColor: "#fff",
+                                    display: "flex",
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    textAlign: "center",
+                                    p: 1.5,
+                                    cursor: disabled ? "default" : "pointer",
+                                    opacity: disabled && !isGenerating ? 0.5 : 1,
+                                    pointerEvents: disabled ? "none" : "auto",
+                                    transition: "all 0.3s ease-in-out",
+                                    "&:hover": {
+                                        transform: disabled ? "none" : "scale(1.05)",
+                                        backgroundColor: disabled
+                                            ? "#fff"
+                                            : settings?.header_color || "#1976d2",
 
-                {/* Label */}
-                <Typography
-                  className="card-text"
-                  sx={{
-                    color: mainButtonColor,
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: "bold",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  {isGenerating ? "Generating PDF..." : lnk.label}
-                </Typography>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </Box>
+                                        "& .card-text": {
+                                            color: disabled ? mainButtonColor : "#fff",
+                                        },
+                                        "& .card-icon": {
+                                            color: disabled ? mainButtonColor : "#fff",
+                                        },
+                                    },
+                                }}
+                                onClick={() => {
+                                    if (disabled) return;
+
+                                    if (lnk.onClick) {
+                                        lnk.onClick();
+                                    } else if (lnk.to) {
+                                        navigate(lnk.to);
+                                    }
+                                }}
+                            >
+                                {/* Icon / Loading */}
+                                {isGenerating ? (
+                                    <CircularProgress
+                                        size={26}
+                                        sx={{ color: mainButtonColor, mr: 1.5 }}
+                                    />
+                                ) : (
+                                    <PictureAsPdfIcon
+                                        className="card-icon"
+                                        sx={{ fontSize: 35, color: mainButtonColor, mr: 1.5 }}
+                                    />
+                                )}
+
+                                {/* Label */}
+                                <Typography
+                                    className="card-text"
+                                    sx={{
+                                        color: mainButtonColor,
+                                        fontFamily: "Poppins, sans-serif",
+                                        fontWeight: "bold",
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    {isGenerating ? "Generating PDF..." : lnk.label}
+                                </Typography>
+                            </Card>
+                        </motion.div>
+                    );
+                })}
+            </Box>
 
 
 
@@ -1973,6 +2038,74 @@ const SuperAdminStudentDashboard2 = () => {
                                 />
                             </Box>
                         </Box>
+
+                        <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>
+                            Siblings (Mga Kapatid Mo)
+                        </Typography>
+                        <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+                        <br />
+
+                        <FormControlLabel
+                            control={<Checkbox checked={person.has_no_siblings === 1} onChange={handleNoSiblingsCheck} />}
+                            label="Check if there's no siblings"
+                        />
+                        <br /><br />
+
+                        {person.has_no_siblings !== 1 && (
+                            <>
+                                {(person.siblings || []).map((sibling, index) => (
+                                    <Box key={sibling.id || index} sx={{ border: `1px solid ${borderColor}`, borderRadius: 2, p: 2, mb: 2, backgroundColor: "#fff" }}>
+                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                            <Typography fontWeight="bold">Sibling {index + 1}</Typography>
+                                            <Button size="small" variant="outlined" color="error" onClick={() => removeSibling(index)} sx={{ minWidth: 36 }}>
+                                                − Remove
+                                            </Button>
+                                        </Box>
+                                        <Box display="flex" gap={2} flexWrap="wrap">
+                                            <Box flex="1 1 30%">
+                                                <Typography variant="subtitle2" mb={0.5}>Name of Sibling</Typography>
+                                                <TextField fullWidth size="small" placeholder="Enter Sibling Name" value={sibling.name || ""}
+                                                    onChange={(e) => handleSiblingFieldChange(index, "name", e.target.value)} />
+                                            </Box>
+                                            <Box flex="1 1 10%">
+                                                <Typography variant="subtitle2" mb={0.5}>Age</Typography>
+                                                <TextField fullWidth size="small" type="number" placeholder="Age" value={sibling.age || ""}
+                                                    onChange={(e) => handleSiblingFieldChange(index, "age", e.target.value)} />
+                                            </Box>
+                                            <Box flex="1 1 20%">
+                                                <Typography variant="subtitle2" mb={0.5}>School Level</Typography>
+                                                <TextField fullWidth size="small" placeholder="e.g. College" value={sibling.schoolLevel || ""}
+                                                    onChange={(e) => handleSiblingFieldChange(index, "schoolLevel", e.target.value)} />
+                                            </Box>
+                                            <Box flex="1 1 30%">
+                                                <Typography variant="subtitle2" mb={0.5}>School Last Attended</Typography>
+                                                <TextField fullWidth size="small" placeholder="Enter School Last Attended" value={sibling.schoolLastAttended || ""}
+                                                    onChange={(e) => handleSiblingFieldChange(index, "schoolLastAttended", e.target.value)} />
+                                            </Box>
+                                            <Box flex="1 1 45%">
+                                                <Typography variant="subtitle2" mb={0.5}>School Address</Typography>
+                                                <TextField fullWidth size="small" placeholder="Enter School Address" value={sibling.schoolAddress || ""}
+                                                    onChange={(e) => handleSiblingFieldChange(index, "schoolAddress", e.target.value)} />
+                                            </Box>
+                                            <Box flex="1 1 25%">
+                                                <Typography variant="subtitle2" mb={0.5}>Occupation</Typography>
+                                                <TextField fullWidth size="small" placeholder="Enter Occupation" value={sibling.occupation || ""}
+                                                    onChange={(e) => handleSiblingFieldChange(index, "occupation", e.target.value)} />
+                                            </Box>
+                                            <Box flex="1 1 25%">
+                                                <Typography variant="subtitle2" mb={0.5}>Monthly Income</Typography>
+                                                <TextField fullWidth size="small" type="number" placeholder="Enter Monthly Income" value={sibling.monthlyIncome || ""}
+                                                    onChange={(e) => handleSiblingFieldChange(index, "monthlyIncome", e.target.value)} />
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                ))}
+
+                                <Button variant="contained" onClick={addSibling} sx={{ backgroundColor: mainButtonColor, border: `1px solid ${borderColor}`, color: "#fff", mb: 2, "&:hover": { backgroundColor: "#000" } }}>
+                                    + Add Sibling
+                                </Button>
+                            </>
+                        )}
 
                         <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Family (Annual Income)</Typography>
                         <hr style={{ border: "1px solid #ccc", width: "100%" }} />
