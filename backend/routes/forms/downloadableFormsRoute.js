@@ -3352,6 +3352,349 @@ router.post("/generate-faculty-evaluation-pdf", async (req, res) => {
   }
 });
 
+router.post("/generate-student-schedule-pdf", async (req, res) => {
+  let browser;
 
+  try {
+    const { html, student_number, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Portrait A4 @ 96dpi
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Letterhead header (logo + centered "Republic of the Philippines /
+    // school name / address / Student Schedule / semester" block),
+    // followed by a two-corner student meta row (Student Number + Name on
+    // the left, Department + Program & Section on the right), the
+    // student's CLASS SCHEDULE table, then the weekly Mon–Sun time grid
+    // (built in studentSchedulePrintLayout.js) below the Total Units row —
+    // mirrors the on-screen desktop grid in StudentSchedule.jsx
+    // (yellow-filled merged blocks per course).
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      color: #000;
+    }
+
+    .print-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      /* No border-bottom here anymore — that was the long divider line
+         running the full page width under the letterhead. Spacing below
+         the header is now handled purely by margin-bottom. */
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    .print-header img {
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .header-text {
+      text-align: center;
+    }
+
+    .header-text p {
+      margin: 0;
+      line-height: 1.35;
+    }
+
+    .header-text .republic {
+      font-size: 11px;
+    }
+
+    .header-text .school-name {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .header-text .address {
+      font-size: 11px;
+    }
+
+    .header-text .program-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .header-text .semester {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .schedule-title {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin: 10px 0;
+      text-transform: uppercase;
+    }
+
+    /* ── Two-corner student meta row: Student Number / Student Name on
+       the left, Department / Program & Section on the right ── */
+    .student-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 6px 24px;
+      font-size: 11px;
+      margin-bottom: 12px;
+    }
+
+    .student-meta .meta-col {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 220px;
+    }
+
+    .student-meta .meta-col-right {
+      text-align: right;
+    }
+
+    .student-meta p {
+      margin: 0;
+    }
+
+    .student-meta strong {
+      font-weight: 700;
+    }
+
+    table.schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table.schedule-table th,
+    table.schedule-table td {
+      border: 1px solid #000;
+      padding: 5px 6px;
+      font-size: 10px;
+      text-align: left;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+
+    table.schedule-table th {
+      background-color: #e0e0e0;
+      text-align: center;
+      font-weight: 700;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    table.schedule-table td.center {
+      text-align: center;
+    }
+
+    table.schedule-table tfoot td {
+      font-weight: 700;
+    }
+
+    .weekly-grid-section {
+      margin-top: 22px;
+      page-break-inside: avoid;
+    }
+
+    .weekly-grid-title {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 8px;
+    }
+
+    table.weekly-grid-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.weekly-grid-table th {
+      border: 1px solid #000;
+      background: #d9d9d9;
+      color: #000;
+      font-weight: 700;
+      font-size: 9px;
+      text-transform: uppercase;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    table.weekly-grid-table td {
+      border: 1px solid #000;
+      text-align: center;
+      vertical-align: middle;
+      padding: 4px 2px;
+      word-wrap: break-word;
+      overflow: hidden;
+    }
+
+    table.weekly-grid-table .wg-official-time {
+      font-size: 7.5px;
+      font-weight: 700;
+      color: #000;
+      text-transform: none;
+      margin-top: 2px;
+    }
+
+    table.weekly-grid-table .wg-time-col {
+      width: 84px;
+      font-weight: 600;
+      font-size: 8px;
+      white-space: nowrap;
+    }
+
+    table.weekly-grid-table .wg-empty {
+      background: #ffffff;
+    }
+
+    table.weekly-grid-table .wg-filled {
+      background-color: #fef08a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      padding: 5px 3px;
+    }
+
+    table.weekly-grid-table .wg-course {
+      font-weight: 700;
+      font-size: 9px;
+      color: #7a5b00;
+    }
+
+    table.weekly-grid-table .wg-room,
+    table.weekly-grid-table .wg-prof {
+      font-size: 7.5px;
+      color: #333;
+      line-height: 1.3;
+    }
+
+    button { display: none; }
+  </style>
+</head>
+<body>
+  ${html}
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // ── Force everything onto a single A4 page ──────────────────────────
+    // Course count (and therefore content height) varies per student, so a
+    // fixed font-size/padding can't guarantee one page for everyone.
+    // Instead, measure the actual rendered height and shrink via
+    // Puppeteer's print `scale` option only as much as needed to fit
+    // within one page's usable height (A4 height minus top/bottom margins).
+    const contentHeightPx = await page.evaluate(
+      () => document.documentElement.scrollHeight
+    );
+
+    const A4_HEIGHT_PX = 1123; // A4 @ 96dpi
+    const MARGIN_PX = 37.8; // 10mm top + 10mm bottom, each side
+    const usableHeightPx = A4_HEIGHT_PX - MARGIN_PX * 2;
+
+    let scale = 1;
+    if (contentHeightPx > usableHeightPx) {
+      // Clamp so very long schedules don't shrink past a readable size —
+      // 0.6 (60%) is the floor; below that the text becomes hard to read.
+      scale = Math.max(0.6, usableHeightPx / contentHeightPx);
+    }
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
+      scale,
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const numberSuffix = student_number ? `_${student_number}` : "";
+    const fileName = `Class_Schedule_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Class Schedule",
+      legacyAction: "STUDENT_CLASS_SCHEDULE_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the Class Schedule PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Student Class Schedule PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
 
 module.exports = router;

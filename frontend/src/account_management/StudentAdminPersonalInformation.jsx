@@ -199,6 +199,8 @@ const SuperAdminStudentDashboard1 = () => {
   const [originalEmailAddress, setOriginalEmailAddress] = useState("");
   const [emailConfirmOpen, setEmailConfirmOpen] = useState(false);
   const [pendingEmailAddress, setPendingEmailAddress] = useState("");
+  const [programConfirmOpen, setProgramConfirmOpen] = useState(false);
+  const [pendingProgramChange, setPendingProgramChange] = useState(null);
 
   const [yearLevelOptions, setYearLevelOptions] = useState([]);
 
@@ -524,6 +526,66 @@ const SuperAdminStudentDashboard1 = () => {
     }
 
     setPerson(updatedPerson);
+  };
+
+  const getCurriculumDisplayLabel = (curriculumId) => {
+    if (!curriculumId) return "N/A";
+
+    const curriculum = curriculumOptions.find(
+      (item) => String(item.curriculum_id) === String(curriculumId),
+    );
+
+    if (!curriculum) return `Curriculum ${curriculumId}`;
+
+    return `(${curriculum.program_code}): ${curriculum.program_description}${
+      curriculum.major ? ` (${curriculum.major})` : ""
+    } (${curriculum.current_year}-${curriculum.next_year}) (${getBranchLabel(
+      curriculum.components,
+    )})`;
+  };
+
+  const getStudentDisplayName = () => {
+    const parts = [
+      person?.first_name,
+      person?.middle_name,
+      person?.last_name,
+      person?.extension,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    return parts.join(" ") || "Student";
+  };
+
+  const handleProgramChangeRequest = (e) => {
+    const nextProgram = e.target.value;
+    const currentProgram = person.program || "";
+
+    if (String(nextProgram || "") === String(currentProgram || "")) return;
+
+    setPendingProgramChange({
+      from: currentProgram,
+      to: nextProgram,
+      fromLabel: getCurriculumDisplayLabel(currentProgram),
+      toLabel: getCurriculumDisplayLabel(nextProgram),
+    });
+    setProgramConfirmOpen(true);
+  };
+
+  const cancelProgramChange = () => {
+    setProgramConfirmOpen(false);
+    setPendingProgramChange(null);
+  };
+
+  const confirmProgramChange = () => {
+    if (!pendingProgramChange) return;
+
+    setPerson((prev) => ({
+      ...prev,
+      program: pendingProgramChange.to,
+    }));
+    setProgramConfirmOpen(false);
+    setPendingProgramChange(null);
   };
 
   const openEmailConfirm = () => {
@@ -1962,7 +2024,7 @@ const SuperAdminStudentDashboard1 = () => {
                       <Select
                         name="program"
                         value={person.program || ""}
-                        onChange={handleChange}
+                        onChange={handleProgramChangeRequest}
                         label="Program"
                       >
                         <MenuItem value="">
@@ -3073,6 +3135,67 @@ const SuperAdminStudentDashboard1 = () => {
                   color="primary"
                   variant="contained"
                   onClick={confirmEmailChange}
+                  sx={{ backgroundColor: mainButtonColor }}
+                >
+                  Continue
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            <Dialog
+              open={programConfirmOpen}
+              onClose={cancelProgramChange}
+              maxWidth="sm"
+              fullWidth
+              PaperProps={{
+                sx: {
+                  borderRadius: 3,
+                  overflow: "hidden",
+                  boxShadow: 6,
+                },
+              }}
+            >
+              <DialogTitle
+                sx={{
+                  background: settings?.header_color || "#1976d2",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: "1.2rem",
+                  py: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <WarningAmberIcon />
+                Confirm Program Change
+              </DialogTitle>
+
+              <DialogContent sx={{ p: 3, mt: 2 }}>
+                <Typography sx={{ mb: 2 }}>
+                  Do you want to change the program of Student{" "}
+                  <strong>{getStudentDisplayName()}</strong> (
+                  <strong>{person?.student_number || "N/A"}</strong>) from{" "}
+                  <strong>{pendingProgramChange?.fromLabel || "N/A"}</strong> to{" "}
+                  <strong>{pendingProgramChange?.toLabel || "N/A"}</strong>?
+                </Typography>
+              </DialogContent>
+
+              <DialogActions
+                sx={{
+                  px: 3,
+                  py: 2,
+                  borderTop: "1px solid #e0e0e0",
+                }}
+              >
+                <Button onClick={cancelProgramChange} color="error" variant="outlined">
+                  Cancel
+                </Button>
+
+                <Button
+                  color="primary"
+                  variant="contained"
+                  onClick={confirmProgramChange}
                   sx={{ backgroundColor: mainButtonColor }}
                 >
                   Continue

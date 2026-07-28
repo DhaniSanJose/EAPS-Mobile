@@ -257,8 +257,18 @@ const copyApplicantRequirements = async ({
     [applicantPersonId],
   );
 
+  if (!requirements.length) {
+    const error = new Error(
+      "Cannot assign student number because no applicant requirements were found to copy.",
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  let copiedRequirementRows = 0;
+
   for (const req of requirements) {
-    await connection.query(
+    const [requirementInsertResult] = await connection.query(
       `INSERT INTO requirement_uploads
         (requirements_id, person_id, submitted_documents, file_path, original_name,
          remarks, status, document_status, registrar_status, created_at)
@@ -276,6 +286,15 @@ const copyApplicantRequirements = async ({
         req.created_at,
       ],
     );
+    copiedRequirementRows += requirementInsertResult.affectedRows || 0;
+  }
+
+  if (copiedRequirementRows !== requirements.length) {
+    const error = new Error(
+      `Cannot assign student number because only ${copiedRequirementRows} of ${requirements.length} requirements were copied.`,
+    );
+    error.status = 500;
+    throw error;
   }
 };
 

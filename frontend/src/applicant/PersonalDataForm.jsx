@@ -489,7 +489,7 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                 {/* Applicant Photo (right) */}
                                 <div
                                     style={{
-                                        width: "120px",
+                                        width: "4.50cm",
                                         display: "flex",
                                         justifyContent: "center",
                                         alignItems: "center",
@@ -501,8 +501,8 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                             src={`${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`}
                                             alt="Applicant Photo"
                                             style={{
-                                                width: "120px",
-                                                height: "120px",
+                                                width: "4.50cm",
+                                                height: "4.50cm",
                                                 objectFit: "cover",
                                                 border: "1px solid black",
                                                 display: "block",
@@ -511,8 +511,8 @@ const PersonalDataForm = forwardRef((props, ref) => {
                                     ) : (
                                         <div
                                             style={{
-                                                width: "120px",
-                                                height: "120px",
+                                                width: "4.50cm",
+                                                height: "4.50cm",
                                                 border: "1px solid black",
                                                 display: "flex",
                                                 alignItems: "center",

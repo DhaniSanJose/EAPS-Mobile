@@ -324,6 +324,9 @@ const StudentGradingPage = () => {
       const balanceInfo = await fetchMatriculationBalance(data[0]?.student_number);
       setMatriculationBalanceInfo(balanceInfo);
 
+      const curriculumId = data[0]?.curriculum_id ?? data[0]?.program ?? null;
+      setDepartment(await resolveDepartmentByCurriculum(curriculumId));
+
       if (balanceInfo.hasBalance) { setStudentGrade(data.map(hideGradeFields)); return; }
 
       const latestMigratedTermKey = getLatestMigratedTermKey(data);
@@ -348,6 +351,19 @@ const StudentGradingPage = () => {
       setMatriculationBalanceInfo({ hasBalance: false, balance: 0 });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [department, setDepartment] = useState("");
+
+  const resolveDepartmentByCurriculum = async (curriculumId) => {
+    if (!curriculumId) return "";
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/department_by_curriculum/${curriculumId}`);
+      return res.data?.dprtmnt_name || "";
+    } catch (error) {
+      console.error("Error resolving department by curriculum:", error);
+      return "";
     }
   };
 
@@ -547,10 +563,17 @@ const StudentGradingPage = () => {
                             {programInfo.student_number}
                           </Box>
                         </Typography>
-                        <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor, wordBreak: "break-word" }}>
+                        <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
                           NAME:{" "}
-                          <Box component="span" sx={{ fontWeight: "normal", ml: "8px" }}>
+                          <Box component="span" sx={{ fontWeight: 400, ml: 1 }}>
                             {programInfo.last_name}, {programInfo.first_name} {programInfo.middle_name}
+                          </Box>
+                        </Typography>
+                        {/* ADD THIS */}
+                        <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                          DEPARTMENT:{" "}
+                          <Box component="span" sx={{ fontWeight: 400, ml: 1 }}>
+                            {department || "—"}
                           </Box>
                         </Typography>
                         {gwaValue && (

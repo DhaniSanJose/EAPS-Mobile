@@ -4,6 +4,7 @@ import React, {
   useContext,
   useRef,
   forwardRef,
+  useImperativeHandle,
 } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
@@ -28,8 +29,6 @@ import { FcPrint } from "react-icons/fc";
 import { useLocation } from "react-router-dom";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import { MdOutlinePayment } from "react-icons/md";
-import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
@@ -47,8 +46,15 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
 const CertificateOfRegistrationForCollege = forwardRef(
   (
-    { student_number, dprtmnt_id, onNotify, preload, activeSchoolYearId },
-    divToPrintRef,
+    {
+      student_number,
+      dprtmnt_id,
+      onNotify,
+      onPaymentActionsChange,
+      preload,
+      activeSchoolYearId,
+    },
+    paymentActionsRef,
   ) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
@@ -61,6 +67,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
         onNotify({ message, severity });
       }
     };
+    const divToPrintRef = useRef(null);
     const FreeTuitionImage = `${API_BASE_URL}/assets/FreeTuition.png`;
 
     useEffect(() => {
@@ -1261,6 +1268,37 @@ const CertificateOfRegistrationForCollege = forwardRef(
     const matriculationLabel = savedMatriculation
       ? "Saved To Matriculation"
       : "Save Matriculation";
+    const isPaymentReady = Boolean(
+      student_number?.trim() &&
+        requestedData.student_number &&
+        String(requestedData.student_number) === String(student_number),
+    );
+
+    useImperativeHandle(paymentActionsRef, () => ({
+      openUnifastConfirm: () => openConfirm("unifast"),
+      openScholarshipModal,
+    }));
+
+    useEffect(() => {
+      if (typeof onPaymentActionsChange !== "function") return;
+
+      onPaymentActionsChange({
+        disabled: isAnySaved,
+        ready: isPaymentReady,
+        savedUnifast,
+        savedMatriculation,
+        unifastLabel,
+        matriculationLabel,
+      });
+    }, [
+      isPaymentReady,
+      isAnySaved,
+      matriculationLabel,
+      onPaymentActionsChange,
+      savedMatriculation,
+      savedUnifast,
+      unifastLabel,
+    ]);
 
     // ?? Disable right-click
 
@@ -1295,74 +1333,6 @@ const CertificateOfRegistrationForCollege = forwardRef(
 
     return (
       <Container className="mb-[4rem]">
-        {/* SAVE TO UNIFAST BUTTON */}
-        <Box sx={{ position: "relative" }}>
-          <button
-            onClick={() => openConfirm("unifast")}
-            disabled={isAnySaved}
-            style={{
-              marginBottom: "2rem",
-              padding: "10px 20px",
-              border: "2px solid black",
-              backgroundColor: "#f0f0f0",
-              color: "black",
-              borderRadius: "5px",
-              marginTop: "20px",
-              cursor: isAnySaved ? "not-allowed" : "pointer",
-              fontSize: "16px",
-              fontWeight: "bold",
-              position: "absolute",
-              zIndex: 1000,
-              right: "12%",
-              top: "-3rem",
-              opacity: isAnySaved ? 0.6 : 1,
-              transition: "background-color 0.3s, transform 0.2s",
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <MdOutlinePayment size={20} />
-              {unifastLabel}
-            </span>
-          </button>
-
-          {/* SAVE TO MATRICULATION BUTTON */}
-          <button
-            onClick={openScholarshipModal}
-            disabled={isAnySaved}
-            style={{
-              marginBottom: "1rem",
-              padding: "10px 20px",
-              border: "2px solid black",
-              backgroundColor: "#f0f0f0",
-              color: "black",
-              borderRadius: "5px",
-              marginTop: "20px",
-              cursor: isAnySaved ? "not-allowed" : "pointer",
-              zIndex: 1000,
-              position: "absolute",
-              right: "-10%",
-              top: "-3rem",
-              fontSize: "16px",
-              fontWeight: "bold",
-              opacity: isAnySaved ? 0.6 : 1,
-              transition: "background-color 0.3s, transform 0.2s",
-            }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <IoMdSchool size={20} />
-              {matriculationLabel}
-            </span>
-          </button>
-        </Box>
-
         <Dialog open={confirmOpen} onClose={closeConfirm}>
           <DialogTitle>Confirm Save</DialogTitle>
           <DialogContent>
@@ -1824,7 +1794,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           "Name",
                           <span>
                             <span style={{ fontWeight: "bold" }}>
-                              {(data[0]?.last_name || "").toUpperCase()}
+                              {(data[0]?.last_name || "")?.toUpperCase()}
                             </span>
                             {`, ${data[0]?.first_name || ""} ${data[0]?.middle_name || ""} ${data[0]?.extension || ""}`
                               .replace(/\s+/g, " ")

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { Button, Box, TextField, Container, Snackbar, Alert, Typography, Card, TableContainer, Paper, Table, TableHead, TableRow, TableCell, FormHelperText, FormControl, InputLabel, Select, MenuItem, Modal, FormControlLabel, Checkbox, IconButton, CircularProgress, } from "@mui/material";
+import { Button, Box, TextField, IconButton, Container, Card, Modal, TableContainer, Paper, Table, TableHead, TableRow, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, CircularProgress, Snackbar, Alert, Autocomplete } from "@mui/material";
 import { Link } from "react-router-dom";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
@@ -475,14 +475,40 @@ const AdminDashboard1 = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [clickedSteps, setClickedSteps] = useState(Array(steps.length).fill(false));
 
-  const handleStepClick = (index, to) => {
-    setActiveStep(index);
+  const handleStepClick = async (index, to) => {
+    if (isFormValid()) {
+      try {
+        await handleUpdate(person);
+      } catch (err) {
+        // handleUpdate already logs the error internally
+      }
 
-    const pid = sessionStorage.getItem("admin_edit_person_id");
-    if (pid) {
-      navigate(`${to}?person_id=${pid}`);
+      setSnackbar({
+        open: true,
+        message: "Your record has been saved successfully!",
+        severity: "success",
+      });
+
+      setActiveStep(index);
+
+      const newClickedSteps = [...clickedSteps];
+      newClickedSteps[index] = true;
+      setClickedSteps(newClickedSteps);
+
+      setTimeout(() => {
+        const pid = sessionStorage.getItem("admin_edit_person_id");
+        if (pid) {
+          navigate(`${to}?person_id=${pid}`);
+        } else {
+          navigate(to);
+        }
+      }, 1000);
     } else {
-      navigate(to);
+      setSnackbar({
+        open: true,
+        message: "Please fill all required fields before proceeding.",
+        severity: "error",
+      });
     }
   };
 
@@ -1083,41 +1109,152 @@ const AdminDashboard1 = () => {
     fetchCurriculums();
   }, []);
 
-  const filteredCurriculum = curriculumOptions.filter((item) => {
-    // Hide programs with e_status = 1 (except currently selected choice)
-    const isSelected =
-      String(item.curriculum_id) === String(person.program) ||
-      String(item.curriculum_id) === String(person.program2) ||
-      String(item.curriculum_id) === String(person.program3);
-    const eStatus =
-      availabilityMap[item.curriculum_id]?.e_status ?? Number(item.e_status ?? 0);
-    if (!isSelected && eStatus === 1) {
-      return false;
-    }
+  const filteredCurriculum = React.useMemo(() => {
+    const seen = new Map();
 
-    // ✅ CAMPUS FILTER
+    curriculumOptions.forEach((item) => {
+      // Skip full/hidden programs (same logic as before)
+      const isSelected =
+        String(item.curriculum_id) === String(person.program) ||
+        String(item.curriculum_id) === String(person.program2) ||
+        String(item.curriculum_id) === String(person.program3);
+      const eStatus =
+        availabilityMap[item.curriculum_id]?.e_status ?? Number(item.e_status ?? 0);
+      if (!isSelected && eStatus === 1) return;
 
-
-    // ✅ ACADEMIC PROGRAM FILTER
-    if (person.academicProgram !== "" && person.academicProgram !== null) {
-      if (
-        Number(item.academic_program) !==
-        Number(person.academicProgram)
-      ) {
-        return false;
+      if (person.academicProgram !== "" && person.academicProgram !== null) {
+        if (Number(item.academic_program) !== Number(person.academicProgram)) return;
       }
-    }
 
-    return true;
-  });
+      // ✅ Dedupe by curriculum_id — keep the first occurrence
+      if (!seen.has(item.curriculum_id)) {
+        seen.set(item.curriculum_id, item);
+      }
+    });
 
+    return Array.from(seen.values());
+  }, [curriculumOptions, person.program, person.program2, person.program3, person.academicProgram, availabilityMap]);
 
 
 
 
   const [errors, setErrors] = useState({});
 
+  const isFormValid = () => {
+    const requiredFields = [
+      "campus",
+      "academicProgram",
+      "classifiedAs",
+      "applyingAs",
+      "program",
+      "yearLevel",
+      "profile_img",
+      "last_name",
+      "first_name",
+      "height",
+      "weight",
+      "gender",
+      "birthOfDate",
+      "age",
+      "birthPlace",
+      "languageDialectSpoken",
+      "citizenship",
+      "religion",
+      "civilStatus",
+      "tribeEthnicGroup",
+      "cellphoneNumber",
+      "emailAddress",
+      "facebook_account",
+      "presentStreet",
+      "presentZipCode",
+      "presentRegion",
+      "presentProvince",
+      "presentMunicipality",
+      "presentBarangay",
+      "permanentStreet",
+      "permanentZipCode",
+      "permanentRegion",
+      "permanentProvince",
+      "permanentMunicipality",
+      "permanentBarangay",
+    ];
 
+    // Spouse required only when Civil Status is Married
+    if (person.civilStatus === "Married") {
+      requiredFields.push("spouse");
+    }
+
+    let newErrors = {};
+    let isValid = true;
+
+    // Generic required fields
+    requiredFields.forEach((field) => {
+      const value = person[field];
+      if (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        value === "null" ||
+        value === "undefined"
+      ) {
+        newErrors[field] = true;
+        isValid = false;
+      }
+    });
+
+    // Email validation
+    const emailValue = person.emailAddress?.trim();
+    const emailPattern = /^[^@]+@[^@]+\.[^@]+$/;
+    if (!emailValue || !emailPattern.test(emailValue)) {
+      newErrors.emailAddress = true;
+      isValid = false;
+    }
+
+    // LRN Number: required only if N/A is NOT checked
+    if (!isLrnNA) {
+      const lrnValue = person.lrnNumber?.toString().trim();
+      if (!lrnValue) {
+        newErrors.lrnNumber = true;
+        isValid = false;
+      }
+    }
+
+    // Present DSWD (only if checked)
+    if (person.presentDswdChecked === 1) {
+      const value = person.presentDswdHouseholdNumber?.trim();
+      if (!value) {
+        newErrors.presentDswdHouseholdNumber = true;
+        isValid = false;
+      }
+    }
+
+    // Permanent DSWD (only if checked)
+    if (person.permanentDswdChecked === 1) {
+      const value = person.permanentDswdHouseholdNumber?.trim();
+      if (!value) {
+        newErrors.permanentDswdHouseholdNumber = true;
+        isValid = false;
+      }
+    }
+
+    // PWD fields: required only if PWD checkbox is checked
+    if (person.pwdMember === 1) {
+      const pwdTypeValue = person.pwdType?.toString().trim();
+      const pwdIdValue = person.pwdId?.toString().trim();
+
+      if (!pwdTypeValue) {
+        newErrors.pwdType = true;
+        isValid = false;
+      }
+      if (!pwdIdValue) {
+        newErrors.pwdId = true;
+        isValid = false;
+      }
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
 
 
 
@@ -1951,6 +2088,7 @@ const AdminDashboard1 = () => {
 
 
                 <Select
+                  readOnly
                   id="campus-select"
                   name="campus"
                   value={person.campus || ""}
@@ -1991,7 +2129,7 @@ const AdminDashboard1 = () => {
               <FormControl fullWidth size="small" required error={!!errors.academicProgram} className="mb-4">
                 <InputLabel id="academic-program-label">Academic Program</InputLabel>
                 <Select
-
+                  readOnly
                   labelId="academic-program-label"
                   id="academic-program-select"
                   name="academicProgram"
@@ -2109,55 +2247,64 @@ const AdminDashboard1 = () => {
                       required
                       error={!!errors.program}
                     >
-                      <InputLabel>Course Applied</InputLabel>
-                      <Select
-
-                        name="program"
-                        value={person.program || ""}
-                        onChange={handleChange}
-
-                        label="Program"
-                      >
-                        <MenuItem value="">
-                          <em>Select Program</em>
-                        </MenuItem>
-
-                        {filteredCurriculum.map((item, index) => {
-
-                          const availability =
-                            availabilityMap[item.curriculum_id];
+                      <Autocomplete
+                        options={filteredCurriculum}
+                        value={
+                          filteredCurriculum.find(
+                            (item) => String(item.curriculum_id) === String(person.program)
+                          ) || null
+                        }
+                        onChange={(event, newValue) => {
+                          handleChange({
+                            target: {
+                              name: "program",
+                              value: newValue ? newValue.curriculum_id : "",
+                            },
+                          });
+                        }}
+                        getOptionLabel={(item) =>
+                          `(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                          } (${getBranchLabel(item.components)})`
+                        }
+                        isOptionEqualToValue={(option, value) =>
+                          String(option.curriculum_id) === String(value?.curriculum_id)
+                        }
+                        getOptionDisabled={(item) => !!availabilityMap[item.curriculum_id]?.isFull}
+                        renderOption={(props, item) => {
+                          const availability = availabilityMap[item.curriculum_id];
                           const remaining = availability?.remaining ?? 0;
                           const isFull = availability?.isFull;
 
                           return (
-                            <MenuItem
-                              key={index}
-                              value={item.curriculum_id}
-                              disabled={isFull}
-                              sx={{
+                            <li
+                              {...props}
+                              key={item.curriculum_id}
+                              style={{
                                 color: isFull ? "red" : "inherit",
                                 fontWeight: isFull ? "bold" : "normal",
                               }}
                             >
                               {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
                                 } (${getBranchLabel(item.components)})`}
-
-                              {/* Slot info */}
                               {isFull ? (
-                                <span style={{ marginLeft: 8 }}>
-                                  — FULL (0 slots left)
-                                </span>
+                                <span style={{ marginLeft: 8 }}>— FULL (0 slots left)</span>
                               ) : (
-                                <span
-                                  style={{ marginLeft: 8, color: "#2e7d32" }}
-                                >
+                                <span style={{ marginLeft: 8, color: "#2e7d32" }}>
                                   ({remaining} slots left)
                                 </span>
                               )}
-                            </MenuItem>
+                            </li>
                           );
-                        })}
-                      </Select>
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Course Applied"
+                            placeholder="Select Program"
+                            error={!!errors.program}
+                          />
+                        )}
+                      />
 
                       {errors.program && (
                         <FormHelperText>This field is required.</FormHelperText>
@@ -2496,7 +2643,7 @@ const AdminDashboard1 = () => {
                 size="small"
                 sx={{ width: 220 }}
                 InputProps={{
-                  readOnly: true, // ✅ makes the field non-editable but keeps normal styling
+
                   sx: { height: 40 },
                 }}
                 inputProps={{
@@ -2553,7 +2700,7 @@ const AdminDashboard1 = () => {
                 error={Boolean(errors.gender)}
                 sx={{ width: 150 }}
                 InputProps={{
-                  readOnly: true, // ✅ makes it non-editable (read-only)
+
                   sx: { height: 40 },
                 }}
                 inputProps={{ style: { height: 40 } }}
@@ -2590,7 +2737,7 @@ const AdminDashboard1 = () => {
                 <>
                   {/* PWD Type */}
                   <TextField
-                    readOnly
+
                     select
                     size="small"
                     label="PWD Type"
@@ -2693,14 +2840,14 @@ const AdminDashboard1 = () => {
                   onChange={handleChange}
                   error={!!errors.age}
                   helperText={errors.age ? "This field is required." : ""}
-                  InputProps={{ readOnly: true }} // read-only so user can’t manually change
+                // read-only so user can’t manually change
                 />
               </Box>
               <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
                   Birth Place
                 </Typography>
-                <TextField InputProps={{ readOnly: true }}
+                <TextField
                   fullWidth size="small" name="birthPlace" placeholder="Enter your Birth Place" value={person.birthPlace ?? ""} required onChange={handleChange} error={!!errors.birthPlace}
                   helperText={errors.birthPlace ? "This field is required." : ""} />
               </Box>
@@ -2708,7 +2855,7 @@ const AdminDashboard1 = () => {
                 <Typography mb={1} fontWeight="medium">
                   Language/Dialect Spoken
                 </Typography>
-                <TextField InputProps={{ readOnly: true }}
+                <TextField
                   fullWidth size="small" name="languageDialectSpoken" placeholder="Enter your Language Spoken" value={person.languageDialectSpoken ?? ""} required onChange={handleChange} error={!!errors.languageDialectSpoken}
                   helperText={errors.languageDialectSpoken ? "This field is required." : ""}
                 />
@@ -3112,9 +3259,7 @@ const AdminDashboard1 = () => {
                   required
                   value={person.emailAddress || ""}
                   placeholder="Your registered email"
-                  InputProps={{
-                    readOnly: true,
-                  }}
+
                   sx={{
                     backgroundColor: "#f0f0f0",
                   }}
@@ -3179,7 +3324,7 @@ const AdminDashboard1 = () => {
                 <Typography mb={1} fontWeight="medium">Present Street</Typography>
                 <TextField
                   fullWidth
-                  InputProps={{ readOnly: true }}
+
 
                   size="small"
                   name="presentStreet"
@@ -3195,7 +3340,7 @@ const AdminDashboard1 = () => {
                 <Typography mb={1} fontWeight="medium">Present Zip Code</Typography>
                 <TextField
                   fullWidth
-                  InputProps={{ readOnly: true }}
+
                   type="number"
                   size="small"
                   name="presentZipCode"
@@ -3219,7 +3364,7 @@ const AdminDashboard1 = () => {
                 <Select
                   name="presentRegion"
                   displayEmpty
-                  readOnly
+
                   value={person.presentRegion || ""}
                   onChange={(e) => {
                     handleChange(e);
@@ -3251,7 +3396,7 @@ const AdminDashboard1 = () => {
                 <Typography mb={1} fontWeight="medium">Present Province</Typography>
 
                 <Select
-                  readOnly
+
                   name="presentProvince"
                   displayEmpty
                   value={person.presentProvince || ""}
@@ -3289,7 +3434,7 @@ const AdminDashboard1 = () => {
                 <Typography mb={1} fontWeight="medium">Present Municipality</Typography>
 
                 <Select
-                  readOnly
+
                   name="presentMunicipality"
                   displayEmpty
                   value={person.presentMunicipality || ""}
@@ -3320,7 +3465,7 @@ const AdminDashboard1 = () => {
                 <Typography mb={1} fontWeight="medium">Present Barangay</Typography>
 
                 <Select
-                  readOnly
+
                   name="presentBarangay"
                   displayEmpty
                   value={person.presentBarangay || ""}
@@ -3353,7 +3498,7 @@ const AdminDashboard1 = () => {
             <Box mb={2}>
               <Typography mb={1} fontWeight="medium">Present DSWD Household Number</Typography>
               <TextField
-                InputProps={{ readOnly: true }}
+
 
                 fullWidth
                 size="small"
@@ -4007,10 +4152,30 @@ const AdminDashboard1 = () => {
               </Button>
               <Button
                 variant="contained"
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; fall through to validation
+                  }
 
-                  navigate(`/admission_family_background?person_id=${userID}`);
+                  if (isFormValid()) {
+                    setSnackbar({
+                      open: true,
+                      message: "Your record has been saved successfully!",
+                      severity: "success",
+                    });
 
+                    setTimeout(() => {
+                      navigate(`/admission_family_background?person_id=${userID}`);
+                    }, 1500);
+                  } else {
+                    setSnackbar({
+                      open: true,
+                      message: "Please complete all required fields before proceeding.",
+                      severity: "error",
+                    });
+                  }
                 }}
                 endIcon={
                   <ArrowForwardIcon
@@ -4021,8 +4186,6 @@ const AdminDashboard1 = () => {
                   />
                 }
                 sx={{
-
-
                   backgroundColor: mainButtonColor,
                   border: `1px solid ${borderColor}`,
                   color: '#fff',
@@ -4035,8 +4198,6 @@ const AdminDashboard1 = () => {
                   },
                 }}
               >
-
-
                 Next Step
               </Button>
             </Box>

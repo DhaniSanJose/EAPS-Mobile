@@ -375,6 +375,53 @@ const AdminDashboard2 = () => {
 
   const [errors, setErrors] = useState({});
 
+  // Admin views arbitrary applicants, so derive this from the loaded person
+  // record instead of localStorage (which only reflects the logged-in user).
+  const requiresSeniorHigh =
+    ["1", "2", "3", "4"].includes(String(person.applyingAs)) ||
+    person.classifiedAs === "Freshman (First Year)";
+
+  const isFormValid = () => {
+    let requiredFields = [
+      // ✅ Always required (Junior High)
+      "schoolLevel",
+      "schoolLastAttended",
+      "schoolAddress",
+      "honor",
+      "generalAverage",
+      "yearGraduated",
+    ];
+
+    // ✅ CONDITION: if applyingAs is 1–4 → require Senior High
+    if (requiresSeniorHigh) {
+      requiredFields.push(
+        "schoolLevel1",
+        "schoolLastAttended1",
+        "schoolAddress1",
+        "honor1",
+        "generalAverage1",
+        "yearGraduated1",
+        "strand"
+      );
+    }
+
+    let newErrors = {};
+    let isValid = true;
+
+    requiredFields.forEach((field) => {
+      const value = person[field];
+      const stringValue = value?.toString().trim();
+
+      if (!stringValue) {
+        newErrors[field] = true;
+        isValid = false;
+      }
+    });
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
 
   const handleUpdate = async (updatedData) => {
     if (!person) return;
@@ -609,11 +656,36 @@ const AdminDashboard2 = () => {
   const [soloParentChoice, setSoloParentChoice] = useState("");
   const [clickedSteps, setClickedSteps] = useState(Array(steps.length).fill(false));
 
-  const handleStepClick = (index) => {
-    setActiveStep(index);
-    const newClickedSteps = [...clickedSteps];
-    newClickedSteps[index] = true;
-    setClickedSteps(newClickedSteps);
+  const handleStepClick = async (index) => {
+    if (isFormValid()) {
+      try {
+        await handleUpdate(person);
+      } catch (err) {
+        // handleUpdate already logs the error internally
+      }
+
+      setSnackbar({
+        open: true,
+        message: "Your record has been saved successfully!",
+        severity: "success",
+      });
+
+      setActiveStep(index);
+
+      const newClickedSteps = [...clickedSteps];
+      newClickedSteps[index] = true;
+      setClickedSteps(newClickedSteps);
+
+      setTimeout(() => {
+        navigate(steps[index].path);
+      }, 1000);
+    } else {
+      setSnackbar({
+        open: true,
+        message: "Please fill all required fields before proceeding.",
+        severity: "error",
+      });
+    }
   };
 
   const handleGuardianChange = (e) => {
@@ -1394,13 +1466,17 @@ const AdminDashboard2 = () => {
                 {/* Wrap the step with Link for routing */}
                 <Link to={step.path} style={{ textDecoration: "none" }}>
                   <Box
+                    to={step.path}
                     sx={{
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
                       cursor: "pointer",
                     }}
-                    onClick={() => handleStepClick(index)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleStepClick(index);
+                    }}
                   >
                     {/* Step Icon */}
                     <Box
@@ -1575,7 +1651,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Father Family Name</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -1590,7 +1666,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Father Given Name</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -1605,7 +1681,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Father Middle Name</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -1622,7 +1698,7 @@ const AdminDashboard2 = () => {
                       <FormControl fullWidth size="small" required error={!!errors.father_ext}>
                         <InputLabel id="father-ext-label">Extension</InputLabel>
                         <Select
-                          readOnly
+                   
                           labelId="father-ext-label"
                           id="father_ext"
                           name="father_ext"
@@ -1648,7 +1724,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Father Nickname</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -1706,7 +1782,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Father Education Level</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -1722,7 +1798,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Father Last School</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -1738,7 +1814,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Father Course</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -1754,7 +1830,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Father Year Graduated</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
                           type="number"
                           fullWidth
                           size="small"
@@ -1770,7 +1846,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Father School Address</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -1818,7 +1894,7 @@ const AdminDashboard2 = () => {
                         error={!!errors.father_contact}
                         helperText={errors.father_contact && "This field is required."}
                         InputProps={{
-                          readOnly: true,
+                      
                           startAdornment: (
                             <Typography sx={{ mr: 1, fontWeight: "bold" }}>+63</Typography>
                           ),
@@ -1830,7 +1906,7 @@ const AdminDashboard2 = () => {
                     <Box flex={1}>
                       <Typography variant="subtitle2" mb={0.5}>Father Occupation</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
 
                         fullWidth
@@ -1849,7 +1925,7 @@ const AdminDashboard2 = () => {
                     <Box flex={1}>
                       <Typography variant="subtitle2" mb={0.5}>Father Employer</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
 
                         fullWidth
@@ -1868,7 +1944,7 @@ const AdminDashboard2 = () => {
                     <Box flex={1}>
                       <Typography variant="subtitle2" mb={0.5}>Father Income</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
 
                         fullWidth
@@ -1897,7 +1973,7 @@ const AdminDashboard2 = () => {
                   <Box flex={1}>
                     <Typography variant="subtitle2" mb={0.5}>Father Email Address</Typography>
                     <TextField
-                      InputProps={{ readOnly: true }}
+                      
 
 
                       fullWidth
@@ -1970,7 +2046,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Mother Family Name</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -1987,7 +2063,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Mother First Name</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -2004,7 +2080,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Mother Middle Name</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -2024,7 +2100,7 @@ const AdminDashboard2 = () => {
                       <FormControl fullWidth size="small" >
                         <InputLabel id="mother-ext-label">Extension</InputLabel>
                         <Select
-                          readOnly
+                    
                           labelId="mother-ext-label"
                           id="mother_ext"
                           name="mother_ext"
@@ -2049,7 +2125,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={1}>Mother Nickname</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -2107,7 +2183,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Mother Education Level</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -2123,7 +2199,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Mother Last School</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -2139,7 +2215,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Mother Course</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -2155,7 +2231,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Mother Year Graduated</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
                           type="number"
                           fullWidth
                           size="small"
@@ -2171,7 +2247,7 @@ const AdminDashboard2 = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" mb={1}>Mother School Address</Typography>
                         <TextField
-                          InputProps={{ readOnly: true }}
+                          
 
                           fullWidth
                           size="small"
@@ -2196,7 +2272,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={0.5}>Mother Contact</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -2211,7 +2287,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={0.5}>Mother Occupation</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -2226,7 +2302,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={0.5}>Mother Employer</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -2243,7 +2319,7 @@ const AdminDashboard2 = () => {
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle2" mb={0.5}>Mother Income</Typography>
                       <TextField
-                        InputProps={{ readOnly: true }}
+                        
 
                         fullWidth
                         size="small"
@@ -2261,7 +2337,7 @@ const AdminDashboard2 = () => {
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="subtitle2" mb={1}>Mother Email</Typography>
                     <TextField
-                      InputProps={{ readOnly: true }}
+                      
 
                       fullWidth
                       size="small"
@@ -2287,7 +2363,7 @@ const AdminDashboard2 = () => {
               <FormControl style={{ marginBottom: "10px", width: "200px" }} size="small" required error={!!errors.guardian}>
                 <InputLabel id="guardian-label">Guardian</InputLabel>
                 <Select
-                  readOnly
+            
                   labelId="guardian-label"
                   id="guardian"
                   name="guardian"
@@ -2323,7 +2399,7 @@ const AdminDashboard2 = () => {
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" mb={1}>Guardian Family Name</Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -2341,7 +2417,7 @@ const AdminDashboard2 = () => {
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" mb={1}>Guardian First Name</Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -2359,7 +2435,7 @@ const AdminDashboard2 = () => {
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" mb={1}>Guardian Middle Name</Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -2379,7 +2455,7 @@ const AdminDashboard2 = () => {
                 <FormControl fullWidth size="small" required error={!!errors.guardian_ext}>
                   <InputLabel id="guardian-ext-label">Extension</InputLabel>
                   <Select
-                    readOnly
+                
                     labelId="guardian-ext-label"
                     id="guardian_ext"
                     name="guardian_ext"
@@ -2406,7 +2482,7 @@ const AdminDashboard2 = () => {
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" mb={1}>Guardian Nickname</Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -2428,7 +2504,7 @@ const AdminDashboard2 = () => {
             <Box sx={{ width: '100%', mb: 2 }}>
               <Typography variant="subtitle2" mb={1}>Guardian Address</Typography>
               <TextField
-                InputProps={{ readOnly: true }}
+                
 
                 fullWidth
                 size="small"
@@ -2446,7 +2522,7 @@ const AdminDashboard2 = () => {
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" mb={1}>Guardian Contact</Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -2462,7 +2538,7 @@ const AdminDashboard2 = () => {
               <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" mb={1}>Guardian Email</Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -2554,7 +2630,7 @@ const AdminDashboard2 = () => {
               <FormControl fullWidth size="small" required error={!!errors.annual_income}>
                 <InputLabel id="annual-income-label">Annual Income</InputLabel>
                 <Select
-                  readOnly
+        
                   labelId="annual-income-label"
                   name="annual_income"
                   value={person.annual_income || ""}
@@ -2712,8 +2788,23 @@ const AdminDashboard2 = () => {
               {/* Previous Page Button */}
               <Button
                 variant="contained"
-                component={Link}
-                to={`/admission_personal_information?person_id=${userID}`}
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; still navigate
+                  }
+
+                  setSnackbar({
+                    open: true,
+                    message: "Your record has been saved successfully!",
+                    severity: "success",
+                  });
+
+                  setTimeout(() => {
+                    navigate(`/admission_personal_information?person_id=${userID}`);
+                  }, 1000);
+                }}
                 startIcon={
                   <ArrowBackIcon
                     sx={{
@@ -2728,7 +2819,6 @@ const AdminDashboard2 = () => {
                   color: "#000",
                   "&:hover": {
                     backgroundColor: "#000000",
-
                     color: "#fff",
                     "& .MuiSvgIcon-root": {
                       color: "#fff",
@@ -2741,10 +2831,30 @@ const AdminDashboard2 = () => {
 
               <Button
                 variant="contained"
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; fall through to validation
+                  }
 
-                  navigate(`/admission_educational_attainment?person_id=${userID}`);
+                  if (isFormValid()) {
+                    setSnackbar({
+                      open: true,
+                      message: "Your record has been saved successfully!",
+                      severity: "success",
+                    });
 
+                    setTimeout(() => {
+                      navigate(`/admission_educational_attainment?person_id=${userID}`);
+                    }, 1000);
+                  } else {
+                    setSnackbar({
+                      open: true,
+                      message: "Please complete all required fields before proceeding.",
+                      severity: "error",
+                    });
+                  }
                 }}
                 endIcon={
                   <ArrowForwardIcon

@@ -17,12 +17,13 @@ import { saveAs } from "file-saver";
 import EaristLogo from "../assets/EaristLogo.png";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
+import { getFlatAuditHeaders } from "../utils/auditEvents";
+import useAccountAuditMac from "./useAccountAuditMac";
 /* ─────────────────────────────────────────────
    Main Component
 ───────────────────────────────────────────── */
 const MigrationDataPanel = () => {
-  useAccountAuditMac();
+    useAccountAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");

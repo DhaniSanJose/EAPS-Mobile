@@ -830,30 +830,21 @@ router.post("/register", async (req, res) => {
       "INSERT INTO applicant_numbering_table (applicant_number, person_id) VALUES (?, ?)",
       [applicant_number, person_id]
     );
-
-    const qrData = `${process.env.DB_HOST_LOCAL}:5173/examination_profile/${applicant_number}`;
-    const qrData2 = `${process.env.DB_HOST_LOCAL}:5173/applicant_profile/${applicant_number}`;
+    
+    const qrData = `${process.env.DB_HOST_LOCAL}:5173/applicant_profile/${applicant_number}`;
     const qrFilename = `${applicant_number}_qrcode.png`;
-    const qrFilename2 = `${applicant_number}_qrcode2.png`;
+
     const qrPath = path.join(
       __dirname,
       "../../uploads/QrCodeGenerated",
       qrFilename
-    );
-    const qrPath2 = path.join(
-      __dirname,
-      "../../uploads/QrCodeGenerated",
-      qrFilename2
     );
 
     await QRCode.toFile(qrPath, qrData, {
       color: { dark: "#000", light: "#FFF" },
       width: 300,
     });
-    await QRCode.toFile(qrPath2, qrData2, {
-      color: { dark: "#000", light: "#FFF" },
-      width: 300,
-    });
+
 
     await db.query(
       "UPDATE applicant_numbering_table SET qr_code = ? WHERE applicant_number = ?",

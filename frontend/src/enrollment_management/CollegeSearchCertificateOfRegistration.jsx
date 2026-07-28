@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -28,6 +28,8 @@ import CertificateOfRegistrationForCollege from "./CollegeCertificateOfRegistrat
 import EaristLogo from "../assets/EaristLogo.png";
 import SearchIcon from "@mui/icons-material/Search";
 import { FcPrint } from "react-icons/fc";
+import { MdOutlinePayment } from "react-icons/md";
+import { IoMdSchool } from "react-icons/io";
 import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
 import Unauthorized from "../components/Unauthorized";
@@ -505,6 +507,36 @@ const SearchCorForCollege = () => {
     }, [debouncedStudentNumber, departmentLoading, selectedActiveSchoolYear]);
 
     const divToPrintRef = useRef();
+    const corPaymentActionsRef = useRef(null);
+    const [paymentActionsState, setPaymentActionsState] = useState({
+        disabled: false,
+        ready: false,
+        unifastLabel: "Save to Unifast",
+        matriculationLabel: "Save Matriculation",
+    });
+
+    const handlePaymentActionsChange = useCallback((nextState) => {
+        setPaymentActionsState((current) => {
+            const next = {
+                disabled: Boolean(nextState.disabled),
+                ready: Boolean(nextState.ready),
+                unifastLabel: nextState.unifastLabel || "Save to Unifast",
+                matriculationLabel:
+                    nextState.matriculationLabel || "Save Matriculation",
+            };
+
+            if (
+                current.disabled === next.disabled &&
+                current.ready === next.ready &&
+                current.unifastLabel === next.unifastLabel &&
+                current.matriculationLabel === next.matriculationLabel
+            ) {
+                return current;
+            }
+
+            return next;
+        });
+    }, []);
 
     // --- Job-based PDF generation (same pipeline as CORExportingModule) ---
     const [pdfLoading, setPdfLoading] = useState(false);
@@ -646,6 +678,35 @@ const SearchCorForCollege = () => {
     const detectedDepartment = departments.find(
         (dep) => String(dep.dprtmnt_id) === String(dprtmntID),
     );
+    const paymentButtonsDisabled =
+        paymentActionsState.disabled ||
+        !debouncedStudentNumber ||
+        !paymentActionsState.ready;
+
+    const actionButtonStyle = (disabled) => ({
+        marginBottom: "1rem",
+        padding: "10px 20px",
+        border: "2px solid black",
+        backgroundColor: "#f0f0f0",
+        color: "black",
+        borderRadius: "5px",
+        marginTop: "20px",
+        cursor: disabled ? "not-allowed" : "pointer",
+        fontSize: "16px",
+        fontWeight: "bold",
+        opacity: disabled ? 0.6 : 1,
+        transition: "background-color 0.3s, transform 0.2s",
+    });
+
+    const handleSaveToUnifastClick = () => {
+        if (paymentButtonsDisabled) return;
+        corPaymentActionsRef.current?.openUnifastConfirm();
+    };
+
+    const handleSaveToMatriculationClick = () => {
+        if (paymentButtonsDisabled) return;
+        corPaymentActionsRef.current?.openScholarshipModal();
+    };
 
     // Put this at the very bottom before the return 
     if (loading || hasAccess === null) {
@@ -764,7 +825,7 @@ const SearchCorForCollege = () => {
                                 Student Name:&nbsp;
                                 <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
                                     {studentData && studentData.last_name
-                                        ? `${studentData.last_name.toUpperCase()}, ${studentData.first_name.toUpperCase()} ${studentData.middle_name.toUpperCase()}`
+                                        ? `${studentData?.last_name?.toUpperCase()}, ${studentData?.first_name?.toUpperCase()} ${studentData?.middle_name?.toUpperCase()}`
                                         : "N/A"}
                                 </span>
                             </TableCell>
@@ -826,33 +887,52 @@ const SearchCorForCollege = () => {
 
             <br />
 
-            <button
-                onClick={handleGeneratePdf}
-                disabled={pdfLoading || !debouncedStudentNumber}
-                style={{
-                    marginBottom: "1rem",
-                    padding: "10px 20px",
-                    border: "2px solid black",
-                    backgroundColor: "#f0f0f0",
-                    color: "black",
-                    borderRadius: "5px",
-                    marginTop: "20px",
-                    cursor: pdfLoading || !debouncedStudentNumber ? "not-allowed" : "pointer",
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    opacity: pdfLoading || !debouncedStudentNumber ? 0.6 : 1,
-                    transition: "background-color 0.3s, transform 0.2s",
-                }}
-                onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-                onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-                onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-            >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FcPrint size={20} />
-                    {pdfLoading ? "Generating..." : "Generate Certificate PDF"}
-                </span>
-            </button>
+            <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+                <button
+                    onClick={handleGeneratePdf}
+                    disabled={pdfLoading || !debouncedStudentNumber}
+                    style={actionButtonStyle(pdfLoading || !debouncedStudentNumber)}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
+                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FcPrint size={20} />
+                        {pdfLoading ? "Generating..." : "Generate Certificate PDF"}
+                    </span>
+                </button>
+
+                <button
+                    onClick={handleSaveToUnifastClick}
+                    disabled={paymentButtonsDisabled}
+                    style={actionButtonStyle(paymentButtonsDisabled)}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
+                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <MdOutlinePayment size={20} />
+                        {paymentActionsState.unifastLabel}
+                    </span>
+                </button>
+
+                <button
+                    onClick={handleSaveToMatriculationClick}
+                    disabled={paymentButtonsDisabled}
+                    style={actionButtonStyle(paymentButtonsDisabled)}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+                    onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
+                    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <IoMdSchool size={20} />
+                        {paymentActionsState.matriculationLabel}
+                    </span>
+                </button>
+            </Box>
 
             <div
                 ref={divToPrintRef}
@@ -862,6 +942,7 @@ const SearchCorForCollege = () => {
                 }}
             >
                 <CertificateOfRegistrationForCollege
+                    ref={corPaymentActionsRef}
                     key={`${debouncedStudentNumber}-${selectedActiveSchoolYear || "none"}`}
                     student_number={
                         selectedActiveSchoolYear && (corPreload || !corPreloadLoading)
@@ -871,6 +952,7 @@ const SearchCorForCollege = () => {
                     dprtmnt_id={dprtmntID}
                     activeSchoolYearId={selectedActiveSchoolYear || undefined}
                     preload={corPreload}
+                    onPaymentActionsChange={handlePaymentActionsChange}
                     onNotify={({ message, severity }) => showSnackbar(message, severity)}
                 />
             </div>

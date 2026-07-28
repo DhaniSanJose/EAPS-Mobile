@@ -436,17 +436,39 @@ const AdminDashboard5 = () => {
   };
 
 
-  const [errors, setErrors] = useState({});
-
   const [clickedSteps, setClickedSteps] = useState(Array(steps.length).fill(false));
 
-  const handleStepClick = (index) => {
-    setActiveStep(index);
-    const newClickedSteps = [...clickedSteps];
-    newClickedSteps[index] = true;
-    setClickedSteps(newClickedSteps);
-  };
+  const handleStepClick = async (index) => {
+    if (isFormValid()) {
+      try {
+        await handleUpdate(person);
+      } catch (err) {
+        // handleUpdate already logs the error internally
+      }
 
+      setSnackbar({
+        open: true,
+        message: "Your record has been saved successfully!",
+        severity: "success",
+      });
+
+      setActiveStep(index);
+
+      const newClickedSteps = [...clickedSteps];
+      newClickedSteps[index] = true;
+      setClickedSteps(newClickedSteps);
+
+      setTimeout(() => {
+        navigate(steps[index].path);
+      }, 1000);
+    } else {
+      setSnackbar({
+        open: true,
+        message: "Please fill all required fields before proceeding.",
+        severity: "error",
+      });
+    }
+  };
 
   const divToPrintRef = useRef();
   const [showPrintView, setShowPrintView] = useState(false);
@@ -702,7 +724,20 @@ const AdminDashboard5 = () => {
     { key: "examPermitDownload", label: "Examination Permit", onClick: downloadExamPermitPDF },
   ];
 
+  const [errors, setErrors] = useState({});
 
+  const isFormValid = () => {
+    let newErrors = {};
+    let isValid = true;
+
+    if (person.termsOfAgreement !== 1) {
+      newErrors.termsOfAgreement = true;
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
 
 
   const [canPrintPermit, setCanPrintPermit] = useState(false);
@@ -1163,7 +1198,10 @@ const AdminDashboard5 = () => {
                       alignItems: "center",
                       cursor: "pointer",
                     }}
-                    onClick={() => handleStepClick(index)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleStepClick(index);
+                    }}
                   >
                     {/* Step Icon */}
                     <Box
@@ -1276,7 +1314,7 @@ const AdminDashboard5 = () => {
                 control={
                   <Checkbox
                     name="termsOfAgreement"
-                    disabled
+              
                     checked={person.termsOfAgreement === 1}
                     onChange={handleChange}
                   />
@@ -1425,8 +1463,23 @@ const AdminDashboard5 = () => {
               {/* Previous Page Button */}
               <Button
                 variant="contained"
-                component={Link}
-                to={`/admission_health_medical_records?person_id=${userID}`}
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; still navigate
+                  }
+
+                  setSnackbar({
+                    open: true,
+                    message: "Your record has been saved successfully!",
+                    severity: "success",
+                  });
+
+                  setTimeout(() => {
+                    navigate(`/admission_health_medical_records?person_id=${userID}`);
+                  }, 1000);
+                }}
                 startIcon={
                   <ArrowBackIcon
                     sx={{
@@ -1452,14 +1505,30 @@ const AdminDashboard5 = () => {
               </Button>
               {/* Next Step (Submit) Button */}
               <Button
-                disabled
                 variant="contained"
-                onClick={(e) => {
-
+                onClick={async () => {
                   if (isFormValid()) {
-                    navigate("/admission_online_requirements"); // Proceed only if valid
+                    try {
+                      await handleUpdate(person);
+                    } catch (err) {
+                      // handleUpdate already logs the error internally
+                    }
+
+                    setSnackbar({
+                      open: true,
+                      message: "Your record has been saved successfully!",
+                      severity: "success",
+                    });
+
+                    setTimeout(() => {
+                      navigate("/admission_online_requirements");
+                    }, 1000);
                   } else {
-                    alert("Please complete all required fields before submitting.");
+                    setSnackbar({
+                      open: true,
+                      message: "Please complete all required fields before submitting.",
+                      severity: "error",
+                    });
                   }
                 }}
                 endIcon={
@@ -1471,7 +1540,6 @@ const AdminDashboard5 = () => {
                   />
                 }
                 sx={{
-
                   backgroundColor: mainButtonColor,
                   border: `1px solid ${borderColor}`,
                   color: '#fff',
@@ -1484,9 +1552,6 @@ const AdminDashboard5 = () => {
                   },
                 }}
               >
-
-
-
                 Submit (Save Information)
               </Button>
 

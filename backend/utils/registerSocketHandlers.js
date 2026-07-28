@@ -709,8 +709,12 @@ WHERE proctor LIKE ?
 
 
 
-    socket.on("assign-student-number", async (payload) => {
+  socket.on("assign-student-number", async (payload) => {
       const conn = await db3.getConnection();
+      const copiedRequirementFilesForRollback = [];
+      let copiedProfileFileForRollback = "";
+      let enrollmentCommitted = false;
+      let connectionReleased = false;
       try {
         const person_id =
           typeof payload === "object" && payload !== null
@@ -741,6 +745,18 @@ WHERE proctor LIKE ?
 
         const person_data = rows[0];
         const { emailAddress, first_name, middle_name, last_name } = person_data;
+
+        const [[requirementCountRow]] = await db.query(
+          `SELECT COUNT(*) AS requirement_count FROM requirement_uploads WHERE person_id = ?`,
+          [person_id],
+        );
+        if (Number(requirementCountRow?.requirement_count || 0) === 0) {
+          conn.release();
+          return socket.emit("assign-student-number-result", {
+            success: false,
+            message: "Cannot assign student number because no applicant requirements were found to copy.",
+          });
+        }
 
         // ── Generate student number ──────────────────────────────────────────────
         let student_number;
@@ -780,6 +796,7 @@ WHERE proctor LIKE ?
               const ext = path.extname(person_data.profile_img) || ".jpg";
               studentProfileImg = `${student_number}_profile_image${ext}`;
               fs.copyFileSync(sourcePath, path.join(studentDir, studentProfileImg));
+              copiedProfileFileForRollback = studentProfileImg;
             } else {
               console.warn(`[assign-student-number] profile image not found for person_id=${person_id}`);
             }
@@ -793,6 +810,12 @@ WHERE proctor LIKE ?
           `SELECT * FROM requirement_uploads WHERE person_id = ?`,
           [person_id],
         );
+
+        if (!requirements.length) {
+          throw new Error(
+            "Cannot assign student number because no applicant requirements were found to copy.",
+          );
+        }
 
         const [[applicantNumberRow]] = await db.query(
           `SELECT applicant_number FROM applicant_numbering_table WHERE person_id = ? LIMIT 1`,
@@ -1017,33 +1040,46 @@ WHERE proctor LIKE ?
       ) VALUES (${placeholders})`,
           personValues,
         );
+        if (!personInsertResult.insertId) {
+          throw new Error("Cannot assign student number because the enrollment person record was not created.");
+        }
 
         // ── Real person_id from MySQL auto-increment ─────────────────────────────
         const personIdForStudent = personInsertResult.insertId;
 
         // ── Insert into student_numbering_table ──────────────────────────────────
-        await conn.query(
+        const [studentNumberInsertResult] = await conn.query(
           `INSERT INTO student_numbering_table (student_number, person_id) VALUES (?, ?)`,
           [student_number, personIdForStudent],
         );
+        if ((studentNumberInsertResult.affectedRows || 0) !== 1) {
+          throw new Error("Cannot assign student number because the student numbering record was not created.");
+        }
 
         // ── Insert into person_status_table ──────────────────────────────────────
-        await conn.query(
+        const [personStatusInsertResult] = await conn.query(
           `INSERT INTO person_status_table
         (person_id, exam_status, requirements, residency, student_registration_status, exam_result, hs_ave)
        VALUES (?, 0, 0, 0, 0, 0, 0)`,
           [personIdForStudent],
         );
+        if ((personStatusInsertResult.affectedRows || 0) !== 1) {
+          throw new Error("Cannot assign student number because the enrollment person status was not created.");
+        }
 
         // ── Insert into student_status_table ─────────────────────────────────────
-        await conn.query(
+        const [studentStatusInsertResult] = await conn.query(
           `INSERT INTO student_status_table
         (student_number, active_curriculum, enrolled_status, year_level_id, active_school_year_id, control_status)
        VALUES (?, ?, 0, 0, 0, 0)`,
           [student_number, person_data.program],
         );
+        if ((studentStatusInsertResult.affectedRows || 0) !== 1) {
+          throw new Error("Cannot assign student number because the enrollment student status was not created.");
+        }
 
         // ── Copy requirements to ENROLLMENT db ───────────────────────────────────
+        let copiedRequirementRows = 0;
         for (const req of requirements) {
           const shortLabel = requirementShortLabels.get(req.requirements_id) || "Unknown";
           const targetFilename = buildStudentRequirementFilename(
@@ -1052,15 +1088,26 @@ WHERE proctor LIKE ?
             req.file_path,
             shortLabel,
           );
-          const { filePath: enrollmentFilePath } = await copyRequirementFileForEnrollment({
+          const {
+            copied: requirementFileCopied,
+            filePath: enrollmentFilePath,
+          } = await copyRequirementFileForEnrollment({
             sourceFilename: req.file_path,
             targetFilename,
             applicantNumber,
             studentNumber: student_number,
             shortLabelFallback: shortLabel,
           });
+          if (req.file_path && !requirementFileCopied) {
+            throw new Error(
+              `Cannot assign student number because requirement file ${req.file_path} could not be copied.`,
+            );
+          }
+          if (requirementFileCopied && enrollmentFilePath) {
+            copiedRequirementFilesForRollback.push(enrollmentFilePath);
+          }
 
-          await conn.query(
+          const [requirementInsertResult] = await conn.query(
             `INSERT INTO requirement_uploads
           (requirements_id, person_id, submitted_documents, file_path, original_name,
            remarks, status, document_status, registrar_status, created_at)
@@ -1078,13 +1125,23 @@ WHERE proctor LIKE ?
               req.created_at,
             ],
           );
+          copiedRequirementRows += requirementInsertResult.affectedRows || 0;
+        }
+
+        if (copiedRequirementRows !== requirements.length) {
+          throw new Error(
+            `Cannot assign student number because only ${copiedRequirementRows} of ${requirements.length} requirements were copied.`,
+          );
         }
 
         // ── Mark student registration complete ───────────────────────────────────
-        await conn.query(
+        const [registrationStatusResult] = await conn.query(
           `UPDATE person_status_table SET student_registration_status = 1 WHERE person_id = ?`,
           [personIdForStudent],
         );
+        if ((registrationStatusResult.affectedRows || 0) !== 1) {
+          throw new Error("Cannot assign student number because student registration was not completed.");
+        }
 
         // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
         // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
@@ -1094,22 +1151,30 @@ WHERE proctor LIKE ?
         );
 
         if (existingUser.length === 0) {
-          await conn.query(
+          const [userInsertResult] = await conn.query(
             `INSERT INTO user_accounts (person_id, email, password, role, status, force_password_change)
  VALUES (?, ?, ?, 'student', 1, 1)`,
             [personIdForStudent, person_data.emailAddress, hashedPassword],
           );
+          if ((userInsertResult.affectedRows || 0) !== 1) {
+            throw new Error("Cannot assign student number because the student login account was not created.");
+          }
         } else {
-          await conn.query(
+          const [userUpdateResult] = await conn.query(
             `UPDATE user_accounts SET email = ?, password = ?, role = 'student', status = 1, force_password_change = 1
  WHERE person_id = ?`,
             [person_data.emailAddress, hashedPassword, personIdForStudent],
           );
+          if ((userUpdateResult.affectedRows || 0) !== 1) {
+            throw new Error("Cannot assign student number because the student login account was not updated.");
+          }
         }
 
         // ── Commit transaction ───────────────────────────────────────────────────
         await conn.commit();
+        enrollmentCommitted = true;
         conn.release();
+        connectionReleased = true;
 
         // ── Generate QR code ─────────────────────────────────────────────────────
         const qrData = `${process.env.DB_HOST_LOCAL}:5173/student_qr_information/${student_number}`;
@@ -1221,8 +1286,31 @@ Click the link below to log in:
         });
 
       } catch (error) {
-        try { await conn.rollback(); } catch (_) { }
-        conn.release();
+        if (!enrollmentCommitted) {
+          try { await conn.rollback(); } catch (_) { }
+          for (const filename of copiedRequirementFilesForRollback) {
+            const cleanupPath = path.join(studentOnlineDocsDir, path.basename(filename));
+            try {
+              if (fs.existsSync(cleanupPath)) fs.unlinkSync(cleanupPath);
+            } catch (cleanupError) {
+              console.error("[assign-student-number] failed to clean copied requirement file:", cleanupError);
+            }
+          }
+          if (copiedProfileFileForRollback) {
+            const cleanupPath = path.join(
+              __dirname,
+              "uploads",
+              "Student1by1",
+              path.basename(copiedProfileFileForRollback),
+            );
+            try {
+              if (fs.existsSync(cleanupPath)) fs.unlinkSync(cleanupPath);
+            } catch (cleanupError) {
+              console.error("[assign-student-number] failed to clean copied profile image:", cleanupError);
+            }
+          }
+        }
+        if (!connectionReleased) conn.release();
 
         console.error("Error in assign-student-number:", error);
         socket.emit("assign-student-number-result", {
@@ -5742,6 +5830,23 @@ Click the link below to log in:
       }
     },
   );
+
+  app.get("/api/get_current_academic_year", (req, res) => {
+    const now = new Date();
+    const month = now.getMonth(); // 0-indexed, June = 5
+
+    const startYear = month >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    const year_description = `${startYear} - ${startYear + 1}`;
+
+    // Optional auto-semester guess — remove this block if you still want to
+    // drive semester manually from get_active_school_years.
+    let semester_description = "First Semester";
+    if (month >= 10 || month <= 2) semester_description = "Second Semester";
+    else if (month === 3 || month === 4) semester_description = "Summer";
+
+    res.json({ year_description, semester_description });
+  });
+
   app.get("/api/interview_applicants/:applicantId", async (req, res) => {
     try {
       const { applicantId } = req.params;

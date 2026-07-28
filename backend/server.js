@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.42:5173",
+  "http://192.168.50.76:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -3373,11 +3373,24 @@ const updateActiveStudentCurriculumForCurrentSchoolYear = async ({
     message: `Student (${studentNumber}) ${studentName} shifted curriculum from ${fromLabel} to ${toLabel}.`,
   });
 
+  const { actorId, actorRole } = await getAuditActorFromRequest(req);
+  const roleLabel = formatAuditActorRole(actorRole);
+
+  await insertAuditLogEnrollment({
+    actorId,
+    role: actorRole || "registrar",
+    action: "STUDENT_PROGRAM_CHANGE",
+    severity: "INFO",
+    message: `${roleLabel} (${actorId}) changed the program of Student ${studentName} (${studentNumber}) from ${fromLabel} to ${toLabel}.`,
+  });
+
   return {
     changed: true,
     studentNumber,
     activeSchoolYearId,
     updatedStatusRows,
+    fromLabel,
+    toLabel,
   };
 };
 

@@ -425,83 +425,275 @@ router.post("/add-applicant", async (req, res) => {
     birthOfDate,
     academicProgram,
     applyingAs,
-    program, // ✅ NEW — curriculum_id of the course the applicant is applying for
+    program,
+    active_school_year_id, // optional override, same as /register
   } = req.body;
 
+  const normalizedEmail = email?.trim().toLowerCase();
   let person_id = null;
 
   try {
-    if (!email || !password || !first_name || !last_name || !birthOfDate) {
-      return res.status(400).json({ message: "Missing required fields" });
+    // ---- 1. Required fields ----
+    if (
+      !normalizedEmail ||
+      !password ||
+      !campus ||
+      !first_name ||
+      !last_name ||
+      !birthOfDate ||
+      !academicProgram ||
+      !applyingAs ||
+      !program
+    ) {
+      await insertRegistrationAuditLog({
+        actorId: normalizedEmail || "unknown",
+        outcome: "FAILED",
+        event: "failed to add applicant",
+        reason: "Missing required fields",
+      });
+      return res.status(400).json({
+        success: false,
+        message: "Please fill up all required fields",
+      });
     }
 
-    // ✅ NEW — Course Applied is the field the registrar actually needs to
-    // save (it's what curriculum/program filtering, the applicant list, and
-    // the exported PDFs all read from). Reject early instead of silently
-    // creating an applicant with no program on record.
-    if (!program) {
-      return res.status(400).json({ message: "Course/Program (program) is required." });
+    // ---- 2. Email domain reachability ----
+    const domainOk = await isDomainReachable(normalizedEmail);
+    if (!domainOk) {
+      await insertRegistrationAuditLog({
+        actorId: normalizedEmail,
+        outcome: "FAILED",
+        event: "failed to add applicant",
+        reason: "Email domain has no valid mail records",
+      });
+      return res.status(400).json({
+        success: false,
+        message: "This email domain doesn't appear to exist or can't receive mail.",
+      });
     }
+
+    // ---- 3. Email uniqueness ----
+    const [existingEmail] = await db.query(
+      "SELECT 1 FROM user_accounts WHERE email = ?",
+      [normalizedEmail]
+    );
+    if (existingEmail.length > 0) {
+      return res.status(400).json({ success: false, message: "Email is already registered" });
+    }
+
+    const [[company]] = await db.query(
+      "SELECT short_term, company_name FROM company_settings WHERE id = 1"
+    );
+    const issuer = company?.short_term || "School";
+    const companyName = company?.company_name || "Main Campus";
+
+    // ---- 4. Duplicate enrollment person check ----
+    const duplicateEnrollmentPerson = await checkEnrollmentPersonDuplicate({
+      email: normalizedEmail,
+      firstName: first_name,
+      lastName: last_name,
+      birthday: birthOfDate,
+    });
+    if (duplicateEnrollmentPerson.duplicate) {
+      await insertRegistrationAuditLog({
+        actorId: normalizedEmail,
+        outcome: "FAILED",
+        event: "failed to add applicant",
+        reason: duplicateEnrollmentPerson.message,
+      });
+      return res.status(400).json({
+        success: false,
+        message: duplicateEnrollmentPerson.message,
+      });
+    }
+
+    // ---- 5. Exact person match -> already took the exam? ----
+    const [personMatch] = await db.query(
+      `SELECT person_id
+       FROM person_table
+       WHERE first_name = ?
+         AND last_name = ?
+         AND birthOfDate = ?
+         AND LOWER(TRIM(emailAddress)) = ?
+       LIMIT 1`,
+      [first_name.trim(), last_name.trim(), birthOfDate, normalizedEmail]
+    );
+    if (personMatch.length > 0) {
+      const matchedPersonId = personMatch[0].person_id;
+      const [applicant] = await db.query(
+        `SELECT applicant_number FROM applicant_numbering_table WHERE person_id = ? LIMIT 1`,
+        [matchedPersonId]
+      );
+      if (applicant.length > 0) {
+        const [exam] = await db.query(
+          `SELECT email_sent FROM exam_applicants WHERE applicant_id = ? LIMIT 1`,
+          [applicant[0].applicant_number]
+        );
+        if (exam.length > 0 && exam[0].email_sent === 1) {
+          return res.status(400).json({
+            success: false,
+            message: `We are sorry to inform you that this applicant is no longer allowed to take the ${issuer} College Admission Test (ECAT). Based on our records, they have already taken the examination.`,
+          });
+        }
+      }
+    }
+
+    // ---- 6. Partial match (same name, different email context) ----
+    const [partialMatch] = await db.query(
+      `SELECT person_id
+       FROM person_table
+       WHERE last_name = ?
+         AND middle_name = ?
+         AND first_name = ?
+       LIMIT 1`,
+      [last_name.trim(), middle_name?.trim() || null, first_name.trim()]
+    );
+    if (partialMatch.length > 0) {
+      const matchedPersonId = partialMatch[0].person_id;
+      const [applicant] = await db.query(
+        `SELECT applicant_number FROM applicant_numbering_table WHERE person_id = ? LIMIT 1`,
+        [matchedPersonId]
+      );
+      if (applicant.length > 0) {
+        const [exam] = await db.query(
+          `SELECT email_sent FROM exam_applicants WHERE applicant_id = ? LIMIT 1`,
+          [applicant[0].applicant_number]
+        );
+        if (exam.length > 0 && exam[0].email_sent === 1) {
+          return res.status(400).json({
+            success: false,
+            message: "A similar applicant already received an email. Cannot add this applicant.",
+          });
+        }
+      }
+    }
+
+    // ---- 7. Branch / campus + registration window validation ----
+    const [[row]] = await db.query(
+      "SELECT branches FROM company_settings WHERE id = 1"
+    );
+    const branches = JSON.parse(row.branches || "[]");
+    const branch = branches.find((b) => b.id == campus);
+    if (!branch) {
+      return res.status(400).json({ success: false, message: "Invalid branch selected" });
+    }
+    const nowDate = new Date();
+    let isOpen = branch.registration_open;
+    if (branch.start_date && branch.end_date) {
+      isOpen =
+        nowDate >= new Date(branch.start_date) &&
+        nowDate <= new Date(branch.end_date);
+    }
+    if (!isOpen) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration is closed for this branch",
+      });
+    }
+
+    // ---- 8. Curriculum / program validation ----
+    const [selectedCurriculumRows] = await db3.query(
+      `SELECT ct.curriculum_id
+       FROM curriculum_table AS ct
+       INNER JOIN program_table AS pt ON pt.program_id = ct.program_id
+       WHERE ct.curriculum_id = ?
+         AND pt.components = ?
+         AND pt.academic_program = ?
+         AND ct.lock_status = 1
+       LIMIT 1`,
+      [program, campus, academicProgram]
+    );
+    if (selectedCurriculumRows.length === 0) {
+      return res.status(400).json({ success: false, message: "Invalid curriculum selected" });
+    }
+
+    // NOTE: No OTP/TOTP check here — this endpoint is for a registrar/admin
+    // creating an applicant record directly, not self-service registration,
+    // so there's no QR/authenticator step to verify.
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // ---- Race-condition guard right before insert ----
     const [existingUser] = await db.query(
       "SELECT * FROM user_accounts WHERE email = ?",
-      [email.trim().toLowerCase()]
+      [normalizedEmail]
     );
-
     if (existingUser.length > 0) {
-      return res.status(400).json({ message: "Email already exists" });
+      await insertRegistrationAuditLog({
+        actorId: normalizedEmail,
+        outcome: "FAILED",
+        event: "failed to add applicant",
+        reason: "Email already registered (race condition)",
+      });
+      return res.status(400).json({ success: false, message: "Email is already registered" });
     }
+
+    const age = calculateAge(birthOfDate);
 
     const [personResult] = await db.query(
       `INSERT INTO person_table
-       (campus, emailAddress, first_name, middle_name, last_name, birthOfDate, academicProgram, applyingAs, program, termsOfAgreement, current_step)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)`,
+       (campus, emailAddress, first_name, middle_name, last_name, birthOfDate, age,
+        academicProgram, applyingAs, program, termsOfAgreement, current_step)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        campus || 1,
-        email.trim().toLowerCase(),
+        campus,
+        normalizedEmail,
         first_name.trim(),
-        middle_name || null,
+        middle_name?.trim() || null,
         last_name.trim(),
         birthOfDate,
+        age,
         academicProgram,
         applyingAs,
-        program, // ✅ NEW
+        program,
+        0,
+        1,
       ]
     );
 
     person_id = personResult.insertId;
 
+    let schoolYearId = Number(active_school_year_id);
+    if (!Number.isInteger(schoolYearId) || schoolYearId <= 0) {
+      const [[activeSchoolYear]] = await db3.query(
+        "SELECT id AS school_year_id FROM active_school_year_table WHERE astatus = 1 LIMIT 1"
+      );
+      schoolYearId = activeSchoolYear?.school_year_id || null;
+    }
+
     await db.query(
-      `INSERT INTO user_accounts (person_id, email, password, role, status)
-       VALUES (?, ?, ?, 'applicant', 1)`,
-      [person_id, email.trim().toLowerCase(), hashedPassword]
+      `INSERT INTO user_accounts (person_id, email, password, role, status, school_year_id)
+       VALUES (?, ?, ?, 'applicant', ?, ?)`,
+      [person_id, normalizedEmail, hashedPassword, 1, schoolYearId]
     );
 
-    // ✅ Force password change on first login
+    // Admin-created accounts must change their password on first login
     await db.query(
       `UPDATE user_accounts SET force_password_change = 1 WHERE person_id = ? AND role = 'applicant'`,
       [person_id]
     );
 
     const [activeYearResult] = await db3.query(`
-      SELECT yt.year_description, st.semester_id
+      SELECT yt.year_description, st.semester_code
       FROM active_school_year_table sy
       JOIN year_table yt ON yt.year_id = sy.year_id
       JOIN semester_table st ON st.semester_id = sy.semester_id
       WHERE sy.astatus = 1
       LIMIT 1
     `);
+    if (activeYearResult.length === 0) {
+      throw new Error("No active school year/semester found.");
+    }
 
     const year = String(activeYearResult[0].year_description).split("-")[0];
-    const semCode = activeYearResult[0].semester_id;
+    const semCode = activeYearResult[0].semester_code;
 
+    // Use the shared counter table (avoids the COUNT(*) race condition
+    // the old add-applicant had when two requests land at once)
     const [countRes] = await db.query(
-      "SELECT COUNT(*) AS count FROM applicant_numbering_table"
+      "SELECT counter, query FROM applicant_counter WHERE id = 1"
     );
-
-    const padded = String(countRes[0].count + 1).padStart(5, "0");
+    const padded = String(countRes[0].query).padStart(5, "0");
     const applicant_number = `${year}${semCode}${padded}`;
 
     await db.query(
@@ -509,9 +701,25 @@ router.post("/add-applicant", async (req, res) => {
       [applicant_number, person_id]
     );
 
+    const qrData = `${process.env.DB_HOST_LOCAL}:5173/applicant_profile/${applicant_number}`;
+    const qrFilename = `${applicant_number}_qrcode.png`;
+    const qrPath = path.join(__dirname, "../../uploads/QrCodeGenerated", qrFilename);
+
+
+    await QRCode.toFile(qrPath, qrData, {
+      color: { dark: "#000", light: "#FFF" },
+      width: 300,
+    });
+   
     await db.query(
-      `INSERT INTO person_status_table 
-       (person_id, applicant_id, exam_status, requirements, residency, student_registration_status, exam_result, hs_ave, qualifying_result, interview_result)
+      "UPDATE applicant_numbering_table SET qr_code = ? WHERE applicant_number = ?",
+      [qrFilename, applicant_number]
+    );
+
+    await db.query(
+      `INSERT INTO person_status_table
+       (person_id, applicant_id, exam_status, requirements, residency,
+        student_registration_status, exam_result, hs_ave, qualifying_result, interview_result)
        VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0, 0)`,
       [person_id, applicant_number]
     );
@@ -519,51 +727,44 @@ router.post("/add-applicant", async (req, res) => {
     await db.query(
       `INSERT INTO interview_applicants
        (schedule_id, applicant_id, email_sent, status, qualifying_status, interview_status)
-       VALUES (?, ?, 0, 0, NULL, NULL)`,
+       VALUES (?, ?, 0, 0, null, null)`,
       [null, applicant_number]
     );
 
-    const qrData = `${process.env.DB_HOST_LOCAL}:5173/examination_profile/${applicant_number}`;
-    const qrData2 = `${process.env.DB_HOST_LOCAL}:5173/applicant_profile/${applicant_number}`;
-
-    const qrFilename = `${applicant_number}_qrcode.png`;
-    const qrFilename2 = `${applicant_number}_qrcode2.png`;
-
-    const qrPath = path.join(__dirname, "../../uploads/QrCodeGenerated", qrFilename);
-    const qrPath2 = path.join(__dirname, "../../uploads/QrCodeGenerated", qrFilename2);
-
-    await QRCode.toFile(qrPath, qrData, {
-      color: { dark: "#000", light: "#FFF" },
-      width: 300,
-    });
-
-    await QRCode.toFile(qrPath2, qrData2, {
-      color: { dark: "#000", light: "#FFF" },
-      width: 300,
-    });
-
+    const nextQuery = countRes[0].query + 1;
     await db.query(
-      "UPDATE applicant_numbering_table SET qr_code = ? WHERE applicant_number = ?",
-      [qrFilename, applicant_number]
+      "UPDATE applicant_counter SET counter = ?, query = ? WHERE id = 1",
+      [countRes[0].query, nextQuery]
     );
 
-    res.json({
+    res.status(201).json({
       success: true,
       message: "Applicant created successfully",
       person_id,
-      applicant_number
+      applicant_number,
+      campus,
     });
 
+    await insertRegistrationAuditLog({
+      actorId: normalizedEmail,
+      outcome: "SUCCESS",
+      event: "successfully added applicant",
+    });
   } catch (error) {
     if (person_id) {
       await db.query("DELETE FROM person_table WHERE person_id = ?", [person_id]);
     }
-
     console.error(error);
-
+    await insertRegistrationAuditLog({
+      actorId: normalizedEmail || "unknown",
+      outcome: "FAILED",
+      event: "failed to add applicant",
+      reason: "Internal server error",
+    });
     res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Internal Server Error",
+      error: error.message,
     });
   }
 });

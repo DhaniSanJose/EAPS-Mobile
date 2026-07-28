@@ -441,6 +441,7 @@ router.get("/student_grade/:id", async (req, res) => {
         ${GWA_UNIT_SQL} AS gwa_units,
         CASE WHEN ${GWA_EXCLUSION_SQL} THEN 1 ELSE 0 END AS is_gwa_excluded,
 
+        cct.curriculum_id,
         pgt.program_code,
         pgt.program_description,
 
@@ -557,6 +558,7 @@ router.get("/student_grade/:id", async (req, res) => {
         es.remarks,
         ct.course_unit,
         ct.lab_unit,
+        cct.curriculum_id,
         pgt.program_code,
         pgt.program_description,
         st.description,
@@ -2155,6 +2157,25 @@ router.post("/student-submit-requirements", async (req, res) => {
     res.json({ message: "Requirements submitted successfully" });
   } catch (err) {
     res.status(500).json({ error: "Failed to update requirements status" });
+  }
+});
+
+router.get('/department_by_curriculum/:curriculum_id', async (req, res) => {
+  const { curriculum_id } = req.params;
+  try {
+    const [[row]] = await db3.query(
+      `SELECT dt.dprtmnt_id, dt.dprtmnt_name, dt.dprtmnt_code
+       FROM dprtmnt_curriculum_table dct
+       JOIN dprtmnt_table dt ON dct.dprtmnt_id = dt.dprtmnt_id
+       WHERE dct.curriculum_id = ?
+       LIMIT 1`,
+      [curriculum_id]
+    );
+    if (!row) return res.status(404).json({ error: 'No department mapped to this curriculum_id' });
+    res.json(row);
+  } catch (err) {
+    console.error('[department_by_curriculum GET]', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

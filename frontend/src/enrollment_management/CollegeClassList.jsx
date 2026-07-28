@@ -619,8 +619,8 @@ const ClassRoster = () => {
 
     const selectedYearLevelLabel = selectedYearLevelFilter
       ? yearLevels.find(
-          (yl) => String(yl.year_level_id) === String(selectedYearLevelFilter),
-        )?.year_level_description || "All Year Levels"
+        (yl) => String(yl.year_level_id) === String(selectedYearLevelFilter),
+      )?.year_level_description || "All Year Levels"
       : "All Year Levels";
 
     const selectedYear = schoolYears.find(
@@ -657,20 +657,20 @@ const ClassRoster = () => {
     const innerHtml = `
       <style>${CLASS_LIST_PRINT_CSS}</style>
       ${buildRegistrarClassListPrintHtml({
-        companyName: companyName?.trim() || "",
-        campusAddress: campusAddress?.trim() || "Nagtahan Sampaloc Manila",
-        logoUrl: logoDataUrl,
-        departmentTitle: selectedDepartmentLabel,
-        programCode,
-        programDescription,
-        classSection: classSectionLabel,
-        facultyName,
-        yearLevel: selectedYearLevelLabel,
-        academicYearLabel: yearLabel,
-        semesterLabel: selectedSemesterLabel,
-        students: filteredStudents.map(mapStudentToPrintRow),
-        printInfoLabel: printTimestamp,
-      })}
+      companyName: companyName?.trim() || "",
+      campusAddress: campusAddress?.trim() || "Nagtahan Sampaloc Manila",
+      logoUrl: logoDataUrl,
+      departmentTitle: selectedDepartmentLabel,
+      programCode,
+      programDescription,
+      classSection: classSectionLabel,
+      facultyName,
+      yearLevel: selectedYearLevelLabel,
+      academicYearLabel: yearLabel,
+      semesterLabel: selectedSemesterLabel,
+      students: filteredStudents.map(mapStudentToPrintRow),
+      printInfoLabel: printTimestamp,
+    })}
     `;
 
     try {
@@ -723,9 +723,9 @@ const ClassRoster = () => {
   const showAllDepartmentsOption = scopedDepartmentIds.length !== 1;
   const selectedDepartmentFilterValue =
     selectedDepartmentFilter === "" ||
-    department.some(
-      (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
-    )
+      department.some(
+        (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+      )
       ? selectedDepartmentFilter
       : "";
 
@@ -815,9 +815,10 @@ const ClassRoster = () => {
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
       <br />
+      <br />
       <CollegeEnrollmentTabs />
       <br />
-
+      <br />
 
       {/* ── Pagination bar ── */}
       <TableContainer component={Paper} sx={{ width: "100%" }}>

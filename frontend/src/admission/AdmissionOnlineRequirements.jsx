@@ -444,10 +444,10 @@ const StudentRequirements = () => {
   const handleConfirmAction = async () => {
     if (confirmAction === "upload") {
       await handleUploadSubmit(targetDoc);
-      console.log(`Document uploaded by: ${localStorage.getItem("username")}`);
+      console.log(`Document uploaded by: ${localStorage.getItem("email")}`);
     } else if (confirmAction === "delete") {
       await handleDelete(targetDoc.upload_id);
-      console.log(`Document deleted by: ${localStorage.getItem("username")}`);
+      console.log(`Document deleted by: ${localStorage.getItem("email")}`);
     } else if (confirmAction === "status") {
       await performStatusChange(targetDoc.upload_id, targetDoc.nextStatus);
     } else if (confirmAction === "documentStatus") {
@@ -1816,7 +1816,11 @@ const StudentRequirements = () => {
               py: 2,
             }}
           >
-            {confirmAction === "upload" ? "📤 Confirm Upload" : "🗑️ Confirm Deletion"}
+            { 
+              confirmAction === "upload" ? "📤 Confirm Upload" : 
+              confirmAction === "documentStatus" ? "Confirm Document Status Change" : 
+              "🗑️ Confirm Deletion"
+            }
           </DialogTitle>
 
           <DialogContent sx={{ maxHeight: 400, overflowY: "auto", p: 3, mt: 2 }}>
@@ -1836,7 +1840,15 @@ const StudentRequirements = () => {
                   Are you sure you want to upload{" "}
                   <strong>{targetDoc?.label}</strong>?<br />
                   Added by:{" "}
-                  <strong>{localStorage.getItem("username")}</strong>
+                  <strong>{localStorage.getItem("email")}</strong>
+                </Typography>
+              ) : confirmAction === "documentStatus" ? (
+                <Typography>
+                  Are you sure you want to change the documents status of all applicant's documents?{" "}
+                  <br />
+                  <br />
+                  Verified by:{" "}
+                  <strong>{localStorage.getItem("email")}</strong>
                 </Typography>
               ) : (
                 <Typography>
@@ -1846,7 +1858,7 @@ const StudentRequirements = () => {
                   </strong>
                   ?<br />
                   Deleted by:{" "}
-                  <strong>{localStorage.getItem("username")}</strong>
+                  <strong>{localStorage.getItem("email")}</strong>
                 </Typography>
               )}
             </Box>

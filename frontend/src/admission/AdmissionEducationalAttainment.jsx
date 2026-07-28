@@ -518,17 +518,88 @@ const AdminDashboard3 = () => {
 
   const [errors, setErrors] = useState({});
 
+  // Admin views arbitrary applicants, so derive this from the loaded person
+  // record instead of localStorage (which only reflects the logged-in user).
+  const requiresSeniorHigh =
+    ["1", "2", "3", "4"].includes(String(person.applyingAs)) ||
+    person.classifiedAs === "Freshman (First Year)";
+
+  const isFormValid = () => {
+    let requiredFields = [
+      // ✅ Always required (Junior High)
+      "schoolLevel",
+      "schoolLastAttended",
+      "schoolAddress",
+      "honor",
+      "generalAverage",
+      "yearGraduated",
+    ];
+
+    // ✅ CONDITION: if applyingAs is 1–4 → require Senior High
+    if (requiresSeniorHigh) {
+      requiredFields.push(
+        "schoolLevel1",
+        "schoolLastAttended1",
+        "schoolAddress1",
+        "honor1",
+        "generalAverage1",
+        "yearGraduated1",
+        "strand"
+      );
+    }
+
+    let newErrors = {};
+    let isValid = true;
+
+    requiredFields.forEach((field) => {
+      const value = person[field];
+      const stringValue = value?.toString().trim();
+
+      if (!stringValue) {
+        newErrors[field] = true;
+        isValid = false;
+      }
+    });
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
 
 
   const [clickedSteps, setClickedSteps] = useState(Array(steps.length).fill(false));
 
-  const handleStepClick = (index) => {
-    setActiveStep(index);
-    const newClickedSteps = [...clickedSteps];
-    newClickedSteps[index] = true;
-    setClickedSteps(newClickedSteps);
-  };
+  const handleStepClick = async (index) => {
+    if (isFormValid()) {
+      try {
+        await handleUpdate(person);
+      } catch (err) {
+        // handleUpdate already logs the error internally
+      }
 
+      setSnackbar({
+        open: true,
+        message: "Your record has been saved successfully!",
+        severity: "success",
+      });
+
+      setActiveStep(index);
+
+      const newClickedSteps = [...clickedSteps];
+      newClickedSteps[index] = true;
+      setClickedSteps(newClickedSteps);
+
+      setTimeout(() => {
+        navigate(steps[index].path);
+      }, 1000);
+    } else {
+      setSnackbar({
+        open: true,
+        message: "Please fill all required fields before proceeding.",
+        severity: "error",
+      });
+    }
+  };
 
   const divToPrintRef = useRef();
   const [showPrintView, setShowPrintView] = useState(false);
@@ -1245,7 +1316,10 @@ const AdminDashboard3 = () => {
                       alignItems: "center",
                       cursor: "pointer",
                     }}
-                    onClick={() => handleStepClick(index)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleStepClick(index);
+                    }}
                   >
                     {/* Step Icon */}
                     <Box
@@ -1339,7 +1413,7 @@ const AdminDashboard3 = () => {
                 <FormControl fullWidth size="small" required error={!!errors.schoolLevel}>
                   <InputLabel id="schoolLevel-label">Educational Attainment</InputLabel>
                   <Select
-                    readOnly
+            
                     labelId="schoolLevel-label"
                     id="schoolLevel"
                     name="schoolLevel"
@@ -1368,7 +1442,7 @@ const AdminDashboard3 = () => {
                 </Typography>
 
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1395,7 +1469,7 @@ const AdminDashboard3 = () => {
                 </Typography>
 
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1416,7 +1490,7 @@ const AdminDashboard3 = () => {
                 </Typography>
 
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1443,7 +1517,7 @@ const AdminDashboard3 = () => {
                   Recognition / Awards
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1463,7 +1537,7 @@ const AdminDashboard3 = () => {
                   General Average
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1483,7 +1557,7 @@ const AdminDashboard3 = () => {
                   Year Graduated
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1523,7 +1597,7 @@ const AdminDashboard3 = () => {
                 <FormControl fullWidth size="small" required error={!!errors.schoolLevel1}>
                   <InputLabel id="schoolLevel1-label">Educational Attainment</InputLabel>
                   <Select
-                    readOnly
+                 
                     labelId="schoolLevel1-label"
                     id="schoolLevel1"
                     name="schoolLevel1"
@@ -1553,7 +1627,7 @@ const AdminDashboard3 = () => {
                 </Typography>
 
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1578,7 +1652,7 @@ const AdminDashboard3 = () => {
                 </Typography>
 
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1599,7 +1673,7 @@ const AdminDashboard3 = () => {
                 </Typography>
 
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1628,7 +1702,7 @@ const AdminDashboard3 = () => {
                   Recognition / Awards
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1649,7 +1723,7 @@ const AdminDashboard3 = () => {
                   General Average
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1670,7 +1744,7 @@ const AdminDashboard3 = () => {
                   Year Graduated
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+                  
 
                   fullWidth
                   size="small"
@@ -1697,7 +1771,7 @@ const AdminDashboard3 = () => {
             <FormControl fullWidth size="small" required error={!!errors.strand} className="mb-4">
               <InputLabel id="strand-label">Strand</InputLabel>
               <Select
-                readOnly
+              
                 labelId="strand-label"
                 id="strand-select"
                 name="strand"
@@ -1865,11 +1939,26 @@ const AdminDashboard3 = () => {
 
 
             <Box display="flex" justifyContent="space-between" mt={4}>
-              {/* Previous Page Button */}
+              {/* Previous Step Button */}
               <Button
                 variant="contained"
-                component={Link}
-                to={`/admission_family_background?person_id=${userID}`}
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; still navigate
+                  }
+
+                  setSnackbar({
+                    open: true,
+                    message: "Your record has been saved successfully!",
+                    severity: "success",
+                  });
+
+                  setTimeout(() => {
+                    navigate(`/admission_family_background?person_id=${userID}`);
+                  }, 1000);
+                }}
                 startIcon={
                   <ArrowBackIcon
                     sx={{
@@ -1897,10 +1986,30 @@ const AdminDashboard3 = () => {
               {/* Next Step Button */}
               <Button
                 variant="contained"
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; fall through to validation
+                  }
 
-                  navigate(`/admission_health_medical_records?person_id=${userID}`);
+                  if (isFormValid()) {
+                    setSnackbar({
+                      open: true,
+                      message: "Your record has been saved successfully!",
+                      severity: "success",
+                    });
 
+                    setTimeout(() => {
+                      navigate(`/admission_health_medical_records?person_id=${userID}`);
+                    }, 1000);
+                  } else {
+                    setSnackbar({
+                      open: true,
+                      message: "Please complete all required fields before proceeding.",
+                      severity: "error",
+                    });
+                  }
                 }}
                 endIcon={
                   <ArrowForwardIcon
@@ -1911,8 +2020,6 @@ const AdminDashboard3 = () => {
                   />
                 }
                 sx={{
-
-
                   backgroundColor: mainButtonColor,
                   border: `1px solid ${borderColor}`,
                   color: '#fff',

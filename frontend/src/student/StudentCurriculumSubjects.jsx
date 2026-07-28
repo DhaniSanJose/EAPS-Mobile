@@ -160,6 +160,10 @@ const StudentCurriculumSubjects = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/student/${id}/curriculum-subjects`);
       setSubjects(res.data);
+
+      // ADD THIS
+      const curriculumId = res.data[0]?.curriculum_id ?? res.data[0]?.program ?? null;
+      setDepartment(await resolveDepartmentByCurriculum(curriculumId));
     } catch (err) {
       console.error(err);
       setMessage("Failed to fetch curriculum subjects");
@@ -167,27 +171,41 @@ const StudentCurriculumSubjects = () => {
       setLoading(false);
     }
   };
-
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
-
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
-
   
+  const [department, setDepartment] = useState("");
+
+  const resolveDepartmentByCurriculum = async (curriculumId) => {
+    if (!curriculumId) return "";
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/department_by_curriculum/${curriculumId}`);
+      return res.data?.dprtmnt_name || "";
+    } catch (error) {
+      console.error("Error resolving department by curriculum:", error);
+      return "";
+    }
+  };
+
+
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
+
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
+
+
   const rawTerms = [...new Set(subjects.map(
     (row) => `${row.year_level_description} ${row.semester_description}`
   ))];
@@ -224,21 +242,17 @@ const StudentCurriculumSubjects = () => {
         pb: { xs: 6, sm: 2 },
       }}
     >
-      {/* ── Page Header ── */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2, px: { xs: 1.5, sm: 0 }, pt: { xs: 2, sm: 0 } }}>
-        {programInfo && (
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: "bold", color: titleColor,
-              fontSize: { xs: 15, sm: 20, md: 26, lg: 30 },
-              lineHeight: 1.3,
-            }}
-          >
-            CURRICULUM: ({programInfo.program_code}) — {programInfo.program_description}{" "}
-            ({formatAcademicYear(programInfo.year_description)})
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2.5, flexWrap: "wrap", gap: 1 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "20px", sm: "26px", md: "32px", lg: "36px" }, lineHeight: 1.2 }}>
+            STUDENT CURRICULUM
           </Typography>
-        )}
+          {programInfo && (
+            <Typography variant="body2" sx={{ color: subtitleColor, mt: "6px", fontSize: { xs: 12.5, sm: 15, md: 17 } }}>
+              {programInfo.program_description} ({programInfo.program_code})
+            </Typography>
+          )}
+        </Box>
       </Box>
       <Box sx={{ borderTop: "1px solid #ccc", width: "100%" }} />
       <Box sx={{ height: { xs: 16, sm: 20 } }} />
@@ -304,6 +318,13 @@ const StudentCurriculumSubjects = () => {
                           NAME:{" "}
                           <Box component="span" sx={{ fontWeight: 400, ml: 1 }}>
                             {programInfo.last_name}, {programInfo.first_name} {programInfo.middle_name}
+                          </Box>
+                        </Typography>
+                        {/* ADD THIS */}
+                        <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                          DEPARTMENT:{" "}
+                          <Box component="span" sx={{ fontWeight: 400, ml: 1 }}>
+                            {department || "—"}
                           </Box>
                         </Typography>
                       </Box>

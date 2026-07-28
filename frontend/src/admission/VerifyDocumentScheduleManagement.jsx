@@ -824,7 +824,6 @@ You have been scheduled for Document Verification with the following details:
 🆔 Applicant No: ${person.applicant_number}
 
 🖨️ Please print the following forms:
-• Printed Online Admission Form Process
 • Personal Data Form (with Applicant Number)
 
 📄 REQUIRED DOCUMENTS:

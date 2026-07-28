@@ -510,11 +510,28 @@ const AdminDashboard4 = () => {
 
   const [clickedSteps, setClickedSteps] = useState(Array(steps.length).fill(false));
 
-  const handleStepClick = (index) => {
+  const handleStepClick = async (index) => {
+    try {
+      await handleUpdate(person);
+    } catch (err) {
+      // handleUpdate already logs the error internally
+    }
+
+    setSnackbar({
+      open: true,
+      message: "Your record has been saved successfully!",
+      severity: "success",
+    });
+
     setActiveStep(index);
+
     const newClickedSteps = [...clickedSteps];
     newClickedSteps[index] = true;
     setClickedSteps(newClickedSteps);
+
+    setTimeout(() => {
+      navigate(steps[index].path);
+    }, 1000);
   };
 
 
@@ -1236,7 +1253,10 @@ const AdminDashboard4 = () => {
                       alignItems: "center",
                       cursor: "pointer",
                     }}
-                    onClick={() => handleStepClick(index)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleStepClick(index);
+                    }}
                   >
                     {/* Step Icon */}
                     <Box
@@ -1319,7 +1339,7 @@ const AdminDashboard4 = () => {
             <FormGroup row sx={{ ml: 2 }}>
               {["cough", "colds", "fever"].map((symptom) => (
                 <FormControlLabel
-                  disabled
+            
                   key={symptom}
                   control={
                     <Checkbox
@@ -1400,7 +1420,7 @@ const AdminDashboard4 = () => {
                                 {/* YES */}
                                 <div style={{ display: "flex", alignItems: "center", gap: "1px", }}>
                                   <Checkbox
-                                    disabled
+                                
                                     name={key}
                                     checked={person[key] === 1}
                                     onChange={() => {
@@ -1417,7 +1437,7 @@ const AdminDashboard4 = () => {
                                 {/* NO */}
                                 <div style={{ display: "flex", alignItems: "center", gap: "1px" }}>
                                   <Checkbox
-                                    disabled
+                                  
                                     name={key}
                                     checked={person[key] === 0}
                                     onChange={() => {
@@ -1456,7 +1476,7 @@ const AdminDashboard4 = () => {
                     <FormControlLabel
                       control={
                         <Checkbox
-                          disabled
+                      
                           name="hospitalized"
                           checked={person.hospitalized === 1}
                           onChange={() => {
@@ -1475,7 +1495,7 @@ const AdminDashboard4 = () => {
                     <FormControlLabel
                       control={
                         <Checkbox
-                          disabled
+                        
                           name="hospitalized"
                           checked={person.hospitalized === 0}
                           onChange={() => {
@@ -1504,8 +1524,7 @@ const AdminDashboard4 = () => {
                 IF YES, PLEASE SPECIFY:
               </Typography>
               <TextField
-                InputProps={{ readOnly: true }}
-
+              
                 fullWidth
                 name="hospitalizationDetails"
                 placeholder=""
@@ -1533,7 +1552,7 @@ const AdminDashboard4 = () => {
 
             <Box mb={2}>
               <TextField
-                InputProps={{ readOnly: true }}
+              
 
                 fullWidth
                 multiline
@@ -1587,7 +1606,7 @@ const AdminDashboard4 = () => {
                         {/* YES */}
                         <Box display="flex" alignItems="center" gap="1px">
                           <Checkbox
-                            disabled
+                          
                             name="hadCovid"
                             checked={person.hadCovid === 1}
                             onChange={() => {
@@ -1604,7 +1623,7 @@ const AdminDashboard4 = () => {
                         {/* NO */}
                         <Box display="flex" alignItems="center" gap="1px">
                           <Checkbox
-                            disabled
+                        
                             name="hadCovid"
                             checked={person.hadCovid === 0}
                             onChange={() => {
@@ -1625,7 +1644,7 @@ const AdminDashboard4 = () => {
                       <span>IF YES, WHEN:</span>
                       <DateField
                         size="small"
-                        readOnly
+                      
                         name="covidDate"
                         value={person.covidDate || ""}
                         onChange={(e) => {
@@ -1685,7 +1704,7 @@ const AdminDashboard4 = () => {
                           {["vaccine1Brand", "vaccine2Brand", "booster1Brand", "booster2Brand"].map((field) => (
                             <td key={field} style={{ padding: "4px" }}>
                               <input
-                                disabled
+                       
                                 type="text"
                                 name={field}
                                 value={person[field] || ""}
@@ -1710,7 +1729,7 @@ const AdminDashboard4 = () => {
                             <td key={field} style={{ padding: "4px" }}>
                               <DateField
                                 size="small"
-                                readOnly
+                        
                                 name={field}
                                 value={person[field] || ""}
                                 onChange={(e) => {
@@ -1748,7 +1767,7 @@ const AdminDashboard4 = () => {
                   <td className="border border-black p-2 w-1/3 font-medium">Chest X-ray:</td>
                   <td className="border border-black p-2 w-2/3">
                     <input
-                      readOnly
+                    
                       type="text"
                       name="chestXray"
                       value={person.chestXray || ""}
@@ -1767,7 +1786,7 @@ const AdminDashboard4 = () => {
                   <td className="border border-black p-2 font-medium">CBC:</td>
                   <td className="border border-black p-2">
                     <input
-                      readOnly
+                  
                       type="text"
                       name="cbc"
                       value={person.cbc || ""}
@@ -1786,7 +1805,7 @@ const AdminDashboard4 = () => {
                   <td className="border border-black p-2 font-medium">Urinalysis:</td>
                   <td className="border border-black p-2">
                     <input
-                      readOnly
+                
                       type="text"
                       name="urinalysis"
                       value={person.urinalysis || ""}
@@ -1805,7 +1824,7 @@ const AdminDashboard4 = () => {
                   <td className="border border-black p-2 font-medium">Other Workups:</td>
                   <td className="border border-black p-2">
                     <input
-                      readOnly
+                 
                       type="text"
                       name="otherworkups"
                       value={person.otherworkups || ""}
@@ -1857,7 +1876,7 @@ const AdminDashboard4 = () => {
                         {/* Physically Fit (0) */}
                         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                           <Checkbox
-                            disabled
+                         
                             name="symptomsToday"
                             checked={person.symptomsToday === 0}
                             onChange={() => {
@@ -1874,7 +1893,7 @@ const AdminDashboard4 = () => {
                         {/* For Compliance (1) */}
                         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                           <Checkbox
-                            disabled
+                       
                             name="symptomsToday"
                             checked={person.symptomsToday === 1}
                             onChange={() => {
@@ -1912,7 +1931,7 @@ const AdminDashboard4 = () => {
                   <TableRow>
                     <TableCell sx={{ border: "1px solid black", p: 1 }}>
                       <TextField
-                        disabled
+                  
                         name="remarks"
                         multiline
                         minRows={2}
@@ -2075,11 +2094,26 @@ const AdminDashboard4 = () => {
 
 
             <Box display="flex" justifyContent="space-between" alignItems="center" mt={4}>
-              {/* Previous Page Button */}
+              {/* Previous Step Button */}
               <Button
                 variant="contained"
-                component={Link}
-                to={`/admission_educational_attainment?person_id=${userID}`}
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; still navigate
+                  }
+
+                  setSnackbar({
+                    open: true,
+                    message: "Your record has been saved successfully!",
+                    severity: "success",
+                  });
+
+                  setTimeout(() => {
+                    navigate(`/admission_educational_attainment?person_id=${userID}`);
+                  }, 1000);
+                }}
                 startIcon={
                   <ArrowBackIcon
                     sx={{
@@ -2091,7 +2125,6 @@ const AdminDashboard4 = () => {
                 sx={{
                   backgroundColor: subButtonColor,
                   border: `1px solid ${borderColor}`,
-
                   color: "#000",
                   "&:hover": {
                     backgroundColor: "#000000",
@@ -2108,8 +2141,22 @@ const AdminDashboard4 = () => {
               {/* Next Step Button */}
               <Button
                 variant="contained"
-                onClick={() => {
-                  navigate(`/admission_other_information?person_id=${userID}`);
+                onClick={async () => {
+                  try {
+                    await handleUpdate(person);
+                  } catch (err) {
+                    // handleUpdate already logs the error internally; still navigate
+                  }
+
+                  setSnackbar({
+                    open: true,
+                    message: "Your record has been saved successfully!",
+                    severity: "success",
+                  });
+
+                  setTimeout(() => {
+                    navigate(`/admission_other_information?person_id=${userID}`);
+                  }, 1000);
                 }}
                 endIcon={
                   <ArrowForwardIcon
@@ -2134,9 +2181,7 @@ const AdminDashboard4 = () => {
               >
                 Next Step
               </Button>
-
             </Box>
-
 
 
           </Container>
