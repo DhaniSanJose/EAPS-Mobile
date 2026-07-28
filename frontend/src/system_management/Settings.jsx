@@ -150,7 +150,6 @@ function Settings({ onUpdate }) {
   // School info
   const [companyName, setCompanyName] = useState("");
   const [shortTerm, setShortTerm] = useState("");
-  const [address, setAddress] = useState("");
   const [logo, setLogo] = useState(null);
   const [previewLogo, setPreviewLogo] = useState(null);
   const [bgImage, setBgImage] = useState(null);
@@ -172,12 +171,23 @@ function Settings({ onUpdate }) {
   };
 
   const [hasAccess, setHasAccess] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const loading = false;
   const pageId = 74;
 
   // Resolved dynamic colors (fall back to context/defaults)
   const resolvedHeader = settings?.header_color || headerColor || "#1976d2";
   const resolvedBorder = borderColor || "#000000";
+  const branches = (() => {
+    try {
+      if (Array.isArray(settings?.branches)) return settings.branches;
+      if (typeof settings?.branches === "string") {
+        return JSON.parse(settings.branches || "[]");
+      }
+    } catch (error) {
+      console.error("Failed to parse branches:", error);
+    }
+    return [];
+  })();
 
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
@@ -206,7 +216,6 @@ function Settings({ onUpdate }) {
       .then(({ data }) => {
         setCompanyName(data.company_name || "");
         setShortTerm(data.short_term || "");
-        setAddress(data.address || "");
         setPreviewLogo(data.logo_url ? `${API_BASE_URL}${data.logo_url}` : null);
         setPreviewBg(data.bg_image ? `${API_BASE_URL}${data.bg_image}` : null);
         setHeaderColor(data.header_color || "#1976d2");
@@ -228,7 +237,6 @@ function Settings({ onUpdate }) {
     const formData = new FormData();
     formData.append("company_name", companyName);
     formData.append("short_term", shortTerm);
-    formData.append("address", address);
     if (logo) formData.append("logo", logo);
     if (bgImage) formData.append("bg_image", bgImage);
     formData.append("header_color", headerColor);
@@ -337,8 +345,48 @@ function Settings({ onUpdate }) {
             <Stack spacing={2.5} sx={{ p: 3 }}>
               <LabeledField label="School Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} borderColor={resolvedBorder} />
               <LabeledField label="Short Term / Abbreviation" value={shortTerm} onChange={(e) => setShortTerm(e.target.value)} borderColor={resolvedBorder} />
-              <LabeledField label="Main Campus Address" value={address} onChange={(e) => setAddress(e.target.value)} borderColor={resolvedBorder} />
               <LabeledField label="Footer Text" value={footerText} onChange={(e) => setFooterText(e.target.value)} borderColor={resolvedBorder} />
+              <Stack spacing={1}>
+                <Typography
+                  sx={{
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: C.textMuted,
+                  }}
+                >
+                  Branches
+                </Typography>
+                <Box
+                  sx={{
+                    border: `1px solid ${resolvedBorder}`,
+                    borderRadius: 2,
+                    backgroundColor: C.cream,
+                    px: 1.5,
+                    py: 1.25,
+                  }}
+                >
+                  {branches.length > 0 ? (
+                    <Stack spacing={1.25}>
+                      {branches.map((branch) => (
+                        <Box key={branch.id || branch.branch}>
+                          <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: C.textMain }}>
+                            {branch.branch || branch.branch_name || "Unnamed Branch"}
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.82rem", color: C.textMuted, mt: 0.25 }}>
+                            {branch.address || "No address set"}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography sx={{ fontSize: "0.82rem", color: C.textMuted }}>
+                      No branches configured.
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
             </Stack>
           </Paper>
 

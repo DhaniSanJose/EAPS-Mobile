@@ -231,7 +231,7 @@ const MobileGradeCard = ({
 );
 
 // ─── Main Component ───────────────────────────────────────────────
-const StudentGradingPage = () => {
+const StudentGradePage = () => {
   const settings = useContext(SettingsContext);
   const theme = useTheme();
 
@@ -637,7 +637,7 @@ const StudentGradingPage = () => {
                           { label: "#", width: "48px", align: "center" },
                           { label: "Code", width: "110px" },
                           { label: "Subject", width: undefined },
-                          { label: "Faculty", width: "170px" },
+                          { label: "Faculty", width: "250px" },
                           { label: "Schedule", width: "170px", align: "center" },
                           { label: "Units", width: "64px", align: "center" },
                           { label: "Section", width: "100px", align: "center" },
@@ -675,7 +675,7 @@ const StudentGradingPage = () => {
                           </TableCell>
                           <TableCell sx={{ ...bodyCell, border: `1px solid ${borderColor}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {row.fname === "TBA" && row.lname === "TBA"
-                              ? <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>TBA</span>
+                              ? <span style={{ color: "#9CA3AF",}}>TBA</span>
                               : `Prof. ${row.fname} ${row.lname}`}
                           </TableCell>
                           <TableCell sx={{ ...bodyCell, border: `1px solid ${borderColor}`, textAlign: "center", whiteSpace: "pre-line", fontSize: 12 }}>
@@ -715,4 +715,4 @@ const StudentGradingPage = () => {
   );
 };
 
-export default StudentGradingPage;
+export default StudentGradePage;

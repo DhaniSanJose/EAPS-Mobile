@@ -248,7 +248,7 @@ const StudentOtherInformation = lazy(() => import("./student/StudentOtherInforma
 const StudentOtherInformationMobile = lazy(() => import("./student/StudentOtherInformationMobile"));
 const StudentECATApplicationForm = lazy(() => import("./student/StudentECATApplicationForm"));
 const StudentFacultyEvaluation = lazy(() => import("./student/StudentFacultyEval"));
-const StudentGradingPage = lazy(() => import("./student/StudentGrade"));
+const StudentGradePage = lazy(() => import("./student/StudentGradePage"));
 const StudentOfficeOfTheRegistrar = lazy(() => import("./student/StudentOfficeOfTheRegistrar"));
 const StudentOnlineRequirements = lazy(() => import("./student/StudentOnlineRequirements"));
 const StudentPersonalDataForm = lazy(() => import("./student/StudentPersonalDataForm"));
@@ -786,7 +786,7 @@ function App() {
                       <Route path="/student_schedule" element={<ProtectedRoute allowedRoles={"student"}><StudentSchedule /></ProtectedRoute>} />
                       <Route path="/student_account_balance" element={<ProtectedRoute allowedRoles={"student"}><StudentBalanceManagement /></ProtectedRoute>} />
                       <Route path="/student_account_balance/info" element={<ProtectedRoute allowedRoles={"student"}><StudentBalanceInfo /></ProtectedRoute>} />
-                      <Route path="/grades_page" element={<ProtectedRoute><StudentGradingPage allowedRoles={"student"} /></ProtectedRoute>} />
+                      <Route path="/student_grades_page" element={<ProtectedRoute><StudentGradePage allowedRoles={"student"} /></ProtectedRoute>} />
                       <Route path="/student_faculty_evaluation" element={<ProtectedRoute allowedRoles={"student"}><StudentFacultyEvaluation /></ProtectedRoute>} />
                       <Route path="/unauthorized" element={<Unauthorized />} />
                       <Route path="/applicant_list_college" element={<ProtectedRoute><ApplicantListCollege /></ProtectedRoute>} />

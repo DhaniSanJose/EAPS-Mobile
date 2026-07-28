@@ -1168,7 +1168,7 @@ const SideBar = ({
                                     <div className="sb-section-label">Navigation</div>
                                     <NavItem to="/student_dashboard" icon={DashboardIcon} label="Dashboard" active={isActive("/student_dashboard")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_schedule" icon={EventNoteIcon} label="Schedule" active={isActive("/student_schedule")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/grades_page" icon={GradeIcon} label="Grades" active={isActive("/grades_page")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
+                                    <NavItem to="/student_grades_page" icon={GradeIcon} label="Grades" active={isActive("/student_grades_page")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_curriculum_subjects" icon={MenuBook} label="Curriculum" active={isActive("/student_curriculum_subjects")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_faculty_evaluation" icon={AssignmentTurnedInIcon} label="Faculty Evaluation" active={isActive("/student_faculty_evaluation")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_personal_information" icon={PersonIcon} label="Student Profile" active={/^\/student_dashboard[1-5]$/.test(loc)} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />

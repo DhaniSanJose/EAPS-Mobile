@@ -737,7 +737,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     "N/A";
   const quickLinks = [
     { label: "Schedule", icon: <CalendarMonth />, href: "/student_schedule" },
-    { label: "Grades", icon: <StarBorder />, href: "/grades_page" },
+    { label: "Grades", icon: <StarBorder />, href: "/student_grades_page" },
     {
       label: "Curriculum",
       icon: <MenuBook />,

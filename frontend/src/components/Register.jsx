@@ -902,6 +902,8 @@ const TotpSetupModal = ({
   const inputRefs = useRef([]);
 
   // Fetch QR code as soon as modal opens
+  const [setupId, setSetupId] = useState("");
+
   useEffect(() => {
     if (!open || !email) return;
     setStep("loading");
@@ -909,6 +911,7 @@ const TotpSetupModal = ({
     setTotpCode(["", "", "", "", "", ""]);
     setShowManualKey(false);
     setQrScale(1);
+    setSetupId(""); // reset
 
     axios
       .post(`${API_BASE_URL}/api/register-totp-setup`, { email })
@@ -916,10 +919,11 @@ const TotpSetupModal = ({
         if (res.data.success) {
           setQrDataUrl(res.data.qrDataUrl);
           setManualKey(res.data.manualKey);
+          setSetupId(res.data.setupId); // NEW
           setStep("scan");
         } else {
           setError(res.data.message || "Failed to generate QR code.");
-          setStep("scan"); // show error in modal
+          setStep("scan");
         }
       })
       .catch((err) => {
@@ -962,6 +966,7 @@ const TotpSetupModal = ({
       const response = await axios.post(`${API_BASE_URL}/api/register`, {
         ...registrationPayload,
         otp: code,
+        setupId, // NEW
       });
 
       if (!response.data.success) {
