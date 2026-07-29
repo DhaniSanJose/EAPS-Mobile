@@ -44,13 +44,6 @@ const StudentFacultyEvaluation = () => {
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [stepperColor, setStepperColor] = useState("#000000");
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
 
   // Collapsible rating criteria on mobile
   const [criteriaOpen, setCriteriaOpen] = useState(false);
@@ -62,12 +55,6 @@ const StudentFacultyEvaluation = () => {
     if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
     if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url) setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
   }, [settings]);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -75,17 +62,40 @@ const StudentFacultyEvaluation = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
   const [userID, setUserID] = useState("");
-  const [user, setUser] = useState("");
-  const [userRole, setUserRole] = useState("");
   const [studentCourses, setStudentCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState("");
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [studentNumber, setStudentNumber] = useState("");
   const [matriculationBalanceInfo, setMatriculationBalanceInfo] = useState({ hasBalance: false, balance: 0 });
+  const [evaluationPeriodLoading, setEvaluationPeriodLoading] = useState(true);
+  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
 
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  const fetchEvaluationPeriodStatus = async () => {
+    try {
+      const { data } = await axios.get(`${API_BASE_URL}/api/get-grading-period`);
+      const periods = Array.isArray(data) ? data : [];
+      const finalGradingPeriod = periods.find(
+        (period) =>
+          String(period.description || "").trim().toLowerCase() ===
+          "final grading period",
+      );
+      const open = Number(finalGradingPeriod?.status) === 1;
+
+      setIsEvaluationOpen(open);
+      return open;
+    } catch (error) {
+      console.error("Error checking evaluation period status:", error);
+      setIsEvaluationOpen(false);
+      showSnackbar("Failed to check faculty evaluation period status.", "error");
+      return false;
+    } finally {
+      setEvaluationPeriodLoading(false);
+    }
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -93,18 +103,20 @@ const StudentFacultyEvaluation = () => {
     const storedID = localStorage.getItem("person_id");
 
     if (storedUser && storedRole && storedID) {
-      setUser(storedUser);
-      setUserRole(storedRole);
       setUserID(storedID);
 
       if (storedRole !== "student") {
         window.location.href = "/faculty_dashboard";
       } else {
-        fetchCourseData(storedID);
+        fetchEvaluationPeriodStatus().then((open) => {
+          if (open) fetchCourseData(storedID, open);
+        });
       }
     } else {
       window.location.href = "/login";
     }
+    // Session bootstrap should run once on page load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchQuestions = async (schoolYearId) => {
@@ -145,7 +157,13 @@ const StudentFacultyEvaluation = () => {
     }
   };
 
-  const fetchCourseData = async (id) => {
+  const fetchCourseData = async (id, evaluationOpenOverride = isEvaluationOpen) => {
+    if (!evaluationOpenOverride) {
+      setStudentCourses([]);
+      setSelectedCourse("");
+      return;
+    }
+
     try {
       const res = await axios.get(`${API_BASE_URL}/api/student_course/${id}`);
       const courses = Array.isArray(res.data) ? res.data : [];
@@ -190,12 +208,19 @@ const StudentFacultyEvaluation = () => {
   );
 
   useEffect(() => {
+    if (!isEvaluationOpen) {
+      setQuestions([]);
+      return;
+    }
+
     if (selectedProfessor?.active_school_year_id) {
       fetchQuestions(selectedProfessor.active_school_year_id);
     } else {
       setQuestions([]);
     }
-  }, [selectedProfessor?.active_school_year_id]);
+    // Questions reload only when the evaluation gate or selected school year changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEvaluationOpen, selectedProfessor?.active_school_year_id]);
 
   const showSnackbar = (message, severity = "success") => {
     setSnackbarMessage(message);
@@ -204,6 +229,11 @@ const StudentFacultyEvaluation = () => {
   };
 
   const SaveEvaluation = async () => {
+    if (!isEvaluationOpen) {
+      showSnackbar("Faculty evaluation is currently closed.", "warning");
+      return;
+    }
+
     if (matriculationBalanceInfo.hasBalance) {
       showSnackbar("You are not currently fully paid for this current semester. Please settle your matriculation balance before evaluating faculty.", "warning");
       return;
@@ -276,6 +306,30 @@ const StudentFacultyEvaluation = () => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+  const evaluationClosedWarning = (
+    <Alert
+      severity="warning"
+      sx={{
+        borderRadius: 2,
+        mb: 3,
+        fontSize: { xs: 12.5, sm: 14 },
+        border: "1px solid #f59e0b",
+        backgroundColor: "#fffbeb",
+        color: "#7c2d12",
+        "& .MuiAlert-icon": { color: "#d97706" },
+      }}
+    >
+      <Typography sx={{ fontWeight: 700, fontSize: { xs: 14, sm: 16 }, mb: 0.5 }}>
+        The faculty evaluation is currently closed.
+      </Typography>
+      <Typography sx={{ fontSize: { xs: 12.5, sm: 14 } }}>
+        Faculty evaluation will only be available when the{" "}
+        <b>Final Grading Period</b> is active. Please check again once the
+        registrar opens the final grading period.
+      </Typography>
+    </Alert>
+  );
 
   // Mobile / tablet: render radio choices as a vertical list with scale badges
   const renderMobileChoices = (q) => {
@@ -395,6 +449,8 @@ const StudentFacultyEvaluation = () => {
       <Box sx={{ height: { xs: 16, sm: 20 } }} />
 
       <Box sx={{ px: { xs: 1.5, sm: 0 } }}>
+        {!evaluationPeriodLoading && !isEvaluationOpen && evaluationClosedWarning}
+
         {matriculationBalanceInfo.hasBalance && (
           <Alert severity="warning" sx={{ borderRadius: 2, mb: 3, fontSize: { xs: 12.5, sm: 14 } }}>
             You are not currently fully paid for this current semester. Your remaining matriculation balance is{" "}
@@ -402,8 +458,23 @@ const StudentFacultyEvaluation = () => {
           </Alert>
         )}
 
-        {/* Choose Course + Rating Criteria panels */}
-        <Grid container spacing={2} sx={{ mb: 4 }}>
+        {evaluationPeriodLoading ? (
+          <Paper
+            sx={{
+              p: { xs: 2, sm: 3 },
+              borderRadius: 3,
+              border: `1px solid ${borderColor}`,
+              boxShadow: 1,
+            }}
+          >
+            <Typography sx={{ color: subtitleColor }}>
+              Checking faculty evaluation availability...
+            </Typography>
+          </Paper>
+        ) : isEvaluationOpen && (
+          <>
+            {/* Choose Course + Rating Criteria panels */}
+            <Grid container spacing={2} sx={{ mb: 4 }}>
 
           {/* CHOOSE COURSE PANEL */}
           <Grid item xs={12} md={6}>
@@ -449,11 +520,14 @@ const StudentFacultyEvaluation = () => {
                     { label: "Course Code", value: selectedProfessor.course_code || "" },
                     {
                       label: "Program Code",
-                      value: `${selectedProfessor.curriculum_year}-${selectedProfessor.program_code}` || "",
+                      value: [selectedProfessor.curriculum_year, selectedProfessor.program_code].filter(Boolean).join("-"),
                     },
                     {
                       label: "Semester or Term/Academic Year",
-                      value: `${selectedProfessor.current_year} - ${selectedProfessor.next_year}, ${selectedProfessor.semester_description}` || "",
+                      value: [
+                        [selectedProfessor.current_year, selectedProfessor.next_year].filter(Boolean).join(" - "),
+                        selectedProfessor.semester_description,
+                      ].filter(Boolean).join(", "),
                     },
                   ].map((row, index) => (
                     // On mobile/tablet: stacked label + value; on desktop (lg+): side-by-side grid
@@ -593,10 +667,12 @@ const StudentFacultyEvaluation = () => {
               </Collapse>
             </Paper>
           </Grid>
-        </Grid>
+            </Grid>
+          </>
+        )}
 
         {/* CATEGORY SECTIONS */}
-        {selectedProfessor &&
+        {isEvaluationOpen && selectedProfessor &&
           Object.entries(groupedQuestions).map(([category, items]) => {
             const isInteraction = category.toLowerCase().includes("interaction");
             const headerBg = isInteraction ? "#eef8ee" : "#e9f4ff";
@@ -664,7 +740,7 @@ const StudentFacultyEvaluation = () => {
           })}
 
         {/* Action Buttons */}
-        {selectedProfessor && (
+        {isEvaluationOpen && selectedProfessor && (
           <Box
             sx={{
               display: "flex",

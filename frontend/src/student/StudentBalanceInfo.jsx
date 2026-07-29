@@ -58,7 +58,9 @@ const StudentBalanceInfo = () => {
       try {
         const personId = localStorage.getItem("person_id");
         if (!personId) return;
-        const { data } = await axios.get(`${API_BASE_URL}/api/student-assessment/${personId}`);
+        const { data } = await axios.get(`${API_BASE_URL}/api/student-assessment/${personId}`, {
+          params: { enrolled_status: 1 },
+        });
         setStudent(data.student || null);
         const activeSchoolYearId = searchParams.get("active_school_year_id");
         const schoolYear = searchParams.get("school_year");

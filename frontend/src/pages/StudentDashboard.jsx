@@ -142,6 +142,9 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   });
   const [studentAssessment, setStudentAssessment] = useState(null);
   const [studentAssessmentRows, setStudentAssessmentRows] = useState([]);
+  const [isOfficiallyEnrolledForBalance, setIsOfficiallyEnrolledForBalance] =
+    useState(null);
+  const [isOfficiallyEnrolled, setIsOfficiallyEnrolled] = useState(null);
   const [honorStanding, setHonorStanding] = useState({
     title: null,
     standing: null,
@@ -168,6 +171,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       } else {
         fetchPersonData(storedID);
         fetchStudentDetails(storedID);
+        fetchActiveEnrollmentStatus(storedID);
         fetchTotalCourse(storedID);
         fetchStudentAssessment(storedID);
         console.log("you are an student");
@@ -238,18 +242,33 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     }
   };
 
+  const fetchActiveEnrollmentStatus = async (id) => {
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/student_active_enrollment_status/${id}`,
+      );
+      setIsOfficiallyEnrolled(Number(res.data?.enrolled_status) === 1);
+    } catch (error) {
+      console.error(error);
+      setIsOfficiallyEnrolled(false);
+    }
+  };
+
   const fetchStudentAssessment = async (id) => {
     try {
       const res = await axios.get(
         `${API_BASE_URL}/api/student-assessment/${id}`,
+        { params: { enrolled_status: 1 } },
       );
       const rows = Array.isArray(res.data?.rows) ? res.data.rows : [];
+      setIsOfficiallyEnrolledForBalance(rows.length > 0);
       setStudentAssessmentRows(rows);
       setStudentAssessment(rows[rows.length - 1] || null);
     } catch (error) {
       console.error(error);
       setStudentAssessmentRows([]);
       setStudentAssessment(null);
+      setIsOfficiallyEnrolledForBalance(false);
     }
   };
 
@@ -1136,12 +1155,26 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         px: 1.4,
                         py: 0.4,
                         borderRadius: 10,
-                        bgcolor: "#e7efd4",
-                        color: "#496b21",
+                        bgcolor:
+                          isOfficiallyEnrolled === null
+                            ? "#f3f4f6"
+                            : isOfficiallyEnrolled
+                              ? "#e7efd4"
+                              : "#fee2e2",
+                        color:
+                          isOfficiallyEnrolled === null
+                            ? "#4b5563"
+                            : isOfficiallyEnrolled
+                              ? "#496b21"
+                              : "#991b1b",
                         fontSize: 12,
                       }}
                     >
-                      Officially Enrolled
+                      {isOfficiallyEnrolled === null
+                        ? "Checking Status"
+                        : isOfficiallyEnrolled
+                          ? "Officially Enrolled"
+                          : "Not Officially Enrolled"}
                     </Typography>
                   </Box>
                 </Stack>
@@ -1218,7 +1251,32 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     </Typography>
                   </Stack>
                 ))}
-                {remainingBalance > 0 && (
+                {isOfficiallyEnrolledForBalance === false ? (
+                  <Stack
+                    direction="row"
+                    spacing={1.5}
+                    sx={{
+                      mt: 2,
+                      p: 1.4,
+                      borderRadius: "8px",
+                      bgcolor: "#fffbeb",
+                      color: "#b45309",
+                    }}
+                  >
+                    <WarningAmber fontSize="small" />
+                    <Box>
+                      <Typography sx={{ fontSize: 12, fontWeight: 700 }}>
+                        Account balance is not available.
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                      >
+                        Student Account Balance is only displayed for
+                        officially enrolled students.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ) : remainingBalance > 0 && (
                   <Stack
                     direction="row"
                     spacing={1.5}

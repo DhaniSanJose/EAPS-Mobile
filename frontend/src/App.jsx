@@ -255,6 +255,7 @@ const StudentPersonalDataForm = lazy(() => import("./student/StudentPersonalData
 const StudentResetPassword = lazy(() => import("./student/StudentResetPassword"));
 const StudentSchedule = lazy(() => import("./student/StudentSchedule"));
 const StudentCurriculumSubjects = lazy(() => import("./student/StudentCurriculumSubjects"));
+const StudentHistory = lazy(() => import("./student/StudentHistory"));
 const AdminBranches = lazy(() => import("./system_management/AdminBranches"));
 const Announcement = lazy(() => import("./system_management/Announcement"));
 const AuditLogs = lazy(() => import("./system_management/AuditLogs"));
@@ -903,6 +904,7 @@ function App() {
 
                       <Route path="/student_grade_file" element={<ProtectedRoute><StudentGradeFile /></ProtectedRoute>} />
                       <Route path="/student_curriculum_subjects" element={<ProtectedRoute allowedRoles={"student"}><StudentCurriculumSubjects /></ProtectedRoute>} />
+                      <Route path="/student_history" element={<ProtectedRoute allowedRoles={"student"}><StudentHistory /></ProtectedRoute>} />
                       <Route path="/student_enrollment" element={<ProtectedRoute><StudentEnrollment /></ProtectedRoute>} />
                       <Route path="/assign_receipt_counter" element={<ProtectedRoute><ReceiptCounterAssignment /></ProtectedRoute>} />
                       <Route path="/matriculation_payment" element={<ProtectedRoute><MatriculationPaymentModule /></ProtectedRoute>} />

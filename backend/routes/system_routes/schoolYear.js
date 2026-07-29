@@ -128,6 +128,53 @@ const getSchoolYearTermById = async (connection, schoolYearId) => {
   };
 };
 
+const resetGradingPeriodToMidtermForNextSameYearSemester = async ({
+  connection,
+  previousActiveSchoolYear,
+  selectedSchoolYear,
+}) => {
+  const previousYearId = Number(previousActiveSchoolYear?.year_id);
+  const selectedYearId = Number(selectedSchoolYear?.year_id);
+  const previousSemesterId = Number(previousActiveSchoolYear?.semester_id);
+  const selectedSemesterId = Number(selectedSchoolYear?.semester_id);
+
+  const shouldReset =
+    previousYearId &&
+    selectedYearId &&
+    previousYearId === selectedYearId &&
+    selectedSemesterId === previousSemesterId + 1;
+
+  if (!shouldReset) {
+    return { reset: false, reason: "NOT_NEXT_SAME_YEAR_SEMESTER" };
+  }
+
+  const [[midtermPeriod]] = await connection.query(
+    `
+    SELECT id, description, status
+    FROM period_status
+    WHERE LOWER(description) LIKE '%midterm%'
+    LIMIT 1
+    `,
+  );
+
+  if (!midtermPeriod) {
+    return { reset: false, reason: "MIDTERM_PERIOD_NOT_FOUND" };
+  }
+
+  await connection.query("UPDATE period_status SET status = 0");
+  await connection.query("UPDATE period_status SET status = 1 WHERE id = ?", [
+    midtermPeriod.id,
+  ]);
+
+  return {
+    reset: true,
+    periodId: Number(midtermPeriod.id),
+    periodDescription: midtermPeriod.description,
+    previousSchoolYearId: Number(previousActiveSchoolYear.id),
+    selectedSchoolYearId: Number(selectedSchoolYear.id),
+  };
+};
+
 const getNextSchoolYearTermAfter = async (connection, previousActiveSchoolYearId) => {
   const previousSchoolYear = await getSchoolYearTermById(
     connection,
@@ -736,10 +783,11 @@ router.put("/school_years/:id", async (req, res) => {
       await connection.beginTransaction();
 
       const [previousActiveRows] = await connection.query(
-        "SELECT id FROM active_school_year_table WHERE astatus = 1 AND id != ? LIMIT 1",
+        "SELECT id, year_id, semester_id FROM active_school_year_table WHERE astatus = 1 AND id != ? LIMIT 1",
         [id],
       );
-      const previousActiveSchoolYearId = previousActiveRows[0]?.id || null;
+      const previousActiveSchoolYear = previousActiveRows[0] || null;
+      const previousActiveSchoolYearId = previousActiveSchoolYear?.id || null;
 
       await connection.query("UPDATE active_school_year_table SET astatus = 0");
 
@@ -761,6 +809,12 @@ router.put("/school_years/:id", async (req, res) => {
         targetSchoolYearId: id,
         targetSemesterId: selectedSchoolYear.semester_id,
         previousActiveSchoolYearId,
+      });
+
+      const gradingPeriodReset = await resetGradingPeriodToMidtermForNextSameYearSemester({
+        connection,
+        previousActiveSchoolYear,
+        selectedSchoolYear,
       });
 
       await connection.commit();
@@ -787,6 +841,7 @@ router.put("/school_years/:id", async (req, res) => {
       return res.status(200).json({
         message: "School year activated",
         studentStatusGeneration,
+        gradingPeriodReset,
       });
     } else {
       connection = await db3.getConnection();

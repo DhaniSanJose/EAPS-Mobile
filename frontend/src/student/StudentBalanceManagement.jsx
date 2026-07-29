@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from "react";
 import {
   Box, Typography, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Button,
-  useTheme, useMediaQuery,
+  useTheme, useMediaQuery, Alert,
 } from "@mui/material";
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
@@ -26,6 +26,8 @@ const ProgramPayment = () => {
 
   const [assessmentData, setAssessmentData] = useState([]);
   const [student, setStudent] = useState(null);
+  const [isOfficiallyEnrolled, setIsOfficiallyEnrolled] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [titleColor, setTitleColor] = useState("#000");
   const [borderColor, setBorderColor] = useState("#000");
 
@@ -40,12 +42,17 @@ const ProgramPayment = () => {
       try {
         const person_id = localStorage.getItem("person_id");
         if (!person_id) return;
-        const response = await axios.get(`${API_BASE_URL}/api/student-assessment/${person_id}`);
+        const response = await axios.get(`${API_BASE_URL}/api/student-assessment/${person_id}`, {
+          params: { enrolled_status: 1 },
+        });
         if (!response.data.success) { console.error(response.data.error); return; }
         setStudent(response.data.student || null);
+        const rows = response.data.rows || [];
+        setIsOfficiallyEnrolled(rows.length > 0);
         setAssessmentData(
-          (response.data.rows || []).map((row) => ({
+          rows.map((row) => ({
             ...row,
+            enrolled_status: Number(row.enrolled_status || 0),
             school_year: row.school_year || "",
             semester: row.semester || "",
             year_level: row.year_level || "",
@@ -59,6 +66,8 @@ const ProgramPayment = () => {
         );
       } catch (error) {
         console.error("FULL ERROR:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchAssessment();
@@ -139,7 +148,35 @@ const ProgramPayment = () => {
         </Box>
 
         {/* ── Mobile & small tablet: cards | Larger tablet/Desktop: table ── */}
-        {isCardLayout ? (
+        {!loading && !isOfficiallyEnrolled && (
+          <Alert
+            severity="warning"
+            sx={{
+              borderRadius: 2,
+              mb: 3,
+              mx: { xs: 0, sm: 2 },
+              border: "1px solid #f59e0b",
+              backgroundColor: "#fffbeb",
+              color: "#7c2d12",
+              "& .MuiAlert-icon": { color: "#d97706" },
+            }}
+          >
+            <Typography sx={{ fontWeight: 700, fontSize: { xs: 14, sm: 16 }, mb: 0.5 }}>
+              Student Account Balance is only available for officially enrolled students.
+            </Typography>
+            <Typography sx={{ fontSize: { xs: 12.5, sm: 14 } }}>
+              Your account balance will be displayed once your enrollment status is marked as officially enrolled.
+            </Typography>
+          </Alert>
+        )}
+
+        {loading && (
+          <Box sx={{ textAlign: "center", py: 4 }}>
+            <Typography sx={{ color: "#888", fontSize: 14 }}>Loading account balance...</Typography>
+          </Box>
+        )}
+
+        {!loading && isOfficiallyEnrolled && (isCardLayout ? (
           <Box>
             {assessmentData.length === 0 ? (
               <Box sx={{ textAlign: "center", py: 4 }}>
@@ -280,7 +317,7 @@ const ProgramPayment = () => {
               </TableBody>
             </Table>
           </TableContainer>
-        )}
+        ))}
       </Paper>
     </Box>
   );

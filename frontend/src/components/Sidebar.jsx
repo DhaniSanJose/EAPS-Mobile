@@ -803,8 +803,8 @@ const SideBar = ({
         { key: "sectionManagement", label: "Section Management", icon: Class, items: [{ title: "Section Panel Form", link: "/section_panel", icon: Class, page_id: 57 }, { title: "Section Slot Management", link: "/section_slot_management", icon: MeetingRoom, page_id: 167 }] },
         { key: "semesterManagement", label: "Semester Management", icon: Timeline, items: [{ title: "Semester Panel Form", link: "/semester_panel", icon: Timeline, page_id: 58 }] },
         { key: "yearManagement", label: "Year Management", icon: CalendarToday, items: [{ title: "Year Level Panel Form", link: "/year_level_panel", icon: Layers, page_id: 63 }, { title: "Year Panel Form", link: "/year_panel", icon: CalendarToday, page_id: 64 }, { title: "School Year Panel", link: "/school_year_panel", icon: DateRange, page_id: 55 }] },
-        { key: "evaluationManagement", label: "Evaluation Management", icon: Assessment, items: [{ title: "Evaluation Management", link: "/evaluation_crud", icon: HelpOutline, page_id: 23 }, { title: "TOSF CRUD", link: "/tosf_crud", icon: HelpOutline, page_id: 99 }] },
-        { key: "paymentManagement", label: "Payment Management", icon: Payments, items: [{ title: "Payment Exporting Module", link: "/payment_exporting_module", icon: HelpOutline, page_id: 116 }, { title: "Receipt Counter Assignment", link: "/assign_receipt_counter", icon: HelpOutline, page_id: 122 }, { title: "Matriculation Payment", link: "/matriculation_payment", icon: HelpOutline, page_id: 121 }] },
+        { key: "evaluationManagement", label: "Evaluation Management", icon: Assessment, items: [{ title: "Evaluation Management", link: "/evaluation_crud", icon: HelpOutline, page_id: 23 }] },
+        { key: "paymentManagement", label: "Payment Management", icon: Payments, items: [{ title: "Payment Exporting Module", link: "/payment_exporting_module", icon: HelpOutline, page_id: 116 }, { title: "Receipt Counter Assignment", link: "/assign_receipt_counter", icon: HelpOutline, page_id: 122 }, { title: "Matriculation Payment", link: "/matriculation_payment", icon: HelpOutline, page_id: 121 }, { title: "TOSF Management", link: "/tosf_crud", icon: HelpOutline, page_id: 99 }] },
         { key: "scholarshipManagement", label: "Scholarship Management", icon: School, items: [{ title: "Student Scholarship List", link: "/student_scholarship_list", icon: HelpOutline, page_id: 116 }] },
         { key: "systemLogs", label: "System Logs", icon: HistoryEdu, items: [{ title: "Audit Logs", link: "/audit_logs", icon: HistoryEdu, page_id: 154 }] },
         { key: "registrarResetPasswords", label: "Reset Password", icon: Settings, items: [{ title: "Registrar Reset Password", link: "/registrar_reset_password", icon: Settings, page_id: 73 }] },
@@ -845,6 +845,7 @@ const SideBar = ({
                 { title: "Edit Educational Background", link: "/admin_student_edit_permissions3", icon: FolderCopy, page_id: 157 },
                 { title: "Edit Health & Medical Records", link: "/admin_student_edit_permissions4", icon: FolderCopy, page_id: 158 },
                 { title: "Edit Other Information", link: "/admin_student_edit_permissions5", icon: FolderCopy, page_id: 159 },
+                { title: "Migration Data Panel", link: "/migration_data_panel", icon: Settings, page_id: 114 },
             ],
         },
         {
@@ -1174,6 +1175,7 @@ const SideBar = ({
                                     <NavItem to="/student_personal_information" icon={PersonIcon} label="Student Profile" active={/^\/student_dashboard[1-5]$/.test(loc)} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_online_requirements" icon={FolderCopy} label="Student Online Requirements" active={isActive("/student_online_requirements")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_account_balance" icon={PaymentIcon} label="Student Account Balance" active={isActive("/student_account_balance")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
+                                    <NavItem to="/student_history" icon={HistoryEdu} label="My History" active={isActive("/student_history")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <div className="sb-section-label">Setting</div>
                                     <NavItem to="/student_reset_password" icon={Settings} label="Change Password" active={isActive("/student_reset_password")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                 </>

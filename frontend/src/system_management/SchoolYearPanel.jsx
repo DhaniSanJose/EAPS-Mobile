@@ -442,12 +442,18 @@ const SchoolYearPanel = () => {
       );
 
       const generationSummary = response.data?.studentStatusGeneration;
+      const gradingPeriodReset = response.data?.gradingPeriodReset;
+      const activationMessage =
+        updatedStatus === 1
+          ? getActivationSuccessMessage(generationSummary)
+          : "School year deactivated!";
+
       setSnackbar({
         open: true,
         message:
-          updatedStatus === 1
-            ? getActivationSuccessMessage(generationSummary)
-            : "School year deactivated!",
+          gradingPeriodReset?.reset
+            ? `${activationMessage} Grading period was reset to Midterm.`
+            : activationMessage,
         severity: "success",
       });
       fetchSchoolYears();

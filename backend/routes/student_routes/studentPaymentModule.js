@@ -23,6 +23,7 @@ const isNstpRelatedCourse = (subject) => {
 router.get("/student-assessment/:person_id", async (req, res) => {
 
     const { person_id } = req.params;
+    const enrolledStatus = req.query.enrolled_status;
 
     try {
         console.log("Person ID: ", person_id);
@@ -45,6 +46,14 @@ router.get("/student-assessment/:person_id", async (req, res) => {
             return res.status(404).json({ success: false, error: "Student not found" });
         }
 
+        const statusParams = [student.student_number];
+        let enrolledStatusClause = "";
+
+        if (enrolledStatus !== undefined && enrolledStatus !== "") {
+            enrolledStatusClause = " AND ss.enrolled_status = ?";
+            statusParams.push(Number(enrolledStatus));
+        }
+
         const [statusRows] = await db3.query(`
             SELECT DISTINCT 
                 ss.*,
@@ -58,11 +67,21 @@ router.get("/student-assessment/:person_id", async (req, res) => {
             LEFT JOIN semester_table sem ON sy.semester_id = sem.semester_id
             LEFT JOIN year_table yt ON sy.year_id = yt.year_id
             WHERE ss.student_number = ?
+            ${enrolledStatusClause}
             ORDER BY ss.id ASC
-        `, [student.student_number]);
+        `, statusParams);
 
         if (!statusRows || statusRows.length === 0) {
-            return res.status(404).json({ success: false, error: "Student status not found" });
+            return res.json({
+                success: true,
+                student,
+                rows: [],
+                officially_enrolled: false,
+                message:
+                    Number(enrolledStatus) === 1
+                        ? "Student is not officially enrolled."
+                        : "Student status not found",
+            });
         }
 
         // ✅ Deduplicate by active_school_year_id — keep first occurrence
@@ -207,6 +226,7 @@ router.get("/student-assessment/:person_id", async (req, res) => {
 
                 return {
                     active_school_year_id: s.active_school_year_id,
+                    enrolled_status:        Number(s.enrolled_status || 0),
                     curriculum_id:         s.active_curriculum,
                     year_level_id:         s.year_level_id,
                     semester_id:           semesterId,

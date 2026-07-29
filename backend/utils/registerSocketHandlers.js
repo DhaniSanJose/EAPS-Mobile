@@ -5265,6 +5265,48 @@ Click the link below to log in:
     }
   });
 
+  app.get("/api/student_active_enrollment_status/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const [rows] = await db3.execute(
+        `
+        SELECT
+          snt.student_number,
+          asy.id AS active_school_year_id,
+          COALESCE(sst.enrolled_status, 0) AS enrolled_status
+        FROM student_numbering_table AS snt
+        CROSS JOIN active_school_year_table AS asy
+        LEFT JOIN student_status_table AS sst
+          ON sst.student_number = snt.student_number
+         AND sst.active_school_year_id = asy.id
+        WHERE snt.person_id = ?
+          AND asy.astatus = 1
+        LIMIT 1
+        `,
+        [id],
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Active enrollment status not found",
+          enrolled_status: 0,
+        });
+      }
+
+      res.json({
+        success: true,
+        student_number: rows[0].student_number,
+        active_school_year_id: rows[0].active_school_year_id,
+        enrolled_status: Number(rows[0].enrolled_status || 0),
+      });
+    } catch (error) {
+      console.error("Error fetching active enrollment status:", error);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
   /* Student Schedule */
   //GET Student Current Assigned Schedule
 

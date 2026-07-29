@@ -2682,10 +2682,12 @@ router.post("/person/import", upload.single("file"), async (req, res) => {
       "citizenship",
       "religion",
       "civilStatus",
+      "spouse",
       "tribeEthnicGroup",
       "cellphoneNumber",
       "emailAddress",
       "presentStreet",
+      "facebook_account",
       "presentBarangay",
       "presentZipCode",
       "presentRegion",
@@ -3021,18 +3023,21 @@ router.post("/person/import", upload.single("file"), async (req, res) => {
         11: "birthPlace",
         12: "gender",
         13: "civilStatus",
-
+        14: "spouse",
         15: "citizenship",
         16: "religion",
 
         // ✅ ADDRESS FIX
         17: "presentStreet",
+        19: "facebook_account",
         20: "presentZipCode",
         20: "permanentZipCode",
         21: "permanentStreet",
 
         22: "cellphoneNumber",
-        23: "emailAddress", //done
+        23: "emailAddress",
+        24: "presentDswdHouseholdNumber",
+        24: "permanentDswdHouseholdNumber",
 
         25: "pwdType",
         26: "pwdId",
@@ -4583,11 +4588,11 @@ router.post("/qualifying_exam/import", async (req, res) => {
     }
 
     const updatedRows = values.map(v => ({
-      applicant_number:        v[1],
-      qualifying_result:       v[2],
-      interview_result:        v[3],
-      exam_result:             v[4],
-      qualifying_status:       v[5],
+      applicant_number: v[1],
+      qualifying_result: v[2],
+      interview_result: v[3],
+      exam_result: v[4],
+      qualifying_status: v[5],
       interview_status_result: v[6],
       college_approval_status: v[7],
     }));
