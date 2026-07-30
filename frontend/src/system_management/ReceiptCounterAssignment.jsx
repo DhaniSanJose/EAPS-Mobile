@@ -27,8 +27,6 @@ import axios from 'axios';
 import API_BASE_URL from '../apiConfig';
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
-import { getFlatAuditHeaders } from "../utils/auditEvents";
-import useAuditMac from "../utils/useAuditMac";
 
 const capitalize = (word) => {
     if (!word) return "";
@@ -38,7 +36,6 @@ const toDigitsOnly = (value) => String(value ?? "").replace(/\D/g, "");
 const getFirstFour = (value) => String(value ?? "").slice(0, 4);
 
 const ReceiptCounterAssignment = () => {
-    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -69,7 +66,7 @@ const ReceiptCounterAssignment = () => {
         if (settings.logo_url) {
             setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
         } else {
-            setFetchedLogo(EaristLogo);
+            setFetchedLogo(NPCLogo);
         }
 
         // 🏷️ School Info
@@ -125,8 +122,11 @@ const ReceiptCounterAssignment = () => {
         counter: "",
         employee_id: "",
         school_year_id: "",
-        semester_id: ""
+        semester_id: "",
+        account_type_id: ""
     });
+
+    const [accountTypes, setAccountTypes] = useState([]);
 
     const [snackbar, setSnackbar] = useState({
         open: false,
@@ -135,7 +135,6 @@ const ReceiptCounterAssignment = () => {
     });
     const auditConfig = {
         headers: {
-            ...getFlatAuditHeaders(),
             "x-audit-actor-id":
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
@@ -214,18 +213,20 @@ const ReceiptCounterAssignment = () => {
         if (!hasAccess) return;
         const fetchInitialData = async () => {
             try {
-                const [employeeRes, departmentRes, schoolYearRes, semesterRes, activeSchoolYearRes] = await Promise.all([
+                const [employeeRes, departmentRes, schoolYearRes, semesterRes, activeSchoolYearRes, accountTypeRes] = await Promise.all([
                     axios.get(`${API_BASE_URL}/api/get_employee`),
                     axios.get(`${API_BASE_URL}/api/get_department`),
                     axios.get(`${API_BASE_URL}/api/get_school_year`),
                     axios.get(`${API_BASE_URL}/api/get_school_semester`),
-                    axios.get(`${API_BASE_URL}/api/active_school_year`)
+                    axios.get(`${API_BASE_URL}/api/active_school_year`),
+                    axios.get(`${API_BASE_URL}/api/tosf/account-types`)
                 ]);     
 
                 setEmployeesData(employeeRes.data || []);
                 setDepartment(departmentRes.data || []);
                 setSchoolYears(schoolYearRes.data || []);
                 setSemesters(semesterRes.data || []);
+                setAccountTypes(accountTypeRes.data || []);
 
                 if (activeSchoolYearRes.data?.length > 0) {
                     const active = activeSchoolYearRes.data[0];
@@ -240,7 +241,7 @@ const ReceiptCounterAssignment = () => {
                 }
             } catch (error) {
                 console.error("Error fetching initial data:", error);
-            }
+    }
         };
 
         fetchInitialData();
@@ -295,7 +296,8 @@ const ReceiptCounterAssignment = () => {
             counter: "",
             employee_id: employee.employee_id || "",
             school_year_id: activeSchoolYear?.year_id || "",
-            semester_id: activeSchoolYear?.semester_id || ""
+            semester_id: activeSchoolYear?.semester_id || "",
+            account_type_id: ""
         });
         setOpenAssignModal(true);
     };
@@ -317,7 +319,8 @@ const ReceiptCounterAssignment = () => {
             counter: assignment?.counter || "",
             employee_id: employee.employee_id || "",
             school_year_id: activeSchoolYear?.year_id || "",
-            semester_id: activeSchoolYear?.semester_id || ""
+            semester_id: activeSchoolYear?.semester_id || "",
+            account_type_id: assignment?.account_type_id ?? ""
         });
         setOpenAssignModal(true);
     };
@@ -356,10 +359,10 @@ const ReceiptCounterAssignment = () => {
             return;
         }
 
-        if (!assignForm.counter || !assignForm.employee_id || !assignForm.school_year_id || !assignForm.semester_id) {
+        if (!assignForm.counter || !assignForm.employee_id || !assignForm.school_year_id || !assignForm.semester_id || !assignForm.account_type_id) {
             setSnackbar({
                 open: true,
-                message: "Please complete all required fields.",
+                message: "Please complete all required fields including account type.",
                 severity: "error"
             });
             return;
@@ -417,7 +420,8 @@ const ReceiptCounterAssignment = () => {
             counter: "",
             employee_id: "",
             school_year_id: activeSchoolYear?.year_id || "",
-            semester_id: activeSchoolYear?.semester_id || ""
+            semester_id: activeSchoolYear?.semester_id || "",
+            account_type_id: ""
         }));
     };
 
@@ -429,7 +433,8 @@ const ReceiptCounterAssignment = () => {
                     counter: normalizedCounter,
                     employee_id: assignForm.employee_id,
                     year_id: assignForm.school_year_id,
-                    semester_id: assignForm.semester_id
+                    semester_id: assignForm.semester_id,
+                    account_type_id: assignForm.account_type_id
                 }, auditConfig);
             } else if (confirmAction === "edit") {
                 if (!selectedAssignment?.id) {
@@ -437,7 +442,8 @@ const ReceiptCounterAssignment = () => {
                 }
 
                 await axios.put(`${API_BASE_URL}/api/receipt-counter/${selectedAssignment.id}`, {
-                    counter: normalizedCounter
+                    counter: normalizedCounter,
+                    account_type_id: assignForm.account_type_id
                 }, auditConfig);
             } else if (confirmAction === "deassign") {
                 if (!selectedAssignment?.id) {
@@ -586,7 +592,7 @@ const ReceiptCounterAssignment = () => {
                             <TableCell colSpan={10} sx={{ py: 0.5, backgroundColor: settings?.header_color || "maroon", color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Admin's Records: {filteredEmployees.length}
+                                        Total Employees: {filteredEmployees.length}
                                     </Typography>
 
                                     <Box display="flex" alignItems="center" gap={1}>
@@ -799,159 +805,6 @@ const ReceiptCounterAssignment = () => {
                     </TableBody>
                 </Table>
             </TableContainer>
-                <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}` }}>
-                <Table size="small">
-                    <TableHead sx={{ backgroundColor: settings?.header_color || '#6D2323', color: "white" }}>
-                        <TableRow>
-                            <TableCell colSpan={10} sx={{ py: 0.5, backgroundColor: settings?.header_color || "maroon", color: "white" }}>
-                                <Box display="flex" justifyContent="space-between" alignItems="center">
-                                    <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Admin's Records: {filteredEmployees.length}
-                                    </Typography>
-
-                                    <Box display="flex" alignItems="center" gap={1}>
-                                        <Button
-                                            onClick={() => setCurrentPage(1)}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)'
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1
-                                                }
-                                            }}
-                                        >
-                                            First
-                                        </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)'
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1
-                                                }
-                                            }}
-                                        >
-                                            Prev
-                                        </Button>
-
-                                        <FormControl size="small" sx={{ minWidth: 90 }}>
-                                            <Select
-                                                value={currentPage}
-                                                onChange={(e) => setCurrentPage(Number(e.target.value))}
-                                                sx={{
-                                                    fontSize: '12px',
-                                                    height: 36,
-                                                    color: 'white',
-                                                    border: '1px solid white',
-                                                    backgroundColor: 'transparent',
-                                                    '.MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white'
-                                                    },
-                                                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white'
-                                                    },
-                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white'
-                                                    },
-                                                    '& svg': {
-                                                        color: 'white'
-                                                    }
-                                                }}
-                                            >
-                                                {Array.from({ length: totalPages }, (_, i) => (
-                                                    <MenuItem key={i + 1} value={i + 1}>
-                                                        Page {i + 1}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-
-                                        <Typography fontSize="11px" color="white">
-                                            of {totalPages} page{totalPages > 1 ? 's' : ''}
-                                        </Typography>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)'
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1
-                                                }
-                                            }}
-                                        >
-                                            Next
-                                        </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(totalPages)}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)'
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1
-                                                }
-                                            }}
-                                        >
-                                            Last
-                                        </Button>
-                                    </Box>
-                                </Box>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                </Table>
-            </TableContainer>
 
             <Dialog open={openAssignModal} onClose={resetModalState} fullWidth maxWidth="sm">
                 <DialogTitle sx={{ color: "maroon", fontWeight: "bold" }}>
@@ -1002,6 +855,26 @@ const ReceiptCounterAssignment = () => {
                                 {semesters.map((semester) => (
                                     <MenuItem key={semester.semester_id} value={semester.semester_id}>
                                         {semester.semester_description}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <FormControl fullWidth required>
+                            <InputLabel id="account-type-select-label">Account Type</InputLabel>
+                            <Select
+                                labelId="account-type-select-label"
+                                label="Account Type"
+                                value={assignForm.account_type_id}
+                                onChange={(e) =>
+                                    setAssignForm((prev) => ({
+                                        ...prev,
+                                        account_type_id: e.target.value,
+                                    }))
+                                }
+                            >
+                                {accountTypes.map((accountType) => (
+                                    <MenuItem key={accountType.id} value={accountType.id}>
+                                        {accountType.description}
                                     </MenuItem>
                                 ))}
                             </Select>

@@ -39,36 +39,6 @@ import {
     Tooltip,
     Cell,
 } from "recharts";
-import { getFlatAuditHeaders } from "../utils/auditEvents";
-import useAuditMac from "../utils/useAuditMac";
-
-const PRIORITY_FEE_CONFIG = [
-    { priority: 0, key: "tuition_fees", label: "Tuition Fees" },
-    { priority: 1, key: "registration_fees", label: "Registration Fee" },
-    { priority: 2, key: "school_id_fees", label: "School Id Fee" },
-    { priority: 3, key: "medical_and_dental_fees", label: "Medical and Dental Fee" },
-    { priority: 4, key: "computer_fees", label: "Computer Fee" },
-    { priority: 5, key: "laboratory_fees", label: "Laboratory Fee" },
-    { priority: 6, key: "guidance_fees", label: "Guidance Fee" },
-    { priority: 7, key: "athletic_fees", label: "Athletic Fee" },
-    { priority: 8, key: "library_fees", label: "Library Fee" },
-    { priority: 9, key: "cultural_fees", label: "Cultural Fee" },
-    { priority: 10, key: "development_fees", label: "Development Fee" },
-    { priority: 11, key: "nstp_fees", label: "NSTP Fees" },
-];
-
-const RECEIPT_MISC_BREAKDOWN_CONFIG = [
-    { key: "registration_fees", label: "Registration Fee" },
-    { key: "athletic_fees", label: "Athletic Fee" },
-    { key: "computer_fees", label: "Computer Fee" },
-    { key: "cultural_fees", label: "Cultural Fee" },
-    { key: "development_fees", label: "Development Fee" },
-    { key: "guidance_fees", label: "Guidance Fee" },
-    { key: "laboratory_fees", label: "Laboratory Fee" },
-    { key: "library_fees", label: "Library Fee" },
-    { key: "medical_and_dental_fees", label: "Medical and Dental Fee" },
-    { key: "school_id_fees", label: "School ID Fee" },
-];
 
 const RECEIPT_STATUS = {
     PAID_NOT_PRINTED: "PAID_NOT_PRINTED",
@@ -98,83 +68,11 @@ const VOID_REASON_OPTIONS = [
     "Others",
 ];
 
-const toAmount = (value) => {
-    const normalizedValue =
-        typeof value === "string" ? value.replace(/,/g, "").trim() : value;
-    const parsed = Number(normalizedValue);
-    if (!Number.isFinite(parsed) || parsed < 0) return 0;
-    return parsed;
-};
-
-const computePriorityPayment = (row, paymentInput) => {
-    const totalPayment = toAmount(paymentInput);
-    const totalTosf =
-        toAmount(row?.total_tosf) ||
-        (toAmount(row?.tuition_fees) + toAmount(row?.total_misc) + toAmount(row?.nstp_fees));
-
-    let remaining = totalPayment;
-    const deductions = [];
-
-    for (const item of PRIORITY_FEE_CONFIG) {
-        const feeAmount = toAmount(row?.[item.key]);
-        if (feeAmount <= 0) {
-            deductions.push({
-                ...item,
-                fee_amount: feeAmount,
-                paid_amount: 0,
-                status: "skipped",
-                remaining_after: remaining,
-            });
-            continue;
-        }
-
-        if (remaining <= 0) {
-            deductions.push({
-                ...item,
-                fee_amount: feeAmount,
-                paid_amount: 0,
-                status: "unpaid",
-                remaining_after: 0,
-            });
-            continue;
-        }
-
-        if (remaining >= feeAmount) {
-            remaining -= feeAmount;
-            deductions.push({
-                ...item,
-                fee_amount: feeAmount,
-                paid_amount: feeAmount,
-                status: "paid",
-                remaining_after: remaining,
-            });
-            continue;
-        }
-
-        deductions.push({
-            ...item,
-            fee_amount: feeAmount,
-            paid_amount: remaining,
-            status: "partial",
-            remaining_after: 0,
-        });
-        remaining = 0;
-    }
-
-    const appliedPayment = Math.max(totalPayment - remaining, 0);
-    const unpaidTotalRaw = Math.max(totalTosf - appliedPayment, 0);
-    const unpaidTotal = Number(unpaidTotalRaw.toFixed(2));
-
-    return {
-        totalPayment,
-        appliedPayment,
-        balance: unpaidTotal,
-        totalTosf,
-        unpaidTotal,
-        deductions,
-        paymentStatus: totalPayment > 0 ? 1 : 0,
-    };
-};
+import {
+    computePriorityPayment,
+    computeScopedBalance,
+    toAmount,
+} from "../utils/matriculationPayment";
 
 const formatAcademicSchoolYear = (row) => {
     const currentYear = row?.current_year ?? row?.year_description;
@@ -210,7 +108,6 @@ const formatTransactionDateTime = (value) => {
 };
 
 const MatriculationPaymentModule = () => {
-    useAuditMac();
     const settings = useContext(SettingsContext);
 
     const [borderColor, setBorderColor] = useState("#000000");
@@ -223,11 +120,21 @@ const MatriculationPaymentModule = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [data, setData] = useState([]);
     const [keepVisiblePaidMatriculationId, setKeepVisiblePaidMatriculationId] = useState(null);
+    const [cashierAccountTypeId, setCashierAccountTypeId] = useState(null);
     const pageSize = 100; // Number of rows per page
+    const getScopedRowTotal = (row) =>
+        computeScopedBalance(
+            row?.fee_lines || [],
+            cashierAccountTypeId,
+            row?.tuition_fees,
+            Number(row?.tuition_is_paid) === 1,
+            toAmount(row?.tuition_paid_amount)
+        );
+
     const visibleData = data.filter((row) => {
-        const isPaid = Number(row?.payment_status) === 1;
+        const scopedBalance = getScopedRowTotal(row);
         const keepVisible = String(row?.id) === String(keepVisiblePaidMatriculationId);
-        return !isPaid || keepVisible;
+        return scopedBalance > 0 || keepVisible;
     });
 
     const totalPages = Math.max(1, Math.ceil(visibleData.length / pageSize));
@@ -259,7 +166,6 @@ const MatriculationPaymentModule = () => {
     };
     const auditConfig = {
         headers: {
-            ...getFlatAuditHeaders(),
             "x-audit-actor-id":
                 personData?.employee_id ||
                 localStorage.getItem("employee_id") ||
@@ -333,6 +239,35 @@ const MatriculationPaymentModule = () => {
         }
     }, []);
 
+    useEffect(() => {
+        const loadCashierAccountType = async () => {
+            const employeeId =
+                personData?.employee_id || localStorage.getItem("employee_id");
+            if (!employeeId) return;
+
+            try {
+                const activeSchoolYearRes = await axios.get(
+                    `${API_BASE_URL}/api/active_school_year`
+                );
+                const activeSchoolYear = activeSchoolYearRes.data?.[0];
+                if (!activeSchoolYear?.school_year_id) return;
+
+                const counterRes = await axios.get(
+                    `${API_BASE_URL}/api/receipt-counter/active/${activeSchoolYear.school_year_id}`
+                );
+                const assignment = (counterRes.data || []).find(
+                    (row) => String(row.employee_id) === String(employeeId)
+                );
+                setCashierAccountTypeId(assignment?.account_type_id ?? null);
+            } catch (error) {
+                console.error("Failed to load cashier account type:", error);
+                setCashierAccountTypeId(null);
+            }
+        };
+
+        loadCashierAccountType();
+    }, [personData?.employee_id]);
+
     const fetchStudentData = async () => {
         try {
             const res = await axios.get(`${API_BASE_URL}/api/get_student_data_matriculation`);
@@ -346,10 +281,15 @@ const MatriculationPaymentModule = () => {
         try {
             const saveEndpoint = "/api/payment_matriculation/";
             const employeeId = personData?.employee_id || localStorage.getItem("employee_id");
-            const paymentSummary = computePriorityPayment(row, payment);
+            const paymentSummary = computePriorityPayment(row, payment, cashierAccountTypeId);
 
             if (!employeeId) {
                 showSnackbar("Employee id is required to save this payment.", "error");
+                return;
+            }
+
+            if (paymentSummary.error) {
+                showSnackbar(paymentSummary.error, "error");
                 return;
             }
 
@@ -370,7 +310,7 @@ const MatriculationPaymentModule = () => {
                 transaction_id: saveRes?.data?.transaction_id || "",
                 student_number: row?.student_number || "",
                 student_name: `${row?.last_name || ""}, ${row?.given_name || ""} ${row?.middle_initial || ""}`.trim(),
-                total_tosf: paymentSummary.totalTosf,
+                total_tosf: saveRes?.data?.total_tosf ?? paymentSummary.totalTosf,
                 tuition_fees: row?.tuition_fees ?? 0,
                 total_misc: row?.total_misc ?? 0,
                 nstp_fees: row?.nstp_fees ?? 0,
@@ -385,10 +325,10 @@ const MatriculationPaymentModule = () => {
                 medical_and_dental_fees: row?.medical_and_dental_fees ?? 0,
                 school_id_fees: row?.school_id_fees ?? 0,
                 payment_entered: paymentSummary.totalPayment,
-                payment_applied: paymentSummary.appliedPayment,
-                balance: paymentSummary.balance,
+                payment_applied: saveRes?.data?.payment_applied ?? paymentSummary.appliedPayment,
+                balance: saveRes?.data?.balance ?? paymentSummary.balance,
                 unpaid_total: paymentSummary.unpaidTotal,
-                payment_breakdown: paymentSummary.deductions,
+                payment_breakdown: saveRes?.data?.payment_breakdown || paymentSummary.deductions,
                 employee_id: employeeId,
                 active_school_year_id: saveRes?.data?.active_school_year_id || row?.active_school_year_id || "",
                 remark: "Matriculation payment",
@@ -409,8 +349,9 @@ const MatriculationPaymentModule = () => {
     };
 
     const openConfirm = (row) => {
+        const scopedTotal = getScopedRowTotal(row);
         setConfirmRow(row);
-        setPaymentValue(row?.payment ?? "");
+        setPaymentValue(scopedTotal > 0 ? String(scopedTotal) : "");
         setConfirmOpen(true);
     };
 
@@ -426,7 +367,11 @@ const MatriculationPaymentModule = () => {
             showSnackbar("Payment is required.", "warning");
             return;
         }
-        const paymentSummary = computePriorityPayment(confirmRow, paymentValue);
+        const paymentSummary = computePriorityPayment(confirmRow, paymentValue, cashierAccountTypeId);
+        if (paymentSummary.error) {
+            showSnackbar(paymentSummary.error, "warning");
+            return;
+        }
         if (paymentSummary.totalPayment > paymentSummary.totalTosf) {
             showSnackbar("Payment exceeds the student's total amount to pay (Total Amount to pay).", "warning");
             return;
@@ -727,23 +672,42 @@ const MatriculationPaymentModule = () => {
         return word.trim();
     };
 
-    const confirmPaymentSummary = confirmRow ? computePriorityPayment(confirmRow, paymentValue) : null;
+    const confirmPaymentSummary = confirmRow
+        ? computePriorityPayment(confirmRow, paymentValue, cashierAccountTypeId)
+        : null;
     const isOverPayment = Boolean(
         confirmPaymentSummary && confirmPaymentSummary.totalPayment > confirmPaymentSummary.totalTosf
     );
     const receiptPaidBreakdown = Array.isArray(receiptData?.payment_breakdown)
         ? receiptData.payment_breakdown
         : [];
-    const getReceiptPaidAmount = (key) =>
-        toAmount(receiptPaidBreakdown.find((item) => item.key === key)?.paid_amount);
-    const receiptTuitionPaid = getReceiptPaidAmount("tuition_fees");
-    const receiptNstpPaid = getReceiptPaidAmount("nstp_fees");
-    const receiptMiscPaid = RECEIPT_MISC_BREAKDOWN_CONFIG.reduce(
-        (sum, item) => sum + getReceiptPaidAmount(item.key),
-        0,
+    const isTuitionBreakdownItem = (item) =>
+        Boolean(item?.is_tuition) ||
+        String(item?.fee_code || item?.key || "").toUpperCase() === "TUITION";
+    const isNstpBreakdownItem = (item) => {
+        const code = String(item?.fee_code || item?.key || "").toUpperCase();
+        const label = String(item?.label || item?.fee_name || "").toUpperCase();
+        return code.includes("NSTP") || label.includes("NSTP");
+    };
+    const receiptPaidLines = receiptPaidBreakdown
+        .filter((item) => toAmount(item.paid_amount) > 0)
+        .sort(
+            (a, b) =>
+                Number(a.priority ?? a.sort_order ?? 0) -
+                Number(b.priority ?? b.sort_order ?? 0)
+        );
+    const receiptTuitionPaid = receiptPaidLines
+        .filter(isTuitionBreakdownItem)
+        .reduce((sum, item) => sum + toAmount(item.paid_amount), 0);
+    const receiptNstpPaid = receiptPaidLines
+        .filter((item) => !isTuitionBreakdownItem(item) && isNstpBreakdownItem(item))
+        .reduce((sum, item) => sum + toAmount(item.paid_amount), 0);
+    const receiptMiscLines = receiptPaidLines.filter(
+        (item) => !isTuitionBreakdownItem(item) && !isNstpBreakdownItem(item)
     );
-    const receiptMiscBreakdownItems = RECEIPT_MISC_BREAKDOWN_CONFIG.filter(
-        (item) => getReceiptPaidAmount(item.key) > 0,
+    const receiptMiscPaid = receiptMiscLines.reduce(
+        (sum, item) => sum + toAmount(item.paid_amount),
+        0
     );
     const formatReceiptAmount = (value) => toAmount(value).toLocaleString();
 
@@ -775,7 +739,7 @@ const MatriculationPaymentModule = () => {
         return <Unauthorized />;
     }
 
-    // 🔒 Disable right-click
+       // 🔒 Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
     // 🔒 Block DevTools shortcuts + Ctrl+P silently
@@ -858,7 +822,7 @@ const MatriculationPaymentModule = () => {
                             >
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Student's Records: {visibleData.length}
+                                        Total Students: {visibleData.length}
                                     </Typography>
                                     <Box display="flex" alignItems="center" gap={1}>
                                         {/* First & Prev */}
@@ -1035,7 +999,7 @@ const MatriculationPaymentModule = () => {
                             <TableCell>Reg Fees</TableCell>
                             <TableCell>Tuition</TableCell>
                             <TableCell>Total Misc</TableCell>
-                            <TableCell>Total Amount</TableCell>
+                            <TableCell>Payable Amount</TableCell>
                             <TableCell>Action</TableCell>
                         </TableRow>
                     </TableHead>
@@ -1078,7 +1042,7 @@ const MatriculationPaymentModule = () => {
                                     <TableCell align="right">{row.registration_fees}</TableCell>
                                     <TableCell align="right">{row.tuition_fees}</TableCell>
                                     <TableCell align="right">{row.total_misc}</TableCell>
-                                    <TableCell align="right">{row.total_tosf}</TableCell>
+                                    <TableCell align="right">{getScopedRowTotal(row).toLocaleString()}</TableCell>
                                     <TableCell>
                                         <Button
                                             variant="contained"
@@ -1094,189 +1058,6 @@ const MatriculationPaymentModule = () => {
                     </TableBody>
                 </Table>
             </TableContainer >
-            <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
-                <Table stickyHeader size="small"
-                    sx={{
-                        "& th, & td": {
-                            border: `1px solid ${borderColor}`,
-                            textAlign: "center",
-                            fontSize: "12px",
-                        },
-                        borderCollapse: "collapse",
-                    }}
-                >
-                    <TableHead>
-                        <TableRow>
-                            <TableCell
-                                colSpan={19}
-                                sx={{
-                                    py: 0.5,
-                                    backgroundColor: settings?.header_color || "#6D2323",
-                                    color: "white",
-                                }}
-                            >
-                                <Box display="flex" justifyContent="space-between" alignItems="center">
-                                    <Typography fontSize="14px" fontWeight="bold" color="white">
-                                        Total Student's Records: {visibleData.length}
-                                    </Typography>
-                                    <Box display="flex" alignItems="center" gap={1}>
-                                        {/* First & Prev */}
-                                        <Button
-                                            onClick={() => setCurrentPage(1)}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
-                                            First
-                                        </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                            disabled={currentPage === 1}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
-                                            Prev
-                                        </Button>
-
-
-                                        {/* Page Dropdown */}
-                                        <FormControl size="small" sx={{ minWidth: 80 }}>
-                                            <Select
-                                                value={currentPage}
-                                                onChange={(e) => setCurrentPage(Number(e.target.value))}
-                                                displayEmpty
-                                                sx={{
-                                                    fontSize: '12px',
-                                                    height: 36,
-                                                    color: 'white',
-                                                    border: '1px solid white',
-                                                    backgroundColor: 'transparent',
-                                                    '.MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                        borderColor: 'white',
-                                                    },
-                                                    '& svg': {
-                                                        color: 'white', // dropdown arrow icon color
-                                                    }
-                                                }}
-                                                MenuProps={{
-                                                    PaperProps: {
-                                                        sx: {
-                                                            maxHeight: 200,
-                                                            backgroundColor: '#fff', // dropdown background
-                                                        }
-                                                    }
-                                                }}
-                                            >
-                                                {Array.from({ length: totalPages }, (_, i) => (
-                                                    <MenuItem key={i + 1} value={i + 1}>
-                                                        Page {i + 1}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-
-                                        <Typography fontSize="11px" color="white">
-                                            of {totalPages} page{totalPages > 1 ? 's' : ''}
-                                        </Typography>
-
-
-                                        {/* Next & Last */}
-                                        <Button
-                                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
-                                            Next
-                                        </Button>
-
-                                        <Button
-                                            onClick={() => setCurrentPage(totalPages)}
-                                            disabled={currentPage === totalPages}
-                                            variant="outlined"
-                                            size="small"
-                                            sx={{
-                                                minWidth: 80,
-                                                color: "white",
-                                                borderColor: "white",
-                                                backgroundColor: "transparent",
-                                                '&:hover': {
-                                                    borderColor: 'white',
-                                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: "white",
-                                                    borderColor: "white",
-                                                    backgroundColor: "transparent",
-                                                    opacity: 1,
-                                                }
-                                            }}
-                                        >
-                                            Last
-                                        </Button>
-                                    </Box>
-
-                                </Box>
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                </Table>
-            </TableContainer>
 
             {/* CONFIRM DIALOG */}
             <Dialog open={confirmOpen} onClose={closeConfirm} fullWidth maxWidth="lg">
@@ -1290,7 +1071,7 @@ const MatriculationPaymentModule = () => {
                         <Box sx={{ mt: 1 }}>
                             <Box>
                                 <Box sx={{ mb: 1, display: "flex", gap: 1 }}>
-                                    <Box sx={{ width: "200px", height: "180px", background: "#6a0181", fontWeight: "700", padding: 2, color: "White", borderRadius: "10px" }}>
+                                    <Box sx={{ width: "200px", height: "180px", background: "#EF4444", fontWeight: "700", padding: 2, color: "White", borderRadius: "10px" }}>
                                         <Typography>
                                             TOTAL:
                                         </Typography>
@@ -1298,7 +1079,7 @@ const MatriculationPaymentModule = () => {
                                             ₱{" "}{toAmount(confirmPaymentSummary?.totalTosf).toLocaleString()}
                                         </Box>
                                     </Box>
-                                    <Box sx={{ width: "200px", height: "180px", background: "#094e9e", fontWeight: "700", padding: 2, color: "White", borderRadius: "10px" }}>
+                                    <Box sx={{ width: "200px", height: "180px", background: "#2563EB", fontWeight: "700", padding: 2, color: "White", borderRadius: "10px" }}>
                                         <Typography>
                                             BALANCE:
                                         </Typography>
@@ -1308,7 +1089,7 @@ const MatriculationPaymentModule = () => {
                                     </Box>
                                 </Box>
                                 <Box sx={{ mb: 1, display: "flex", gap: 1 }}>
-                                    <Box sx={{ width: "410px", height: "180px", background: "#109917", fontWeight: "700", padding: 2, color: "White", borderRadius: "10px" }}>
+                                    <Box sx={{ width: "410px", height: "180px", background: "#22C55E", fontWeight: "700", padding: 2, color: "White", borderRadius: "10px" }}>
                                         <Typography>
                                             STUDENT'S PAYMENT:
                                         </Typography>
@@ -1370,7 +1151,7 @@ const MatriculationPaymentModule = () => {
                                 >
                                     Cancel
                                 </Button>
-                                <Button onClick={handleConfirmTransfer} variant="contained" disabled={isOverPayment}>
+                                <Button onClick={handleConfirmTransfer} variant="contained" sx={{marginLeft: "10px"}} disabled={isOverPayment}>
                                     Confirm
                                 </Button>
                             </Box>
@@ -1401,7 +1182,7 @@ const MatriculationPaymentModule = () => {
                                     Fee Breakdown in Privilege Order{" "}
                                 </Typography>
                                 <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-                                    Payment is applied in order from fee 0, then fee 1, and so on.
+                                    Payment is applied in order from fee 0, then fee 1, and so on. Base tuition is always priority 0.
                                 </Typography>
                                 <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 260 }}>
                                     <Table stickyHeader size="small">
@@ -1409,6 +1190,7 @@ const MatriculationPaymentModule = () => {
                                             <TableRow>
                                                 <TableCell>Priority</TableCell>
                                                 <TableCell>Fee</TableCell>
+                                                <TableCell>Account Type</TableCell>
                                                 <TableCell align="right">Fee Amount</TableCell>
                                             </TableRow>
                                         </TableHead>
@@ -1425,9 +1207,10 @@ const MatriculationPaymentModule = () => {
                                             }}
                                         >
                                             {(confirmPaymentSummary?.deductions || []).map((item) => (
-                                                <TableRow key={item.key}>
+                                                <TableRow key={`${item.key}-${item.priority}`}>
                                                     <TableCell>{item.priority}</TableCell>
                                                     <TableCell>{item.label}</TableCell>
+                                                    <TableCell>{item.account_type_label || "—"}</TableCell>
                                                     <TableCell align="right">{toAmount(item.fee_amount).toLocaleString()}</TableCell>
                                                 </TableRow>
                                             ))}
@@ -1649,31 +1432,35 @@ const MatriculationPaymentModule = () => {
                                 </Typography>
                             </>
 
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                                <Typography variant="body2" sx={{ mt: '1.3cm', marginLeft: '1.7cm', width: '7cm' }}>
-                                    TUITION FEE
-                                </Typography>
-                                <Typography variant="body2" sx={{ mt: '1.3cm', ml: '1cm', textAlign: 'right' }}>
-                                    {formatReceiptAmount(receiptTuitionPaid)}
-                                </Typography>
-                            </Box>
+                            {receiptTuitionPaid > 0 && (
+                                <Box sx={{ display: "flex", alignItems: "center" }}>
+                                    <Typography variant="body2" sx={{ mt: '1.3cm', marginLeft: '1.7cm', width: '7cm' }}>
+                                        TUITION FEE
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ mt: '1.3cm', ml: '1cm', textAlign: 'right' }}>
+                                        {formatReceiptAmount(receiptTuitionPaid)}
+                                    </Typography>
+                                </Box>
+                            )}
 
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                                <Typography variant="body2" sx={{ mt: '0.1cm', marginLeft: '1.7cm', width: '7cm' }}>
-                                    MISCELLANEOUS FEE
-                                </Typography>
-                                <Typography variant="body2" sx={{ mt: '0.1cm', ml: '1cm', textAlign: 'right' }}>
-                                    {formatReceiptAmount(receiptMiscPaid)}
-                                </Typography>
-                            </Box>
-
-                            {receiptMiscBreakdownItems.map((item) => (
-                                <Box key={item.key} sx={{ display: "flex", alignItems: "center" }}>
-                                    <Typography variant="body2" sx={{ mt: '0.1cm', marginLeft: '2.1cm', width: '6.6cm' }}>
-                                        {item.label}
+                            {receiptMiscPaid > 0 && (
+                                <Box sx={{ display: "flex", alignItems: "center" }}>
+                                    <Typography variant="body2" sx={{ mt: '0.1cm', marginLeft: '1.7cm', width: '7cm' }}>
+                                        MISCELLANEOUS FEE
                                     </Typography>
                                     <Typography variant="body2" sx={{ mt: '0.1cm', ml: '1cm', textAlign: 'right' }}>
-                                        {formatReceiptAmount(getReceiptPaidAmount(item.key))}
+                                        {formatReceiptAmount(receiptMiscPaid)}
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {receiptMiscLines.map((item, index) => (
+                                <Box key={`${item.fee_code || item.key || item.label}-${index}`} sx={{ display: "flex", alignItems: "center" }}>
+                                    <Typography variant="body2" sx={{ mt: '0.1cm', marginLeft: '2.1cm', width: '6.6cm' }}>
+                                        {item.label || item.fee_name}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ mt: '0.1cm', ml: '1cm', textAlign: 'right' }}>
+                                        {formatReceiptAmount(item.paid_amount)}
                                     </Typography>
                                 </Box>
                             ))}
