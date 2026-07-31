@@ -26,7 +26,7 @@ import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 import API_BASE_URL from "../apiConfig";
 import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
-const SuperAdminApplicantDashboard5 = () => {
+const ApplicantAdminOtherInformation = () => {
     useAccountAuditMac();
     const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
     const getAuditHeaders = () =>
@@ -1403,4 +1403,4 @@ const SuperAdminApplicantDashboard5 = () => {
 };
 
 
-export default SuperAdminApplicantDashboard5;
+export default ApplicantAdminOtherInformation;

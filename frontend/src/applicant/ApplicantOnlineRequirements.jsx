@@ -342,30 +342,31 @@ const ApplicantOnlineRequirements = () => {
     });
   };
 
-     document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   // 🔒 Right-click / DevTools blocking was previously here and is left disabled,
   // matching the existing intent of this file. If re-enabled elsewhere, do it via
   // a useEffect with listener cleanup (see ApplicantResetPassword / ApplicantOtherInformation)
   // rather than attaching a new listener on every render.
 
+  // Mobile / small-tablet card per document
   // Mobile / small-tablet card per document
   const renderMobileCard = (doc) => {
     const uploaded = uploads.find((u) => Number(u.requirements_id) === Number(doc.id));
@@ -397,11 +398,10 @@ const ApplicantOnlineRequirements = () => {
               fontSize: { xs: 12, sm: 13 },
               fontWeight: "bold",
               mb: 1.5,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              wordBreak: "break-all",
+              overflowWrap: "break-word",
+              whiteSpace: "normal",
             }}
-            title={selectedFiles[doc.id]}
           >
             📎 {selectedFiles[doc.id]}
           </Box>
@@ -438,7 +438,7 @@ const ApplicantOnlineRequirements = () => {
             <Button
               variant="contained"
               color="primary"
-              href={`${API_BASE_URL}/ApplicantOnlineDocuments/${uploaded.file_path}`}
+              href={`${API_BASE_URL}/api/uploads/preview/${uploaded.upload_id}`}
               target="_blank"
               startIcon={<VisibilityIcon />}
               size="small"
@@ -479,8 +479,20 @@ const ApplicantOnlineRequirements = () => {
             <Box sx={{ width: { md: 160, lg: 220 }, flexShrink: 0, textAlign: "center" }}>
               {selectedFiles[doc.id] ? (
                 <Box
-                  sx={{ backgroundColor: "#e0e0e0", padding: "6px 12px", borderRadius: "4px", fontSize: { md: 12.5, lg: 14 }, fontWeight: "bold", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                  title={selectedFiles[doc.id]}
+                  sx={{
+                    backgroundColor: "#e0e0e0",
+                    padding: "6px 12px",
+                    borderRadius: "4px",
+                    fontSize: { md: 12.5, lg: 14 },
+                    fontWeight: "bold",
+                    minHeight: "40px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    wordBreak: "break-all",
+                    overflowWrap: "break-word",
+                    whiteSpace: "normal",
+                  }}
                 >
                   {selectedFiles[doc.id]}
                 </Box>
@@ -524,7 +536,7 @@ const ApplicantOnlineRequirements = () => {
             <Button
               variant="contained"
               color="primary"
-              href={`${API_BASE_URL}/ApplicantOnlineDocuments/${uploaded.file_path}`}
+              href={`${API_BASE_URL}/api/uploads/preview/${uploaded.upload_id}`}
               target="_blank"
               startIcon={<VisibilityIcon />}
               sx={{ color: "white", fontWeight: "bold", height: "40px", textTransform: "none", minWidth: { md: 120, lg: 140 }, fontSize: { md: 12.5, lg: 14 } }}
@@ -698,7 +710,7 @@ const ApplicantOnlineRequirements = () => {
             </Box>
           </Box>
 
-            <Box
+          <Box
             sx={{
               display: "flex",
               alignItems: "flex-start",
@@ -787,7 +799,7 @@ const ApplicantOnlineRequirements = () => {
                     <Typography sx={{ fontSize: 11.5, color: uploaded ? "#2e7d32" : "#999", mt: "1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{uploaded?.original_name || "No file uploaded"}</Typography>
                   </Box>
                   {uploaded ? (
-                    <Button variant="contained" color="primary" href={`${API_BASE_URL}/ApplicantOnlineDocuments/${uploaded.file_path}`} target="_blank" startIcon={<VisibilityIcon />} size="small" sx={{ color: "white", fontWeight: "bold", textTransform: "none", minWidth: { xs: "80px", sm: "140px" } }}>
+                    <Button variant="contained" color="primary" href={`${API_BASE_URL}/api/uploads/preview/${uploaded.upload_id}`} target="_blank" startIcon={<VisibilityIcon />} size="small" sx={{ color: "white", fontWeight: "bold", textTransform: "none", minWidth: { xs: "80px", sm: "140px" } }}>
                       {isMobile ? "View" : "Preview"}
                     </Button>
                   ) : (

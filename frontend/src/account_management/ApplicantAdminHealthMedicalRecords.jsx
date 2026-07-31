@@ -28,7 +28,7 @@ import useAccountAuditMac from "./useAccountAuditMac";
 import DateField from "../components/DateField";
 import { Snackbar, Alert } from "@mui/material";
 
-const SuperAdminApplicantDashboard4 = () => {
+const ApplicantAdminHealthMedicalRecords = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1986,4 +1986,4 @@ const SuperAdminApplicantDashboard4 = () => {
 };
 
 
-export default SuperAdminApplicantDashboard4;
+export default ApplicantAdminHealthMedicalRecords;

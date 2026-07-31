@@ -420,6 +420,12 @@ const StudentSchedule = () => {
       if (!isOdd) marginTop = `calc(${marginTop}rem - 1rem)`;
 
       const fontSize = totalSlots <= 2 ? "9.5px" : isTablet ? "10px" : "11px";
+
+      const professorLabel =
+        entry.prof_firstname === "TBA" && entry.prof_lastname === "TBA"
+          ? "TBA"
+          : `Prof. ${entry.prof_firstname || ""} ${entry.prof_lastname || ""}`.trim();
+
       return (
         <span style={{ position: "relative", display: "inline-block", textAlign: "center", width: "100%", fontSize, marginTop }}>
           <div style={{ width: "100%", padding: "0 2px" }}>
@@ -430,7 +436,7 @@ const StudentSchedule = () => {
               {entry.room_description === "TBA" ? "TBA" : entry.room_description}
             </span>
             <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: totalSlots <= 2 ? "8px" : "9.5px" }}>
-              {entry.prof_lastname === "TBA" ? "TBA" : `Prof. ${entry.prof_lastname}`}
+              {professorLabel}
             </span>
           </div>
         </span>
@@ -472,7 +478,9 @@ const StudentSchedule = () => {
           📍 {entry.room_description}
         </Typography>
         <Typography sx={{ fontSize: 11, color: "#555" }}>
-          👤 {entry.prof_lastname === "TBA" ? "TBA" : `Prof. ${entry.prof_lastname}`}
+          👤 {entry.prof_firstname === "TBA" && entry.prof_lastname === "TBA"
+            ? "TBA"
+            : `Prof. ${entry.prof_firstname || ""} ${entry.prof_lastname || ""}`.trim()}
         </Typography>
         <Typography sx={{ fontSize: 11, color: "#555" }}>
           📚 {entry.program_code} {entry.section_description}
@@ -540,9 +548,9 @@ const StudentSchedule = () => {
                   row.course_unit == null ? "" : toWholeUnit(row.course_unit),
                   `${row.program_code} ${row.section_description}`,
                   `${row.day_description}, ${row.school_time_start} - ${row.school_time_end} ${row.room_description}`,
-                  !row.prof_lastname || row.prof_lastname === "TBA"
+                  row.prof_firstname === "TBA" && row.prof_lastname === "TBA"
                     ? "TBA"
-                    : `Prof. ${row.prof_lastname}`,
+                    : `Prof. ${row.prof_firstname || ""} ${row.prof_lastname || ""}`.trim(),
                 ].map((cell, ci) => (
                   <TableCell key={ci} sx={{ fontSize: { sm: "0.7rem", md: "0.75rem" }, border: `1px solid ${borderColor}` }}>
                     {cell}

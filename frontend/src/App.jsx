@@ -49,7 +49,7 @@ const UploadApplicants = lazy(() => import("./account_management/UploadApplicant
 const ApplicationSuperAdmin = lazy(() => import("./account_management/ApplicationProcessSuperAdmin"));
 const Archived = lazy(() => import("./account_management/ArchivedModule"));
 const MigrationDataPanel = lazy(() => import("./account_management/MigrationDataPanel"));
-const PageCRUD = lazy(() => import("./account_management/PageCRUD"));
+const PageManagement = lazy(() => import("./account_management/PageManagement"));
 const RegisterProf = lazy(() => import("./account_management/RegisterProf"));
 const RegisterRegistrar = lazy(() => import("./account_management/RegisterRegistrar"));
 const RegisterStudent = lazy(() => import("./account_management/RegisterStudent"));
@@ -914,7 +914,7 @@ function App() {
                       <Route path="/registrar_exam_permit" element={<ProtectedRoute><RegistrarExamPermit /></ProtectedRoute>} />
                       <Route path="/examination_permit_change_course" element={<ProtectedRoute><ExaminationPermitChangeCourse /></ProtectedRoute>} />
                       <Route path="/registrar_examination_profile/:personId" element={<ApplicantProfile />} />
-                      <Route path="/page_crud" element={<ProtectedRoute><PageCRUD /></ProtectedRoute>} />
+                      <Route path="/page_crud" element={<ProtectedRoute><PageManagement /></ProtectedRoute>} />
                       <Route path="/report_of_grades" element={<ProtectedRoute><ReportOfGrade /></ProtectedRoute>} />
                       <Route path="/user_page_access" element={<ProtectedRoute><UserPageAccess /></ProtectedRoute>} />
                       <Route path="/student_scholarship_list" element={<ProtectedRoute><StudentScholarshipList /></ProtectedRoute>} />

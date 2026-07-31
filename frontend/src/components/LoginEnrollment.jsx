@@ -120,6 +120,7 @@ const TotpLoginModal = ({
       setStep("loading_qr");
       axios
         .post(`${API_BASE_URL}/api/login-totp-setup`, {
+          loginSetupId: loginData.loginSetupId,
           email: loginData.email,
           source: loginData.source || "user",
         })
@@ -175,6 +176,7 @@ const TotpLoginModal = ({
 
     try {
       const verifyRes = await axios.post(`${API_BASE_URL}/api/verify-login-totp`, {
+        loginSetupId: loginData.loginSetupId,
         email: loginData.email,
         token: totpToken,
         isSetup: isSetupFlow,

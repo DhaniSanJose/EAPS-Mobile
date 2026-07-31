@@ -27,7 +27,7 @@ import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
 
-const SuperAdminApplicantDashboard2 = () => {
+const ApplicantAdminFamilyBackground = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -2529,4 +2529,4 @@ const SuperAdminApplicantDashboard2 = () => {
 };
 
 
-export default SuperAdminApplicantDashboard2;
+export default ApplicantAdminFamilyBackground;

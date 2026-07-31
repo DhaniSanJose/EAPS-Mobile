@@ -65,7 +65,7 @@ import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
-const SuperAdminApplicantDashboard1 = () => {
+const ApplicantAdminPersonalInformation = () => {
   useAccountAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -4653,4 +4653,4 @@ const SuperAdminApplicantDashboard1 = () => {
   );
 };
 
-export default SuperAdminApplicantDashboard1;
+export default ApplicantAdminPersonalInformation;

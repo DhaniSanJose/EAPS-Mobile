@@ -1010,8 +1010,6 @@ router.post("/login", async (req, res) => {
 
   try {
     // ── UNION ALL: check user_accounts (students/registrar) + prof_table ──
-    // Both tables carry totp_secret and totp_enabled.
-    // totp_enabled = 0 → skip TOTP gate entirely, log in directly.
     const query = `
     (
       SELECT ua.id AS account_id, ua.person_id, ua.email, ua.password,
@@ -1160,8 +1158,6 @@ router.post("/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    // Shared payload — sent back in both TOTP branches so the frontend
-    // has everything it needs when completeLogin() is called after verify.
     const loginPayload = {
       success: true,
       token,
@@ -1174,16 +1170,9 @@ router.post("/login", async (req, res) => {
       curriculum_id: registrarFields.curriculum_id,
       accessList,
       force_password_change: user.force_password_change === 1,
-      // Tells /verify-login-totp which table to read/write the secret from
       source: user.source,
     };
 
-    // ── TOTP gate ──────────────────────────────────────────────────────────
-    //
-    //   totp_enabled = 0  → user turned off TOTP in settings → log in directly
-    //   totp_enabled = 1 and totp_secret IS NULL  → first login ever → QR setup
-    //   totp_enabled = 1 and totp_secret NOT NULL → returning user → enter code
-    //
     delete loginAttempts[loginKey]; // creds were correct regardless of TOTP path
     const successOutcome = failureCount >= 2 ? "SUCCESS_AFTER_FAILURES" : "SUCCESS";
 
@@ -1206,6 +1195,27 @@ router.post("/login", async (req, res) => {
 
     // ── TOTP enabled — first-ever login, no secret yet → prompt QR setup ──
     if (!user.totp_secret) {
+      // Invalidate any earlier pending login-setup attempts for this email —
+      // a stale QR from an abandoned attempt should never remain usable
+      // once a fresh one is issued (same reasoning as registration).
+      Object.keys(otpStore).forEach((key) => {
+        if (otpStore[key]?.email === user.email && otpStore[key]?.loginSetup) {
+          delete otpStore[key];
+        }
+      });
+
+      // Unique per-attempt token — THIS, not the email, is what
+      // /login-totp-setup and /verify-login-totp will key off of. It's
+      // only ever generated here, right after a real password check.
+      const loginSetupId = crypto.randomUUID();
+      otpStore[loginSetupId] = {
+        email: user.email,
+        source: user.source,
+        loginSetup: true,
+        totpSecret: null, // filled in by /login-totp-setup
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      };
+
       await insertLoginAuditLog({
         actorId,
         role: user.role,
@@ -1217,6 +1227,7 @@ router.post("/login", async (req, res) => {
         ...loginPayload,
         requireTotpSetup: true,
         requireTotp: false,
+        loginSetupId, // frontend must store this and send it back
         message: "Please set up Google Authenticator to complete login.",
       });
     }
@@ -1246,12 +1257,39 @@ router.post("/login", async (req, res) => {
 
 router.post("/login-totp-setup", async (req, res) => {
   try {
-    const { email, source } = req.body;
+    const { loginSetupId, email, source } = req.body;
+
+    if (!loginSetupId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing setup reference. Please log in again.",
+      });
+    }
+
+    const stored = otpStore[loginSetupId];
+    const now = Date.now();
+
+    if (!stored || !stored.loginSetup) {
+      return res.status(400).json({
+        success: false,
+        message: "No pending authenticator setup found. Please log in again.",
+      });
+    }
+
+    if (stored.expiresAt < now) {
+      delete otpStore[loginSetupId];
+      return res.status(400).json({
+        success: false,
+        message: "Setup session expired. Please log in again.",
+      });
+    }
+
     const normalizedEmail = email?.trim().toLowerCase();
-    if (!normalizedEmail) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required" });
+    if (normalizedEmail && stored.email.toLowerCase() !== normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Setup reference does not match this account.",
+      });
     }
 
     const [[company]] = await db.query(
@@ -1260,17 +1298,17 @@ router.post("/login-totp-setup", async (req, res) => {
     const issuer = company?.short_term || "School";
 
     const secret = speakeasy.generateSecret({
-      name: `${issuer} Login (${normalizedEmail})`,
+      name: `${issuer} Login (${stored.email})`,
       issuer,
       length: 20,
     });
 
-    // Store temporarily — namespaced to avoid collision with registration store
-    otpStore[`login_setup::${normalizedEmail}`] = {
-      totpSecret: secret.base32,
-      source: source || "user",
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    };
+    // Bind the freshly generated secret to this SAME loginSetupId — don't
+    // create a new key, so the id issued at /login stays the single
+    // source of truth for the whole setup attempt.
+    stored.totpSecret = secret.base32;
+    stored.source = source || stored.source || "user";
+    stored.expiresAt = Date.now() + 10 * 60 * 1000; // refresh the window
 
     const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url, {
       color: { dark: "#000000", light: "#FFFFFF" },
@@ -1294,7 +1332,7 @@ router.post("/login-totp-setup", async (req, res) => {
 
 router.post("/verify-login-totp", async (req, res) => {
   try {
-    const { email, token: totpToken, isSetup, source } = req.body;
+    const { email, token: totpToken, isSetup, source, loginSetupId } = req.body;
     const normalizedEmail = email?.trim().toLowerCase();
     const insertLoginAuditLog = createLoginAuditLogger(req);
 
@@ -1313,9 +1351,16 @@ router.post("/verify-login-totp", async (req, res) => {
     const now = Date.now();
 
     if (isSetup) {
-      // ── First-time setup: verify against the pending secret ──────────────
-      const storeKey = `login_setup::${normalizedEmail}`;
-      const stored = otpStore[storeKey];
+      // ── First-time setup: verify against the pending secret, keyed by
+      //    the unique loginSetupId issued at /login (not by email). ──────
+      if (!loginSetupId) {
+        return res.status(400).json({
+          success: false,
+          message: "Missing setup reference. Please log in again.",
+        });
+      }
+
+      const stored = otpStore[loginSetupId];
 
       if (!stored || !stored.totpSecret) {
         return res.status(400).json({
@@ -1325,11 +1370,20 @@ router.post("/verify-login-totp", async (req, res) => {
         });
       }
       if (stored.expiresAt < now) {
-        delete otpStore[storeKey];
+        delete otpStore[loginSetupId];
         return res.status(400).json({
           success: false,
           message:
             "QR code expired (10 minutes). Please log in again to restart setup.",
+        });
+      }
+
+      // Belt-and-suspenders, same as registration: the code being
+      // verified must belong to the same account this setup was issued for.
+      if (stored.email.toLowerCase() !== normalizedEmail) {
+        return res.status(400).json({
+          success: false,
+          message: "This authenticator code was issued for a different account.",
         });
       }
 
@@ -1362,7 +1416,7 @@ router.post("/verify-login-totp", async (req, res) => {
         );
       }
 
-      delete otpStore[storeKey];
+      delete otpStore[loginSetupId];
 
       await insertLoginAuditLog({
         actorId: normalizedEmail,
@@ -1435,6 +1489,7 @@ router.post("/verify-login-totp", async (req, res) => {
       .json({ success: false, message: "Server error verifying code." });
   }
 });
+
 
 router.post("/login_applicant", async (req, res) => {
   const { email, password } = req.body;

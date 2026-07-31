@@ -346,13 +346,12 @@ router.get("/student_schedule/:id", async (req, res) => {
       ct.lab_unit,
       pgt.program_code,
       st.description AS section_description,
-      IFNULL(pft.lname, 'TBA') AS prof_lastname,
       IFNULL(rdt.description, 'TBA') AS day_description,
       IFNULL(tt.school_time_start, 'TBA') AS school_time_start,
       IFNULL(tt.school_time_end, 'TBA') AS school_time_end,
       IFNULL(rt.room_description, 'TBA') AS room_description,
-      IFNULL(pft.fname, 'TBA') AS fname,
-      IFNULL(pft.lname, 'TBA') AS lname
+      IFNULL(pft.fname, 'TBA') AS prof_firstname,
+      IFNULL(pft.lname, 'TBA') AS prof_lastname
      FROM enrolled_subject AS es
     JOIN student_numbering_table AS snt ON es.student_number = snt.student_number
     JOIN person_table AS pt ON snt.person_id = pt.person_id

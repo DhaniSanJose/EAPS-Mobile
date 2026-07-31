@@ -1,10 +1,8 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
-  Alert,
   Box,
-  Chip,
-  CircularProgress,
+  Typography,
   Paper,
   Table,
   TableBody,
@@ -12,15 +10,15 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Typography,
-  useMediaQuery,
   useTheme,
+  useMediaQuery,
+  Alert,
 } from "@mui/material";
-import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
-import PersonIcon from "@mui/icons-material/Person";
-import SchoolIcon from "@mui/icons-material/School";
 import API_BASE_URL from "../apiConfig";
 import { SettingsContext } from "../App";
+import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 
 const formatDate = (value) => {
   if (!value) return "N/A";
@@ -36,10 +34,14 @@ const formatDate = (value) => {
   });
 };
 
-const formatName = (person = {}) =>
-  [person.last_name, person.first_name, person.middle_name]
-    .filter(Boolean)
-    .join(", ") || "Student";
+const formatName = (person) => {
+  if (!person) return "Student";
+  return (
+    [person.last_name, person.first_name, person.middle_name]
+      .filter(Boolean)
+      .join(", ") || "Student"
+  );
+};
 
 const getEmployeeName = (log = {}) =>
   [log.last_name, log.first_name, log.middle_name]
@@ -49,17 +51,23 @@ const getEmployeeName = (log = {}) =>
 const StudentHistory = () => {
   const settings = useContext(SettingsContext);
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  const titleColor = settings?.title_color || "#000000";
-  const subtitleColor = settings?.subtitle_color || "#555555";
-  const borderColor = settings?.border_color || "#d1d5db";
-  const headerBg = settings?.header_color || "#800000";
+  // Card layout for phones AND small/portrait tablets (< 900px);
+  // scrollable table for larger tablets (landscape) and desktop.
+  const isCardLayout = useMediaQuery(theme.breakpoints.down("md"));
 
   const [student, setStudent] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [titleColor, setTitleColor] = useState("#000");
+  const [borderColor, setBorderColor] = useState("#000");
+
+  useEffect(() => {
+    if (!settings) return;
+    if (settings.title_color) setTitleColor(settings.title_color);
+    if (settings.border_color) setBorderColor(settings.border_color);
+  }, [settings]);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -119,193 +127,178 @@ const StudentHistory = () => {
     [logs],
   );
 
-  if (loading) {
-    return (
-      <Box sx={{ p: 3, display: "flex", alignItems: "center", gap: 1.5 }}>
-        <CircularProgress size={24} />
-        <Typography>Loading student history...</Typography>
-      </Box>
-    );
-  }
+  const headerColor = settings?.header_color || "#990000";
 
   return (
-    <Box
-      sx={{
-        minHeight: { xs: "100vh", md: "calc(100vh - 150px)" },
-        overflowY: { md: "auto" },
-        backgroundColor: { xs: "#f5f5f5", md: "transparent" },
-        mt: { md: 1 },
-        p: { xs: 1.5, sm: 2, md: 3 },
-      }}
-    >
-      <Box sx={{ mb: 2.5 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-          <HistoryEduIcon sx={{ color: headerBg, fontSize: { xs: 25, md: 30 } }} />
-          <Typography
-            variant="h4"
-            sx={{
-              color: titleColor,
-              fontWeight: 700,
-              fontSize: { xs: 24, sm: 28, md: 36 },
-            }}
-          >
-            My History
+    <Box sx={{ minHeight: "calc(100vh - 150px)", overflowY: "auto", backgroundColor: "transparent", mt: 1, p: { xs: 1, sm: 2 } }}>
+
+      {/* ── Header ── */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", mb: 2 }}>
+        <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "18px", sm: "24px", md: "30px", lg: "36px" } }}>
+         STUDENT HISTORY LOGS
+        </Typography>
+      </Box>
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+      <br />
+
+      <Paper sx={{ mt: 3, p: { xs: 1.25, sm: 2, md: 3 }, border: `1px solid ${borderColor}`, minHeight: "75vh", backgroundColor: "white" }}>
+
+        {/* ── Announcement ── */}
+        <Box sx={{ textAlign: "center", mb: 4 }}>
+          <Typography sx={{ fontSize: { xs: "14px", sm: "18px", md: "22px", lg: "24px" }, textDecoration: "underline" }}>
+            Announcement :
+          </Typography>
+          <Typography sx={{ fontSize: { xs: "12.5px", sm: "16px", md: "20px", lg: "22px" }, mt: 1, px: { xs: 1, sm: 0 } }}>
+            This page shows a record of actions taken on your student account.
+            If you notice anything unfamiliar, please report it to the REGISTRAR'S OFFICE.
           </Typography>
         </Box>
-        <Typography sx={{ color: subtitleColor, fontSize: { xs: 13, sm: 14 } }}>
-          Student history logs recorded for your account.
-        </Typography>
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Paper
-        elevation={0}
-        sx={{
-          border: `1px solid ${borderColor}`,
-          borderRadius: "8px",
-          mb: 2,
-          p: { xs: 1.5, sm: 2 },
-        }}
-      >
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: { xs: "100%", sm: 240 } }}>
-            <PersonIcon sx={{ color: headerBg }} />
-            <Box>
-              <Typography sx={{ color: subtitleColor, fontSize: 12, textTransform: "uppercase" }}>
-                Student
-              </Typography>
-              <Typography sx={{ color: titleColor, fontWeight: 700, fontSize: { xs: 14, sm: 15 } }}>
-                {formatName(student)}
-              </Typography>
-            </Box>
+        {/* ── Student Info ── */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", mb: 2, px: { xs: 0, sm: 2 }, gap: { xs: 0.5, sm: 1 } }}>
+          <Box sx={{ display: "flex", gap: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: "bold", fontSize: { xs: 12.5, sm: 15 }, whiteSpace: "nowrap" }}>Student Name :</Typography>
+            <Typography sx={{ fontSize: { xs: 12.5, sm: 15 }, wordBreak: "break-word" }}>
+              {formatName(student)}
+            </Typography>
           </Box>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: { xs: "100%", sm: 220 } }}>
-            <SchoolIcon sx={{ color: headerBg }} />
-            <Box>
-              <Typography sx={{ color: subtitleColor, fontSize: 12, textTransform: "uppercase" }}>
-                Student Number
-              </Typography>
-              <Typography sx={{ color: titleColor, fontWeight: 700, fontSize: { xs: 14, sm: 15 } }}>
-                {student?.student_number || "N/A"}
-              </Typography>
-            </Box>
+          <Box sx={{ display: "flex", gap: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: "bold", fontSize: { xs: 12.5, sm: 15 }, whiteSpace: "nowrap" }}>Student No. :</Typography>
+            <Typography sx={{ fontSize: { xs: 12.5, sm: 15 } }}>{student?.student_number || "N/A"}</Typography>
           </Box>
-
-          {student?.current_curriculum && (
-            <Box sx={{ minWidth: { xs: "100%", sm: 260 }, flex: 1 }}>
-              <Typography sx={{ color: subtitleColor, fontSize: 12, textTransform: "uppercase" }}>
-                Current Curriculum
-              </Typography>
-              <Typography sx={{ color: titleColor, fontWeight: 600, fontSize: { xs: 13, sm: 14 } }}>
-                {student.current_curriculum}
-              </Typography>
-            </Box>
-          )}
         </Box>
-      </Paper>
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-        <Typography sx={{ color: titleColor, fontWeight: 700, fontSize: { xs: 16, sm: 18 } }}>
-          History Logs
-        </Typography>
-        <Chip
-          label={`${sortedLogs.length} ${sortedLogs.length === 1 ? "record" : "records"}`}
-          size="small"
-          sx={{
-            backgroundColor: "#f3f4f6",
-            border: `1px solid ${borderColor}`,
-            color: titleColor,
-            fontWeight: 600,
-          }}
-        />
-      </Box>
+        {error && (
+          <Alert
+            severity="error"
+            sx={{
+              borderRadius: 2,
+              mb: 3,
+              mx: { xs: 0, sm: 2 },
+            }}
+          >
+            {error}
+          </Alert>
+        )}
 
-      {!sortedLogs.length ? (
-        <Paper
-          elevation={0}
-          sx={{
-            border: `1px solid ${borderColor}`,
-            borderRadius: "8px",
-            p: 3,
-            textAlign: "center",
-          }}
-        >
-          <Typography sx={{ color: subtitleColor }}>No history logs found.</Typography>
-        </Paper>
-      ) : isMobile ? (
-        <Box>
-          {sortedLogs.map((log) => (
-            <Paper
-              key={log.id}
-              elevation={0}
-              sx={{
-                border: `1px solid ${borderColor}`,
-                borderRadius: "8px",
-                p: 1.5,
-                mb: 1.25,
-                backgroundColor: "#ffffff",
-              }}
-            >
-              <Typography sx={{ color: titleColor, fontWeight: 700, fontSize: 13, mb: 0.75 }}>
-                {formatDate(log.created_at)}
-              </Typography>
-              <Typography sx={{ color: "#111827", fontSize: 13, lineHeight: 1.5, mb: 1 }}>
-                {log.message || "No message provided."}
-              </Typography>
-              <Typography sx={{ color: subtitleColor, fontSize: 12 }}>
-                Recorded by: {getEmployeeName(log)}
-              </Typography>
-            </Paper>
-          ))}
-        </Box>
-      ) : (
-        <TableContainer
-          component={Paper}
-          elevation={0}
-          sx={{
-            border: `1px solid ${borderColor}`,
-            borderRadius: "8px",
-            maxHeight: "calc(100vh - 360px)",
-          }}
-        >
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ backgroundColor: headerBg, color: "#fff", fontWeight: 700, width: 220 }}>
-                  Date/Time
-                </TableCell>
-                <TableCell sx={{ backgroundColor: headerBg, color: "#fff", fontWeight: 700 }}>
-                  Message
-                </TableCell>
-                <TableCell sx={{ backgroundColor: headerBg, color: "#fff", fontWeight: 700, width: 220 }}>
-                  Recorded By
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sortedLogs.map((log, index) => (
-                <TableRow key={log.id} sx={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "#f9fafb" }}>
-                  <TableCell sx={{ borderColor, fontSize: 13 }}>
-                    {formatDate(log.created_at)}
-                  </TableCell>
-                  <TableCell sx={{ borderColor, fontSize: 13, whiteSpace: "pre-line" }}>
+        {loading && (
+          <Box sx={{ textAlign: "center", py: 4 }}>
+            <Typography sx={{ color: "#888", fontSize: 14 }}>Loading history logs...</Typography>
+          </Box>
+        )}
+
+        {/* ── Mobile & small tablet: cards | Larger tablet/Desktop: table ── */}
+        {!loading && !error && (isCardLayout ? (
+          <Box>
+            {sortedLogs.length === 0 ? (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Typography sx={{ color: "#888", fontSize: 14 }}>No history logs found.</Typography>
+              </Box>
+            ) : (
+              sortedLogs.map((log) => (
+                <Box key={log.id} sx={{
+                  border: `1px solid ${borderColor}`,
+                  borderLeft: `5px solid ${headerColor}`,
+                  borderRadius: "8px", p: 1.5, mb: 1.5,
+                  backgroundColor: "#fff",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                }}>
+                  {/* Date/time */}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}>
+                    <AccessTimeIcon sx={{ fontSize: 14, color: "#555" }} />
+                    <Typography sx={{ fontWeight: 700, fontSize: 12.5, color: "#555" }}>
+                      {formatDate(log.created_at)}
+                    </Typography>
+                  </Box>
+
+                  {/* Message */}
+                  <Typography sx={{ fontSize: 13, color: "#111827", lineHeight: 1.5, mb: 0.8 }}>
                     {log.message || "No message provided."}
+                  </Typography>
+
+                  {/* Recorded by */}
+                  <Box sx={{
+                    display: "flex", alignItems: "center", gap: 0.5,
+                    pt: 0.8, borderTop: `1px solid ${borderColor}`,
+                  }}>
+                    <PersonOutlineIcon sx={{ fontSize: 14, color: "#555" }} />
+                    <Typography sx={{ fontSize: 11.5, color: "#555" }}>
+                      Recorded by: {getEmployeeName(log)}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))
+            )}
+
+            {/* Total logs strip */}
+            <Box sx={{
+              display: "flex", justifyContent: "space-between",
+              px: 1.5, py: 1, mt: 1, gap: 1,
+              borderRadius: "8px", backgroundColor: "#fff1f1",
+              border: `1px solid ${borderColor}`,
+              flexWrap: "wrap",
+            }}>
+              <Typography sx={{ fontWeight: "bold", fontSize: { xs: 12.5, sm: 14 } }}>Total Records :</Typography>
+              <Typography sx={{ fontWeight: "bold", color: "red", fontSize: { xs: 12.5, sm: 14 } }}>{sortedLogs.length}</Typography>
+            </Box>
+          </Box>
+        ) : (
+          <TableContainer component={Paper} sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <Table sx={{ minWidth: 720 }}>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: headerColor }}>
+                  {["Date/Time", "Message", "Recorded By"].map((h) => (
+                    <TableCell key={h} sx={{ color: "white", fontWeight: "bold", border: `1px solid ${borderColor}`, textAlign: "center", padding: "6px", whiteSpace: "nowrap" }}>
+                      {h}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  "& .MuiTableRow-root:nth-of-type(odd)": {
+                    backgroundColor: "#ffffff",
+                  },
+                  "& .MuiTableRow-root:nth-of-type(even)": {
+                    backgroundColor: "lightgray",
+                  },
+                }}
+              >
+                {sortedLogs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center" sx={{ border: `1px solid ${borderColor}`, py: 4 }}>
+                      No history logs found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedLogs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, whiteSpace: "nowrap" }}>
+                        {formatDate(log.created_at)}
+                      </TableCell>
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, whiteSpace: "pre-line" }}>
+                        {log.message || "No message provided."}
+                      </TableCell>
+                      <TableCell sx={{ border: `1px solid ${borderColor}` }}>
+                        {getEmployeeName(log)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+                <TableRow>
+                  <TableCell colSpan={2} align="right" sx={{ fontWeight: "bold", border: `1px solid ${borderColor}`, fontSize: "16px" }}>
+                    Total Records :
                   </TableCell>
-                  <TableCell sx={{ borderColor, fontSize: 13 }}>
-                    {getEmployeeName(log)}
+                  <TableCell align="right" sx={{ fontWeight: "bold", color: "red", fontSize: "16px", border: `1px solid ${borderColor}` }}>
+                    {sortedLogs.length}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ))}
+      </Paper>
     </Box>
   );
 };

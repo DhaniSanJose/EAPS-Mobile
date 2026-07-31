@@ -51,7 +51,7 @@ import {
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import SaveIcon from "@mui/icons-material/Save";
 
-const ApplicationProcessAdmin = () => {
+const ApplicantProcessSuperAdmin = () => {
   useAuditMac();
   const socket = useRef(null);
 
@@ -3283,4 +3283,4 @@ const ApplicationProcessAdmin = () => {
   );
 };
 
-export default ApplicationProcessAdmin;
+export default ApplicantProcessSuperAdmin;

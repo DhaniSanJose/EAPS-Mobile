@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.50.39:5173",
+  "http://192.168.1.42:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -4233,6 +4233,44 @@ app.post("/api/requirement-uploads", async (req, res) => {
   }
 });
 
+app.get("/api/uploads/preview/:uploadId", async (req, res) => {
+  const { uploadId } = req.params;
+
+  try {
+    const [[row]] = await db.query(
+      "SELECT file_path FROM requirement_uploads WHERE upload_id = ?",
+      [uploadId]
+    );
+
+    if (!row || !row.file_path) {
+      return res.status(404).json({ error: "File record not found" });
+    }
+
+    const dir = applicantDocsDir; // already defined at the top of server.js
+    let fullPath = path.join(dir, row.file_path);
+
+    if (!fs.existsSync(fullPath)) {
+      // Fallback: DB extension is stale — find the actual file on disk
+      // that shares the same base name regardless of extension.
+      const baseName = path.basename(row.file_path, path.extname(row.file_path));
+      const filesInDir = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+      const match = filesInDir.find(
+        (f) => path.basename(f, path.extname(f)) === baseName
+      );
+
+      if (!match) {
+        return res.status(404).json({ error: "File not found on server" });
+      }
+      fullPath = path.join(dir, match);
+    }
+
+    res.sendFile(fullPath);
+  } catch (err) {
+    console.error("Applicant preview error:", err);
+    res.status(500).json({ error: "Failed to load file" });
+  }
+});
+
 app.put("/api/missing-documents/:person_id", async (req, res) => {
   const { person_id } = req.params;
   let { missing_documents, user_id } = req.body;
@@ -4405,254 +4443,6 @@ registerSocketHandlers({
   upload,
   baseDir: __dirname,
 });
-
-app.post("/api/generate-cor-pdf", async (req, res) => {
-  let browser;
-
-  try {
-    const { html, student_number } = req.body;
-
-    if (!html || typeof html !== "string") {
-      return res.status(400).json({ message: "No HTML received" });
-    }
-
-    console.log("Received HTML length:", html.length);
-
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath:
-        process.env.PUPPETEER_EXECUTABLE_PATH ||
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-
-    const page = await browser.newPage();
-
-    // Set viewport to match exactly 8.5in wide at 96dpi (816px) with extra height
-    await page.setViewport({
-      width: 816,
-      height: 1200,
-      deviceScaleFactor: 2,
-    });
-
-    page.on("console", (msg) => {
-      console.log("PAGE LOG:", msg.text());
-    });
-
-    page.on("pageerror", (err) => {
-      console.log("PAGE ERROR:", err.message);
-    });
-
-    page.on("requestfailed", (request) => {
-      console.log(
-        "REQUEST FAILED:",
-        request.url(),
-        request.failure()?.errorText,
-      );
-    });
-
-    await page.setRequestInterception(true);
-    page.on("request", (request) => {
-      if (request.resourceType() === "media") {
-        request.abort();
-      } else {
-        request.continue();
-      }
-    });
-
-    // Wrap the received HTML fragment with proper page-level styles
-    const wrappedHtml = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    /* ── Reset ── */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #ffffff;
-      font-family: Arial, sans-serif;
-      /* 96 px/in × 8.5 in = 816 px  →  set page width to 8in content = 768px */
-      width: 816px;
-    }
-
-    /* ── Page setup for @print ── */
-    @page {
-      size: A4 portrait;
-      margin: 6mm 10mm 6mm 10mm;
-    }
-
-    @media print {
-      html, body {
-        width: 100%;
-      }
-      button { display: none !important; }
-      .certificate-watermark {
-        color: rgba(0, 0, 0, 0.15) !important;
-      }
-    }
-
-    /* ── Ensure the certificate tables stay at 8in ── */
-    .certificate-wrapper {
-      position: relative;
-      width: 8in;
-      margin: 0 auto;
-      background: #ffffff;
-    }
-
-    .certificate-watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-45deg);
-      font-size: 7rem;
-      font-weight: 900;
-      color: rgba(0, 0, 0, 0.08);
-      text-transform: uppercase;
-      white-space: nowrap;
-      pointer-events: none;
-      user-select: none;
-      z-index: 9999;
-    }
-
-    /* ── Table normalization ── */
-    table {
-      border-collapse: collapse;
-    }
-
-    /* ── Input → plain text in PDF ── */
-    input[type="text"],
-    input[readonly] {
-      -webkit-appearance: none;
-      appearance: none;
-      border: none !important;
-      outline: none !important;
-      background: transparent !important;
-      box-shadow: none !important;
-      padding: 0;
-    }
-
-    /* ── Keep background colors when printing ── */
-    [style*="background-color"],
-    [style*="backgroundColor"] {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-
-    /* ── Gray header rows ── */
-    td[style*="background-color: gray"],
-    td[style*="backgroundColor: gray"],
-    td[style*="background: gray"] {
-      background-color: #808080 !important;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-
-    /* ── Hide MUI Container padding that pushes layout ── */
-    .MuiContainer-root {
-      padding: 0 !important;
-      min-height: unset !important;
-      display: block !important;
-    }
-
-    .flex-container,
-    .section {
-      display: block !important;
-      width: 100% !important;
-    }
-
-    img {
-      max-width: 100%;
-    }
-  </style>
-</head>
-<body>
-  ${html}
-</body>
-</html>
-    `.trim();
-
-    await page.setContent(wrappedHtml, {
-      waitUntil: "networkidle0",
-      timeout: 60000,
-    });
-
-    // Wait for all images to finish loading
-    await page.evaluate(async () => {
-      const images = Array.from(document.images);
-      await Promise.all(
-        images.map((img) => {
-          if (img.complete) return Promise.resolve();
-          return new Promise((resolve) => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        }),
-      );
-    });
-
-    // Let the layout settle after images load
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: false,   // let Puppeteer control the page size
-      scale: 1,                   // no scaling — we sized the viewport correctly
-      margin: {
-        top: "6mm",
-        bottom: "6mm",
-        left: "10mm",
-        right: "10mm",
-      },
-    });
-
-    console.log("PDF buffer size:", pdfBuffer.length);
-
-    if (!pdfBuffer || pdfBuffer.length === 0) {
-      throw new Error("Generated PDF buffer is empty");
-    }
-
-    const { actorId, actorRole } = getEnrollmentAuditActor(req);
-    const roleLabel = formatEnrollmentAuditActorRole(actorRole);
-    await insertAuditLogEnrollment({
-      actorId,
-      role: actorRole,
-      action: "STUDENT_SCHOLARSHIP_COR_EXPORT",
-      severity: "INFO",
-      message: `${roleLabel} (${actorId}) exported Certificate of Registration PDF${student_number ? ` for Student (${student_number})` : ""}.`,
-    });
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=certificate-of-registration-${student_number || "student"}.pdf`,
-    );
-    res.setHeader("Content-Length", pdfBuffer.length);
-
-    return res.end(pdfBuffer);
-  } catch (err) {
-    console.error("PDF ERROR:", err);
-    return res.status(500).json({
-      message: "PDF generation failed",
-      error: err.message,
-      stack: err.stack,
-    });
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
-});
-
 
 app.get("/api/submitted-status/:person_id", async (req, res) => {
   const { person_id } = req.params;

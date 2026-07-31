@@ -40,6 +40,7 @@ import {
     EmojiEvents,
     LockReset
 } from "@mui/icons-material";
+import HistoryIcon from '@mui/icons-material/History';
 
 const GLOBAL_PAGE_IDS = [13, 15, 17, 38, 39, 40, 41, 42, 50, 56, 59, 62, 73, 80, 92, 96, 101, 104, 105, 106, 117];
 const GLOBAL_ACCESS_THRESHOLD = 10;
@@ -73,8 +74,8 @@ function buildStyles(s = {}, hasDept = true, collapsed = false, isMobile = false
 @media (max-width: 767px) {
   .sb-root {
     width: 290px !important;
-    height: 100dvh !important;
     height: 100vh !important;
+    height: 100dvh !important;
     top: 0 !important;
     bottom: 0 !important;
     left: 0 !important;
@@ -1175,7 +1176,7 @@ const SideBar = ({
                                     <NavItem to="/student_personal_information" icon={PersonIcon} label="Student Profile" active={/^\/student_dashboard[1-5]$/.test(loc)} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_online_requirements" icon={FolderCopy} label="Student Online Requirements" active={isActive("/student_online_requirements")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <NavItem to="/student_account_balance" icon={PaymentIcon} label="Student Account Balance" active={isActive("/student_account_balance")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_history" icon={HistoryEdu} label="My History" active={isActive("/student_history")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
+                                    <NavItem to="/student_history" icon={HistoryIcon} label="History Logs" active={isActive("/student_history")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                     <div className="sb-section-label">Setting</div>
                                     <NavItem to="/student_reset_password" icon={Settings} label="Change Password" active={isActive("/student_reset_password")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
                                 </>

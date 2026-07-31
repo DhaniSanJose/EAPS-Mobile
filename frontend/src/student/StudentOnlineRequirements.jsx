@@ -248,11 +248,10 @@ const StudentOnlineRequirements = () => {
               fontSize: { xs: 12, sm: 13 },
               fontWeight: "bold",
               mb: 1.5,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              wordBreak: "break-all",
+              overflowWrap: "break-word",
+              whiteSpace: "normal",
             }}
-            title={selectedFiles[doc.id]}
           >
             📎 {selectedFiles[doc.id]}
           </Box>
@@ -274,7 +273,19 @@ const StudentOnlineRequirements = () => {
             startIcon={<CloudUploadIcon />}
             size="small"
             disabled={allRequirementsCompleted}
-            sx={{ backgroundColor: "#F0C03F", color: "white", fontWeight: "bold", textTransform: "none", flex: "1 1 auto", minWidth: "120px" }}
+            sx={{
+              backgroundColor: "#F0C03F",
+              color: "white",
+              fontWeight: "bold",
+              textTransform: "none",
+              flex: "1 1 auto",
+              minWidth: "120px",
+              "&.Mui-disabled": {
+                backgroundColor: "#F0C03F",
+                color: "white",
+                opacity: 0.6,
+              },
+            }}
           >
             Browse File
             <input
@@ -290,7 +301,7 @@ const StudentOnlineRequirements = () => {
             <Button
               variant="contained"
               color="primary"
-              href={`${API_BASE_URL}/StudentOnlineDocuments/${uploaded.file_path}`}
+              href={`${API_BASE_URL}/api/student-upload/preview/${uploaded.upload_id}`}
               target="_blank"
               startIcon={<VisibilityIcon />}
               size="small"
@@ -306,7 +317,19 @@ const StudentOnlineRequirements = () => {
               startIcon={<DeleteIcon />}
               size="small"
               disabled={allRequirementsCompleted}
-              sx={{ backgroundColor: "#9E0000", color: "white", fontWeight: "bold", textTransform: "none", flex: "1 1 auto", minWidth: "100px" }}
+              sx={{
+                backgroundColor: "#9E0000",
+                color: "white",
+                fontWeight: "bold",
+                textTransform: "none",
+                flex: "1 1 auto",
+                minWidth: "100px",
+                "&.Mui-disabled": {
+                  backgroundColor: "#9E0000",
+                  color: "white",
+                  opacity: 0.6,
+                },
+              }}
             >
               Delete
             </Button>
@@ -332,8 +355,20 @@ const StudentOnlineRequirements = () => {
             <Box sx={{ width: { md: 160, lg: 220 }, flexShrink: 0, textAlign: "center" }}>
               {selectedFiles[doc.id] ? (
                 <Box
-                  sx={{ backgroundColor: "#e0e0e0", padding: "6px 12px", borderRadius: "4px", fontSize: { md: 12.5, lg: 14 }, fontWeight: "bold", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                  title={selectedFiles[doc.id]}
+                  sx={{
+                    backgroundColor: "#e0e0e0",
+                    padding: "6px 12px",
+                    borderRadius: "4px",
+                    fontSize: { md: 12.5, lg: 14 },
+                    fontWeight: "bold",
+                    minHeight: "40px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    wordBreak: "break-all",
+                    overflowWrap: "break-word",
+                    whiteSpace: "normal",
+                  }}
                 >
                   {selectedFiles[doc.id]}
                 </Box>
@@ -347,7 +382,20 @@ const StudentOnlineRequirements = () => {
                 component="label"
                 startIcon={<CloudUploadIcon />}
                 disabled={allRequirementsCompleted}
-                sx={{ backgroundColor: "#F0C03F", color: "white", fontWeight: "bold", height: "40px", textTransform: "none", minWidth: { md: 120, lg: 140 }, fontSize: { md: 12.5, lg: 14 } }}
+                sx={{
+                  backgroundColor: "#F0C03F",
+                  color: "white",
+                  fontWeight: "bold",
+                  height: "40px",
+                  textTransform: "none",
+                  minWidth: { md: 120, lg: 140 },
+                  fontSize: { md: 12.5, lg: 14 },
+                  "&.Mui-disabled": {
+                    backgroundColor: "#F0C03F",
+                    color: "white",
+                    opacity: 0.6,
+                  },
+                }}
               >
                 Browse File
                 <input
@@ -378,7 +426,7 @@ const StudentOnlineRequirements = () => {
             <Button
               variant="contained"
               color="primary"
-              href={`${API_BASE_URL}/StudentOnlineDocuments/${uploaded.file_path}`}
+              href={`${API_BASE_URL}/api/student-upload/preview/${uploaded.upload_id}`}
               target="_blank"
               startIcon={<VisibilityIcon />}
               sx={{ color: "white", fontWeight: "bold", height: "40px", textTransform: "none", minWidth: { md: 120, lg: 140 }, fontSize: { md: 12.5, lg: 14 } }}
@@ -394,7 +442,20 @@ const StudentOnlineRequirements = () => {
               onClick={() => handleDelete(uploaded.upload_id)}
               startIcon={<DeleteIcon />}
               disabled={allRequirementsCompleted}
-              sx={{ backgroundColor: "#9E0000", color: "white", fontWeight: "bold", height: "40px", textTransform: "none", minWidth: { md: 120, lg: 140 }, fontSize: { md: 12.5, lg: 14 } }}
+              sx={{
+                backgroundColor: "#9E0000",
+                color: "white",
+                fontWeight: "bold",
+                height: "40px",
+                textTransform: "none",
+                minWidth: { md: 120, lg: 140 },
+                fontSize: { md: 12.5, lg: 14 },
+                "&.Mui-disabled": {
+                  backgroundColor: "#9E0000",
+                  color: "white",
+                  opacity: 0.6,
+                },
+              }}
             >
               Delete
             </Button>
@@ -457,7 +518,7 @@ const StudentOnlineRequirements = () => {
                     <Typography sx={{ fontSize: 11.5, color: uploaded ? "#2e7d32" : "#999", mt: "1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{uploaded?.original_name || "No file uploaded"}</Typography>
                   </Box>
                   {uploaded ? (
-                    <Button variant="contained" color="primary" href={`${API_BASE_URL}/StudentOnlineDocuments/${uploaded.file_path}`} target="_blank" startIcon={<VisibilityIcon />} size="small" sx={{ color: "white", fontWeight: "bold", textTransform: "none", minWidth: { xs: "80px", sm: "140px" } }}>
+                    <Button variant="contained" color="primary" href={`${API_BASE_URL}/uploads/StudentOnlineDocuments/${uploaded.file_path}`} target="_blank" startIcon={<VisibilityIcon />} size="small" sx={{ color: "white", fontWeight: "bold", textTransform: "none", minWidth: { xs: "80px", sm: "140px" } }}>
                       {isMobile ? "View" : "Preview"}
                     </Button>
                   ) : (
@@ -541,9 +602,28 @@ const StudentOnlineRequirements = () => {
                 {category === "Medical" ? "MEDICAL REQUIREMENTS" : category === "Others" ? "OTHER REQUIREMENTS" : "MAIN REQUIREMENTS"}
               </Typography>
               {category !== "Medical" && category !== "Others" && (
-                <Typography sx={{ textAlign: "center", fontSize: { xs: 13, sm: 15, md: 17 }, mt: 1.25, mb: { xs: 2, sm: 3.5 }, color: "#333" }}>
-                  Complete the student form to secure your place for the upcoming academic year at{" "}
-                  {shortTerm ? <><strong>{shortTerm.toUpperCase()}</strong> <br />{companyName || ""}</> : companyName || ""}.
+                <Typography
+                  sx={{
+                    textAlign: "center",
+                    fontSize: { xs: 13, sm: 15, md: 17 },
+                    mt: 1.25,
+                    mb: { xs: 2, sm: 3.5 },
+                    color: "#333",
+                  }}
+                >
+                  Please upload your required documents for the upcoming academic year at{" "}
+                  {shortTerm ? (
+                    <>
+                      <strong>{shortTerm.toUpperCase()}</strong>
+                      <br />
+                      {companyName || ""}
+                    </>
+                  ) : (
+                    companyName || ""
+                  )}
+                  .
+                  <br />
+                  <strong>All required documents must be uploaded again</strong> to keep your records complete and up to date.
                 </Typography>
               )}
             </Container>

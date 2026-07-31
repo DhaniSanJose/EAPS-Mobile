@@ -42,7 +42,7 @@ const Transition = React.forwardRef(function Transition(props, ref) {
     return <Slide direction="up" ref={ref} {...props} />;
 });
 
-const PageCRUD = () => {
+const PageManagement = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -635,4 +635,4 @@ const PageCRUD = () => {
     );
 };
 
-export default PageCRUD;
+export default PageManagement;

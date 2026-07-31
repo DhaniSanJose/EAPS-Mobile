@@ -47,7 +47,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import CloseIcon from "@mui/icons-material/Close";
 import FormalExample from "../assets/formalexample.png";
 
-const SuperAdminRequirementsUploader = () => {
+const ApplicantOnlineRequirementsAdmin = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const navigate = useNavigate();
@@ -2137,4 +2137,4 @@ const SuperAdminRequirementsUploader = () => {
   );
 };
 
-export default SuperAdminRequirementsUploader;
+export default ApplicantOnlineRequirementsAdmin;

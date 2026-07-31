@@ -637,7 +637,6 @@ router.post("/generate-personal-data-form-pdf", async (req, res) => {
   }
 });
 
-
 // ─── 4. ECAT Application Form ───────────────────────────────────────────────
 router.post("/generate-ecat-form-pdf", async (req, res) => {
   let browser;
@@ -778,6 +777,7 @@ router.post("/generate-ecat-form-pdf", async (req, res) => {
     if (browser) await browser.close();
   }
 });
+
 // ─── 5. Admission Services (Client Satisfaction Measurement form) ─────────
 router.post("/generate-admission-services-pdf", async (req, res) => {
   let browser;
@@ -1065,8 +1065,6 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
   }
 });
 
-
-// ─────────────────────────────────────────────────────────────────────────
 // ADD THESE TWO ROUTES to your existing router file (the one with
 // /generate-admission-form-pdf, /generate-exam-permit-pdf, etc).
 // Paste them in above `module.exports = router;`.
@@ -1470,7 +1468,6 @@ router.post("/generate-applicant-list-pdf", async (req, res) => {
   }
 });
 
-
 router.post("/generate-schedule-applicant-list-pdf", async (req, res) => {
   let browser;
 
@@ -1863,8 +1860,6 @@ router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
   }
 });
 
-// ─── 9. Student List (College Enrollment) ──────────────────────────────────
-// ─── 9. Student List (College Enrollment) ──────────────────────────────────
 router.post("/generate-student-list-pdf", async (req, res) => {
   let browser;
 
@@ -2059,7 +2054,6 @@ router.post("/generate-student-list-pdf", async (req, res) => {
     if (browser) await browser.close();
   }
 });
-
 
 router.post("/generate-report-of-grades-pdf", async (req, res) => {
   let browser;
@@ -3694,6 +3688,253 @@ router.post("/generate-student-schedule-pdf", async (req, res) => {
     });
   } finally {
     if (browser) await browser.close();
+  }
+});
+
+router.post("/generate-cor-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, student_number } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    console.log("Received HTML length:", html.length);
+
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath:
+        process.env.PUPPETEER_EXECUTABLE_PATH ||
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+
+    // Set viewport to match exactly 8.5in wide at 96dpi (816px) with extra height
+    await page.setViewport({
+      width: 816,
+      height: 1200,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => {
+      console.log("PAGE LOG:", msg.text());
+    });
+
+    page.on("pageerror", (err) => {
+      console.log("PAGE ERROR:", err.message);
+    });
+
+    page.on("requestfailed", (request) => {
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      );
+    });
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Wrap the received HTML fragment with proper page-level styles
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      /* 96 px/in × 8.5 in = 816 px  →  set page width to 8in content = 768px */
+      width: 816px;
+    }
+
+    /* ── Page setup for @print ── */
+    @page {
+      size: A4 portrait;
+      margin: 6mm 10mm 6mm 10mm;
+    }
+
+    @media print {
+      html, body {
+        width: 100%;
+      }
+      button { display: none !important; }
+      .certificate-watermark {
+        color: rgba(0, 0, 0, 0.15) !important;
+      }
+    }
+
+    /* ── Ensure the certificate tables stay at 8in ── */
+    .certificate-wrapper {
+      position: relative;
+      width: 8in;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+
+    .certificate-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 7rem;
+      font-weight: 900;
+      color: rgba(0, 0, 0, 0.08);
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      z-index: 9999;
+    }
+
+    /* ── Table normalization ── */
+    table {
+      border-collapse: collapse;
+    }
+
+    /* ── Input → plain text in PDF ── */
+    input[type="text"],
+    input[readonly] {
+      -webkit-appearance: none;
+      appearance: none;
+      border: none !important;
+      outline: none !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      padding: 0;
+    }
+
+    /* ── Keep background colors when printing ── */
+    [style*="background-color"],
+    [style*="backgroundColor"] {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* ── Gray header rows ── */
+    td[style*="background-color: gray"],
+    td[style*="backgroundColor: gray"],
+    td[style*="background: gray"] {
+      background-color: #808080 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* ── Hide MUI Container padding that pushes layout ── */
+    .MuiContainer-root {
+      padding: 0 !important;
+      min-height: unset !important;
+      display: block !important;
+    }
+
+    .flex-container,
+    .section {
+      display: block !important;
+      width: 100% !important;
+    }
+
+    img {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  ${html}
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    // Wait for all images to finish loading
+    await page.evaluate(async () => {
+      const images = Array.from(document.images);
+      await Promise.all(
+        images.map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        }),
+      );
+    });
+
+    // Let the layout settle after images load
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: false,   // let Puppeteer control the page size
+      scale: 1,                   // no scaling — we sized the viewport correctly
+      margin: {
+        top: "6mm",
+        bottom: "6mm",
+        left: "10mm",
+        right: "10mm",
+      },
+    });
+
+    console.log("PDF buffer size:", pdfBuffer.length);
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const { actorId, actorRole } = getEnrollmentAuditActor(req);
+    const roleLabel = formatEnrollmentAuditActorRole(actorRole);
+    await insertAuditLogEnrollment({
+      actorId,
+      role: actorRole,
+      action: "STUDENT_SCHOLARSHIP_COR_EXPORT",
+      severity: "INFO",
+      message: `${roleLabel} (${actorId}) exported Certificate of Registration PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=certificate-of-registration-${student_number || "student"}.pdf`,
+    );
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
 });
 
