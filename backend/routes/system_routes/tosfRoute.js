@@ -89,6 +89,22 @@ const normalizeFeeRatePayload = (body) => {
   };
 };
 
+const normalizeScholarshipFeePayload = (body) => {
+  const rawDiscountType = normalizeTinyInt(body.discount_type, 0);
+  const discountType = [0, 1, 2].includes(rawDiscountType) ? rawDiscountType : 0;
+
+  return {
+    scholarshipId: normalizeNullableInt(body.scholarship_id),
+    feeRateId: normalizeNullableInt(body.fee_rate_id),
+    discountType,
+    discountValue: discountType === 0 ? null : normalizeNullableInt(body.discount_value),
+    yearLevelId: normalizeNullableInt(body.year_level_id) ?? 0,
+    schoolYearId: normalizeNullableInt(body.school_year_id),
+    semesterId: normalizeNullableInt(body.semester_id),
+    status: normalizeTinyInt(body.status, 1) === 1 ? 1 : 0,
+  };
+};
+
 const findDuplicateFeeRate = async (conn, payload, excludeFeeRateId = null) => {
   const params = [
     payload.feeId,
@@ -244,9 +260,9 @@ router.delete("/delete_scholarship_type/:id", CanDelete, async (req, res) => {
   }
 });
 
-// ================== SCHOLARSHIP RULES (PHASE 1 - no fee mapping yet) ==================
+// ================== SCHOLARSHIP FEES ==================
 
-router.get("/tosf/scholarship-rule-options", async (req, res) => {
+router.get("/tosf/scholarship-fee-options", async (req, res) => {
   try {
     const [yearLevels] = await db3.query(`
       SELECT year_level_id, year_level_description, level_type
@@ -256,9 +272,31 @@ router.get("/tosf/scholarship-rule-options", async (req, res) => {
     `);
 
     const [schoolYears] = await db3.query(`
-      SELECT id, year_id, semester_id, astatus
-      FROM active_school_year_table
-      ORDER BY id DESC
+      SELECT DISTINCT
+        year_id,
+        year_description,
+        year_description AS current_year,
+        year_description + 1 AS next_year
+      FROM year_table
+      ORDER BY current_year ASC
+    `);
+
+    const [activeSchoolYears] = await db3.query(`
+      SELECT
+        asyt.id AS active_school_year_id,
+        asyt.year_id,
+        asyt.semester_id,
+        asyt.astatus,
+        yt.year_description,
+        yt.year_description AS current_year,
+        yt.year_description + 1 AS next_year,
+        sem.semester_description
+      FROM active_school_year_table AS asyt
+      INNER JOIN year_table AS yt ON yt.year_id = asyt.year_id
+      INNER JOIN semester_table AS sem ON sem.semester_id = asyt.semester_id
+      WHERE asyt.astatus = 1
+      ORDER BY asyt.id DESC
+      LIMIT 1
     `);
 
     const [years] = await db3.query(`
@@ -273,14 +311,14 @@ router.get("/tosf/scholarship-rule-options", async (req, res) => {
       ORDER BY semester_id ASC
     `);
 
-    res.json({ yearLevels, schoolYears, years, semesters });
+    res.json({ yearLevels, schoolYears, activeSchoolYear: activeSchoolYears[0] || null, years, semesters });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error while fetching scholarship rule options" });
+    res.status(500).json({ message: "Server error while fetching scholarship fee options" });
   }
 });
 
-router.get("/tosf/scholarship-rules", async (req, res) => {
+router.get("/tosf/scholarship-fees", async (req, res) => {
   try {
     const scholarshipId = req.query?.scholarship_id;
     if (!scholarshipId) {
@@ -289,158 +327,171 @@ router.get("/tosf/scholarship-rules", async (req, res) => {
 
     const [rows] = await db3.query(
       `SELECT
-        sr.*,
-        st.scholarship_name
-       FROM scholarship_rule sr
-       INNER JOIN scholarship_type st ON st.id = sr.scholarship_id
-       WHERE sr.scholarship_id = ?
-       ORDER BY sr.id DESC`,
+        sf.*,
+        st.scholarship_name,
+        fc.fee_code,
+        fc.fee_name,
+        fr.amount,
+        ylt.year_level_description,
+        sf.school_year_id AS year_id,
+        yt.year_description,
+        yt.year_description AS current_year,
+        yt.year_description + 1 AS next_year,
+        sem.semester_description
+       FROM scholarship_fees sf
+       INNER JOIN scholarship_type st ON st.id = sf.scholarship_id
+       INNER JOIN fee_rate fr ON fr.fee_rate_id = sf.fee_rate_id
+       INNER JOIN fee_catalog fc ON fc.fee_id = fr.fee_id
+       LEFT JOIN year_level_table ylt ON ylt.year_level_id = sf.year_level_id
+       LEFT JOIN year_table yt ON yt.year_id = sf.school_year_id
+       LEFT JOIN semester_table sem ON sem.semester_id = sf.semester_id
+       WHERE sf.scholarship_id = ?
+       ORDER BY sf.id DESC`,
       [scholarshipId]
     );
     res.json(rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error while fetching scholarship rules" });
+    res.status(500).json({ message: "Server error while fetching scholarship fees" });
   }
 });
 
-router.post("/tosf/scholarship-rules", CanCreate, async (req, res) => {
-  const {
-    scholarship_id,
-    discount_type,
-    discount_value,
-    year_level_id,
-    school_year_id,
-    semester_id,
-    is_active,
-  } = req.body || {};
+router.post("/tosf/scholarship-fees", CanCreate, async (req, res) => {
+  const payload = normalizeScholarshipFeePayload(req.body || {});
 
-  if (!scholarship_id) {
+  if (!payload.scholarshipId) {
     return res.status(400).json({ message: "scholarship_id is required" });
   }
-  if (!discount_type || !["percent", "fixed_amount"].includes(String(discount_type))) {
-    return res.status(400).json({ message: "discount_type must be percent or fixed_amount" });
+  if (!payload.feeRateId) {
+    return res.status(400).json({ message: "fee_rate_id is required" });
+  }
+  if (!payload.schoolYearId) {
+    return res.status(400).json({ message: "school_year_id is required" });
+  }
+  if (!payload.semesterId) {
+    return res.status(400).json({ message: "semester_id is required" });
   }
 
   try {
     const [result] = await db3.query(
-      `INSERT INTO scholarship_rule
-       (scholarship_id, discount_type, discount_value, year_level_id, school_year_id, semester_id, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO scholarship_fees
+       (scholarship_id, fee_rate_id, discount_type, discount_value, year_level_id, school_year_id, semester_id, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        Number(scholarship_id),
-        String(discount_type),
-        Number(discount_value ?? 0),
-        year_level_id === "" ? null : (year_level_id == null ? null : Number(year_level_id)),
-        school_year_id === "" ? null : (school_year_id == null ? null : Number(school_year_id)),
-        semester_id === "" ? null : (semester_id == null ? null : Number(semester_id)),
-        Number(is_active ?? 1) ? 1 : 0,
+        payload.scholarshipId,
+        payload.feeRateId,
+        payload.discountType,
+        payload.discountValue,
+        payload.yearLevelId,
+        payload.schoolYearId,
+        payload.semesterId,
+        payload.status,
       ]
     );
 
     const { actorId, roleLabel } = getActorLabel(req);
     await insertTosfAuditLog({
       req,
-      action: "SCHOLARSHIP_RULE_CREATE",
-      message: `${roleLabel} (${actorId}) created scholarship rule ${result.insertId} for scholarship_id ${scholarship_id}.`,
+      action: "SCHOLARSHIP_FEE_CREATE",
+      message: `${roleLabel} (${actorId}) created scholarship fee ${result.insertId} for scholarship_id ${payload.scholarshipId}.`,
     });
 
-    res.json({ success: true, id: result.insertId, message: "Scholarship rule created successfully" });
+    res.json({ success: true, id: result.insertId, message: "Scholarship fee created successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error while creating scholarship rule" });
+    res.status(500).json({ message: "Server error while creating scholarship fee" });
   }
 });
 
-router.put("/tosf/scholarship-rules/:id", CanEdit, async (req, res) => {
+router.put("/tosf/scholarship-fees/:id", CanEdit, async (req, res) => {
   const { id } = req.params;
-  const {
-    scholarship_id,
-    discount_type,
-    discount_value,
-    year_level_id,
-    school_year_id,
-    semester_id,
-    is_active,
-  } = req.body || {};
+  const payload = normalizeScholarshipFeePayload(req.body || {});
 
-  if (!scholarship_id) {
+  if (!payload.scholarshipId) {
     return res.status(400).json({ message: "scholarship_id is required" });
   }
-  if (!discount_type || !["percent", "fixed_amount"].includes(String(discount_type))) {
-    return res.status(400).json({ message: "discount_type must be percent or fixed_amount" });
+  if (!payload.feeRateId) {
+    return res.status(400).json({ message: "fee_rate_id is required" });
+  }
+  if (!payload.schoolYearId) {
+    return res.status(400).json({ message: "school_year_id is required" });
+  }
+  if (!payload.semesterId) {
+    return res.status(400).json({ message: "semester_id is required" });
   }
 
   try {
     const [result] = await db3.query(
-      `UPDATE scholarship_rule
+      `UPDATE scholarship_fees
        SET scholarship_id = ?,
+           fee_rate_id = ?,
            discount_type = ?,
            discount_value = ?,
            year_level_id = ?,
            school_year_id = ?,
            semester_id = ?,
-           is_active = ?
+           status = ?
        WHERE id = ?`,
       [
-        Number(scholarship_id),
-        String(discount_type),
-        Number(discount_value ?? 0),
-        year_level_id === "" ? null : (year_level_id == null ? null : Number(year_level_id)),
-        school_year_id === "" ? null : (school_year_id == null ? null : Number(school_year_id)),
-        semester_id === "" ? null : (semester_id == null ? null : Number(semester_id)),
-        Number(is_active ?? 1) ? 1 : 0,
+        payload.scholarshipId,
+        payload.feeRateId,
+        payload.discountType,
+        payload.discountValue,
+        payload.yearLevelId,
+        payload.schoolYearId,
+        payload.semesterId,
+        payload.status,
         Number(id),
       ]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Scholarship rule not found" });
+      return res.status(404).json({ message: "Scholarship fee not found" });
     }
 
     const { actorId, roleLabel } = getActorLabel(req);
     await insertTosfAuditLog({
       req,
-      action: "SCHOLARSHIP_RULE_UPDATE",
-      message: `${roleLabel} (${actorId}) updated scholarship rule ${id}.`,
+      action: "SCHOLARSHIP_FEE_UPDATE",
+      message: `${roleLabel} (${actorId}) updated scholarship fee ${id}.`,
     });
 
-    res.json({ success: true, message: "Scholarship rule updated successfully" });
+    res.json({ success: true, message: "Scholarship fee updated successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error while updating scholarship rule" });
+    res.status(500).json({ message: "Server error while updating scholarship fee" });
   }
 });
 
-router.delete("/tosf/scholarship-rules/:id", CanDelete, async (req, res) => {
+router.delete("/tosf/scholarship-fees/:id", CanDelete, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [[rule]] = await db3.query(
-      `SELECT id, scholarship_id FROM scholarship_rule WHERE id = ? LIMIT 1`,
+    const [[scholarshipFee]] = await db3.query(
+      `SELECT id, scholarship_id FROM scholarship_fees WHERE id = ? LIMIT 1`,
       [id]
     );
 
     const [result] = await db3.query(
-      `DELETE FROM scholarship_rule WHERE id = ?`,
+      `DELETE FROM scholarship_fees WHERE id = ?`,
       [id]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Scholarship rule not found" });
+      return res.status(404).json({ message: "Scholarship fee not found" });
     }
 
     const { actorId, roleLabel } = getActorLabel(req);
     await insertTosfAuditLog({
       req,
-      action: "SCHOLARSHIP_RULE_DELETE",
-      message: `${roleLabel} (${actorId}) deleted scholarship rule ${id} (scholarship_id ${rule?.scholarship_id ?? "unknown"}).`,
+      action: "SCHOLARSHIP_FEE_DELETE",
+      message: `${roleLabel} (${actorId}) deleted scholarship fee ${id} (scholarship_id ${scholarshipFee?.scholarship_id ?? "unknown"}).`,
     });
 
-    res.json({ success: true, message: "Scholarship rule deleted successfully" });
+    res.json({ success: true, message: "Scholarship fee deleted successfully" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error while deleting scholarship rule" });
+    res.status(500).json({ message: "Server error while deleting scholarship fee" });
   }
 });
 

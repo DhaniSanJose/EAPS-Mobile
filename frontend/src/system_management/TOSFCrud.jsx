@@ -332,6 +332,7 @@ const TOSF = () => {
   const [scholarshipRuleOptions, setScholarshipRuleOptions] = useState({
     yearLevels: [],
     schoolYears: [],
+    activeSchoolYear: null,
     years: [],
     semesters: [],
   });
@@ -341,6 +342,7 @@ const TOSF = () => {
   const [scholarshipRuleForm, setScholarshipRuleForm] = useState({
     scholarship_id: "",
     fee_rate_id: "",
+    discount_type: 0,
     discount_value: "",
     year_level_id: 0,
     school_year_id: "",
@@ -367,16 +369,26 @@ const TOSF = () => {
 
   const fetchScholarshipRuleOptions = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-rule-options`);
+      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fee-options`);
+      const schoolYears = Array.isArray(res.data?.schoolYears) ? res.data.schoolYears : [];
+      const semesters = Array.isArray(res.data?.semesters) ? res.data.semesters : [];
+      const activeSchoolYear = res.data?.activeSchoolYear || null;
+
       setScholarshipRuleOptions({
         yearLevels: Array.isArray(res.data?.yearLevels) ? res.data.yearLevels : [],
-        schoolYears: Array.isArray(res.data?.schoolYears) ? res.data.schoolYears : [],
+        schoolYears,
+        activeSchoolYear,
         years: Array.isArray(res.data?.years) ? res.data.years : [],
-        semesters: Array.isArray(res.data?.semesters) ? res.data.semesters : [],
+        semesters,
       });
+      setScholarshipRuleForm((prev) => ({
+        ...prev,
+        school_year_id: prev.school_year_id || (activeSchoolYear?.year_id == null ? "" : String(activeSchoolYear.year_id)),
+        semester_id: prev.semester_id || (activeSchoolYear?.semester_id == null ? "" : String(activeSchoolYear.semester_id)),
+      }));
     } catch (error) {
-      console.error("Error fetching scholarship rule options:", error);
-      showSnackbar("Error fetching scholarship rule options", "error");
+      console.error("Error fetching scholarship fee options:", error);
+      showSnackbar("Error fetching scholarship fee options", "error");
     }
   };
 
@@ -390,13 +402,13 @@ const TOSF = () => {
       return;
     }
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-rules`, {
+      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fees`, {
         params: { scholarship_id: scholarshipId },
       });
       setScholarshipRules(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
-      console.error("Error fetching scholarship rules:", error);
-      showSnackbar("Error fetching scholarship rules", "error");
+      console.error("Error fetching scholarship fees:", error);
+      showSnackbar("Error fetching scholarship fees", "error");
     }
   };
 
@@ -1173,13 +1185,16 @@ const TOSF = () => {
   };
 
   const resetScholarshipRuleForm = () => {
+    const activeSchoolYear = scholarshipRuleOptions.activeSchoolYear;
+
     setScholarshipRuleForm({
       scholarship_id: selectedScholarshipForRules || "",
       fee_rate_id: "",
+      discount_type: 0,
       discount_value: "",
       year_level_id: 0,
-      school_year_id: "",
-      semester_id: "",
+      school_year_id: activeSchoolYear?.year_id == null ? "" : String(activeSchoolYear.year_id),
+      semester_id: activeSchoolYear?.semester_id == null ? "" : String(activeSchoolYear.semester_id),
       status: 1,
     });
     setEditingScholarshipRuleId(null);
@@ -1187,6 +1202,15 @@ const TOSF = () => {
 
   const handleScholarshipRuleChange = (e) => {
     const { name, value } = e.target;
+    if (name === "discount_type") {
+      const nextDiscountType = Number(value);
+      setScholarshipRuleForm((prev) => ({
+        ...prev,
+        discount_type: nextDiscountType,
+        discount_value: nextDiscountType === 0 ? "" : prev.discount_value,
+      }));
+      return;
+    }
     if (["year_level_id", "status"].includes(name)) {
       setScholarshipRuleForm((prev) => ({ ...prev, [name]: Number(value) }));
       return;
@@ -1208,7 +1232,8 @@ const TOSF = () => {
       const payload = {
         scholarship_id: Number(scholarshipRuleForm.scholarship_id || selectedScholarshipForRules),
         fee_rate_id: Number(scholarshipRuleForm.fee_rate_id),
-        discount_value: scholarshipRuleForm.discount_value === ""
+        discount_type: Number(scholarshipRuleForm.discount_type),
+        discount_value: Number(scholarshipRuleForm.discount_type) === 0 || scholarshipRuleForm.discount_value === ""
           ? null
           : Number(scholarshipRuleForm.discount_value),
         year_level_id: Number(scholarshipRuleForm.year_level_id || 0),
@@ -1219,25 +1244,25 @@ const TOSF = () => {
 
       if (editingScholarshipRuleId) {
         await axios.put(
-          `${API_BASE_URL}/api/tosf/scholarship-rules/${editingScholarshipRuleId}`,
+          `${API_BASE_URL}/api/tosf/scholarship-fees/${editingScholarshipRuleId}`,
           payload,
           permissionHeaders,
         );
-        showSnackbar("Scholarship rule updated successfully!");
+        showSnackbar("Scholarship fee updated successfully!");
       } else {
         await axios.post(
-          `${API_BASE_URL}/api/tosf/scholarship-rules`,
+          `${API_BASE_URL}/api/tosf/scholarship-fees`,
           payload,
           permissionHeaders,
         );
-        showSnackbar("Scholarship rule added successfully!");
+        showSnackbar("Scholarship fee added successfully!");
       }
 
       resetScholarshipRuleForm();
       fetchScholarshipRules(selectedScholarshipForRules);
     } catch (error) {
-      console.error("Error saving scholarship rule:", error);
-      showSnackbar(error.response?.data?.message || "Error saving scholarship rule", "error");
+      console.error("Error saving scholarship fee:", error);
+      showSnackbar(error.response?.data?.message || "Error saving scholarship fee", "error");
     }
   };
 
@@ -1259,7 +1284,8 @@ const TOSF = () => {
     setScholarshipRuleForm({
       scholarship_id: String(rule.scholarship_id ?? selectedScholarshipForRules ?? ""),
       fee_rate_id: String(rule.fee_rate_id ?? ""),
-      discount_value: String(rule.discount_value ?? ""),
+      discount_type: Number(rule.discount_type ?? 0),
+      discount_value: Number(rule.discount_type ?? 0) === 0 ? "" : String(rule.discount_value ?? ""),
       year_level_id: Number(rule.year_level_id ?? 0),
       school_year_id: rule.school_year_id == null ? "" : String(rule.school_year_id),
       semester_id: rule.semester_id == null ? "" : String(rule.semester_id),
@@ -1280,14 +1306,14 @@ const TOSF = () => {
     if (!selectedScholarshipRuleId) return;
     try {
       await axios.delete(
-        `${API_BASE_URL}/api/tosf/scholarship-rules/${selectedScholarshipRuleId}`,
+        `${API_BASE_URL}/api/tosf/scholarship-fees/${selectedScholarshipRuleId}`,
         permissionHeaders,
       );
-      showSnackbar("Scholarship rule deleted successfully!");
+      showSnackbar("Scholarship fee deleted successfully!");
       fetchScholarshipRules(selectedScholarshipForRules);
     } catch (error) {
-      console.error("Error deleting scholarship rule:", error);
-      showSnackbar(error.response?.data?.message || "Error deleting scholarship rule", "error");
+      console.error("Error deleting scholarship fee:", error);
+      showSnackbar(error.response?.data?.message || "Error deleting scholarship fee", "error");
     } finally {
       setScholarshipRuleDeleteDialogOpen(false);
       setSelectedScholarshipRuleId(null);
@@ -1381,12 +1407,35 @@ const TOSF = () => {
       : scholarshipRuleOptions.yearLevels.find((level) => String(level.year_level_id) === String(value))
         ?.year_level_description || value || "-";
   const getScholarshipSchoolYearLabel = (value) => {
-    const schoolYear = scholarshipRuleOptions.schoolYears.find((item) => String(item.id) === String(value));
-    return schoolYear?.school_year || schoolYear?.school_year_description || schoolYear?.year_description || value || "-";
+    const schoolYear = scholarshipRuleOptions.schoolYears.find((item) => String(item.year_id) === String(value));
+    return formatScholarshipAcademicYear(schoolYear) || value || "-";
   };
   const getScholarshipSemesterLabel = (value) =>
     scholarshipRuleOptions.semesters.find((item) => String(item.semester_id) === String(value))
       ?.semester_description || value || "-";
+  const getScholarshipDiscountTypeLabel = (value) => {
+    const labels = {
+      0: "Full Discount",
+      1: "Percentage",
+      2: "Number",
+    };
+    return labels[Number(value)] || "Full Discount";
+  };
+  const formatScholarshipAcademicYear = (year) => {
+    if (!year) return "";
+    if (typeof year === "object") {
+      if (year.current_year != null && year.next_year != null) {
+        return `${year.current_year} - ${year.next_year}`;
+      }
+      return formatScholarshipAcademicYear(year.year_description);
+    }
+    if (typeof year === "string" && year.includes("-")) return year;
+
+    const startYear = Number(year);
+    if (Number.isNaN(startYear)) return "";
+
+    return `${startYear} - ${startYear + 1}`;
+  };
 
   const headerColor = settings?.header_color || "#1976d2";
 
@@ -1717,7 +1766,7 @@ const TOSF = () => {
           </Card>
 
           <Card sx={cardSx(borderColor)}>
-            <SectionHeading icon={<RuleIcon />} title="Scholarship Rules" subtitle="Assign scholarship discounts to fee rates by year level, school year, and semester." accentColor={headerColor} />
+            <SectionHeading icon={<RuleIcon />} title="Scholarship Fees" subtitle="Assign scholarship discounts to fee rates by year level, school year, and semester." accentColor={headerColor} />
 
             <Box
               sx={{
@@ -1761,7 +1810,7 @@ const TOSF = () => {
 
             <form onSubmit={handleScholarshipRuleSubmit}>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={5}>
+                <Grid item xs={12} md={4}>
                   <Typography sx={fieldLabelSx}>FEE RATE</Typography>
                   <TextField select SelectProps={{ native: true }} name="fee_rate_id" value={scholarshipRuleForm.fee_rate_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
                     <option value="">Select Fee Rate</option>
@@ -1773,8 +1822,27 @@ const TOSF = () => {
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
+                  <Typography sx={fieldLabelSx}>DISCOUNT TYPE</Typography>
+                  <TextField select SelectProps={{ native: true }} name="discount_type" value={scholarshipRuleForm.discount_type} onChange={handleScholarshipRuleChange} size="small" fullWidth>
+                    <option value={0}>Full Discount</option>
+                    <option value={1}>Percentage</option>
+                    <option value={2}>Number</option>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
                   <Typography sx={fieldLabelSx}>DISCOUNT VALUE</Typography>
-                  <TextField name="discount_value" type="number" value={scholarshipRuleForm.discount_value} onChange={handleScholarshipRuleChange} size="small" fullWidth inputProps={{ inputMode: "numeric", pattern: "[0-9]*", step: 1, min: 0 }} />
+                  <TextField
+                    name="discount_value"
+                    type="number"
+                    value={scholarshipRuleForm.discount_value}
+                    onChange={handleScholarshipRuleChange}
+                    size="small"
+                    fullWidth
+                    disabled={Number(scholarshipRuleForm.discount_type) === 0}
+                    required={Number(scholarshipRuleForm.discount_type) !== 0}
+                    placeholder={Number(scholarshipRuleForm.discount_type) === 0 ? "Full discount" : ""}
+                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", step: 1, min: 0 }}
+                  />
                 </Grid>
                 <Grid item xs={12} sm={6} md={2}>
                   <Typography sx={fieldLabelSx}>STATUS</Typography>
@@ -1797,8 +1865,8 @@ const TOSF = () => {
                   <TextField select SelectProps={{ native: true }} name="school_year_id" value={scholarshipRuleForm.school_year_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
                     <option value="">Select School Year</option>
                     {scholarshipRuleOptions.schoolYears.map((sy) => (
-                      <option key={sy.id} value={sy.id}>
-                        {sy.school_year || sy.school_year_description || sy.year_description || sy.id}
+                      <option key={sy.year_id} value={sy.year_id}>
+                        {formatScholarshipAcademicYear(sy) || sy.year_id}
                       </option>
                     ))}
                   </TextField>
@@ -1817,7 +1885,7 @@ const TOSF = () => {
               <Box sx={{ mt: 2, textAlign: "right" }}>
                 {(showCreateActions || (editingScholarshipRuleId && canEdit)) && (
                   <Button type="submit" variant="contained" sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor }}>
-                    {editingScholarshipRuleId ? "Update Rule" : (<><SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save</>)}
+                    {editingScholarshipRuleId ? "Update Fee" : (<><SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save</>)}
                   </Button>
                 )}
                 {editingScholarshipRuleId && (
@@ -1831,16 +1899,17 @@ const TOSF = () => {
             <Divider sx={{ my: 3 }} />
 
             <CleanTable
-              headers={["ID", "Fee Rate", "Discount Value", "Year Level", "School Year", "Semester", "Status", "Actions"]}
+              headers={["ID", "Fee Rate", "Discount Type", "Discount Value", "Year Level", "School Year", "Semester", "Status", "Actions"]}
               showActionColumn={showActionColumn}
               headerColor={headerColor}
-              emptyMessage={selectedScholarshipForRules ? "No rules found." : "Select a scholarship to manage rules."}
-              colSpanOverride={showActionColumn ? 8 : 7}
+              emptyMessage={selectedScholarshipForRules ? "No scholarship fees found." : "Select a scholarship to manage fees."}
+              colSpanOverride={showActionColumn ? 9 : 8}
             >
               {selectedScholarshipForRules && scholarshipRules.map((rule) => (
                 <TableRow key={rule.id}>
                   <TableCell>{rule.id}</TableCell>
                   <TableCell>{getScholarshipFeeRateLabel(rule)}</TableCell>
+                  <TableCell>{getScholarshipDiscountTypeLabel(rule.discount_type)}</TableCell>
                   <TableCell>{rule.discount_value == null ? "-" : Number(rule.discount_value || 0).toLocaleString()}</TableCell>
                   <TableCell>{getScholarshipYearLevelLabel(rule.year_level_id)}</TableCell>
                   <TableCell>{getScholarshipSchoolYearLabel(rule.school_year_id)}</TableCell>
@@ -2193,7 +2262,7 @@ const TOSF = () => {
       <Dialog open={scholarshipRuleUpdateDialogOpen} onClose={() => setScholarshipRuleUpdateDialogOpen(false)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Update</DialogTitle>
         <DialogContent>
-          <DialogContentText>Do you want to save the updated scholarship rule?</DialogContentText>
+          <DialogContentText>Do you want to save the updated scholarship fee?</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setScholarshipRuleUpdateDialogOpen(false)} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
@@ -2204,7 +2273,7 @@ const TOSF = () => {
       <Dialog open={scholarshipRuleDeleteDialogOpen} onClose={() => { setScholarshipRuleDeleteDialogOpen(false); setSelectedScholarshipRuleId(null); }}>
         <DialogTitle sx={{ fontWeight: 700 }}>Delete Confirmation</DialogTitle>
         <DialogContent>
-          <DialogContentText>Are you sure you want to delete this scholarship rule? This action cannot be undone.</DialogContentText>
+          <DialogContentText>Are you sure you want to delete this scholarship fee? This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => { setScholarshipRuleDeleteDialogOpen(false); setSelectedScholarshipRuleId(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
