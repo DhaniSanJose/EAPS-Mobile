@@ -340,12 +340,12 @@ const TOSF = () => {
   const [editingScholarshipRuleId, setEditingScholarshipRuleId] = useState(null);
   const [scholarshipRuleForm, setScholarshipRuleForm] = useState({
     scholarship_id: "",
-    discount_type: "percent",
+    fee_rate_id: "",
     discount_value: "",
-    year_level_id: "",
+    year_level_id: 0,
     school_year_id: "",
     semester_id: "",
-    is_active: 1,
+    status: 1,
   });
   const [scholarshipRuleUpdateDialogOpen, setScholarshipRuleUpdateDialogOpen] = useState(false);
   const [scholarshipRuleDeleteDialogOpen, setScholarshipRuleDeleteDialogOpen] = useState(false);
@@ -1175,20 +1175,20 @@ const TOSF = () => {
   const resetScholarshipRuleForm = () => {
     setScholarshipRuleForm({
       scholarship_id: selectedScholarshipForRules || "",
-      discount_type: "percent",
+      fee_rate_id: "",
       discount_value: "",
-      year_level_id: "",
+      year_level_id: 0,
       school_year_id: "",
       semester_id: "",
-      is_active: 1,
+      status: 1,
     });
     setEditingScholarshipRuleId(null);
   };
 
   const handleScholarshipRuleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "is_active") {
-      setScholarshipRuleForm((prev) => ({ ...prev, is_active: Number(value) }));
+    if (["year_level_id", "status"].includes(name)) {
+      setScholarshipRuleForm((prev) => ({ ...prev, [name]: Number(value) }));
       return;
     }
     setScholarshipRuleForm((prev) => ({ ...prev, [name]: value }));
@@ -1206,9 +1206,15 @@ const TOSF = () => {
 
     try {
       const payload = {
-        ...scholarshipRuleForm,
         scholarship_id: Number(scholarshipRuleForm.scholarship_id || selectedScholarshipForRules),
-        discount_value: Number(scholarshipRuleForm.discount_value || 0),
+        fee_rate_id: Number(scholarshipRuleForm.fee_rate_id),
+        discount_value: scholarshipRuleForm.discount_value === ""
+          ? null
+          : Number(scholarshipRuleForm.discount_value),
+        year_level_id: Number(scholarshipRuleForm.year_level_id || 0),
+        school_year_id: Number(scholarshipRuleForm.school_year_id),
+        semester_id: Number(scholarshipRuleForm.semester_id),
+        status: Number(scholarshipRuleForm.status),
       };
 
       if (editingScholarshipRuleId) {
@@ -1252,12 +1258,12 @@ const TOSF = () => {
     setEditingScholarshipRuleId(rule.id);
     setScholarshipRuleForm({
       scholarship_id: String(rule.scholarship_id ?? selectedScholarshipForRules ?? ""),
-      discount_type: String(rule.discount_type || "percent"),
+      fee_rate_id: String(rule.fee_rate_id ?? ""),
       discount_value: String(rule.discount_value ?? ""),
-      year_level_id: rule.year_level_id == null ? "" : String(rule.year_level_id),
+      year_level_id: Number(rule.year_level_id ?? 0),
       school_year_id: rule.school_year_id == null ? "" : String(rule.school_year_id),
       semester_id: rule.semester_id == null ? "" : String(rule.semester_id),
-      is_active: Number(rule.is_active ?? 1),
+      status: Number(rule.status ?? 1),
     });
   };
 
@@ -1362,6 +1368,25 @@ const TOSF = () => {
         ?.year_level_description || "-";
   const getBranchLabel = (value) =>
     branches.find((branch) => String(branch.id) === String(value))?.branch || "All Branches";
+  const getScholarshipFeeRateLabel = (rule) => {
+    const rate = feeRates.find((item) => String(item.fee_rate_id) === String(rule.fee_rate_id));
+    if (rate) {
+      return `${rate.fee_code || ""}${rate.fee_code ? " - " : ""}${rate.fee_name || "Fee"} (${Number(rate.amount || 0).toLocaleString()})`;
+    }
+    return rule.fee_name || rule.fee_code || rule.fee_rate_id || "-";
+  };
+  const getScholarshipYearLevelLabel = (value) =>
+    Number(value) === 0
+      ? "All Year Level"
+      : scholarshipRuleOptions.yearLevels.find((level) => String(level.year_level_id) === String(value))
+        ?.year_level_description || value || "-";
+  const getScholarshipSchoolYearLabel = (value) => {
+    const schoolYear = scholarshipRuleOptions.schoolYears.find((item) => String(item.id) === String(value));
+    return schoolYear?.school_year || schoolYear?.school_year_description || schoolYear?.year_description || value || "-";
+  };
+  const getScholarshipSemesterLabel = (value) =>
+    scholarshipRuleOptions.semesters.find((item) => String(item.semester_id) === String(value))
+      ?.semester_description || value || "-";
 
   const headerColor = settings?.header_color || "#1976d2";
 
@@ -1692,7 +1717,7 @@ const TOSF = () => {
           </Card>
 
           <Card sx={cardSx(borderColor)}>
-            <SectionHeading icon={<RuleIcon />} title="Scholarship Rules" subtitle="Set discount rules per scholarship, scoped by year level, school year, and semester." accentColor={headerColor} />
+            <SectionHeading icon={<RuleIcon />} title="Scholarship Rules" subtitle="Assign scholarship discounts to fee rates by year level, school year, and semester." accentColor={headerColor} />
 
             <Box
               sx={{
@@ -1728,7 +1753,7 @@ const TOSF = () => {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
-                    Choose a scholarship above, then define its discount rule below.
+                    Choose a scholarship above, then assign the fee rate it discounts.
                   </Typography>
                 </Grid>
               </Grid>
@@ -1736,46 +1761,52 @@ const TOSF = () => {
 
             <form onSubmit={handleScholarshipRuleSubmit}>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Typography sx={fieldLabelSx}>DISCOUNT TYPE</Typography>
-                  <TextField select SelectProps={{ native: true }} name="discount_type" value={scholarshipRuleForm.discount_type} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
-                    <option value="percent">Percent</option>
-                    <option value="fixed_amount">Fixed Amount</option>
+                <Grid item xs={12} md={5}>
+                  <Typography sx={fieldLabelSx}>FEE RATE</Typography>
+                  <TextField select SelectProps={{ native: true }} name="fee_rate_id" value={scholarshipRuleForm.fee_rate_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
+                    <option value="">Select Fee Rate</option>
+                    {feeRates.map((rate) => (
+                      <option key={rate.fee_rate_id} value={rate.fee_rate_id}>
+                        {rate.fee_code} - {rate.fee_name} ({Number(rate.amount || 0).toLocaleString()})
+                      </option>
+                    ))}
                   </TextField>
                 </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item xs={12} sm={6} md={3}>
                   <Typography sx={fieldLabelSx}>DISCOUNT VALUE</Typography>
-                  <TextField name="discount_value" value={scholarshipRuleForm.discount_value} onChange={handleScholarshipRuleChange} size="small" fullWidth required />
+                  <TextField name="discount_value" type="number" value={scholarshipRuleForm.discount_value} onChange={handleScholarshipRuleChange} size="small" fullWidth inputProps={{ inputMode: "numeric", pattern: "[0-9]*", step: 1, min: 0 }} />
                 </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                <Grid item xs={12} sm={6} md={2}>
                   <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField select SelectProps={{ native: true }} name="is_active" value={scholarshipRuleForm.is_active} onChange={handleScholarshipRuleChange} size="small" fullWidth>
+                  <TextField select SelectProps={{ native: true }} name="status" value={scholarshipRuleForm.status} onChange={handleScholarshipRuleChange} size="small" fullWidth>
                     <option value={1}>Active</option>
                     <option value={0}>Inactive</option>
                   </TextField>
                 </Grid>
-                <Grid item xs={12} sm={4} md={4}>
+                <Grid item xs={12} sm={6} md={2}>
                   <Typography sx={fieldLabelSx}>YEAR LEVEL</Typography>
                   <TextField select SelectProps={{ native: true }} name="year_level_id" value={scholarshipRuleForm.year_level_id} onChange={handleScholarshipRuleChange} size="small" fullWidth>
-                    <option value="">All</option>
+                    <option value={0}>All</option>
                     {scholarshipRuleOptions.yearLevels.map((yl) => (
                       <option key={yl.year_level_id} value={yl.year_level_id}>{yl.year_level_description}</option>
                     ))}
                   </TextField>
                 </Grid>
-                <Grid item xs={12} sm={4} md={4}>
-                  <Typography sx={fieldLabelSx}>SCHOOL YEAR (ACTIVE ID)</Typography>
-                  <TextField select SelectProps={{ native: true }} name="school_year_id" value={scholarshipRuleForm.school_year_id} onChange={handleScholarshipRuleChange} size="small" fullWidth>
-                    <option value="">All</option>
+                <Grid item xs={12} sm={6} md={6}>
+                  <Typography sx={fieldLabelSx}>SCHOOL YEAR</Typography>
+                  <TextField select SelectProps={{ native: true }} name="school_year_id" value={scholarshipRuleForm.school_year_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
+                    <option value="">Select School Year</option>
                     {scholarshipRuleOptions.schoolYears.map((sy) => (
-                      <option key={sy.id} value={sy.id}>{sy.id}</option>
+                      <option key={sy.id} value={sy.id}>
+                        {sy.school_year || sy.school_year_description || sy.year_description || sy.id}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
-                <Grid item xs={12} sm={4} md={4}>
+                <Grid item xs={12} sm={6} md={6}>
                   <Typography sx={fieldLabelSx}>SEMESTER</Typography>
-                  <TextField select SelectProps={{ native: true }} name="semester_id" value={scholarshipRuleForm.semester_id} onChange={handleScholarshipRuleChange} size="small" fullWidth>
-                    <option value="">All</option>
+                  <TextField select SelectProps={{ native: true }} name="semester_id" value={scholarshipRuleForm.semester_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
+                    <option value="">Select Semester</option>
                     {scholarshipRuleOptions.semesters.map((sem) => (
                       <option key={sem.semester_id} value={sem.semester_id}>{sem.semester_description}</option>
                     ))}
@@ -1800,7 +1831,7 @@ const TOSF = () => {
             <Divider sx={{ my: 3 }} />
 
             <CleanTable
-              headers={["ID", "Type", "Value", "Year Level", "School Year", "Semester", "Status", "Actions"]}
+              headers={["ID", "Fee Rate", "Discount Value", "Year Level", "School Year", "Semester", "Status", "Actions"]}
               showActionColumn={showActionColumn}
               headerColor={headerColor}
               emptyMessage={selectedScholarshipForRules ? "No rules found." : "Select a scholarship to manage rules."}
@@ -1809,12 +1840,12 @@ const TOSF = () => {
               {selectedScholarshipForRules && scholarshipRules.map((rule) => (
                 <TableRow key={rule.id}>
                   <TableCell>{rule.id}</TableCell>
-                  <TableCell>{rule.discount_type}</TableCell>
-                  <TableCell>{rule.discount_value}</TableCell>
-                  <TableCell>{rule.year_level_id || "All"}</TableCell>
-                  <TableCell>{rule.school_year_id || "All"}</TableCell>
-                  <TableCell>{rule.semester_id || "All"}</TableCell>
-                  <TableCell><StatusChip active={Number(rule.is_active) === 1} /></TableCell>
+                  <TableCell>{getScholarshipFeeRateLabel(rule)}</TableCell>
+                  <TableCell>{rule.discount_value == null ? "-" : Number(rule.discount_value || 0).toLocaleString()}</TableCell>
+                  <TableCell>{getScholarshipYearLevelLabel(rule.year_level_id)}</TableCell>
+                  <TableCell>{getScholarshipSchoolYearLabel(rule.school_year_id)}</TableCell>
+                  <TableCell>{getScholarshipSemesterLabel(rule.semester_id)}</TableCell>
+                  <TableCell><StatusChip active={Number(rule.status) === 1} /></TableCell>
                   {showActionColumn && (
                     <TableCell>
                       <RowActions canEdit={canEdit} canDelete={canDelete} onEdit={() => handleScholarshipRuleEdit(rule)} onDelete={() => handleScholarshipRuleDelete(rule.id)} />
