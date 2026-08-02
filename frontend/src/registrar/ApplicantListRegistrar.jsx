@@ -996,28 +996,32 @@ const ApplicantListRegistrar = () => {
     setOpenDialog(false);
   };
 
-  const handleSaveMissingDocs = async () => {
-    try {
-      await axios.put(
-        `${API_BASE_URL}/api/missing-documents/${activePerson.person_id}`,
-        {
-          missing_documents: selected, // this is your array of checked keys
-        },
-      );
+ const handleSaveMissingDocs = async () => {
+  try {
+    await axios.put(
+      `${API_BASE_URL}/api/missing-documents/${activePerson.person_id}`,
+      {
+        missing_documents: selected, // this is your array of checked keys
+      },
+    );
 
-      setSnack({
-        open: true,
-        message: "Missing documents saved!",
-        severity: "success",
-      });
+    const isNowComplete = selected.length === 0;
 
-      fetchApplicants(); // reload table
-      setOpenDialog(false);
-    } catch (err) {
-      console.error("❌ Error saving missing docs:", err);
-      alert("Failed to save missing documents");
-    }
-  };
+    setSnack({
+      open: true,
+      message: isNowComplete
+        ? "✅ Applicant has successfully submitted all main requirements!"
+        : "Missing documents saved!",
+      severity: "success",
+    });
+
+    fetchApplicants(); // reload table
+    handleCloseDialog(); // close modal (also resets activePerson/selected)
+  } catch (err) {
+    console.error("❌ Error saving missing docs:", err);
+    alert("Failed to save missing documents");
+  }
+};
 
   const handleSnackClose = (_, reason) => {
     if (reason === "clickaway") return;
@@ -2738,3 +2742,4 @@ const ApplicantListRegistrar = () => {
 };
 
 export default ApplicantListRegistrar;
+  

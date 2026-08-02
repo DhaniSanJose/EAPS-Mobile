@@ -28,6 +28,7 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Autocomplete
 } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
@@ -64,6 +65,7 @@ import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
+import SaveIcon from '@mui/icons-material/Save';
 
 const ApplicantAdminPersonalInformation = () => {
   useAccountAuditMac();
@@ -156,6 +158,8 @@ const ApplicantAdminPersonalInformation = () => {
     citizenship: "",
     religion: "",
     civilStatus: "",
+    facebook_account: "",
+    spouse: "",
     tribeEthnicGroup: "",
     cellphoneNumber: "",
     emailAddress: "",
@@ -175,6 +179,9 @@ const ApplicantAdminPersonalInformation = () => {
     permanentMunicipality: "",
     permanentDswdHouseholdNumber: "",
   });
+
+  const [programConfirmOpen, setProgramConfirmOpen] = useState(false);
+  const [pendingProgramChange, setPendingProgramChange] = useState(null);
 
   const [originalEmailAddress, setOriginalEmailAddress] = useState("");
   const [emailConfirmOpen, setEmailConfirmOpen] = useState(false);
@@ -231,6 +238,54 @@ const ApplicantAdminPersonalInformation = () => {
     message: "",
     severity: "success",
   });
+
+
+
+  const [programAvailability, setProgramAvailability] = useState([]);
+  const [activeYearId, setActiveYearId] = useState(null);
+  const [activeSemesterId, setActiveSemesterId] = useState(null);
+
+  useEffect(() => {
+    const fetchActiveYearAndAvailability = async () => {
+      const yearRes = await axios.get(`${API_BASE_URL}/api/active_school_year`);
+      const activeYear = yearRes.data[0];
+
+      if (activeYear) {
+        setActiveYearId(activeYear.year_id);
+        setActiveSemesterId(activeYear.semester_id);
+
+        const availRes = await axios.get(
+          `${API_BASE_URL}/api/programs/availability`,
+          {
+            params: {
+              year_id: activeYear.year_id,
+              semester_id: activeYear.semester_id,
+            },
+          }
+        );
+
+        setProgramAvailability(availRes.data);
+      }
+    };
+
+    fetchActiveYearAndAvailability();
+  }, []);
+
+  const availabilityMap = React.useMemo(() => {
+    const map = {};
+    programAvailability.forEach((p) => {
+      map[p.curriculum_id] = {
+        remaining: Number(p.remaining),
+        isFull: Number(p.remaining) <= 0,
+        e_status: Number(p.e_status ?? 0),
+      };
+    });
+    return map;
+  }, [programAvailability]);
+
+
+
+
   const handleCloseSnackbar = () =>
     setSnackbar((prev) => ({ ...prev, open: false }));
 
@@ -1403,27 +1458,101 @@ const ApplicantAdminPersonalInformation = () => {
     fetchCurriculums();
   }, []);
 
-  const filteredCurriculum = curriculumOptions.filter((item) => {
-    // ✅ Hide programs with e_status = 1 (except currently selected choice)
-    const isSelected =
-      String(item.curriculum_id) === String(person.program) ||
-      String(item.curriculum_id) === String(person.program2) ||
-      String(item.curriculum_id) === String(person.program3);
-    if (!isSelected && Number(item.e_status ?? 0) === 1) {
-      return false;
-    }
+  const filteredCurriculum = React.useMemo(() => {
+    const seen = new Map();
 
-    // ✅ CAMPUS FILTER
+    curriculumOptions.forEach((item) => {
+      // ✅ STEP 1 — Campus filter: only show courses offered on the selected campus
+      if (person.campus && Number(item.components) !== Number(person.campus)) return;
 
-    // ✅ ACADEMIC PROGRAM FILTER
-    if (person.academicProgram !== "" && person.academicProgram !== null) {
-      if (Number(item.academic_program) !== Number(person.academicProgram)) {
-        return false;
+      // Skip full/hidden programs (same logic as before)
+      const isSelected =
+        String(item.curriculum_id) === String(person.program) ||
+        String(item.curriculum_id) === String(person.program2) ||
+        String(item.curriculum_id) === String(person.program3);
+      const eStatus =
+        availabilityMap[item.curriculum_id]?.e_status ?? Number(item.e_status ?? 0);
+      if (!isSelected && eStatus === 1) return;
+
+      // ✅ STEP 2 — Academic Program filter
+      if (person.academicProgram !== "" && person.academicProgram !== null) {
+        if (Number(item.academic_program) !== Number(person.academicProgram)) return;
       }
-    }
 
-    return true;
-  });
+      // ✅ STEP 3 — Dedupe by curriculum_id — keep the first occurrence
+      if (!seen.has(item.curriculum_id)) {
+        seen.set(item.curriculum_id, item);
+      }
+    });
+
+    return Array.from(seen.values());
+  }, [
+    curriculumOptions,
+    person.campus,
+    person.program,
+    person.program2,
+    person.program3,
+    person.academicProgram,
+    availabilityMap,
+  ]);
+
+  const getCurriculumDisplayLabel = (curriculumId) => {
+    if (!curriculumId) return "N/A";
+
+    const curriculum = curriculumOptions.find(
+      (item) => String(item.curriculum_id) === String(curriculumId),
+    );
+
+    if (!curriculum) return `Curriculum ${curriculumId}`;
+
+    return `(${curriculum.program_code}): ${curriculum.program_description}${curriculum.major ? ` (${curriculum.major})` : ""
+      } (${getBranchLabel(curriculum.components)})`;
+  };
+
+  const getApplicantDisplayName = () => {
+    const parts = [
+      person?.first_name,
+      person?.middle_name,
+      person?.last_name,
+      person?.extension,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    return parts.join(" ") || "Applicant";
+  };
+
+  const handleProgramChangeRequest = (newValue) => {
+    const nextProgram = newValue ? newValue.curriculum_id : "";
+    const currentProgram = person.program || "";
+
+    if (String(nextProgram || "") === String(currentProgram || "")) return;
+
+    setPendingProgramChange({
+      from: currentProgram,
+      to: nextProgram,
+      fromLabel: getCurriculumDisplayLabel(currentProgram),
+      toLabel: getCurriculumDisplayLabel(nextProgram),
+    });
+    setProgramConfirmOpen(true);
+  };
+
+  const cancelProgramChange = () => {
+    setProgramConfirmOpen(false);
+    setPendingProgramChange(null);
+  };
+
+  const confirmProgramChange = () => {
+    if (!pendingProgramChange) return;
+
+    setPerson((prev) => ({
+      ...prev,
+      program: pendingProgramChange.to,
+    }));
+    setProgramConfirmOpen(false);
+    setPendingProgramChange(null);
+  };
+
 
   const [errors, setErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -1677,7 +1806,7 @@ const ApplicantAdminPersonalInformation = () => {
           audit_print_action: "PRINTING_APPLICANT_DOCS",
           audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
-    
+
         },
         { responseType: "blob" },
       );
@@ -2078,14 +2207,15 @@ const ApplicantAdminPersonalInformation = () => {
         <Button
           variant="contained"
           onClick={handleManualSave}
+          startIcon={<SaveIcon />}
           disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
           sx={{
             position: "absolute",
             right: 16,
-            backgroundColor: mainButtonColor,
+
             textTransform: "none",
             fontWeight: "bold",
-            "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+
           }}
         >
           {saving ? "Saving..." : "Save Changes"}
@@ -2511,136 +2641,183 @@ const ApplicantAdminPersonalInformation = () => {
 
             <Box display="flex" width="100%" gap={2}>
               {/* Left Side: TextFields with label beside each input */}
-              <Box display="flex" flexDirection="column" sx={{ width: "75%" }}>
-                {/* Program Fields */}
-                <Box
-                  display="flex"
-                  flexDirection="column"
-                  sx={{ width: "100%" }}
-                >
-                  {/* Program 1 */}
-                  <Box display="flex" alignItems="center" gap={2} mb={3}>
-                    <label className="w-40 font-medium">Course Applied:</label>
-                    <FormControl
-                      fullWidth
+              <Box display="flex" flexDirection="column" sx={{ width: "100%" }}>
+                {/* Program 1 */}
+                <div className="flex items-center mb-4 gap-2">
+                  <label className="w-42 font-medium">
+                    Course Applied:<span style={{ color: "red" }}> *</span>
+                  </label>
+                  <FormControl
+                    fullWidth
+                    size="small"
+                    required
+                    error={!!errors.program}
+                  >
+                    <Autocomplete
                       size="small"
-                      required
-                      error={!!errors.program}
-                    >
-                      <InputLabel>Course Applied</InputLabel>
-                      <Select
-                        name="program"
-                        value={person.program || ""}
-                        onChange={handleChange}
-                        label="Program"
-                      >
-                        <MenuItem value="">
-                          <em>Select Program</em>
-                        </MenuItem>
-                        {filteredCurriculum.map((item, index) => (
-                          <MenuItem key={index} value={item.curriculum_id}>
-                            {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
-                              } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      {errors.program && (
-                        <FormHelperText>This field is required.</FormHelperText>
-                      )}
-                    </FormControl>
-                  </Box>
+                      disabled={!person.campus || !person.academicProgram}
+                      options={filteredCurriculum}
+                      value={
+                        filteredCurriculum.find(
+                          (item) => String(item.curriculum_id) === String(person.program)
+                        ) || null
+                      }
+                      onChange={(event, newValue) => {
+                        handleProgramChangeRequest(newValue);
+                      }}
+                      getOptionLabel={(item) =>
+                        `(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                        } (${getBranchLabel(item.components)})`
+                      }
+                      isOptionEqualToValue={(option, value) =>
+                        String(option.curriculum_id) === String(value?.curriculum_id)
+                      }
+                      getOptionDisabled={(item) => !!availabilityMap[item.curriculum_id]?.isFull}
+                      renderOption={(props, item) => {
+                        const availability = availabilityMap[item.curriculum_id];
+                        const remaining = availability?.remaining ?? 0;
+                        const isFull = availability?.isFull;
 
-                  {/* <Box display="flex" alignItems="center" gap={2} mb={1}>
-                           <label className="w-40 font-medium">Course Applied:</label>
-                            <FormControl fullWidth size="small" required error={!!errors.program2}>
-                                                                      <InputLabel>Course Applied</InputLabel>
-                                                                      <Select
-                                                                          name="program2"
-                                                                          value={person.program2 || ""} onChange={handleChange}
-                                                                          label="Program 2"
-                                                                      >
-                                                                          <MenuItem value=""><em>Select Program</em></MenuItem>
-                                                                          {filteredCurriculum.map((item, index) => (
-                                                                              <MenuItem key={index} value={item.curriculum_id}>
-                                                                                  {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
-                                                                                      } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
-                                                                              </MenuItem>
-                                                                          ))}
-                          
-                          
-                                                                      </Select>
-                                                                      {errors.program2 && (
-                                                                          <FormHelperText>This field is required.</FormHelperText>
-                                                                      )}
-                                                                  </FormControl>
-                         </Box> */}
-
-                  {/* Program 3 */}
-                  {/* <Box display="flex" alignItems="center" gap={2}>
-                           <label className="w-40 font-medium">Course Applied:</label>
-                          <FormControl fullWidth size="small" required error={!!errors.program3}>
-                                                                    <InputLabel>Course Applied</InputLabel>
-                                                                    <Select
-                                                                        name="program3"
-                                                                        value={person.program3 || ""} onChange={handleChange}
-                                                                        label="Program 3"
-                                                                    >
-                                                                        <MenuItem value=""><em>Select Program</em></MenuItem>
-                                                                        {filteredCurriculum.map((item, index) => (
-                                                                            <MenuItem key={index} value={item.curriculum_id}>
-                                                                                {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
-                                                                                    } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
-                                                                            </MenuItem>
-                                                                        ))}
-                        
-                        
-                                                                    </Select>
-                                                                    {errors.program3 && (
-                                                                        <FormHelperText>This field is required.</FormHelperText>
-                                                                    )}
-                                                                </FormControl>
-                         </Box> */}
-
-                  {/* Year Level */}
-                  <div className="flex items-center mb-4 gap-2">
-                    <label className="w-40 mt:[2] font-medium ">
-                      Year Level:
-                    </label>
-
-                    <FormControl
-                      fullWidth
-                      size="small"
-                      required
-                      error={!!errors.yearLevel}
-                    >
-                      <InputLabel id="year-level-label">Year Level</InputLabel>
-                      <Select
-                        labelId="year-level-label"
-                        id="year-level-select"
-                        name="yearLevel"
-                        value={getYearLevelSelectValue()}
-                        label="Year Level"
-                        onChange={handleChange}
-                      >
-                        <MenuItem value="">
-                          <em>Select Year Level</em>
-                        </MenuItem>
-
-                        {filteredYearLevels.map((yl) => (
-                          <MenuItem
-                            key={yl.year_level_id}
-                            value={String(yl.year_level_id)}
+                        return (
+                          <li
+                            {...props}
+                            key={item.curriculum_id}
+                            style={{
+                              color: isFull ? "red" : "inherit",
+                              fontWeight: isFull ? "bold" : "normal",
+                            }}
                           >
-                            {yl.year_level_description}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      {errors.yearLevel && (
-                        <FormHelperText>This field is required.</FormHelperText>
+                            {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                              } (${getBranchLabel(item.components)})`}
+                            {isFull ? (
+                              <span style={{ marginLeft: 8 }}>— FULL (0 slots left)</span>
+                            ) : (
+                              <span style={{ marginLeft: 8, color: "#2e7d32" }}>
+                                ({remaining} slots left)
+                              </span>
+                            )}
+                          </li>
+                        );
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Course Applied"
+                          placeholder={
+                            !person.campus
+                              ? "Select Campus first"
+                              : !person.academicProgram
+                                ? "Select Academic Program first"
+                                : "Select Program"
+                          }
+                          error={!!errors.program}
+                        />
                       )}
-                    </FormControl>
-                  </div>
-                </Box>
+                    />
+
+                    {errors.program && (
+                      <FormHelperText>This field is required.</FormHelperText>
+                    )}
+                    {person.program && !errors.program && (
+                      <FormHelperText sx={{ color: "red" }}>
+                        Changing the selected curriculum requires confirmation.
+                      </FormHelperText>
+                    )}
+
+
+
+                  </FormControl>
+                </div>
+
+
+                {/* <Box display="flex" alignItems="center" gap={2} mb={1}>
+                                     <label className="w-40 font-medium">Course Applied:</label>
+                                      <FormControl fullWidth size="small" required error={!!errors.program2}>
+                                                                                <InputLabel>Course Applied</InputLabel>
+                                                                                <Select
+                                                                                    name="program2"
+                                                                                    value={person.program2 || ""}
+           onChange={handleChange}
+                                                                                    label="Program 2"
+                                                                                >
+                                                                                    <MenuItem value=""><em>Select Program</em></MenuItem>
+                                                                                    {filteredCurriculum.map((item, index) => (
+                                                                                        <MenuItem key={index} value={item.curriculum_id}>
+                                                                                            {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                                                                                                } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
+                                                                                        </MenuItem>
+                                                                                    ))}
+                                    
+                                    
+                                                                                </Select>
+                                                                                {errors.program2 && (
+                                                                                    <FormHelperText>This field is required.</FormHelperText>
+                                                                                )}
+                                                                            </FormControl>
+                                   </Box> */}
+
+                {/* Program 3 */}
+                {/* <Box display="flex" alignItems="center" gap={2}>
+                                     <label className="w-40 font-medium">Course Applied:</label>
+                                    <FormControl fullWidth size="small" required error={!!errors.program3}>
+                                                                              <InputLabel>Course Applied</InputLabel>
+                                                                              <Select
+                                                                                  name="program3"
+                                                                                  value={person.program3 || ""}
+           onChange={handleChange}
+                                                                                  label="Program 3"
+                                                                              >
+                                                                                  <MenuItem value=""><em>Select Program</em></MenuItem>
+                                                                                  {filteredCurriculum.map((item, index) => (
+                                                                                      <MenuItem key={index} value={item.curriculum_id}>
+                                                                                          {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                                                                                              } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
+                                                                                      </MenuItem>
+                                                                                  ))}
+                                  
+                                  
+                                                                              </Select>
+                                                                              {errors.program3 && (
+                                                                                  <FormHelperText>This field is required.</FormHelperText>
+                                                                              )}
+                                                                          </FormControl>
+                                   </Box> */}
+
+                {/* Year Level */}
+                <div className="flex items-center mb-4 gap-2">
+                  <label className="w-40 mt:[2] font-medium ">Year Level:</label>
+                  <FormControl fullWidth size="small" required error={!!errors.yearLevel}>
+                    <InputLabel id="year-level-label">Year Level</InputLabel>
+
+                    <Select
+                      labelId="year-level-label"
+                      id="year-level-select"
+                      name="yearLevel"
+                      value={getYearLevelSelectValue()}
+                      label="Year Level"
+                      onChange={handleChange}
+
+                    >
+                      <MenuItem value="">
+                        <em>Select Year Level</em>
+                      </MenuItem>
+
+                      {filteredYearLevels.map((yl) => (
+                        <MenuItem
+                          key={yl.year_level_id}
+                          value={String(yl.year_level_id)}
+                        >
+                          {yl.year_level_description}
+                        </MenuItem>
+                      ))}
+                    </Select>
+
+                    {errors.yearLevel && (
+                      <FormHelperText>This field is required.</FormHelperText>
+                    )}
+                  </FormControl>
+
+                </div>
               </Box>
 
               <Box
@@ -4631,6 +4808,67 @@ const ApplicantAdminPersonalInformation = () => {
                 Next Step
               </Button>
             </Box>
+
+            <Dialog
+              open={programConfirmOpen}
+              onClose={cancelProgramChange}
+              maxWidth="sm"
+              fullWidth
+              PaperProps={{
+                sx: {
+                  borderRadius: 3,
+                  overflow: "hidden",
+                  boxShadow: 6,
+                },
+              }}
+            >
+              <DialogTitle
+                sx={{
+                  background: settings?.header_color || mainButtonColor || "#1976d2",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: "1.2rem",
+                  py: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <WarningAmberIcon />
+                Confirm Program Change
+              </DialogTitle>
+
+              <DialogContent sx={{ p: 3, mt: 2 }}>
+                <Typography sx={{ mb: 2 }}>
+                  Do you want to change the program of Applicant{" "}
+                  <strong>{getApplicantDisplayName()}</strong> (
+                  <strong>{person?.applicant_number || "N/A"}</strong>) from{" "}
+                  <strong>{pendingProgramChange?.fromLabel || "N/A"}</strong> into{" "}
+                  <strong>{pendingProgramChange?.toLabel || "N/A"}</strong>?
+                </Typography>
+              </DialogContent>
+
+              <DialogActions
+                sx={{
+                  px: 3,
+                  py: 2,
+                  borderTop: "1px solid #e0e0e0",
+                }}
+              >
+                <Button onClick={cancelProgramChange} color="error" variant="outlined">
+                  Cancel
+                </Button>
+
+                <Button
+                  color="primary"
+                  variant="contained"
+                  onClick={confirmProgramChange}
+                  sx={{ backgroundColor: mainButtonColor }}
+                >
+                  Continue
+                </Button>
+              </DialogActions>
+            </Dialog>
 
             <Snackbar
               open={snackbar.open}

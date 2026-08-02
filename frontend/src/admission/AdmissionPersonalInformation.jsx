@@ -45,7 +45,9 @@ import AdminECATApplicationForm from "./AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
-const AdminDashboard1 = () => {
+import SaveIcon from '@mui/icons-material/Save';
+
+const AdminPersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -1115,6 +1117,9 @@ const AdminDashboard1 = () => {
     const seen = new Map();
 
     curriculumOptions.forEach((item) => {
+      // ✅ STEP 1 — Campus filter: only show courses offered on the selected campus
+      if (person.campus && Number(item.components) !== Number(person.campus)) return;
+
       // Skip full/hidden programs (same logic as before)
       const isSelected =
         String(item.curriculum_id) === String(person.program) ||
@@ -1124,18 +1129,27 @@ const AdminDashboard1 = () => {
         availabilityMap[item.curriculum_id]?.e_status ?? Number(item.e_status ?? 0);
       if (!isSelected && eStatus === 1) return;
 
+      // ✅ STEP 2 — Academic Program filter
       if (person.academicProgram !== "" && person.academicProgram !== null) {
         if (Number(item.academic_program) !== Number(person.academicProgram)) return;
       }
 
-      // ✅ Dedupe by curriculum_id — keep the first occurrence
+      // ✅ STEP 3 — Dedupe by curriculum_id — keep the first occurrence
       if (!seen.has(item.curriculum_id)) {
         seen.set(item.curriculum_id, item);
       }
     });
 
     return Array.from(seen.values());
-  }, [curriculumOptions, person.program, person.program2, person.program3, person.academicProgram, availabilityMap]);
+  }, [
+    curriculumOptions,
+    person.campus,
+    person.program,
+    person.program2,
+    person.program3,
+    person.academicProgram,
+    availabilityMap,
+  ]);
 
   const getCurriculumDisplayLabel = (curriculumId) => {
     if (!curriculumId) return "N/A";
@@ -1146,9 +1160,8 @@ const AdminDashboard1 = () => {
 
     if (!curriculum) return `Curriculum ${curriculumId}`;
 
-    return `(${curriculum.program_code}): ${curriculum.program_description}${
-      curriculum.major ? ` (${curriculum.major})` : ""
-    } (${getBranchLabel(curriculum.components)})`;
+    return `(${curriculum.program_code}): ${curriculum.program_description}${curriculum.major ? ` (${curriculum.major})` : ""
+      } (${getBranchLabel(curriculum.components)})`;
   };
 
   const getApplicantDisplayName = () => {
@@ -1891,13 +1904,14 @@ const AdminDashboard1 = () => {
           variant="contained"
           onClick={handleManualSave}
           disabled={saving || !(person?.person_id || userID)}
+          startIcon={<SaveIcon />}
           sx={{
             position: "absolute",
             right: 16,
-            backgroundColor: mainButtonColor,
+
             textTransform: "none",
             fontWeight: "bold",
-            "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+
           }}
         >
           {saving ? "Saving..." : "Save Changes"}
@@ -2299,8 +2313,10 @@ const AdminDashboard1 = () => {
                 {/* Program Fields */}
                 <Box display="flex" flexDirection="column" sx={{ width: "100%" }}>
                   {/* Program 1 */}
-                  <Box display="flex" alignItems="center" gap={2} mb={3}>
-                    <label className="w-42 font-medium">Course Applied:<span style={{ color: "red" }}> *</span></label>
+                  <div className="flex items-center mb-4 gap-2">
+                    <label className="w-42 font-medium">
+                      Course Applied:<span style={{ color: "red" }}> *</span>
+                    </label>
                     <FormControl
                       fullWidth
                       size="small"
@@ -2308,6 +2324,8 @@ const AdminDashboard1 = () => {
                       error={!!errors.program}
                     >
                       <Autocomplete
+                        size="small"
+                        disabled={!person.campus || !person.academicProgram}
                         options={filteredCurriculum}
                         value={
                           filteredCurriculum.find(
@@ -2355,7 +2373,13 @@ const AdminDashboard1 = () => {
                           <TextField
                             {...params}
                             label="Course Applied"
-                            placeholder="Select Program"
+                            placeholder={
+                              !person.campus
+                                ? "Select Campus first"
+                                : !person.academicProgram
+                                  ? "Select Academic Program first"
+                                  : "Select Program"
+                            }
                             error={!!errors.program}
                           />
                         )}
@@ -2369,9 +2393,11 @@ const AdminDashboard1 = () => {
                           Changing the selected curriculum requires confirmation.
                         </FormHelperText>
                       )}
-                    </FormControl>
-                  </Box>
 
+
+
+                    </FormControl>
+                  </div>
 
 
                   {/* <Box display="flex" alignItems="center" gap={2} mb={1}>
@@ -4341,4 +4367,4 @@ const AdminDashboard1 = () => {
   );
 };
 
-export default AdminDashboard1;
+export default AdminPersonalInformation;

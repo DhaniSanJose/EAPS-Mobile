@@ -284,7 +284,7 @@ const StudentNumbering = () => {
     
 - Please keep your temporary password confidential and change it upon first login.
 - Visit your respective college office to tag your schedule and obtain your class schedule.
-- Bring a valid school ID when claiming any physical documents.`
+`
   );
 
 

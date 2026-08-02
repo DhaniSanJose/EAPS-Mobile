@@ -28,6 +28,7 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Autocomplete
 } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 import PersonIcon from "@mui/icons-material/Person";
@@ -65,8 +66,10 @@ import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
+import SaveIcon from '@mui/icons-material/Save';
+import { createFilterOptions } from "@mui/material/Autocomplete";
 
-const SuperAdminStudentDashboard1 = () => {
+const SuperAdminPersonalInformation = () => {
   useAccountAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -176,6 +179,8 @@ const SuperAdminStudentDashboard1 = () => {
     citizenship: "",
     religion: "",
     civilStatus: "",
+    spouse: "",
+    facebook_account: "",
     tribeEthnicGroup: "",
     cellphoneNumber: "",
     emailAddress: "",
@@ -537,11 +542,10 @@ const SuperAdminStudentDashboard1 = () => {
 
     if (!curriculum) return `Curriculum ${curriculumId}`;
 
-    return `(${curriculum.program_code}): ${curriculum.program_description}${
-      curriculum.major ? ` (${curriculum.major})` : ""
-    } (${curriculum.current_year}-${curriculum.next_year}) (${getBranchLabel(
-      curriculum.components,
-    )})`;
+    return `(${curriculum.program_code}): ${curriculum.program_description}${curriculum.major ? ` (${curriculum.major})` : ""
+      } (${curriculum.current_year}-${curriculum.next_year}) (${getBranchLabel(
+        curriculum.components,
+      )})`;
   };
 
   const getStudentDisplayName = () => {
@@ -557,20 +561,6 @@ const SuperAdminStudentDashboard1 = () => {
     return parts.join(" ") || "Student";
   };
 
-  const handleProgramChangeRequest = (e) => {
-    const nextProgram = e.target.value;
-    const currentProgram = person.program || "";
-
-    if (String(nextProgram || "") === String(currentProgram || "")) return;
-
-    setPendingProgramChange({
-      from: currentProgram,
-      to: nextProgram,
-      fromLabel: getCurriculumDisplayLabel(currentProgram),
-      toLabel: getCurriculumDisplayLabel(nextProgram),
-    });
-    setProgramConfirmOpen(true);
-  };
 
   const cancelProgramChange = () => {
     setProgramConfirmOpen(false);
@@ -962,18 +952,53 @@ const SuperAdminStudentDashboard1 = () => {
     fetchCurriculums();
   }, []);
 
-  const filteredCurriculum = curriculumOptions.filter((item) => {
-    // ✅ CAMPUS FILTER
-
-    // ✅ ACADEMIC PROGRAM FILTER
-    if (person.academicProgram !== "" && person.academicProgram !== null) {
-      if (Number(item.academic_program) !== Number(person.academicProgram)) {
-        return false;
-      }
-    }
-
-    return true;
+  const filterCurriculumOptions = createFilterOptions({
+    stringify: (item) =>
+      `${item.program_code ?? ""} ${item.program_description ?? ""} ${item.major ?? ""}`,
   });
+
+  const filteredCurriculum = React.useMemo(() => {
+    const seen = new Map();
+
+    curriculumOptions.forEach((item) => {
+      // ✅ STEP 1 — Campus filter: only show courses offered on the selected campus
+      if (person.campus && Number(item.components) !== Number(person.campus)) return;
+
+      // ✅ STEP 2 — Academic Program filter
+      if (person.academicProgram !== "" && person.academicProgram !== null) {
+        if (Number(item.academic_program) !== Number(person.academicProgram)) return;
+      }
+
+      // ✅ STEP 3 — Dedupe by curriculum_id — keep the first occurrence
+      if (!seen.has(item.curriculum_id)) {
+        seen.set(item.curriculum_id, item);
+      }
+    });
+
+    return Array.from(seen.values());
+  }, [
+    curriculumOptions,
+    person.campus,
+    person.program,
+    person.program2,
+    person.program3,
+    person.academicProgram,
+  ]);
+
+  const handleProgramChangeRequest = (newValue) => {
+    const nextProgram = newValue ? newValue.curriculum_id : "";
+    const currentProgram = person.program || "";
+
+    if (String(nextProgram || "") === String(currentProgram || "")) return;
+
+    setPendingProgramChange({
+      from: currentProgram,
+      to: nextProgram,
+      fromLabel: getCurriculumDisplayLabel(currentProgram),
+      toLabel: getCurriculumDisplayLabel(nextProgram),
+    });
+    setProgramConfirmOpen(true);
+  };
 
   const [errors, setErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -1573,13 +1598,14 @@ const SuperAdminStudentDashboard1 = () => {
           variant="contained"
           onClick={handleManualSave}
           disabled={saving || !userID}
+          startIcon={<SaveIcon />}
           sx={{
             position: "absolute",
             right: 16,
-            backgroundColor: mainButtonColor,
+
             textTransform: "none",
             fontWeight: "bold",
-            "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+
           }}
         >
           {saving ? "Saving..." : "Save Changes"}
@@ -2012,36 +2038,68 @@ const SuperAdminStudentDashboard1 = () => {
                   sx={{ width: "100%" }}
                 >
                   {/* Program 1 */}
-                  <Box display="flex" alignItems="center" gap={2} mb={3}>
-                    <label className="w-40 font-medium">Course Applied:</label>
+                  <div className="flex items-center mb-4 gap-2">
+                    <label className="w-42 font-medium">
+                      Course Applied:<span style={{ color: "red" }}> *</span>
+                    </label>
                     <FormControl
                       fullWidth
                       size="small"
                       required
                       error={!!errors.program}
                     >
-                      <InputLabel>Course Applied</InputLabel>
-                      <Select
-                        name="program"
-                        value={person.program || ""}
-                        onChange={handleProgramChangeRequest}
-                        label="Program"
-                      >
-                        <MenuItem value="">
-                          <em>Select Program</em>
-                        </MenuItem>
-                        {filteredCurriculum.map((item, index) => (
-                          <MenuItem key={index} value={item.curriculum_id}>
+                      <Autocomplete
+                        size="small"
+                        disabled={!person.campus || !person.academicProgram}
+                        options={filteredCurriculum}
+                        filterOptions={filterCurriculumOptions}
+                        value={
+                          filteredCurriculum.find(
+                            (item) => String(item.curriculum_id) === String(person.program)
+                          ) || null
+                        }
+                        onChange={(event, newValue) => {
+                          handleProgramChangeRequest(newValue);
+                        }}
+                        getOptionLabel={(item) =>
+                          `(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                          } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`
+                        }
+                        isOptionEqualToValue={(option, value) =>
+                          String(option.curriculum_id) === String(value?.curriculum_id)
+                        }
+                        renderOption={(props, item) => (
+                          <li {...props} key={item.curriculum_id}>
                             {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
                               } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
-                          </MenuItem>
-                        ))}
-                      </Select>
+                          </li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Course Applied"
+                            placeholder={
+                              !person.campus
+                                ? "Select Campus first"
+                                : !person.academicProgram
+                                  ? "Select Academic Program first"
+                                  : "Select Program"
+                            }
+                            error={!!errors.program}
+                          />
+                        )}
+                      />
+
                       {errors.program && (
                         <FormHelperText>This field is required.</FormHelperText>
                       )}
+                      {person.program && !errors.program && (
+                        <FormHelperText sx={{ color: "red" }}>
+                          Changing the selected curriculum requires confirmation.
+                        </FormHelperText>
+                      )}
                     </FormControl>
-                  </Box>
+                  </div>
 
                   {/* <Box display="flex" alignItems="center" gap={2} mb={1}>
                            <label className="w-40 font-medium">Course Applied:</label>
@@ -4118,4 +4176,4 @@ const SuperAdminStudentDashboard1 = () => {
   );
 };
 
-export default SuperAdminStudentDashboard1;
+export default SuperAdminPersonalInformation;

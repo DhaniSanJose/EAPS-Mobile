@@ -55,6 +55,8 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import { ArrowBackIos, ArrowForwardIos, Campaign, } from "@mui/icons-material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import FacebookIcon from "@mui/icons-material/Facebook";
+import EmailIcon from "@mui/icons-material/Email";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 // ─────────────────────────────────────────────────────────────────────────
 // ✅ small presentational helpers used by the "Application Snapshot"
 // cards below (Application Progress / Details / Requirements Status).
@@ -665,10 +667,21 @@ const ApplicantDashboard = (props) => {
     }
   };
 
+  const fetchApplicationRegisteredStatus = async () => {
+    if (!person_id) return;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/applicant-status/${person_id}`);
+      setAllRequirementsCompleted(Number(res.data?.requirements) === 1);
+    } catch (err) {
+      console.error("❌ Failed fetching applicant-status:", err);
+    }
+  };
+
   useEffect(() => {
     if (person_id) {
       fetchRequirementsAndUploads();
       fetchRegistrarStatus();
+      fetchApplicationRegisteredStatus(); // ← add this
     }
   }, [person_id]);
 
@@ -1134,35 +1147,60 @@ const ApplicantDashboard = (props) => {
   // as the 50x50 calendar badge) instead of a plain icon, and no longer
   // repeat the date inline in the subtitle text.
   const reminders = [];
+
+  // Missing required documents
   if (!docsCompleted) {
     reminders.push({
-      icon: <WarningAmberIcon sx={{ color: "#fff", fontSize: 20 }} />,
+      icon: <WarningAmberIcon sx={{ color: "#fff", fontSize: 32 }} />,
       iconBg: "#c62828",
-      title: "Please make sure to complete all required documents",
-      subtitle: "Incomplete requirements may delay your application.",
+      title: "Please Complete All Required Documents",
+      subtitle:
+        "Incomplete application requirements may delay the verification and processing of your admission.",
     });
   }
+
+  // Waiting for document verification
+  if (!verifyDocSchedule && !hasSchedule) {
+    reminders.push({
+      icon: <FactCheckIcon sx={{ color: "#fff", fontSize: 32 }} />,
+      iconBg: "#1565c0",
+      title: "Document Verification is Required",
+      subtitle:
+        "Please visit the Admission Office to have your documents verified and wait for the Admission Form Process. Your entrance examination schedule will only be issued after your documents have been successfully verified.",
+    });
+  }
+
+  // Document Verification Schedule
   if (verifyDocSchedule) {
     reminders.push({
       dateBadge: verifyDocSchedule?.day_description,
       dateBadgeColor: "#8B0000",
       title: "Document Verification Schedule",
-      subtitle: `${formatTime(verifyDocSchedule?.start_time)} – ${formatTime(
+      subtitle: `${formatTime(
+        verifyDocSchedule?.start_time
+      )} – ${formatTime(
         verifyDocSchedule?.end_time
       )} • ${verifyDocSchedule?.building_description || "TBA"}, ${verifyDocSchedule?.room_description || "TBA"
         }`,
     });
   }
+
+  // Entrance Examination Schedule
   if (hasSchedule) {
     reminders.push({
       dateBadge: proctor?.day_description,
       dateBadgeColor: "#1976d2",
       title: "Entrance Examination Schedule",
-      subtitle: `${formatTime(proctor?.start_time)} – ${formatTime(
+      subtitle: `${formatTime(
+        proctor?.start_time
+      )} – ${formatTime(
         proctor?.end_time
-      )} • ${proctor?.building_description || "TBA"}, ${proctor?.room_description || "TBA"}`,
+      )} • ${proctor?.building_description || "TBA"}, ${proctor?.room_description || "TBA"
+        }`,
     });
   }
+
+  // Qualifying / Interview Schedule
   if (interviewSchedule) {
     reminders.push({
       dateBadge: interviewSchedule?.day_description,
@@ -1170,18 +1208,23 @@ const ApplicantDashboard = (props) => {
       title: "Qualifying / Interview Schedule",
       subtitle: `${formatTime(
         interviewSchedule?.start_time
-      )} – ${formatTime(interviewSchedule?.end_time)} • ${interviewSchedule?.building_description || "TBA"}, ${interviewSchedule?.room_description || "TBA"
+      )} – ${formatTime(
+        interviewSchedule?.end_time
+      )} • ${interviewSchedule?.building_description || "TBA"}, ${interviewSchedule?.room_description || "TBA"
         }`,
     });
   }
+
+  // No reminders
   if (reminders.length === 0) {
     reminders.push({
-      icon: <CheckCircleIcon sx={{ color: "#fff", fontSize: 20 }} />,
+      icon: <CheckCircleIcon sx={{ color: "#fff", fontSize: 32 }} />,
       iconBg: "#2e7d32",
-      title: "You're all caught up",
-      subtitle: "No pending reminders at the moment.",
+      title: "You're All Caught Up",
+      subtitle: "There are no pending reminders at the moment.",
     });
   }
+
 
   useEffect(() => {
     const socket = io(API_BASE_URL, { path: "/api/socket.io", transports: ["websocket", "polling"] });
@@ -2139,25 +2182,24 @@ const ApplicantDashboard = (props) => {
                   </Card>
                 </Grid>
                 {/* Mobile: Calendar */}
-                {/* Mobile: Calendar */}
                 <Grid item xs={12}>
                   <Card
                     sx={{
                       boxShadow: 3,
+                      p: 2,
                       border: `2px solid ${borderColor}`,
                       borderRadius: "10px",
                       width: "100%",
                       transition: "transform 0.2s ease",
                       "&:hover": { transform: "scale(1.03)" },
-                      overflow: "hidden",
                       backgroundColor: "#fff",
+                      display: "flex",
+                      flexDirection: "column",
                     }}
                   >
                     <CardContent sx={{ p: 0, width: "100%" }}>
-                      {/* Month header — no border/radius of its own; the Card's
-          border + overflow:hidden already frames and clips it, so
-          this just sits flush as one continuous outline instead of
-          a "frame within a frame". */}
+                      {/* Month header — own border, radius top only, no bottom border
+          (so it visually joins the day-grid below it), just like desktop */}
                       <Grid
                         container
                         alignItems="center"
@@ -2165,6 +2207,9 @@ const ApplicantDashboard = (props) => {
                         sx={{
                           backgroundColor: settings?.header_color || "#1976d2",
                           color: "white",
+                          border: `2px solid ${borderColor}`,
+                          borderBottom: "none",
+                          borderRadius: "8px 8px 0 0",
                           padding: "10px 8px",
                         }}
                       >
@@ -2185,9 +2230,20 @@ const ApplicantDashboard = (props) => {
                         </Grid>
                       </Grid>
 
-                      {/* Day-name row + date grid — no left/right/bottom border here
-          either; the Card is already the single boundary. */}
-                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+                      {/* Day-name row + date grid — own border on the remaining 3 sides,
+          radius bottom only, matching desktop's inner frame */}
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(7, 1fr)",
+                          borderLeft: `2px solid ${borderColor}`,
+                          borderRight: `2px solid ${borderColor}`,
+                          borderBottom: `2px solid ${borderColor}`,
+                          borderTop: `2px solid ${borderColor}`,
+                          borderRadius: "0 0 8px 8px",
+                          overflow: "hidden",
+                        }}
+                      >
                         {days.map((day, idx) => (
                           <Box
                             key={idx}
@@ -2273,7 +2329,7 @@ const ApplicantDashboard = (props) => {
                 >
                   <CardContent>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                      <DescriptionIcon sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <DescriptionIcon sx={{ color: mainButtonColor, fontSize: 32 }} />
                       <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Application Details</Typography>
                     </Stack>
                     <Stack divider={<Divider sx={{ my: 0.6 }} />} spacing={0.6}>
@@ -2313,7 +2369,7 @@ const ApplicantDashboard = (props) => {
                 >
                   <CardContent>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                      <CloudUploadIcon sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <CloudUploadIcon sx={{ color: mainButtonColor, fontSize: 32 }} />
                       <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Requirements Status</Typography>
                     </Stack>
                     <Stack divider={<Divider sx={{ my: 0.6 }} />} spacing={0.6}>
@@ -2356,7 +2412,7 @@ const ApplicantDashboard = (props) => {
                 >
                   <CardContent>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                      <Campaign sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <Campaign sx={{ color: mainButtonColor, fontSize: 32 }} />
                       <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Important Reminders</Typography>
                     </Stack>
                     <Stack divider={<Divider sx={{ my: 1 }} />} spacing={1}>
@@ -2400,6 +2456,7 @@ const ApplicantDashboard = (props) => {
               </Grid>
 
               {/* Need Help? */}
+              {/* Need Help? */}
               <Grid item xs={12} sm={6} md={3}>
                 <Card
                   sx={{
@@ -2414,80 +2471,94 @@ const ApplicantDashboard = (props) => {
                 >
                   <CardContent>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                      <HeadsetMicIcon sx={{ color: mainButtonColor, fontSize: 20 }} />
+                      <HeadsetMicIcon sx={{ color: mainButtonColor, fontSize: 32 }} />
                       <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#222" }}>Need Help?</Typography>
                     </Stack>
-                    <Stack spacing={1.4}>
-                      <Stack direction="row" spacing={1.3} alignItems="flex-start">
-                        <PhoneIcon sx={{ color: mainButtonColor, fontSize: 20, mt: "1px" }} />
-                        <Box>
-                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222" }}>Admissions Office</Typography>
-                          <Typography sx={{ fontSize: 11, color: "#888" }}>
-                            {admissionContact?.contact_number || settings?.contact_number || "(032) 123-4567 loc. 100"}
-                          </Typography>
-                          <Typography
-                            component="a"
-                            href={buildGmailComposeUrl(
-                              admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph"
-                            )}
-                            target="_blank"
-                            rel="noopener noreferrer"
+
+                    <Stack divider={<Divider sx={{ my: 1 }} />} spacing={1}>
+                      {[
+                        {
+                          icon: <PhoneIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                          iconBg: mainButtonColor,
+                          title: "Admissions Office",
+                          subtitle: admissionContact?.contact_number || settings?.contact_number || "(032) 123-4567 loc. 100",
+                        },
+                        {
+                          icon: <EmailIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                          iconBg: "#c62828",
+                          title: "Email",
+                          subtitle: admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph",
+                          link: buildGmailComposeUrl(
+                            admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph"
+                          ),
+                        },
+                        {
+                          icon: <AccessTimeIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                          iconBg: "#f5a623",
+                          title: "Office Hours",
+                          subtitle: admissionContact
+                            ? `${admissionContact.office_days_start} – ${admissionContact.office_days_end} • ${formatContactTime(
+                              admissionContact.office_time_start
+                            )} – ${formatContactTime(admissionContact.office_time_end)}`
+                            : "Monday – Friday • 8:00 AM – 5:00 PM",
+                        },
+                        ...(admissionContact?.facebook_url
+                          ? [
+                            {
+                              icon: <FacebookIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                              iconBg: "#1877F2",
+                              title: "Facebook",
+                              subtitle: admissionContact.facebook_url,
+                              link: admissionContact.facebook_url,
+                            },
+                          ]
+                          : []),
+                      ].map((r, idx) => (
+                        <Stack key={idx} direction="row" spacing={1.5} alignItems="flex-start">
+                          <Box
                             sx={{
-                              fontSize: 11,
-                              color: mainButtonColor,
-                              textDecoration: "none",
-                              cursor: "pointer",
-                              "&:hover": { textDecoration: "underline" },
+                              width: 50,
+                              height: 50,
+                              borderRadius: "8px",
+                              backgroundColor: r.iconBg,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
                             }}
                           >
-                            {admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph"}
-                          </Typography>
-                        </Box>
-                      </Stack>
-
-                      <Stack direction="row" spacing={1.3} alignItems="flex-start">
-                        <AccessTimeIcon sx={{ color: mainButtonColor, fontSize: 20, mt: "1px" }} />
-                        <Box>
-                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222" }}>Office Hours</Typography>
-                          <Typography sx={{ fontSize: 11, color: "#888" }}>
-                            {admissionContact
-                              ? `${admissionContact.office_days_start} – ${admissionContact.office_days_end}`
-                              : "Monday – Friday"}
-                          </Typography>
-                          <Typography sx={{ fontSize: 11, color: "#888" }}>
-                            {admissionContact
-                              ? `${formatContactTime(admissionContact.office_time_start)} – ${formatContactTime(admissionContact.office_time_end)}`
-                              : "8:00 AM – 5:00 PM"}
-                          </Typography>
-                        </Box>
-                      </Stack>
-
-                      {admissionContact?.facebook_url && (
-                        <Stack direction="row" spacing={1.3} alignItems="flex-start">
-                          <FacebookIcon sx={{ color: mainButtonColor, fontSize: 20, mt: "1px" }} />
+                            {r.icon}
+                          </Box>
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222" }}>Facebook</Typography>
-                            <Typography
-                              component="a"
-                              href={admissionContact.facebook_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              sx={{ fontSize: 11, color: mainButtonColor, wordBreak: "break-all" }}
-                            >
-                              {admissionContact.facebook_url}
+                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#222", lineHeight: 1.35 }}>
+                              {r.title}
                             </Typography>
+                            {r.link ? (
+                              <Typography
+                                component="a"
+                                href={r.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                sx={{
+                                  fontSize: 11,
+                                  color: mainButtonColor,
+                                  lineHeight: 1.35,
+                                  textDecoration: "none",
+                                  wordBreak: "break-all",
+                                  "&:hover": { textDecoration: "underline" },
+                                }}
+                              >
+                                {r.subtitle}
+                              </Typography>
+                            ) : (
+                              <Typography sx={{ fontSize: 11, color: "#888", lineHeight: 1.35 }}>{r.subtitle}</Typography>
+                            )}
                           </Box>
                         </Stack>
-                      )}
+                      ))}
                     </Stack>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      onClick={() => (window.location.href = "/help_center")}
-                      sx={{ mt: 2, backgroundColor: mainButtonColor, textTransform: "none", fontWeight: 700, borderRadius: "8px", "&:hover": { backgroundColor: mainButtonColor } }}
-                    >
-                      Visit Help Center
-                    </Button>
+
+
                   </CardContent>
                 </Card>
               </Grid>
@@ -2731,7 +2802,7 @@ const ApplicantDashboard = (props) => {
 
               {/* MOBILE: vertical accordion stepper */}
               {isMobile && (
-                <Box sx={{ px: 1 }}>
+                <Box sx={{ px: 1, mb: 5 }}>
                   {steps.map((label, index) => {
                     const isActive = index === activeStep;
                     const isCompleted = index < activeStep;
