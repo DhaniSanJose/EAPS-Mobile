@@ -69,7 +69,7 @@ import StudentServicesSurvey from "../student/StudentServicesSurvey";
 import SaveIcon from '@mui/icons-material/Save';
 import { createFilterOptions } from "@mui/material/Autocomplete";
 
-const SuperAdminPersonalInformation = () => {
+const StudentAdminPersonalInformation = () => {
   useAccountAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -4176,4 +4176,4 @@ const SuperAdminPersonalInformation = () => {
   );
 };
 
-export default SuperAdminPersonalInformation;
+export default StudentAdminPersonalInformation;
