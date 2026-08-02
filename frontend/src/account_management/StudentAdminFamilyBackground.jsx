@@ -26,7 +26,7 @@ import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 
-const SuperAdminStudentDashboard2 = () => {
+const StudentAdminFamilyBackground = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -2237,4 +2237,4 @@ const SuperAdminStudentDashboard2 = () => {
 };
 
 
-export default SuperAdminStudentDashboard2;
+export default StudentAdminFamilyBackground;

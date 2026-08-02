@@ -26,7 +26,7 @@ import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 
-const SuperAdminStudentDashboard3 = () => {
+const StudentAdminEducationalAttainment = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1488,4 +1488,4 @@ const SuperAdminStudentDashboard3 = () => {
 };
 
 
-export default SuperAdminStudentDashboard3;
+export default StudentAdminEducationalAttainment;
