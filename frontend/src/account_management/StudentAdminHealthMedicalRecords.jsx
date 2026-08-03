@@ -25,7 +25,7 @@ import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
-const SuperAdminStudentDashboard4 = () => {
+const StudentAdminHealthMedicalRecords = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1735,4 +1735,4 @@ const SuperAdminStudentDashboard4 = () => {
 };
 
 
-export default SuperAdminStudentDashboard4;
+export default StudentAdminHealthMedicalRecords;

@@ -25,7 +25,7 @@ import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 
-const SuperAdminStudentDashboard5 = () => {
+const StudentAdminOtherInformation = () => {
     useAccountAuditMac();
     const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
     const getAuditHeaders = () =>
@@ -1187,4 +1187,4 @@ const SuperAdminStudentDashboard5 = () => {
 };
 
 
-export default SuperAdminStudentDashboard5;
+export default StudentAdminOtherInformation;

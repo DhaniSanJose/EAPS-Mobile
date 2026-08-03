@@ -46,7 +46,7 @@ export const SettingsContext = createContext(null);
 
 
 const UploadApplicants = lazy(() => import("./account_management/UploadApplicants"));
-const ApplicationSuperAdmin = lazy(() => import("./account_management/ApplicationProcessSuperAdmin"));
+const ApplicantProcessSuperAdmin = lazy(() => import("./account_management/ApplicationProcessSuperAdmin"));
 const Archived = lazy(() => import("./account_management/ArchivedModule"));
 const MigrationDataPanel = lazy(() => import("./account_management/MigrationDataPanel"));
 const PageManagement = lazy(() => import("./account_management/PageManagement"));
@@ -798,7 +798,7 @@ function App() {
                       <Route path="/applicant_list_registrar" element={<ProtectedRoute><ApplicantListRegistrar /></ProtectedRoute>} />
                       <Route path="/application_process_admin" element={<ProtectedRoute><ApplicationProcessAdmin /></ProtectedRoute>} />
                       <Route path="/archived" element={<ProtectedRoute><Archived /></ProtectedRoute>} />
-                      <Route path="/application_process_super_admin" element={<ProtectedRoute><ApplicationSuperAdmin /></ProtectedRoute>} />
+                      <Route path="/application_process_super_admin" element={<ProtectedRoute><ApplicantProcessSuperAdmin /></ProtectedRoute>} />
                       <Route path="/grade_conversion_admin" element={<ProtectedRoute><GradeConversionAdmin /></ProtectedRoute>} />
                       <Route path="/honors_report" element={<ProtectedRoute><HonorsReport /></ProtectedRoute>} />
                       <Route path="/proctor_applicant_list" element={<ProtectedRoute><ProctorApplicantList /></ProtectedRoute>} />

@@ -48,7 +48,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import FormalExample from "../assets/formalexample.png";
 
 
-const StudentRequirementsUploader = () => {
+const StudentOnlineRequirementsAdmin = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const navigate = useNavigate();
@@ -1944,4 +1944,4 @@ const StudentRequirementsUploader = () => {
   );
 };
 
-export default StudentRequirementsUploader;
+export default StudentOnlineRequirementsAdmin;
