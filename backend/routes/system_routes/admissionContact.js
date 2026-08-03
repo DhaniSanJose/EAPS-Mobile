@@ -117,7 +117,10 @@ router.post("/admission_contact", CanCreate, async (req, res) => {
     facebook_url,
   } = req.body;
 
-  if (!branch_id || !email || !contact_number || !office_days_start || !office_days_end || !office_time_start || !office_time_end) {
+  // ✅ CHANGED: email and contact_number are now optional — only
+  // branch_id and the office days/hours remain required, since those
+  // drive the dashboard's schedule display.
+  if (!branch_id || !office_days_start || !office_days_end || !office_time_start || !office_time_end) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -126,7 +129,8 @@ router.post("/admission_contact", CanCreate, async (req, res) => {
     return res.status(400).json({ error: "Invalid branch" });
   }
 
-  if (!isValidEmail(email)) {
+  // ✅ CHANGED: only validate email format if one was actually provided.
+  if (email && !isValidEmail(email)) {
     return res.status(400).json({ error: "Invalid email address" });
   }
 
@@ -145,8 +149,8 @@ router.post("/admission_contact", CanCreate, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         branch_id,
-        email.trim(),
-        contact_number.trim(),
+        email?.trim() || null,
+        contact_number?.trim() || null,
         office_days_start,
         office_days_end,
         office_time_start,
@@ -185,7 +189,9 @@ router.put("/admission_contact/:id", CanEdit, async (req, res) => {
     facebook_url,
   } = req.body;
 
-  if (!branch_id || !email || !contact_number || !office_days_start || !office_days_end || !office_time_start || !office_time_end) {
+  // ✅ CHANGED: email and contact_number are now optional — same relaxed
+  // requirement as the CREATE route above.
+  if (!branch_id || !office_days_start || !office_days_end || !office_time_start || !office_time_end) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -194,7 +200,18 @@ router.put("/admission_contact/:id", CanEdit, async (req, res) => {
     return res.status(400).json({ error: "Invalid branch" });
   }
 
-  // ...same email/day/time validation as before...
+  // ✅ CHANGED: only validate email format if one was actually provided.
+  if (email && !isValidEmail(email)) {
+    return res.status(400).json({ error: "Invalid email address" });
+  }
+
+  if (!DAY_OPTIONS.includes(office_days_start) || !DAY_OPTIONS.includes(office_days_end)) {
+    return res.status(400).json({ error: "Invalid office day value" });
+  }
+
+  if (!isValidTime(office_time_start) || !isValidTime(office_time_end)) {
+    return res.status(400).json({ error: "Invalid office time value" });
+  }
 
   try {
     const [[before]] = await db.execute(
@@ -209,8 +226,8 @@ router.put("/admission_contact/:id", CanEdit, async (req, res) => {
        WHERE id = ?`,
       [
         branch_id,
-        email.trim(),
-        contact_number.trim(),
+        email?.trim() || null,
+        contact_number?.trim() || null,
         office_days_start,
         office_days_end,
         office_time_start,
@@ -224,7 +241,14 @@ router.put("/admission_contact/:id", CanEdit, async (req, res) => {
       return res.status(404).json({ error: "Admission contact not found" });
     }
 
-    // ...audit log as before, message can mention branch_id too
+    const { actorId, actorRole } = getAuditActor(req);
+    const roleLabel = formatAuditActorRole(actorRole);
+    await insertContactAuditLog({
+      req,
+      action: "ADMISSION_CONTACT_UPDATE",
+      message: `${roleLabel} (${actorId}) updated admission contact ${contactLabel(before)} for branch ${branch_id}.`,
+    });
+
     res.json({ message: "Admission contact updated successfully" });
   } catch (err) {
     console.error("Error updating admission contact:", err);

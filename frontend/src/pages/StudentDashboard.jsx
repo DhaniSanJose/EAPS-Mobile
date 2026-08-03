@@ -407,7 +407,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       downloadBlob(
         downloadRes.data,
         job?.file_name ||
-          `${studentNumberForExport}_Certificate_Of_Registration.pdf`,
+        `${studentNumberForExport}_Certificate_Of_Registration.pdf`,
       );
 
       setExportProgress(100);
@@ -416,7 +416,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       console.error("Failed to generate COR PDF:", error);
       window.alert(
         error?.message ||
-          "Failed to generate Certificate of Registration PDF. Please try again.",
+        "Failed to generate Certificate of Registration PDF. Please try again.",
       );
     } finally {
       setIsGeneratingCorPdf(false);
@@ -943,14 +943,10 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
             px: { xs: 1.5, sm: 2, md: 4 },
             py: 1.5,
             backgroundColor: "lightgray",
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "repeat(2, 1fr)",
-              md: "repeat(3, 1fr)",
-              lg: "1fr 1fr 2fr 1fr 1fr",
-            },
-            gap: 2,
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            rowGap: 1.5,
             borderTop: `2px solid ${borderColor}`,
           }}
         >
@@ -961,15 +957,20 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
             [
               "Section",
               `${studentDetails.program_code || ""}${studentDetails.section_description ? ` ${studentDetails.section_description}` : ""}` ||
-                "N/A",
+              "N/A",
             ],
             ["Year Level", studentYearLevel],
-          ].map(([label, value]) => (
+          ].map(([label, value], idx, arr) => (
             <Box
               key={label}
               sx={{
-                borderLeft: { lg: "1px solid rgba(255,255,255,0.22)" },
-                pl: { lg: 2 },
+                px: 2,
+                textAlign: "center",
+                borderRight:
+                  idx < arr.length - 1
+                    ? "1px solid rgba(0,0,0,0.2)"
+                    : "none",
+                "&:first-of-type": { pl: 0 },
               }}
             >
               <Typography
@@ -978,6 +979,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   textTransform: "uppercase",
                   opacity: 0.78,
                   color: "black",
+                  letterSpacing: "0.05em",
                 }}
               >
                 {label}
@@ -987,7 +989,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   fontSize: { xs: 13, sm: 15 },
                   fontWeight: 600,
                   color: "black",
-                  wordBreak: "break-word",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {value}
@@ -1545,11 +1547,11 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         {honorStanding.loading
                           ? "Loading..."
                           : honorStanding.title ||
-                            (honorStanding.standing === "disqualified"
-                              ? "Disqualified"
-                              : honorStanding.standing === "not_in_standing"
-                                ? "Not In Standing"
-                                : "No Current Standing")}
+                          (honorStanding.standing === "disqualified"
+                            ? "Disqualified"
+                            : honorStanding.standing === "not_in_standing"
+                              ? "Not In Standing"
+                              : "No Current Standing")}
                       </Typography>
                       {!honorStanding.loading && honorStanding.overallGwa && (
                         <Typography

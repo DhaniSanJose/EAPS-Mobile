@@ -207,12 +207,9 @@ const AdmissionContactManagement = () => {
     };
 
     const handleSavingContact = async () => {
-        if (!contact.email.trim() || !contact.contactNumber.trim()) {
-            showSnack("Email and contact number are required", "warning");
-            return;
-        }
-
-        if (!isValidEmail(contact.email)) {
+        // ✅ CHANGED: Email and Contact Number are now optional. Only validate
+        // the email's format if the admin actually typed one in.
+        if (contact.email.trim() && !isValidEmail(contact.email)) {
             showSnack("Enter a valid email address", "warning");
             return;
         }
@@ -239,8 +236,8 @@ const AdmissionContactManagement = () => {
 
         const payload = {
             branch_id: contact.branchId,
-            email: contact.email.trim(),
-            contact_number: contact.contactNumber.trim(),
+            email: contact.email.trim() || null,
+            contact_number: contact.contactNumber.trim() || null,
             office_days_start: contact.officeDaysStart,
             office_days_end: contact.officeDaysEnd,
             office_time_start: contact.officeTimeStart,
@@ -535,10 +532,14 @@ const AdmissionContactManagement = () => {
                                             {row.contact_number}
                                         </TableCell>
                                         <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
-                                            {row.office_days_start} – {row.office_days_end}
+                                            {row.office_days_start && row.office_days_end
+                                                ? `${row.office_days_start} – ${row.office_days_end}`
+                                                : ""}
                                         </TableCell>
                                         <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
-                                            {formatTimeDisplay(row.office_time_start)} – {formatTimeDisplay(row.office_time_end)}
+                                            {row.office_time_start && row.office_time_end
+                                                ? `${formatTimeDisplay(row.office_time_start)} – ${formatTimeDisplay(row.office_time_end)}`
+                                                : ""}
                                         </TableCell>
                                         <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                                             {row.facebook_url ? (
@@ -612,6 +613,93 @@ const AdmissionContactManagement = () => {
                 )}
                 {contactList.length === 0 && !contactLoading && <p>No admission contact records available.</p>}
             </Box>
+
+            <TableContainer component={Paper} sx={{ width: "100%" }}>
+                <Table size="small">
+                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                        <TableRow>
+                            <TableCell sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" sx={{ padding: "6px" }}>
+                                    <Typography fontSize="14px" fontWeight="bold" color="white">
+                                        Total Admission Contact Records: {filteredContacts.length}
+                                    </Typography>
+
+                                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                        <Button
+                                            onClick={() => setCurrentPage(1)}
+                                            disabled={currentPage === 1}
+                                            variant="outlined"
+                                            size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}
+                                        >
+                                            First
+                                        </Button>
+                                        <Button
+                                            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                            disabled={currentPage === 1}
+                                            variant="outlined"
+                                            size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}
+                                        >
+                                            Prev
+                                        </Button>
+
+                                        <FormControl size="small" sx={{ minWidth: 80 }}>
+                                            <Select
+                                                value={currentPage}
+                                                onChange={(e) => setCurrentPage(Number(e.target.value))}
+                                                displayEmpty
+                                                sx={{
+                                                    fontSize: "12px",
+                                                    height: 36,
+                                                    color: "white",
+                                                    border: "1px solid white",
+                                                    backgroundColor: "transparent",
+                                                    ".MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+                                                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+                                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+                                                    "& svg": { color: "white" },
+                                                }}
+                                                MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } } }}
+                                            >
+                                                {Array.from({ length: totalPages }, (_, i) => (
+                                                    <MenuItem key={i + 1} value={i + 1}>
+                                                        Page {i + 1}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                        <Typography fontSize="11px" color="white">
+                                            of {totalPages} page{totalPages > 1 ? "s" : ""}
+                                        </Typography>
+
+                                        <Button
+                                            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                            disabled={currentPage === totalPages}
+                                            variant="outlined"
+                                            size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}
+                                        >
+                                            Next
+                                        </Button>
+                                        <Button
+                                            onClick={() => setCurrentPage(totalPages)}
+                                            disabled={currentPage === totalPages}
+                                            variant="outlined"
+                                            size="small"
+                                            sx={{ minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent", "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" }, "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 } }}
+                                        >
+                                            Last
+                                        </Button>
+
+                    
+                                    </Box>
+                                </Box>
+                            </TableCell>
+                        </TableRow>
+                    </TableHead>
+                </Table>
+            </TableContainer>
 
             {/* ADD / EDIT MODAL */}
             <Dialog

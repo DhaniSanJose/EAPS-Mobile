@@ -213,6 +213,10 @@ const ApplicantDashboard = (props) => {
     first_name: "",
     middle_name: "",
     extension: "",
+    academicProgram: "",
+    classifiedAs: "",
+    applyingAs: "",
+    yearLevel: "",
   });
   const [verifyDocSchedule, setVerifyDocSchedule] = useState(null);
 
@@ -1114,35 +1118,76 @@ const ApplicantDashboard = (props) => {
     { label: "Student Number", value: studentNumber || "Not yet assigned" },
   ];
 
+  const APPLYING_AS_LABELS = {
+    1: "Senior High School Graduate",
+    2: "Senior High School Graduating Student",
+    3: "ALS (Alternative Learning System) Passer",
+    4: "Transferee from other University/College",
+    5: "Cross Enrolee Student",
+    6: "Foreign Applicant/Student",
+    7: "Baccalaureate Graduate",
+    8: "Master Degree Graduate",
+  };
   // ✅ CHANGED: header info-strip values (Academic Year / Program Applied /
   // Date Applied / Status) — Academic Year now prefers the fetched active
   // school year (e.g. "2025-2026 (1st Semester)") over the older
   // person/settings fallback fields.
   const academicYearValue = activeSchoolYear
-    ? `${activeSchoolYear.current_year}-${activeSchoolYear.next_year}${activeSchoolYear.semester_description ? ` (${activeSchoolYear.semester_description})` : ""
-    }`
+    ? `${activeSchoolYear.current_year}-${activeSchoolYear.next_year}`
     : person?.academic_year || settings?.academic_year || "N/A";
 
-  // resolve "Program Applied" the same way
-  // ApplicantPersonalInformation resolves "Course Applied" — by matching
-  // person.program (a curriculum_id) against /api/applied_program.
+  const semesterValue =
+    activeSchoolYear?.semester_description ||
+    person?.semester ||
+    person?.semester_description ||
+    "N/A";
+
+  // ⚠️ Adjust these key names to match whatever your API actually returns —
+  // I'm guessing based on the initial `person` state shape (classifiedAs/applyingAs).
+  const classifiedAsValue =
+    person?.classifiedAs || person?.classified_as || "N/A";
+
+  const applyingAsValue =
+    APPLYING_AS_LABELS[Number(person?.applyingAs)] ||
+    person?.applyingAs ||
+    "N/A";
+
+
   const selectedCurriculum = curriculumOptions.find(
     (item) => String(item.curriculum_id) === String(person?.program),
   );
+
   const programAppliedValue = selectedCurriculum
     ? `(${selectedCurriculum.program_code}): ${selectedCurriculum.program_description}${selectedCurriculum.major ? ` (${selectedCurriculum.major})` : ""
-    }${getBranchLabel(selectedCurriculum.components)
-      ? ` — ${getBranchLabel(selectedCurriculum.components).toUpperCase()}`
-      : ""
     }`
     : (person?.program_applied || person?.program || "N/A");
 
   const dateAppliedValue = formatDate(person?.date_applied || person?.created_at);
-  const overallStatusLabel =
-    person?.final_status === "Accepted" ? "Accepted" : person?.final_status === "Rejected" ? "Rejected" : "In Progress";
-  const overallStatusColor =
-    person?.final_status === "Accepted" ? "#2e7d32" : person?.final_status === "Rejected" ? "#c62828" : "#f5a623";
 
+  const infoItems = [
+    ["ACADEMIC YEAR", academicYearValue],
+    ["SEMESTER", semesterValue],
+    ["PROGRAM", programAppliedValue],
+    ["CLASSIFIED AS", classifiedAsValue],
+    ["APPLYING AS", applyingAsValue],
+    ["DATE APPLIED", dateAppliedValue],
+  ];
+
+  const overallStatusLabel = hasStudentNumber
+    ? "Student"
+    : person?.final_status === "Accepted"
+      ? "Accepted"
+      : person?.final_status === "Rejected"
+        ? "Rejected"
+        : "In Progress";
+
+  const overallStatusColor = hasStudentNumber
+    ? "#1565c0"
+    : person?.final_status === "Accepted"
+      ? "#2e7d32"
+      : person?.final_status === "Rejected"
+        ? "#c62828"
+        : "#f5a623";
   // Important Reminders — schedule reminders carry a `dateBadge` (rendered
   // as the 50x50 calendar badge) instead of a plain icon, and no longer
   // repeat the date inline in the subtitle text.
@@ -1342,26 +1387,37 @@ const ApplicantDashboard = (props) => {
                   sx={{
                     backgroundColor: "lightgray",
                     borderTop: "1px solid rgba(255,255,255,0.2)",
-                    px: 4,
+                    px: { xs: 2, md: 4 },
                     py: 1.5,
                     display: "flex",
                     flexWrap: "wrap",
                     rowGap: 1.5,
-                    columnGap: 6,
                   }}
                 >
-                  {[
-                    ["ACADEMIC YEAR", academicYearValue],
-                    ["PROGRAM APPLIED", programAppliedValue],
-                    ["DATE APPLIED", dateAppliedValue],
-                  ].map(([label, value]) => (
-                    <Box key={label}>
-                      <Typography sx={{ fontSize: 10.5, opacity: 0.75, color: "#000", letterSpacing: "0.05em" }}>{label}</Typography>
-                      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#000", }}>{value}</Typography>
+                  {infoItems.map(([label, value], idx) => (
+                    <Box
+                      key={label}
+                      sx={{
+                        px: 2,
+                        textAlign: "center",
+                        borderRight: "1px solid rgba(0,0,0,0.2)",   // ← always on, no idx check
+                        "&:first-of-type": { pl: 0 },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 10.5, opacity: 0.75, color: "#000", letterSpacing: "0.05em" }}>
+                        {label}
+                      </Typography>
+                      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#000", whiteSpace: "nowrap" }}>
+                        {value}
+                      </Typography>
                     </Box>
                   ))}
-                  <Box>
-                    <Typography sx={{ fontSize: 10.5, opacity: 0.75, letterSpacing: "0.05em", color: "#000", }}>APPLICATION STATUS</Typography>
+
+                  {/* STATUS — last item, no border-right */}
+                  <Box sx={{ px: 2 }}>
+                    <Typography sx={{ fontSize: 10.5, opacity: 0.75, letterSpacing: "0.05em", color: "#000" }}>
+                      APPLICATION STATUS
+                    </Typography>
                     <Chip
                       label={overallStatusLabel}
                       size="small"
@@ -1524,31 +1580,41 @@ const ApplicantDashboard = (props) => {
                     sx={{
                       backgroundColor: "lightgray",
                       borderTop: "1px solid rgba(255,255,255,0.2)",
-                      mx: -2,
-                      px: 2,
-                      pt: 1.5,
+                      px: { xs: 2, md: 4 },
+                      py: 1.5,
                       display: "flex",
                       flexWrap: "wrap",
-                      rowGap: 1.2,
-                      columnGap: 3,
+                      justifyContent: "center",   // ← add this
+                      rowGap: 1.5,
                     }}
                   >
-                    {[
-                      ["ACADEMIC YEAR", academicYearValue],
-                      ["PROGRAM APPLIED", programAppliedValue],
-                      ["DATE APPLIED", dateAppliedValue],
-                    ].map(([label, value]) => (
-                      <Box key={label}>
-                        <Typography sx={{ fontSize: 9.5, color: "#000", opacity: 0.75, letterSpacing: "0.05em" }}>{label}</Typography>
-                        <Typography sx={{ fontSize: 12, color: "#000", fontWeight: 700 }}>{value}</Typography>
+                    {infoItems.map(([label, value], idx) => (
+                      <Box
+                        key={label}
+                        sx={{
+                          px: 2,
+                          borderRight: "1px solid rgba(0,0,0,0.2)",   // ← always on, no idx check
+                          "&:first-of-type": { pl: 0 },
+                        }}
+                      >
+                        <Typography sx={{ fontSize: 10.5, opacity: 0.75, color: "#000", letterSpacing: "0.05em" }}>
+                          {label}
+                        </Typography>
+                        <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#000", whiteSpace: "nowrap" }}>
+                          {value}
+                        </Typography>
                       </Box>
                     ))}
-                    <Box>
-                      <Typography sx={{ fontSize: 9.5, opacity: 0.75, letterSpacing: "0.05em", color: "#000", }}>STATUS</Typography>
+
+                    {/* STATUS — last item, no border-right */}
+                    <Box sx={{ px: 2 }}>
+                      <Typography sx={{ fontSize: 10.5, opacity: 0.75, letterSpacing: "0.05em", color: "#000" }}>
+                        APPLICATION STATUS
+                      </Typography>
                       <Chip
                         label={overallStatusLabel}
                         size="small"
-                        sx={{ backgroundColor: overallStatusColor, color: "#000", fontWeight: 700, fontSize: 10.5, height: 20 }}
+                        sx={{ backgroundColor: overallStatusColor, color: "#000", fontWeight: 700, fontSize: 11.5 }}
                       />
                     </Box>
                   </Box>
@@ -2477,41 +2543,41 @@ const ApplicantDashboard = (props) => {
 
                     <Stack divider={<Divider sx={{ my: 1 }} />} spacing={1}>
                       {[
-                        {
-                          icon: <PhoneIcon sx={{ color: "#fff", fontSize: 34 }} />,
-                          iconBg: mainButtonColor,
-                          title: "Admissions Office",
-                          subtitle: admissionContact?.contact_number || settings?.contact_number || "(032) 123-4567 loc. 100",
-                        },
-                        {
-                          icon: <EmailIcon sx={{ color: "#fff", fontSize: 34 }} />,
-                          iconBg: "#c62828",
-                          title: "Email",
-                          subtitle: admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph",
-                          link: buildGmailComposeUrl(
-                            admissionContact?.email || settings?.contact_email || "admissions@earist.edu.ph"
-                          ),
-                        },
-                        {
-                          icon: <AccessTimeIcon sx={{ color: "#fff", fontSize: 34 }} />,
-                          iconBg: "#f5a623",
-                          title: "Office Hours",
-                          subtitle: admissionContact
-                            ? `${admissionContact.office_days_start} – ${admissionContact.office_days_end} • ${formatContactTime(
+                        ...(admissionContact?.contact_number
+                          ? [{
+                            icon: <PhoneIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                            iconBg: mainButtonColor,
+                            title: "Admissions Office",
+                            subtitle: admissionContact.contact_number,
+                          }]
+                          : []),
+                        ...(admissionContact?.email
+                          ? [{
+                            icon: <EmailIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                            iconBg: "#c62828",
+                            title: "Email",
+                            subtitle: admissionContact.email,
+                            link: buildGmailComposeUrl(admissionContact.email),
+                          }]
+                          : []),
+                        ...(admissionContact?.office_days_start && admissionContact?.office_days_end && admissionContact?.office_time_start && admissionContact?.office_time_end
+                          ? [{
+                            icon: <AccessTimeIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                            iconBg: "#f5a623",
+                            title: "Office Hours",
+                            subtitle: `${admissionContact.office_days_start} – ${admissionContact.office_days_end} • ${formatContactTime(
                               admissionContact.office_time_start
-                            )} – ${formatContactTime(admissionContact.office_time_end)}`
-                            : "Monday – Friday • 8:00 AM – 5:00 PM",
-                        },
+                            )} – ${formatContactTime(admissionContact.office_time_end)}`,
+                          }]
+                          : []),
                         ...(admissionContact?.facebook_url
-                          ? [
-                            {
-                              icon: <FacebookIcon sx={{ color: "#fff", fontSize: 34 }} />,
-                              iconBg: "#1877F2",
-                              title: "Facebook",
-                              subtitle: admissionContact.facebook_url,
-                              link: admissionContact.facebook_url,
-                            },
-                          ]
+                          ? [{
+                            icon: <FacebookIcon sx={{ color: "#fff", fontSize: 34 }} />,
+                            iconBg: "#1877F2",
+                            title: "Facebook",
+                            subtitle: admissionContact.facebook_url,
+                            link: admissionContact.facebook_url,
+                          }]
                           : []),
                       ].map((r, idx) => (
                         <Stack key={idx} direction="row" spacing={1.5} alignItems="flex-start">

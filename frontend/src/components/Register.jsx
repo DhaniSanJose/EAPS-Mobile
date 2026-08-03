@@ -1486,7 +1486,7 @@ const ReviewApplicationModal = ({
 
       <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1 }}>
         {/* Icon, same visual language as the success modal */}
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 2, mt: 1 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 2, mt: 4 }}>
           <Box sx={{
             width: 64, height: 64, borderRadius: "50%",
             backgroundColor: "rgba(255,255,255,0.9)",
@@ -1904,7 +1904,8 @@ const Register = () => {
     cellphoneNumber: "",
     emailAddress: "",
     telephoneNumber: "",
-    facebookAccount: "",
+    facebook_account: "",
+    spouse: "",
     presentStreet: "",
     presentBarangay: "",
     presentZipCode: "",
@@ -2719,13 +2720,14 @@ const Register = () => {
                           <option value="3">ALS Passer</option>
                           <option value="4">Transferee</option>
                           <option value="5">Cross Enrollee</option>
-                          <option value="6">Foreign Applicant</option>
                         </>
                       );
                       if (name.includes("graduate") || name.includes("master") || name.includes("baccalaureate")) return (
                         <>
                           <option value="7">Baccalaureate Graduate</option>
                           <option value="8">Master Degree Graduate</option>
+                          <option value="6">Foreign Applicant</option>
+                          <option value="5">Cross Enrollee</option>
                         </>
                       );
                       return null;
@@ -3206,6 +3208,52 @@ const Register = () => {
                   • The University reserves the right to verify all applicant
                   records. Any account found to belong to a previous examinee may be
                   automatically rejected or disqualified.
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box
+              sx={{
+                border: "1px solid #ffe08a",
+                backgroundColor: "#fffaf0",
+                borderRadius: "12px",
+                p: 2,
+                mb: 2,
+              }}
+            >
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#9a6700", mb: 1 }}>
+                Applicant Eligibility Notice
+              </Typography>
+              <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.7 }}>
+                Please review which <strong style={{fontWeight: "bold"}}>"Applying As"</strong> category applies to you before continuing:
+              </Typography>
+
+              <Box sx={{ mt: 1.25, display: "flex", flexDirection: "column", gap: 1 }}>
+                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
+                  • <strong>Senior High School Graduate / Graduating Student, ALS Passer,
+                    Transferee</strong> — intended for <strong style={{ color: "red" }}>UNDERGRADUATE APPLICANTS</strong>.
+                  Ensure you meet the admission requirements for first-year or transferee
+                  undergraduate students.
+                </Typography>
+
+                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
+                  • <strong>Cross Enrollee</strong> — available to qualified applicants from
+                  recognized higher education institutions, subject to the University's
+                  admission policies and document verification requirements. Open to
+                  <strong style={{ color: "red" }}> BOTH UNDERGRADUATE and GRADUATE APPLICANTS.</strong>
+                </Typography>
+
+                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
+                  • <strong>Foreign Applicant/Student</strong> — currently available
+                  <strong style={{ color: "red" }}> ONLY</strong> for <strong style={{ color: "red" }}>BACCALAUREATE GRADUATE</strong> and
+                  <strong style={{ color: "red" }}> MASTER DEGREE GRADUATE</strong> applicants. Not yet available
+                  for undergraduate applications.
+                </Typography>
+
+                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
+                  • <strong>Baccalaureate Graduate / Master Degree Graduate</strong> —
+                  intended for <strong style={{ color: "red" }}>GRADUATE-LEVEL APPLICANTS</strong>. Ensure you
+                  satisfy the academic qualifications and documentary requirements.
                 </Typography>
               </Box>
             </Box>
