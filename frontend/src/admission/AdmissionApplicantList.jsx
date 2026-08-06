@@ -52,7 +52,7 @@ import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import DateField from "../components/DateField";
 
-const ApplicantList = () => {
+const AdmissionApplicantList = () => {
   useAuditMac();
   const socket = useRef(null);
 
@@ -2818,4 +2818,4 @@ const ApplicantList = () => {
   );
 };
 
-export default ApplicantList;
+export default AdmissionApplicantList;

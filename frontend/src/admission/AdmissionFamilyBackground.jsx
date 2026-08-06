@@ -36,7 +36,7 @@ import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
-const AdminDashboard2 = () => {
+const AdmissionFamilyBackground = () => {
   useAuditMac();
 
   const settings = useContext(SettingsContext);
@@ -2906,4 +2906,4 @@ const AdminDashboard2 = () => {
 };
 
 
-export default AdminDashboard2;
+export default AdmissionFamilyBackground;

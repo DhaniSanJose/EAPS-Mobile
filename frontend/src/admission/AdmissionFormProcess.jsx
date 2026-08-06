@@ -13,7 +13,7 @@ import useAuditMac from "../utils/useAuditMac";
 import { QRCodeSVG } from "qrcode.react";
 import DownloadIcon from "@mui/icons-material/Download";
 
-const AdminAdmissionFormProcess = forwardRef((props, ref) => {
+const AdmissionFormProcess = forwardRef((props, ref) => {
   useAuditMac();
   const { personId: personIdProp, controlNumber: controlNumberProp } = props;
   const settings = useContext(SettingsContext);
@@ -2739,4 +2739,4 @@ const AdminAdmissionFormProcess = forwardRef((props, ref) => {
   );
 });
 
-export default AdminAdmissionFormProcess;
+export default AdmissionFormProcess;

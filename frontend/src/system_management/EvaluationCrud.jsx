@@ -12,7 +12,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const EvaluationCRUD = () => {
+const EvaluationCrud = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -1649,5 +1649,5 @@ const EvaluationCRUD = () => {
     );
 }
 
-export default EvaluationCRUD;
+export default EvaluationCrud;
 

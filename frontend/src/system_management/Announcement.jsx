@@ -39,7 +39,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const AnnouncementPanel = () => {
+const Announcement = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -1320,4 +1320,4 @@ const AnnouncementPanel = () => {
     );
 };
 
-export default AnnouncementPanel;
+export default Announcement;

@@ -41,7 +41,7 @@ import Cropper from "react-easy-crop";
 import SaveIcon from '@mui/icons-material/Save';
 import SearchIcon from "@mui/icons-material/Search";
 
-const AnnouncementPanel = () => {
+const AdmissionAnnouncement = () => {
   useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -1314,4 +1314,4 @@ const AnnouncementPanel = () => {
     );
 };
 
-export default AnnouncementPanel;
+export default AdmissionAnnouncement;

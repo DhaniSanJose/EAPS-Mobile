@@ -44,7 +44,7 @@ import CampaignIcon from '@mui/icons-material/Campaign';
 import DateField from "../components/DateField";
 import SaveIcon from "@mui/icons-material/Save";
 
-const ApplicantScoring = () => {
+const ApplicantEntranceExamScore = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -2531,4 +2531,4 @@ const ApplicantScoring = () => {
     );
 };
 
-export default ApplicantScoring;
+export default ApplicantEntranceExamScore;

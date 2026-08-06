@@ -12,7 +12,7 @@ import useAuditMac from "../utils/useAuditMac";
 import DownloadIcon from "@mui/icons-material/Download";
 
 
-const ECATApplicationForm = forwardRef(({ personId }, ref) => {
+const AdminECATApplicationForm = forwardRef(({ personId }, ref) => {
   useAuditMac();
 
   const settings = useContext(SettingsContext);
@@ -1572,5 +1572,5 @@ const ECATApplicationForm = forwardRef(({ personId }, ref) => {
   );
 });
 
-export default ECATApplicationForm;
+export default AdminECATApplicationForm;
 

@@ -53,7 +53,7 @@ import CampaignIcon from "@mui/icons-material/Campaign";
 import { Toc } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close"; // or use the custom SVG below
 
-const AssignScheduleToApplicants = () => {
+const EntranceExamScheduleManagement = () => {
   useAuditMac();
   const socket = useRef(null);
   const settings = useContext(SettingsContext);
@@ -2590,4 +2590,4 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
   );
 };
 
-export default AssignScheduleToApplicants;
+export default EntranceExamScheduleManagement;

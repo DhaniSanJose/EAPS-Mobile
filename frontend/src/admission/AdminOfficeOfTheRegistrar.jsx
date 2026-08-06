@@ -12,7 +12,7 @@ import useAuditMac from "../utils/useAuditMac";
 import DownloadIcon from "@mui/icons-material/Download";
 
 
-const OfficeOfTheRegistrar = forwardRef(({ personId }, ref) => {
+const AdminOfficeOfTheRegistrar = forwardRef(({ personId }, ref) => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -2876,4 +2876,4 @@ const OfficeOfTheRegistrar = forwardRef(({ personId }, ref) => {
   );
 });
 
-export default OfficeOfTheRegistrar;
+export default AdminOfficeOfTheRegistrar;

@@ -256,7 +256,7 @@ const StudentResetPassword = lazy(() => import("./student/StudentResetPassword")
 const StudentSchedule = lazy(() => import("./student/StudentSchedule"));
 const StudentCurriculumSubjects = lazy(() => import("./student/StudentCurriculumSubjects"));
 const StudentHistory = lazy(() => import("./student/StudentHistory"));
-const AdminBranches = lazy(() => import("./system_management/AdminBranches"));
+const AdminBranches = lazy(() => import("./system_management/AdminBranchesManagement"));
 const Announcement = lazy(() => import("./system_management/Announcement"));
 const AuditLogs = lazy(() => import("./system_management/AuditLogs"));
 const ChangeGradingPeriod = lazy(() => import("./system_management/ChangeYearGradPer"));

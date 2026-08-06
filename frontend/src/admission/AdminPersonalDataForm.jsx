@@ -11,7 +11,7 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import DownloadIcon from "@mui/icons-material/Download";
 
-const PersonalDataForm = forwardRef(({ personId }, ref) => {
+const AdminPersonalDataForm = forwardRef(({ personId }, ref) => {
     useAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1787,6 +1787,6 @@ const PersonalDataForm = forwardRef(({ personId }, ref) => {
     );
 });
 
-export default PersonalDataForm;
+export default AdminPersonalDataForm;
 
 

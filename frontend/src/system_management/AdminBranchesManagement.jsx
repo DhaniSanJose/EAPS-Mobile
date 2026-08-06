@@ -40,7 +40,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const AdminBranches = () => {
+const AdminBranchesManagement = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -671,4 +671,4 @@ const AdminBranches = () => {
   );
 };
 
-export default AdminBranches;
+export default AdminBranchesManagement;

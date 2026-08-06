@@ -32,7 +32,7 @@ import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import DateField from "../components/DateField";
 import AdmissionRoomAssignmentTabs from "../components/AdmissionRoomAssignmentTabs";
 
-const ScheduleHoverTile = () => {
+const AdmissionScheduleTile = () => {
     useAuditMac();
     const navigate = useNavigate();
     const settings = useContext(SettingsContext);
@@ -642,4 +642,4 @@ const ScheduleHoverTile = () => {
     );
 };
 
-export default ScheduleHoverTile;
+export default AdmissionScheduleTile;

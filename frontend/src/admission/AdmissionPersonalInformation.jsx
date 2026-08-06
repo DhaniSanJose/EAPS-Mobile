@@ -47,7 +47,7 @@ import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 import SaveIcon from '@mui/icons-material/Save';
 
-const AdminPersonalInformation = () => {
+const AdmissionPersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -4367,4 +4367,4 @@ const AdminPersonalInformation = () => {
   );
 };
 
-export default AdminPersonalInformation;
+export default AdmissionPersonalInformation;

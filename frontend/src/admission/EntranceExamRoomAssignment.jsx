@@ -39,7 +39,7 @@ import SaveIcon from '@mui/icons-material/Save';
 
 
 
-const AssignEntranceExam = () => {
+const EntranceExamRoomAssignment = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -1559,4 +1559,4 @@ const AssignEntranceExam = () => {
   );
 };
 
-export default AssignEntranceExam;
+export default EntranceExamRoomAssignment;

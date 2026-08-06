@@ -43,7 +43,7 @@ import CampaignIcon from '@mui/icons-material/Campaign';
 import CloseIcon from "@mui/icons-material/Close";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
-const StudentRequirements = () => {
+const AdmissionOnlineRequirements = () => {
   useAuditMac();
   const navigate = useNavigate();
   // ------------------------------------
@@ -2128,4 +2128,4 @@ const StudentRequirements = () => {
   );
 };
 
-export default StudentRequirements;
+export default AdmissionOnlineRequirements;

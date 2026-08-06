@@ -35,7 +35,7 @@ import AdminECATApplicationForm from "./AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
-const AdminDashboard5 = () => {
+const AdmissionOtherInformation = () => {
   useAuditMac();
 
   const settings = useContext(SettingsContext);
@@ -1586,4 +1586,4 @@ const AdminDashboard5 = () => {
 };
 
 
-export default AdminDashboard5;
+export default AdmissionOtherInformation;

@@ -115,7 +115,7 @@ const FORM_ENDPOINTS = {
   admissionFormProcess: { url: "/api/generate-admission-form-pdf", prefix: "Admission_Form_Process" },
 };
 
-const ExaminationProfile = () => {
+const ExaminationPermitChangeCourse = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const [fetchedLogo, setFetchedLogo] = useState(null);
@@ -1586,4 +1586,4 @@ const ExaminationProfile = () => {
   );
 };
 
-export default ExaminationProfile;
+export default ExaminationPermitChangeCourse;

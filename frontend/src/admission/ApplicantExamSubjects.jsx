@@ -38,7 +38,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
 
-const AdminSubjects = () => {
+const ApplicantExamSubjects = () => {
   useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -714,4 +714,4 @@ const AdminSubjects = () => {
     );
 };
 
-export default AdminSubjects;
+export default ApplicantExamSubjects;

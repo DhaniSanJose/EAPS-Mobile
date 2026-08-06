@@ -30,7 +30,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import DateField from "../components/DateField";
 import AdmissionRoomAssignmentTabs from "../components/AdmissionRoomAssignmentTabs";
 
-const ScheduleHoverTile = () => {
+const EvaluatorScheduleTile = () => {
   useAuditMac();
   const navigate = useNavigate();
   const settings = useContext(SettingsContext);
@@ -674,4 +674,4 @@ const ScheduleHoverTile = () => {
   );
 };
 
-export default ScheduleHoverTile;
+export default EvaluatorScheduleTile;

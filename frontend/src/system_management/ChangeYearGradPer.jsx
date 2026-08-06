@@ -12,7 +12,7 @@ import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const ChangeGradingPeriod = () => {
+const ChangeYearGradPer = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -279,4 +279,4 @@ const ChangeGradingPeriod = () => {
   );
 };
 
-export default ChangeGradingPeriod;
+export default ChangeYearGradPer;
