@@ -1090,8 +1090,8 @@ const ScheduleChecker = () => {
       console.error("Error updating schedule:", error);
       showScheduleSnackbar(
         error.response?.data?.message ||
-          error.response?.data?.error ||
-          "Failed to update schedule."
+        error.response?.data?.error ||
+        "Failed to update schedule."
       );
     }
   };
@@ -1138,7 +1138,7 @@ const ScheduleChecker = () => {
       if (timeResponse.data.conflict) {
         showScheduleSnackbar(
           timeResponse.data.message ||
-            "Schedule conflict detected! Please choose a different time."
+          "Schedule conflict detected! Please choose a different time."
         );
       } else {
         const workloadWarning = await getWorkloadWarning({
@@ -1559,12 +1559,12 @@ const ScheduleChecker = () => {
       const selectionHighlightClass =
         editingScheduleId === entry.id
           ? [
-              "box-border border-blue-600 border-l-2 border-r-2",
-              isTopSlot ? "border-t-2" : "",
-              isBottomSlot ? "border-b-2" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")
+            "box-border border-blue-600 border-l-2 border-r-2",
+            isTopSlot ? "border-t-2" : "",
+            isBottomSlot ? "border-b-2" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")
           : "";
 
       const blockHeightRem = totalHours * SLOT_HEIGHT_REM;
@@ -1579,9 +1579,8 @@ const ScheduleChecker = () => {
         if (useOverlayCentering) {
           textContent = (
             <span
-              className={`absolute left-0 right-0 z-[2] box-border border-b border-black flex flex-col items-center justify-center text-center leading-tight pointer-events-none px-0.5 ${
-                useCompactText ? "text-[10px]" : "text-[11px]"
-              }`}
+              className={`absolute left-0 right-0 z-[2] box-border border-b border-black flex flex-col items-center justify-center text-center leading-tight pointer-events-none px-0.5 ${useCompactText ? "text-[10px]" : "text-[11px]"
+                }`}
               style={{
                 top: 0,
                 height: `${blockHeightRem}rem`,
@@ -1715,8 +1714,8 @@ const ScheduleChecker = () => {
       console.error("Failed to download class schedule:", error);
       setMessage(
         error?.response?.data?.message ||
-          error?.message ||
-          "Failed to download class schedule. Please try again.",
+        error?.message ||
+        "Failed to download class schedule. Please try again.",
       );
       setSnackbarSeverity("error");
       setOpenSnackbar(true);
@@ -2358,7 +2357,7 @@ const ScheduleChecker = () => {
               LEGEND
             </Typography>
 
-  
+
 
             {workloadTypeList.map((item) => (
               <Chip

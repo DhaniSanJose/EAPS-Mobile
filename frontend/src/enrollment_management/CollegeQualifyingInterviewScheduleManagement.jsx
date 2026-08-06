@@ -1324,8 +1324,10 @@ ${requirementsSection}
   const [finalPreview, setFinalPreview] = useState(""); // live full preview shown read-only
 
   const [customReminders, setCustomReminders] = useState(
-    `• Please provide your Enrollment Officer with photocopies of all your submitted online documents.
-• Your Enrollment Officer will provide you with the Admission Form Process, including the required signatories.`,
+    `• Bring your Entrance Examination Permit during Qualifying / Interview.
+• Bring the Admission Form Process provided by the Admission Office.
+• Bring one (1) long brown envelope with a long plastic cover for your college copies.
+• Provide your Enrollment Officer with photocopies of all documents you previously submitted through the online application portal.`,
   );
 
   const [schedules, setSchedules] = useState([]);

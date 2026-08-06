@@ -15,6 +15,16 @@ const toWholeUnit = (value) => {
   return Number.isFinite(num) ? Math.round(num) : 0;
 };
 
+const formatProfessorName = (firstName, lastName, middleName) => {
+  const isTba = firstName === "TBA" && lastName === "TBA";
+  if (isTba) return "TBA";
+  const last = (lastName || "").trim();
+  const first = (firstName || "").trim();
+  const middle = (middleName || "").trim();
+  if (!last && !first) return "TBA";
+  return `${last}, ${first}${middle ? " " + middle : ""}`.trim();
+};
+
 // Schedule cell text is squeezed as tight as possible (no comma after the
 // day, no space before AM/PM) so each row's schedule column has a chance
 // of fitting on a single printed line alongside the rest of the row.
@@ -154,12 +164,12 @@ const buildWeeklyGridHtml = (studentSchedule) => {
     <tr>
       <th class="wg-time-col">TIME<div class="wg-official-time">Official Time</div></th>
       ${GRID_DAYS.map(
-        (day) => `
+    (day) => `
         <th>
           ${GRID_DAY_LABELS[day]}
           <div class="wg-official-time">7:00AM - 9:00PM</div>
         </th>`
-      ).join("")}
+  ).join("")}
     </tr>
   `;
 
@@ -181,10 +191,11 @@ const buildWeeklyGridHtml = (studentSchedule) => {
         entry.room_description && entry.room_description !== "TBA"
           ? entry.room_description
           : "TBA";
-      const prof =
-        entry.prof_lastname && entry.prof_lastname !== "TBA"
-          ? `Prof. ${entry.prof_lastname}`
-          : "TBA";
+      const prof = formatProfessorName(
+        entry.prof_firstname,
+        entry.prof_lastname,
+        entry.prof_middlename
+      );
 
       return `
         <td class="wg-filled" rowspan="${rowSpan}">
@@ -258,21 +269,17 @@ export const buildStudentSchedulePrintHtml = ({
           <td>${escapeHtml(row.course_description)}</td>
           <td class="center">${escapeHtml(row.course_code)}</td>
           <td class="center">1</td>
-          <td class="center">${
-            row.lab_unit == null ? "" : toWholeUnit(row.lab_unit)
-          }</td>
-          <td class="center">${
-            row.course_unit == null ? "" : toWholeUnit(row.course_unit)
-          }</td>
+          <td class="center">${row.lab_unit == null ? "" : toWholeUnit(row.lab_unit)
+        }</td>
+          <td class="center">${row.course_unit == null ? "" : toWholeUnit(row.course_unit)
+        }</td>
           <td class="center">${escapeHtml(
-            `${row.program_code || ""} ${row.section_description || ""}`.trim()
-          )}</td>
+          `${row.program_code || ""} ${row.section_description || ""}`.trim()
+        )}</td>
           <td>${buildScheduleCell(row)}</td>
-          <td>${escapeHtml(
-            !row.prof_lastname || row.prof_lastname === "TBA"
-              ? "TBA"
-              : `Prof. ${row.prof_lastname}`
-          )}</td>
+            <td>${escapeHtml(
+          formatProfessorName(row.prof_firstname, row.prof_lastname, row.prof_middlename)
+        )}</td>
         </tr>`
     )
     .join("");
@@ -297,8 +304,8 @@ export const buildStudentSchedulePrintHtml = ({
       <div class="meta-col meta-col-right">
         <p><strong>Department:</strong> ${escapeHtml(departmentLabel)}</p>
         <p><strong>Program &amp; Section:</strong> ${escapeHtml(
-          studentInfo.programSection || ""
-        )}</p>
+    studentInfo.programSection || ""
+  )}</p>
       </div>
     </div>
 

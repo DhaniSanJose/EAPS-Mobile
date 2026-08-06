@@ -3180,7 +3180,7 @@ const CollegeScheduleChecker = () => {
               LEGEND
             </Typography>
 
-      
+
 
             {workloadTypeList.map((item) => (
               <Chip

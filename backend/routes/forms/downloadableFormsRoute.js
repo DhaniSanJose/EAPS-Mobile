@@ -2888,10 +2888,10 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
     browser = await launchBrowser();
     const page = await browser.newPage();
 
-    // American Legal: 8.5in x 14in. Use a wide viewport so the form can
+    // American Legal: 8.5in x 13in. Use a wide viewport so the form can
     // lay out at its natural ~63rem width before we scale it down.
     const LEGAL_WIDTH_PX = 816;  // 8.5in @ 96dpi
-    const LEGAL_HEIGHT_PX = 1344; // 14in @ 96dpi
+    const LEGAL_HEIGHT_PX = 1248; // 13in @ 96dpi
     const PRINT_MARGIN_IN = 0.2;
     const PRINT_MARGIN_PX = PRINT_MARGIN_IN * 96;
 
@@ -2930,7 +2930,7 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
     ${safeStyles}
 
     @page {
-      size: 8.5in 14in;
+      size: 8.5in 13in;
       margin: 0;
     }
 
@@ -2951,7 +2951,7 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
     .fw-pdf-page {
       position: relative;
       width: 8.5in;
-      height: 14in;
+      height: 13in;
       overflow: hidden;
     }
 
@@ -2959,6 +2959,7 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
       position: absolute;
       top: ${PRINT_MARGIN_IN}in;
       left: 0;
+      margin-top: -20px;
       width: max-content;
       max-width: none;
       transform-origin: top left;
@@ -3064,7 +3065,7 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
 
     const pdfBuffer = await page.pdf({
       width: "8.5in",
-      height: "14in",
+      height: "13in",
       printBackground: true,
       preferCSSPageSize: false,
       margin: { top: "0", bottom: "0", left: "0", right: "0" },

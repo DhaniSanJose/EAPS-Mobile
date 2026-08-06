@@ -17,7 +17,7 @@ import API_BASE_URL from "../apiConfig";
 import { downloadStudentSchedulePdf } from "../utils/studentSchedulePrintLayout";
 import EaristLogo from "../assets/EaristLogo.png";
 import { FcPrint } from "react-icons/fc";
-import EventNoteIcon from '@mui/icons-material/EventNote';
+import EventNoteIcon from "@mui/icons-material/EventNote";
 
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const DAY_LABELS = {
@@ -93,7 +93,9 @@ const StudentSchedule = () => {
   const [studentSchedule, setStudentSchedule] = useState([]);
   const [activeDay, setActiveDay] = useState("MON");
   const [deviceType, setDeviceType] = useState(() =>
-    typeof window !== "undefined" ? getDeviceType(window.innerWidth) : "desktop"
+    typeof window !== "undefined"
+      ? getDeviceType(window.innerWidth)
+      : "desktop",
   );
   const [isDownloadingSchedule, setIsDownloadingSchedule] = useState(false);
 
@@ -132,7 +134,8 @@ const StudentSchedule = () => {
     if (settings.title_color) setTitleColor(settings.title_color);
     if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+    if (settings.main_button_color)
+      setMainButtonColor(settings.main_button_color);
   }, [settings]);
 
   // Single resize listener drives device type (mobile / tablet / desktop)
@@ -156,8 +159,14 @@ const StudentSchedule = () => {
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
     const storedID = localStorage.getItem("person_id");
-    if (!storedID) { window.location.href = "/login"; return; }
-    if (storedRole !== "student") { window.location.href = "/faculty_dashboard"; return; }
+    if (!storedID) {
+      window.location.href = "/login";
+      return;
+    }
+    if (storedRole !== "student") {
+      window.location.href = "/faculty_dashboard";
+      return;
+    }
     fetchStudentSchedule(storedID);
     fetchStudentInfo(storedID);
     fetchStudentAcademicDetails(storedID);
@@ -171,13 +180,18 @@ const StudentSchedule = () => {
   useEffect(() => {
     const fetchActiveSemester = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/get_current_academic_year`);
+        const res = await axios.get(
+          `${API_BASE_URL}/api/get_current_academic_year`,
+        );
         const { year_description, semester_description } = res.data || {};
         setActiveSemesterName(semester_description || "");
         setActiveSemesterLabel(
-          [semester_description?.toUpperCase(), year_description ? `AY ${year_description}` : ""]
+          [
+            year_description ? `AY ${year_description}` : "",
+            semester_description?.toUpperCase(),
+          ]
             .filter(Boolean)
-            .join(", ")
+            .join(", "),
         );
       } catch (error) {
         console.error("Error fetching active school year:", error);
@@ -238,7 +252,7 @@ const StudentSchedule = () => {
     if (!curriculumId) return "";
     try {
       const res = await axios.get(
-        `${API_BASE_URL}/api/department_by_curriculum/${curriculumId}`
+        `${API_BASE_URL}/api/department_by_curriculum/${curriculumId}`,
       );
       return res.data?.dprtmnt_name || "";
     } catch (error) {
@@ -265,7 +279,10 @@ const StudentSchedule = () => {
       // Prefer a department name already present on the row; otherwise
       // resolve it from the curriculum the student is enrolled under.
       let department =
-        row.dprtmnt_name || row.department_name || row.department_description || "";
+        row.dprtmnt_name ||
+        row.department_name ||
+        row.department_description ||
+        "";
 
       const curriculumId = row.curriculum_id ?? row.program ?? null;
       if (!department && curriculumId) {
@@ -280,11 +297,14 @@ const StudentSchedule = () => {
           const deptRes = await axios.get(`${API_BASE_URL}/api/get_department`);
           const deptRows = Array.isArray(deptRes.data) ? deptRes.data : [];
           const match = deptRows.find(
-            (d) => String(d.dprtmnt_id) === String(departmentId)
+            (d) => String(d.dprtmnt_id) === String(departmentId),
           );
           department = match?.dprtmnt_name || "";
         } catch (deptErr) {
-          console.error("Error resolving student department (legacy):", deptErr);
+          console.error(
+            "Error resolving student department (legacy):",
+            deptErr,
+          );
         }
       }
 
@@ -299,8 +319,10 @@ const StudentSchedule = () => {
           .filter(Boolean)
           .join(" - "),
         programCode: prev.programCode || row.program_code || "",
-        programDescription: prev.programDescription || row.program_description || "",
-        sectionDescription: prev.sectionDescription || row.section_description || "",
+        programDescription:
+          prev.programDescription || row.program_description || "",
+        sectionDescription:
+          prev.sectionDescription || row.section_description || "",
       }));
     } catch (error) {
       console.error("Error fetching student info:", error);
@@ -318,15 +340,18 @@ const StudentSchedule = () => {
 
       setStudentInfo((prev) => ({
         ...prev,
-        programCode: row.program_code && row.program_code !== "Not Currently Enrolled"
-          ? row.program_code
-          : prev.programCode,
+        programCode:
+          row.program_code && row.program_code !== "Not Currently Enrolled"
+            ? row.program_code
+            : prev.programCode,
         programDescription:
-          row.program_description && row.program_description !== "Not Currently Enrolled"
+          row.program_description &&
+          row.program_description !== "Not Currently Enrolled"
             ? row.program_description
             : prev.programDescription,
         sectionDescription:
-          row.section_description && row.section_description !== "Not Currently Enrolled"
+          row.section_description &&
+          row.section_description !== "Not Currently Enrolled"
             ? row.section_description
             : prev.sectionDescription,
         yearLevelDescription:
@@ -347,14 +372,18 @@ const StudentSchedule = () => {
   const sortedSchedule = useMemo(
     () =>
       [...studentSchedule].sort((a, b) =>
-        (a.course_code || "").localeCompare(b.course_code || "")
+        (a.course_code || "").localeCompare(b.course_code || ""),
       ),
-    [studentSchedule]
+    [studentSchedule],
   );
 
   const totalUnits = useMemo(
-    () => sortedSchedule.reduce((total, row) => total + toWholeUnit(row.course_unit), 0),
-    [sortedSchedule]
+    () =>
+      sortedSchedule.reduce(
+        (total, row) => total + toWholeUnit(row.course_unit),
+        0,
+      ),
+    [sortedSchedule],
   );
 
   const isTimeInSchedule = (start, end, day) =>
@@ -382,7 +411,9 @@ const StudentSchedule = () => {
   // the source of the misaligned border/height seen in the screenshot).
   const hasAdjacentSchedule = (start, end, day, direction = "top") => {
     const minutesOffset = direction === "top" ? -30 : 30;
-    const newStart = new Date(parseTime(start).getTime() + minutesOffset * 60000);
+    const newStart = new Date(
+      parseTime(start).getTime() + minutesOffset * 60000,
+    );
     const newEnd = new Date(parseTime(end).getTime() + minutesOffset * 60000);
     const currentEntry = getEntryForSlot(start, day);
     const adjacentEntry = studentSchedule.find((entry) => {
@@ -392,7 +423,8 @@ const StudentSchedule = () => {
       return newStart >= schedStart && newEnd <= schedEnd;
     });
     if (!adjacentEntry) return false;
-    if (currentEntry && adjacentEntry.course_code === currentEntry.course_code) return "same";
+    if (currentEntry && adjacentEntry.course_code === currentEntry.course_code)
+      return "same";
     return "different";
   };
 
@@ -410,7 +442,9 @@ const StudentSchedule = () => {
       if (!(slotStart >= schedStart && slotStart < schedEnd)) continue;
 
       const totalSlots = Math.round((schedEnd - schedStart) / (30 * 60 * 1000));
-      const idxInBlock = Math.round((slotStart - schedStart) / (30 * 60 * 1000));
+      const idxInBlock = Math.round(
+        (slotStart - schedStart) / (30 * 60 * 1000),
+      );
       const isOdd = totalSlots % 2 === 1;
       const centerIndex = isOdd ? (totalSlots - 1) / 2 : totalSlots / 2;
       const isCenter = idxInBlock === centerIndex;
@@ -427,15 +461,51 @@ const StudentSchedule = () => {
           : `Prof. ${entry.prof_firstname || ""} ${entry.prof_lastname || ""}`.trim();
 
       return (
-        <span style={{ position: "relative", display: "inline-block", textAlign: "center", width: "100%", fontSize, marginTop }}>
+        <span
+          style={{
+            position: "relative",
+            display: "inline-block",
+            textAlign: "center",
+            width: "100%",
+            fontSize,
+            marginTop,
+          }}
+        >
           <div style={{ width: "100%", padding: "0 2px" }}>
-            <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 700, fontSize }}>
+            <span
+              style={{
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontWeight: 700,
+                fontSize,
+              }}
+            >
               {entry.course_code}
             </span>
-            <span style={{ display: "block", whiteSpace: "normal", wordBreak: "break-word", fontSize: "8px", lineHeight: 1.2 }}>
-              {entry.room_description === "TBA" ? "TBA" : entry.room_description}
+            <span
+              style={{
+                display: "block",
+                whiteSpace: "normal",
+                wordBreak: "break-word",
+                fontSize: "8px",
+                lineHeight: 1.2,
+              }}
+            >
+              {entry.room_description === "TBA"
+                ? "TBA"
+                : entry.room_description}
             </span>
-            <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: totalSlots <= 2 ? "8px" : "9.5px" }}>
+            <span
+              style={{
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: totalSlots <= 2 ? "8px" : "9.5px",
+              }}
+            >
               {professorLabel}
             </span>
           </div>
@@ -457,12 +527,28 @@ const StudentSchedule = () => {
         p: 1.5,
       }}
     >
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 14, color: mainButtonColor }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 1,
+        }}
+      >
+        <Typography
+          sx={{ fontWeight: 700, fontSize: 14, color: mainButtonColor }}
+        >
           {entry.course_code}
         </Typography>
         {showDay && (
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#777", whiteSpace: "nowrap" }}>
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#777",
+              whiteSpace: "nowrap",
+            }}
+          >
             {entry.day_description}
           </Typography>
         )}
@@ -478,7 +564,8 @@ const StudentSchedule = () => {
           📍 {entry.room_description}
         </Typography>
         <Typography sx={{ fontSize: 11, color: "#555" }}>
-          👤 {entry.prof_firstname === "TBA" && entry.prof_lastname === "TBA"
+          👤{" "}
+          {entry.prof_firstname === "TBA" && entry.prof_lastname === "TBA"
             ? "TBA"
             : `Prof. ${entry.prof_firstname || ""} ${entry.prof_lastname || ""}`.trim()}
         </Typography>
@@ -486,7 +573,8 @@ const StudentSchedule = () => {
           📚 {entry.program_code} {entry.section_description}
         </Typography>
         <Typography sx={{ fontSize: 11, color: "#555" }}>
-          ⓤ {toWholeUnit(entry.course_unit)} unit{toWholeUnit(entry.course_unit) === 1 ? "" : "s"}
+          ⓤ {toWholeUnit(entry.course_unit)} unit
+          {toWholeUnit(entry.course_unit) === 1 ? "" : "s"}
         </Typography>
       </Box>
     </Box>
@@ -497,7 +585,14 @@ const StudentSchedule = () => {
   const renderCourseSummary = () => {
     if (isMobile) {
       return (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, px: { xs: 0.5, sm: 0 } }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+            px: { xs: 0.5, sm: 0 },
+          }}
+        >
           {sortedSchedule.map((row, i) => (
             <CourseCard key={i} entry={row} showDay />
           ))}
@@ -512,8 +607,12 @@ const StudentSchedule = () => {
               background: "#f5f5f5",
             }}
           >
-            <Typography sx={{ fontWeight: 700, fontSize: 13 }}>Total Units</Typography>
-            <Typography sx={{ fontWeight: 700, fontSize: 13, color: mainButtonColor }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+              Total Units
+            </Typography>
+            <Typography
+              sx={{ fontWeight: 700, fontSize: 13, color: mainButtonColor }}
+            >
               {totalUnits}
             </Typography>
           </Box>
@@ -522,12 +621,42 @@ const StudentSchedule = () => {
     }
 
     return (
-      <TableContainer component={Paper} sx={{ mx: "auto", width: "100%", overflowX: "auto", borderRadius: "10px" }}>
+      <TableContainer
+        component={Paper}
+        sx={{
+          mx: "auto",
+          width: "100%",
+          overflowX: "auto",
+          borderRadius: "10px",
+        }}
+      >
         <Table size="small" sx={{ minWidth: isTablet ? 640 : "auto" }}>
           <TableHead sx={{ backgroundColor: headerBg }}>
             <TableRow>
-              {["#", "Course Description", "Course Code", "Lec", "Lab", "Units", "Section", "Schedule", "Professor"].map((h) => (
-                <TableCell key={h} sx={{ color: "white", border: `1px solid ${borderColor}`, fontSize: { sm: "0.7rem", md: "0.75rem" }, whiteSpace: "nowrap", fontWeight: 600, textTransform: "uppercase" }}>{h}</TableCell>
+              {[
+                "#",
+                "Course Description",
+                "Course Code",
+                "Lec",
+                "Lab",
+                "Units",
+                "Section",
+                "Schedule",
+                "Professor",
+              ].map((h) => (
+                <TableCell
+                  key={h}
+                  sx={{
+                    color: "white",
+                    border: `1px solid ${borderColor}`,
+                    fontSize: { sm: "0.7rem", md: "0.75rem" },
+                    whiteSpace: "nowrap",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {h}
+                </TableCell>
               ))}
             </TableRow>
           </TableHead>
@@ -552,20 +681,49 @@ const StudentSchedule = () => {
                     ? "TBA"
                     : `Prof. ${row.prof_firstname || ""} ${row.prof_lastname || ""}`.trim(),
                 ].map((cell, ci) => (
-                  <TableCell key={ci} sx={{ fontSize: { sm: "0.7rem", md: "0.75rem" }, border: `1px solid ${borderColor}` }}>
+                  <TableCell
+                    key={ci}
+                    sx={{
+                      fontSize: { sm: "0.7rem", md: "0.75rem" },
+                      border: `1px solid ${borderColor}`,
+                    }}
+                  >
                     {cell}
                   </TableCell>
                 ))}
               </TableRow>
             ))}
             <TableRow>
-              <TableCell colSpan={3} style={{ border: `1px solid ${borderColor}` }} />
-              <TableCell colSpan={2} style={{ fontWeight: "600", border: `1px solid ${borderColor}`, fontSize: "0.75rem" }}>Total Units</TableCell>
-              <TableCell style={{ border: `1px solid ${borderColor}`, fontSize: "0.75rem" }}>
+              <TableCell
+                colSpan={3}
+                style={{ border: `1px solid ${borderColor}` }}
+              />
+              <TableCell
+                colSpan={2}
+                style={{
+                  fontWeight: "600",
+                  border: `1px solid ${borderColor}`,
+                  fontSize: "0.75rem",
+                }}
+              >
+                Total Units
+              </TableCell>
+              <TableCell
+                style={{
+                  border: `1px solid ${borderColor}`,
+                  fontSize: "0.75rem",
+                }}
+              >
                 {totalUnits}
               </TableCell>
-              <TableCell colSpan={2} style={{ border: `1px solid ${borderColor}` }} />
-              <TableCell colSpan={2} style={{ border: `1px solid ${borderColor}` }} />
+              <TableCell
+                colSpan={2}
+                style={{ border: `1px solid ${borderColor}` }}
+              />
+              <TableCell
+                colSpan={2}
+                style={{ border: `1px solid ${borderColor}` }}
+              />
             </TableRow>
           </TableBody>
         </Table>
@@ -577,12 +735,17 @@ const StudentSchedule = () => {
   const renderCompactDaySchedule = () => {
     const dayEntries = studentSchedule
       .filter((e) => e.day_description === activeDay)
-      .sort((a, b) => parseTime(a.school_time_start) - parseTime(b.school_time_start));
+      .sort(
+        (a, b) =>
+          parseTime(a.school_time_start) - parseTime(b.school_time_start),
+      );
 
     if (!dayEntries.length) {
       return (
         <Box sx={{ textAlign: "center", py: 6, color: "#888" }}>
-          <Typography sx={{ fontSize: 14 }}>No classes on {DAY_LABELS[activeDay]}</Typography>
+          <Typography sx={{ fontSize: 14 }}>
+            No classes on {DAY_LABELS[activeDay]}
+          </Typography>
         </Box>
       );
     }
@@ -606,9 +769,21 @@ const StudentSchedule = () => {
 
   const renderDayTabs = () => (
     <>
-      <Box sx={{ display: "flex", gap: 0.75, overflowX: "auto", pb: 1, mb: 1, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 0.75,
+          overflowX: "auto",
+          pb: 1,
+          mb: 1,
+          scrollbarWidth: "none",
+          "&::-webkit-scrollbar": { display: "none" },
+        }}
+      >
         {DAYS.map((day) => {
-          const hasClass = studentSchedule.some((e) => e.day_description === day);
+          const hasClass = studentSchedule.some(
+            (e) => e.day_description === day,
+          );
           const isActive = activeDay === day;
           return (
             <Box
@@ -631,13 +806,25 @@ const StudentSchedule = () => {
             >
               {day}
               {hasClass && !isActive && (
-                <Box sx={{ position: "absolute", top: 2, right: 2, width: 5, height: 5, borderRadius: "50%", backgroundColor: mainButtonColor }} />
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 2,
+                    right: 2,
+                    width: 5,
+                    height: 5,
+                    borderRadius: "50%",
+                    backgroundColor: mainButtonColor,
+                  }}
+                />
               )}
             </Box>
           );
         })}
       </Box>
-      <Typography sx={{ fontSize: 13, fontWeight: 600, color: mainButtonColor, mb: 1 }}>
+      <Typography
+        sx={{ fontSize: 13, fontWeight: 600, color: mainButtonColor, mb: 1 }}
+      >
         {DAY_LABELS[activeDay]}
       </Typography>
     </>
@@ -660,7 +847,15 @@ const StudentSchedule = () => {
     const gridTemplateColumns = `${timeColWidth} repeat(7, minmax(${dayColWidth}, 1fr))`;
 
     return (
-      <Box sx={{ overflowX: "auto", width: "100%", borderRadius: "10px", border: `1px solid ${borderColor}`, overflow: "hidden" }}>
+      <Box
+        sx={{
+          overflowX: "auto",
+          width: "100%",
+          borderRadius: "10px",
+          border: `1px solid ${borderColor}`,
+          overflow: "hidden",
+        }}
+      >
         <Box sx={{ display: "grid", gridTemplateColumns, minWidth: "1050px" }}>
           {/* ── Header row ── */}
           <Box
@@ -698,12 +893,15 @@ const StudentSchedule = () => {
                 alignItems: "center",
                 justifyContent: "center",
                 py: 0.75,
-                borderRight: i === DAYS.length - 1 ? "none" : `1px solid ${borderColor}`,
+                borderRight:
+                  i === DAYS.length - 1 ? "none" : `1px solid ${borderColor}`,
                 borderBottom: `1px solid ${borderColor}`,
                 minHeight: "3.1rem",
               }}
             >
-              <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}>
+              <Typography
+                sx={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5 }}
+              >
                 {DAY_LABELS[day].toUpperCase()}
               </Typography>
               <Typography sx={{ fontSize: 10, opacity: 0.85, mt: 0.2 }}>
@@ -748,9 +946,16 @@ const StudentSchedule = () => {
                       justifyContent: "center",
                       fontSize: 14,
                       backgroundColor: inSched ? "#fef08a" : "transparent",
-                      borderRight: i === DAYS.length - 1 ? "none" : `1px solid ${borderColor}`,
-                      borderTop: inSched && topAdj === "same" ? "none" : undefined,
-                      borderBottom: inSched && botAdj === "same" ? "none" : `1px solid ${borderColor}`,
+                      borderRight:
+                        i === DAYS.length - 1
+                          ? "none"
+                          : `1px solid ${borderColor}`,
+                      borderTop:
+                        inSched && topAdj === "same" ? "none" : undefined,
+                      borderBottom:
+                        inSched && botAdj === "same"
+                          ? "none"
+                          : `1px solid ${borderColor}`,
                       marginTop: inSched && topAdj === "same" ? "-1px" : 0,
                     }}
                   >
@@ -795,7 +1000,8 @@ const StudentSchedule = () => {
         // resolveDepartmentByCurriculum above), falling back to
         // settings if that lookup comes back empty.
         collegeName: studentInfo.department || settings?.college_name || "",
-        semesterLabel: activeSemesterLabel || settings?.active_semester_label || "",
+        semesterLabel:
+          activeSemesterLabel || settings?.active_semester_label || "",
         logoUrl: settings?.logo_url
           ? `${API_BASE_URL}${settings.logo_url}`
           : `${window.location.origin}${EaristLogo}`,
@@ -815,17 +1021,37 @@ const StudentSchedule = () => {
     .join(" — ");
 
   return (
-    <Box sx={{ minHeight: "calc(100vh - 150px)", overflowY: "auto", backgroundColor: "transparent", mt: 1, p: { xs: 1, sm: 2 } }}>
+    <Box
+      sx={{
+        minHeight: "calc(100vh - 150px)",
+        overflowY: "auto",
+        backgroundColor: "transparent",
+        mt: 1,
+        p: { xs: 1, sm: 2 },
+      }}
+    >
       {/* Header */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, mb: 2, px: { xs: 0, sm: 2 } }}>
-        <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: { xs: "20px", sm: "26px", md: "32px", lg: "36px" } }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 1,
+          mb: 2,
+          px: { xs: 0, sm: 2 },
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: "bold",
+            color: titleColor,
+            fontSize: { xs: "20px", sm: "26px", md: "32px", lg: "36px" },
+          }}
+        >
           CLASS SCHEDULE
         </Typography>
-
-
-
-
-
 
         <button
           variant="contained"
@@ -852,9 +1078,7 @@ const StudentSchedule = () => {
           onMouseLeave={(e) =>
             (e.currentTarget.style.backgroundColor = "#f0f0f0")
           }
-          onMouseDown={(e) =>
-            (e.currentTarget.style.transform = "scale(0.95)")
-          }
+          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
           type="button"
         >
@@ -864,7 +1088,6 @@ const StudentSchedule = () => {
       </Box>
 
       <Box sx={{ height: "1px", backgroundColor: borderColor, mb: 3 }} />
-
 
       {/* ── Student Info Card — mirrors StudentCurriculumSubjects.jsx ── */}
       {(studentInfo.fullName || studentInfo.studentNumber) && (
@@ -922,25 +1145,48 @@ const StudentSchedule = () => {
             >
               {/* LEFT */}
               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 11.5, sm: 13, md: 14 },
+                    fontWeight: 700,
+                    color: titleColor,
+                  }}
+                >
                   STUDENT NUMBER:{" "}
-                  <Box component="span" sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}>
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}
+                  >
                     {studentInfo.studentNumber || "—"}
                   </Box>
                 </Typography>
-                <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 11.5, sm: 13, md: 14 },
+                    fontWeight: 700,
+                    color: titleColor,
+                  }}
+                >
                   NAME:{" "}
                   <Box component="span" sx={{ fontWeight: 400, ml: 1 }}>
                     {studentInfo.fullName}
                   </Box>
                 </Typography>
-                <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 11.5, sm: 13, md: 14 },
+                    fontWeight: 700,
+                    color: titleColor,
+                  }}
+                >
                   DEPARTMENT:{" "}
-                  <Box component="span" sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}>
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}
+                  >
                     {studentInfo.department || "—"}
                   </Box>
                 </Typography>
-
               </Box>
 
               {/* RIGHT */}
@@ -952,22 +1198,51 @@ const StudentSchedule = () => {
                   gap: 0.5,
                 }}
               >
-                <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 11.5, sm: 13, md: 14 },
+                    fontWeight: 700,
+                    color: titleColor,
+                  }}
+                >
                   PROGRAM:{" "}
-                  <Box component="span" sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}>
-                    {studentInfo.programCode ? `(${studentInfo.programCode}) ` : ""}
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}
+                  >
+                    {studentInfo.programCode
+                      ? `(${studentInfo.programCode}) `
+                      : ""}
                     {studentInfo.programDescription || "—"}
                   </Box>
                 </Typography>
-                <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 11.5, sm: 13, md: 14 },
+                    fontWeight: 700,
+                    color: titleColor,
+                  }}
+                >
                   YEAR / SEMESTER:{" "}
-                  <Box component="span" sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}>
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}
+                  >
                     {yearSemesterLine || "—"}
                   </Box>
                 </Typography>
-                <Typography sx={{ fontSize: { xs: 11.5, sm: 13, md: 14 }, fontWeight: 700, color: titleColor }}>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 11.5, sm: 13, md: 14 },
+                    fontWeight: 700,
+                    color: titleColor,
+                  }}
+                >
                   SECTION:{" "}
-                  <Box component="span" sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}>
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 400, ml: 1, color: subtitleColor }}
+                  >
                     {studentInfo.sectionDescription || "—"}
                   </Box>
                 </Typography>
@@ -981,9 +1256,21 @@ const StudentSchedule = () => {
       <Box sx={{ mb: 3, px: { xs: 0, sm: 2 } }}>{renderCourseSummary()}</Box>
 
       {/* Weekly Grid Section */}
-      <Box sx={{ px: { xs: 1, sm: "1rem" }, mx: { xs: 0, sm: 2 }, overflowX: "auto" }}>
+      <Box
+        sx={{
+          px: { xs: 1, sm: "1rem" },
+          mx: { xs: 0, sm: 2 },
+          overflowX: "auto",
+        }}
+      >
         {isCompact ? (
-          <Box sx={{ border: `1px solid ${borderColor}`, borderRadius: "10px", p: { xs: 1, sm: "1rem" } }}>
+          <Box
+            sx={{
+              border: `1px solid ${borderColor}`,
+              borderRadius: "10px",
+              p: { xs: 1, sm: "1rem" },
+            }}
+          >
             {renderDayTabs()}
             {renderCompactDaySchedule()}
           </Box>

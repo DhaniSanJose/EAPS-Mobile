@@ -973,9 +973,8 @@ const FacultyWorkload = () => {
     return WORKLOAD_DAY_COLUMNS.map(({ key, className }) => (
       <div
         key={`${categoryKey}-${key}`}
-        className={`${className} ${rowHeight} ${
-          key === "TOTAL" ? totalClassName : ""
-        }`}
+        className={`${className} ${rowHeight} ${key === "TOTAL" ? totalClassName : ""
+          }`}
         style={{ backgroundColor }}
       >
         {formatWorkloadHours(dailyWorkload[categoryKey][key])}
@@ -1279,7 +1278,7 @@ const FacultyWorkload = () => {
       console.error("Failed to generate Faculty Workload PDF:", error);
       window.alert(
         error?.message ||
-          "Failed to generate Faculty Workload PDF. Please try again.",
+        "Failed to generate Faculty Workload PDF. Please try again.",
       );
     } finally {
       setIsGeneratingWorkloadPdf(false);
@@ -1598,8 +1597,11 @@ const FacultyWorkload = () => {
                       : ""}
                     <p className="ml-2">
                       {activeAcademicTerm.current_year && activeAcademicTerm.next_year
-                        ? `SY, ${activeAcademicTerm.current_year}-${activeAcademicTerm.next_year}`
+                        ? `AY ${activeAcademicTerm.current_year}-${activeAcademicTerm.next_year}`
                         : ""}
+                    </p>
+                    <p className="ml-2">
+                      {activeAcademicTerm.semester_description || ""}
                     </p>
                   </div>
                 </div>
@@ -1691,10 +1693,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -1806,10 +1808,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -1920,10 +1922,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2035,10 +2037,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2150,10 +2152,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2264,10 +2266,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2379,10 +2381,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2494,10 +2496,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2609,10 +2611,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2724,10 +2726,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2839,10 +2841,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -2954,10 +2956,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -3069,10 +3071,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">
@@ -3184,10 +3186,10 @@ const FacultyWorkload = () => {
                       <td
                         key={day}
                         className={`m-0 p-0 ${day === "WED"
-                            ? "min-w-[7rem]"
-                            : day === "THU"
-                              ? "min-w-[6.9rem]"
-                              : "min-w-[6.8rem]"
+                          ? "min-w-[7rem]"
+                          : day === "THU"
+                            ? "min-w-[6.9rem]"
+                            : "min-w-[6.8rem]"
                           }`}
                       >
                         <div className="h-[2.5rem] p-0 m-0">

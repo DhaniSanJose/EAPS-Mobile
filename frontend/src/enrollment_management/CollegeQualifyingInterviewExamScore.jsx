@@ -1803,8 +1803,18 @@ const QualifyingExamScore = () => {
 
   const [emailMessage, setEmailMessage] = useState("");
 
-  const [customReminders, setCustomReminders] = useState(
-    `⚠️ Important Reminder:
+const getReminderDeadline = () => {
+  const deadline = new Date();
+  deadline.setDate(deadline.getDate() + 7);
+  return deadline.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const [customReminders, setCustomReminders] = useState(
+  `⚠️ Important Reminder:
 
 1. Proceed to the Clinic for your Medical Examination.
    - Bring and present your Admission Form Process so they can verify if you're eligible to take the Medical Examination.
@@ -1814,8 +1824,8 @@ const QualifyingExamScore = () => {
 
 3. Please note that failure to comply within 7 days may result in your slot being given to another applicant.
 
-You have until May 11, 2026 to complete the admission process.`,
-  );
+You have until ${getReminderDeadline()} to complete the admission process.`,
+);
 
   const [finalPreview, setFinalPreview] = useState("");
 
