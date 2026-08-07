@@ -2941,8 +2941,7 @@ const Register = () => {
                   control={<Checkbox checked={reminderChecked} onChange={(e) => setReminderChecked(e.target.checked)} />}
                   label={
                     <Typography sx={{ fontSize: isMobile ? "15px" : "16px" }}>
-                      I have read and agree to the admission requirements and policies of {settings?.company_name || ""} before proceeding.
-                    </Typography>
+                      I have read and understood the admission rules and application guidelines. I confirm that I have never taken the University's admission examination before and that I will select the correct application type and "Applying As" category based on my qualifications.                    </Typography>
                   }
                 />
               </Box>
@@ -3042,6 +3041,7 @@ const Register = () => {
         </Snackbar>
 
         {/* Dialog: Important Reminder */}
+        {/* Dialog: Important Reminder */}
         <Dialog
           open={openReminder}
           onClose={() => setOpenReminder(false)}
@@ -3056,6 +3056,7 @@ const Register = () => {
             },
           }}
         >
+          {/* Dialog Header */}
           <DialogTitle
             sx={{
               bgcolor: mainButtonColor,
@@ -3104,6 +3105,7 @@ const Register = () => {
             </Box>
           </DialogTitle>
 
+          {/* Dialog Content */}
           <DialogContent
             sx={{
               px: { xs: 2, sm: 3 },
@@ -3111,7 +3113,7 @@ const Register = () => {
               pb: 1,
             }}
           >
-            {/* Icon */}
+            {/* Warning Icon */}
             <Box
               sx={{
                 display: "flex",
@@ -3131,14 +3133,16 @@ const Register = () => {
                   alignItems: "center",
                   justifyContent: "center",
                   fontSize: 34,
-                  mt: 3
+                  mt: 1,
                 }}
               >
                 ⚠️
               </Box>
             </Box>
 
-            {/* Main Reminder */}
+            {/* =========================================================
+        MAIN REMINDER
+    ========================================================= */}
             <Box sx={{ textAlign: "center", mb: 2 }}>
               <Typography
                 sx={{
@@ -3147,17 +3151,19 @@ const Register = () => {
                   lineHeight: 1.7,
                 }}
               >
-                This online admission is intended only for
+                This online admission portal is intended only for{" "}
                 <strong style={{ color: mainButtonColor }}>
-                  {" "}first-time applicants
-                </strong>.
-                Applicants who have already taken the admission examination in any
-                previous school year are not allowed to register for another
-                applicant account.
+                  first-time applicants
+                </strong>
+                . Applicants who have previously taken the University's admission
+                examination are no longer eligible to register for a new applicant
+                account.
               </Typography>
             </Box>
 
-            {/* Rules */}
+            {/* =========================================================
+        ADMISSION RULES
+    ========================================================= */}
             <Box
               sx={{
                 border: `1.5px solid ${mainButtonColor}`,
@@ -3166,6 +3172,7 @@ const Register = () => {
                 mb: 2,
               }}
             >
+              {/* Section Header */}
               <Box
                 sx={{
                   backgroundColor: mainButtonColor,
@@ -3184,6 +3191,7 @@ const Register = () => {
                 </Typography>
               </Box>
 
+              {/* Section Content */}
               <Box
                 sx={{
                   p: 2,
@@ -3198,20 +3206,74 @@ const Register = () => {
                   }}
                 >
                   • Register only if you have <strong>never taken</strong> the
-                  admission examination before.
+                  University's admission examination.
                   <br />
                   <br />
-                  • Applicants who have previously taken the admission examination are
-                  <strong> no longer eligible to submit a new application or create another applicant account.</strong>
+                  • Applicants who have previously taken the admission examination are{" "}
+                  <strong>not eligible</strong> to create another applicant account or
+                  submit a new application.
                   <br />
                   <br />
-                  • The University reserves the right to verify all applicant
-                  records. Any account found to belong to a previous examinee may be
-                  automatically rejected or disqualified.
+                  • The University reserves the right to verify all applicant records.
+                  Any duplicate or invalid application may be rejected or disqualified.
                 </Typography>
               </Box>
             </Box>
 
+            {/* =========================================================
+        APPLICATION TYPES
+    ========================================================= */}
+            <Box
+              sx={{
+                border: "1px solid #d7e6ff",
+                backgroundColor: "#f8fbff",
+                borderRadius: "12px",
+                p: 2,
+                mb: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: mainButtonColor,
+                  mb: 1,
+                }}
+              >
+                Application Types
+              </Typography>
+
+              <Typography
+                sx={{
+                  fontSize: "12.5px",
+                  color: "#333",
+                  lineHeight: 1.7,
+                }}
+              >
+                Before continuing, determine which application type matches the
+                program you intend to pursue.
+                <br />
+                <br />
+
+                • <strong>Undergraduate</strong> — For applicants applying to
+                bachelor's degree programs.
+                <br />
+                <br />
+
+                • <strong>Graduate</strong> — For applicants pursuing graduate
+                studies, including master's or doctoral degree programs.
+                <br />
+                <br />
+
+                • <strong>TechVoc</strong> — For applicants enrolling in
+                Technical-Vocational Education and Training (TVET) programs focused
+                on practical and industry-based skills.
+              </Typography>
+            </Box>
+
+            {/* =========================================================
+        APPLYING AS CATEGORY
+    ========================================================= */}
             <Box
               sx={{
                 border: "1px solid #ffe08a",
@@ -3221,44 +3283,115 @@ const Register = () => {
                 mb: 2,
               }}
             >
-              <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#9a6700", mb: 1 }}>
-                Applicant Eligibility Notice
+              <Typography
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#9a6700",
+                  mb: 1,
+                }}
+              >
+                Select the Correct "Applying As" Category
               </Typography>
-              <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.7 }}>
-                Please review which <strong style={{fontWeight: "bold"}}>"Applying As"</strong> category applies to you before continuing:
+
+              <Typography
+                sx={{
+                  fontSize: "12.5px",
+                  color: "#333",
+                  lineHeight: 1.7,
+                  mb: 2,
+                }}
+              >
+                After choosing your application type, select the{" "}
+                <strong>"Applying As"</strong> option that best describes your
+                educational background.
               </Typography>
 
-              <Box sx={{ mt: 1.25, display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
-                  • <strong>Senior High School Graduate / Graduating Student, ALS Passer,
-                    Transferee</strong> — intended for <strong style={{ color: "red" }}>UNDERGRADUATE APPLICANTS</strong>.
-                  Ensure you meet the admission requirements for first-year or transferee
-                  undergraduate students.
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1.5,
+                }}
+              >
+                {/* Undergraduate Applicants */}
+                <Typography
+                  sx={{
+                    fontSize: "12.5px",
+                    lineHeight: 1.65,
+                    color: "#333",
+                  }}
+                >
+                  <strong style={{ color: mainButtonColor }}>
+                    UNDERGRADUATE APPLICANTS
+                  </strong>
+                  <br />
+                  • Senior High School Graduate
+                  <br />
+                  • Senior High School Graduating Student
+                  <br />
+                  • ALS Passer
+                  <br />
+                  • Transferee
+                  <br />
+                  • Second-Course Applicant
                 </Typography>
 
-                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
-                  • <strong>Cross Enrollee</strong> — available to qualified applicants from
-                  recognized higher education institutions, subject to the University's
-                  admission policies and document verification requirements. Open to
-                  <strong style={{ color: "red" }}> BOTH UNDERGRADUATE and GRADUATE APPLICANTS.</strong>
+                {/* Undergraduate or Graduate */}
+                <Typography
+                  sx={{
+                    fontSize: "12.5px",
+                    lineHeight: 1.65,
+                    color: "#333",
+                  }}
+                >
+                  <strong style={{ color: mainButtonColor }}>
+                    UNDERGRADUATE OR GRADUATE
+                  </strong>
+                  <br />
+                  • Cross Enrollee
                 </Typography>
 
-                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
-                  • <strong>Foreign Applicant/Student</strong> — currently available
-                  <strong style={{ color: "red" }}> ONLY</strong> for <strong style={{ color: "red" }}>BACCALAUREATE GRADUATE</strong> and
-                  <strong style={{ color: "red" }}> MASTER DEGREE GRADUATE</strong> applicants. Not yet available
-                  for undergraduate applications.
+                {/* Graduate Applicants */}
+                <Typography
+                  sx={{
+                    fontSize: "12.5px",
+                    lineHeight: 1.65,
+                    color: "#333",
+                  }}
+                >
+                  <strong style={{ color: mainButtonColor }}>
+                    GRADUATE APPLICANTS
+                  </strong>
+                  <br />
+                  • Baccalaureate Graduate
+                  <br />
+                  • Master Degree Graduate
                 </Typography>
 
-                <Typography sx={{ fontSize: "12.5px", color: "#333", lineHeight: 1.65 }}>
-                  • <strong>Baccalaureate Graduate / Master Degree Graduate</strong> —
-                  intended for <strong style={{ color: "red" }}>GRADUATE-LEVEL APPLICANTS</strong>. Ensure you
-                  satisfy the academic qualifications and documentary requirements.
+                {/* Foreign Applicants */}
+                <Typography
+                  sx={{
+                    fontSize: "12.5px",
+                    lineHeight: 1.65,
+                    color: "#333",
+                  }}
+                >
+                  <strong style={{ color: "#c62828" }}>
+                    FOREIGN APPLICANTS
+                  </strong>
+                  <br />
+                  Foreign Applicant/Student registration is currently available only
+                  for <strong>Baccalaureate Graduate</strong> and{" "}
+                  <strong>Master Degree Graduate</strong> applicants. Undergraduate
+                  foreign admissions are not yet available through this online portal.
                 </Typography>
               </Box>
             </Box>
 
-            {/* Agreement */}
+            {/* =========================================================
+        AGREEMENT
+    ========================================================= */}
             <Box
               component="label"
               htmlFor="agreeCheck"
@@ -3297,13 +3430,16 @@ const Register = () => {
                   userSelect: "none",
                 }}
               >
-                I have read and understood the admission rules. I confirm that I
-                have never taken the admission examination before and that the
-                information I provide is true and accurate.
+                I have read and understood the admission rules. I confirm that I have
+                never taken the admission examination before and that the information I
+                provide is true and accurate.
               </Typography>
             </Box>
           </DialogContent>
 
+          {/* =========================================================
+      DIALOG ACTIONS
+  ========================================================= */}
           <DialogActions
             sx={{
               px: { xs: 2, sm: 3 },
@@ -3327,6 +3463,7 @@ const Register = () => {
                 fontSize: 14,
                 textTransform: "none",
                 boxShadow: "none",
+
                 "&:hover": {
                   backgroundColor: agreeChecked
                     ? mainButtonColor
@@ -3334,6 +3471,7 @@ const Register = () => {
                   opacity: 0.9,
                   boxShadow: "none",
                 },
+
                 "&.Mui-disabled": {
                   backgroundColor: "#b0b8c8",
                   color: "#fff",

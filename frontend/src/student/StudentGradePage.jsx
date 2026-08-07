@@ -70,11 +70,14 @@ const getUnitDisplay = (row) => {
 };
 
 // ─── Term Sorting ─────────────────────────────────────────────────
-const yearOrder = { "First Year": 1, "Second Year": 2, "Third Year": 3, "Fourth Year": 4, "Fifth Year": 5 };
-const semesterOrder = { "First Semester": 1, "Second Semester": 2, "Summer": 3 };
-const yearLabelMap = {
-  "First Year": "1st Year", "Second Year": "2nd Year", "Third Year": "3rd Year",
-  "Fourth Year": "4th Year", "Fifth Year": "5th Year",
+const ordinalSuffix = (n) => {
+  if (n % 100 >= 11 && n % 100 <= 13) return "th";
+  switch (n % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
 };
 
 const parseTerm = (term) => {
@@ -84,7 +87,7 @@ const parseTerm = (term) => {
   return { yearLabel, semesterLabel };
 };
 
-const sortTerms = (terms) =>
+const sortTerms = (terms, yearOrder, semesterOrder) =>
   [...terms].sort((a, b) => {
     const tA = parseTerm(a); const tB = parseTerm(b);
     const yA = yearOrder[tA.yearLabel] || 0;
@@ -93,7 +96,20 @@ const sortTerms = (terms) =>
     return (semesterOrder[tB.semesterLabel] || 0) - (semesterOrder[tA.semesterLabel] || 0);
   });
 
-const formatYearLabel = (year) => yearLabelMap[year] || year;
+const getTermSortValue = (subject, semesterOrder) => {
+  const schoolYear = Number(subject?.year_description) || 0;
+  const semester = Number(subject?.semester_id) || (semesterOrder?.[subject?.semester_description] || 0);
+  const schoolYearId = Number(subject?.active_school_year_id) || 0;
+  return (schoolYear * 10000) + (semester * 100) + schoolYearId;
+};
+
+const getLatestMigratedTermKey = (subjects, semesterOrder) => {
+  const latestMigratedSubject = subjects
+    .filter(isMigratedGrade)
+    .sort((a, b) => getTermSortValue(b, semesterOrder) - getTermSortValue(a, semesterOrder))[0];
+
+  return latestMigratedSubject ? getAcademicTermKey(latestMigratedSubject) : null;
+};
 
 const isMigratedGrade = (subject) => Number(subject?.is_migrated) === 1 || subject?.is_migrated === true;
 const isEvaluatedGrade = (subject) => Number(subject?.fe_status) === 1;
@@ -102,20 +118,6 @@ const isPostedGrade = (subject) => Number(subject?.is_posted) === 1;
 const getAcademicTermKey = (subject) =>
   `${subject?.active_school_year_id || subject?.year_description || "N/A"}-${subject?.semester_id || subject?.semester_description || "N/A"}`;
 
-const getTermSortValue = (subject) => {
-  const schoolYear = Number(subject?.year_description) || 0;
-  const semester = Number(subject?.semester_id) || semesterOrder[subject?.semester_description] || 0;
-  const schoolYearId = Number(subject?.active_school_year_id) || 0;
-  return (schoolYear * 10000) + (semester * 100) + schoolYearId;
-};
-
-const getLatestMigratedTermKey = (subjects) => {
-  const latestMigratedSubject = subjects
-    .filter(isMigratedGrade)
-    .sort((a, b) => getTermSortValue(b) - getTermSortValue(a))[0];
-
-  return latestMigratedSubject ? getAcademicTermKey(latestMigratedSubject) : null;
-};
 
 // Returns: 'show' | 'not_posted' | 'hidden'
 const getGradeVisibility = (subject, latestMigratedTermKey) => {
@@ -305,6 +307,7 @@ const StudentGradePage = () => {
 
     subjects.forEach((row) => {
       if (row.grade_display) return;
+      if (Number(row.is_gwa_excluded) === 1) return; // ✅ policy: excluded subject
       const grade = Number(row.numeric_grade);
       const rowUnits = Number(row.gwa_units ?? row.course_unit) || 0;
       if (!Number.isFinite(grade) || grade <= 0 || rowUnits <= 0) return;
@@ -327,9 +330,12 @@ const StudentGradePage = () => {
       const curriculumId = data[0]?.curriculum_id ?? data[0]?.program ?? null;
       setDepartment(await resolveDepartmentByCurriculum(curriculumId));
 
-      if (balanceInfo.hasBalance) { setStudentGrade(data.map(hideGradeFields)); return; }
+      if (balanceInfo.hasBalance) {
+        setStudentGrade(data.map(hideGradeFields));
+        return;
+      }
 
-      const latestMigratedTermKey = getLatestMigratedTermKey(data);
+      const latestMigratedTermKey = getLatestMigratedTermKey(data, semesterOrder);
       const groupedByTerm = {};
       data.forEach((subj) => {
         const termKey = getAcademicTermKey(subj);
@@ -353,6 +359,8 @@ const StudentGradePage = () => {
       setLoading(false);
     }
   };
+
+
 
   const [department, setDepartment] = useState("");
 
@@ -380,7 +388,7 @@ const StudentGradePage = () => {
   useEffect(() => {
     if (matriculationBalanceInfo.hasBalance) { setMessage(""); return; }
     if (!gradingActive || studentGrade.length === 0) return;
-    const latestMigratedTermKey = getLatestMigratedTermKey(studentGrade);
+    const latestMigratedTermKey = getLatestMigratedTermKey(studentGrade, semesterOrder);
     const pending = studentGrade.filter(
       (s) => getGradeVisibility(s, latestMigratedTermKey) === "hidden",
     ).length;
@@ -388,8 +396,53 @@ const StudentGradePage = () => {
     else setMessage("");
   }, [gradingActive, matriculationBalanceInfo.hasBalance, studentGrade]);
 
-  // 🔒 Disable right-click + block DevTools shortcuts (properly scoped with cleanup,
-  // 🔒 Disable right-click
+
+  const [yearLevelList, setYearLevelList] = useState([]);
+  const [semesterList, setSemesterList] = useState([]);
+
+  useEffect(() => {
+    fetchYearLevels();
+    fetchSemesters();
+  }, []);
+
+  const fetchYearLevels = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+      setYearLevelList(res.data);
+    } catch (err) {
+      console.error("Error fetching year levels:", err);
+    }
+  };
+
+  const fetchSemesters = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/semesters`);
+      setSemesterList(res.data);
+    } catch (err) {
+      console.error("Error fetching semesters:", err);
+    }
+  };
+
+  const yearOrder = yearLevelList.reduce((acc, yl) => {
+    acc[yl.year_level_description] = yl.year_level_id;
+    return acc;
+  }, {});
+
+  const semesterOrder = semesterList.reduce((acc, s) => {
+    acc[s.semester_description] = s.semester_id;
+    return acc;
+  }, {});
+
+  const yearLabelMap = yearLevelList.reduce((acc, yl) => {
+    acc[yl.year_level_description] =
+      yl.level_type === "year"
+        ? `${yl.year_level_id}${ordinalSuffix(yl.year_level_id)} Year`
+        : yl.year_level_description;
+    return acc;
+  }, {});
+
+  const formatYearLabel = (year) => yearLabelMap[year] || year;
+
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // 🔒 Block DevTools shortcuts + Ctrl+P silently
@@ -410,7 +463,7 @@ const StudentGradePage = () => {
   });
 
   const rawTerms = [...new Set(studentGrade.map((row) => `${row.year_level_description} ${row.semester_description}`))];
-  const sortedTerms = sortTerms(rawTerms);
+  const sortedTerms = sortTerms(rawTerms, yearOrder, semesterOrder);
   const headerBg = settings?.header_color || "#1976d2";
   const programInfo = studentGrade[0] || null;
   const formattedMatriculationBalance = matriculationBalanceInfo.balance.toLocaleString(undefined, {
@@ -612,16 +665,73 @@ const StudentGradePage = () => {
                 </Box>
               </Box>
 
-              {/* ── Mobile & small tablet: cards | Larger tablet/Desktop: scrollable table ── */}
               {isCardLayout ? (
                 <Box>
                   {termSubjects.map((row, i) => (
-                    <MobileGradeCard
-                      key={i} row={row} index={i}
-                      borderColor={borderColor}
-                      subtitleColor={subtitleColor}
-                      titleColor={titleColor}
-                    />
+                    <Box
+                      key={i}
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: "8px",
+                        p: { xs: 1.25, sm: 1.5 },
+                        mb: 1.5,
+                        backgroundColor: i % 2 === 0 ? "#ffffff" : "lightgray",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                      }}
+                    >
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 0.5, gap: 1 }}>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 700, fontSize: { xs: 12.5, sm: 13 }, color: titleColor, mb: 0.2 }}>
+                            {row.course_code}
+                          </Typography>
+                          <Typography sx={{ fontSize: { xs: 11, sm: 11.5 }, color: subtitleColor, lineHeight: 1.3 }}>
+                            {row.course_description}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ ml: 1, flexShrink: 0 }}>
+                          {row.grade_display
+                            ? <Typography sx={{ fontWeight: 700, fontSize: { xs: 12, sm: 13 }, color: "#E65100" }}>{row.grade_display}</Typography>
+                            : row.numeric_grade
+                              ? <Typography sx={{ fontWeight: 700, fontSize: { xs: 15, sm: 16 }, color: titleColor }}>{row.numeric_grade}</Typography>
+                              : <Typography sx={{ color: "#9CA3AF", fontSize: 14 }}>—</Typography>
+                          }
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", mt: 0.8, alignItems: "center" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+                          <PersonOutlineIcon sx={{ fontSize: 13, color: "#000", flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: 11, color: "#000", wordBreak: "break-word" }}>
+                            {row.fname === "TBA" && row.lname === "TBA" ? "TBA" : `Prof. ${row.fname} ${row.lname}`}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <ClassIcon sx={{ fontSize: 13, color: "#000", flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: 11, color: "#000" }}>
+                            {row.program_code}-{row.section_description}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <FilterNoneIcon sx={{ fontSize: 13, color: "#000", flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: 11, color: "#000" }}>
+                            {getUnitDisplay(row)} unit{getUnitDisplay(row) !== 1 ? "s" : ""}
+                          </Typography>
+                        </Box>
+
+                        {row.schedule && (
+                          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, width: "100%" }}>
+                            <AccessTimeIcon sx={{ fontSize: 13, color: "#000", mt: "1px", flexShrink: 0 }} />
+                            <Typography sx={{ fontSize: 11, color: "#000", whiteSpace: "pre-line", lineHeight: 1.5, wordBreak: "break-word" }}>
+                              {row.schedule}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <RemarkBadge value={row.en_remarks} />
+                      </Box>
+                    </Box>
                   ))}
                 </Box>
               ) : (
@@ -675,7 +785,7 @@ const StudentGradePage = () => {
                           </TableCell>
                           <TableCell sx={{ ...bodyCell, border: `1px solid ${borderColor}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {row.fname === "TBA" && row.lname === "TBA"
-                              ? <span style={{ color: "#9CA3AF",}}>TBA</span>
+                              ? <span style={{ color: "#9CA3AF", }}>TBA</span>
                               : `Prof. ${row.fname} ${row.lname}`}
                           </TableCell>
                           <TableCell sx={{ ...bodyCell, border: `1px solid ${borderColor}`, textAlign: "center", whiteSpace: "pre-line", fontSize: 12 }}>
@@ -699,6 +809,14 @@ const StudentGradePage = () => {
                           </TableCell>
                         </TableRow>
                       ))}
+                      <TableRow sx={{ backgroundColor: headerBg, color: "white" }}>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, color: "white", height: "35px" }} colSpan={4}></TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}></TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}></TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}></TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}></TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}></TableCell>
+                      </TableRow>
                     </TableBody>
                   </Table>
                 </TableContainer>

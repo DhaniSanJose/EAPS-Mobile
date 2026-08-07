@@ -1,8 +1,5 @@
-// Student Dashboard where the student can download his/her cor
-
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
-
 import "../styles/TempStyles.css";
 import axios from "axios";
 import {
@@ -174,6 +171,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         fetchActiveEnrollmentStatus(storedID);
         fetchTotalCourse(storedID);
         fetchStudentAssessment(storedID);
+        fetchTermGwa(storedID);
         console.log("you are an student");
       }
     } else {
@@ -344,6 +342,9 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatus, setExportStatus] = useState("");
 
+  const [termGwaList, setTermGwaList] = useState([]);
+  const [termGwaLoading, setTermGwaLoading] = useState(true);
+
   const downloadCorPdf = async () => {
     if (isGeneratingCorPdf) return;
 
@@ -463,6 +464,75 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const handleNextMonth = () => setDate(new Date(year, month + 1, 1));
 
   const [holidays, setHolidays] = useState({});
+
+  const ordinalYear = (n) => {
+    const num = Number(n);
+    if (!Number.isFinite(num)) return String(n);
+    const s = ["th", "st", "nd", "rd"];
+    const v = num % 100;
+    return `${num}${s[(v - 20) % 10] || s[v] || s[0]} Yr`;
+  };
+
+
+  const fetchTermGwa = async (id) => {
+    setTermGwaLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/student_grade/${id}`);
+      const rows = Array.isArray(res.data) ? res.data : [];
+
+      const groupedByTerm = {};
+      rows.forEach((row) => {
+        // key on the real IDs, not the description text
+        const key = `${row.year_level_id}||${row.semester_id}`;
+        if (!groupedByTerm[key]) {
+          groupedByTerm[key] = {
+            year_level_id: row.year_level_id,
+            year_level_description: row.year_level_description,
+            level_type: row.level_type,
+            semester_id: row.semester_id,
+            semester_description: row.semester_description,
+            total: 0,
+            units: 0,
+          };
+        }
+        if (Number(row.is_gwa_excluded) === 1) return;
+
+        const grade = Number(row.numeric_grade);
+        const units = Number(row.gwa_units) || 0;
+        if (!Number.isFinite(grade) || grade <= 0 || units <= 0) return;
+
+        groupedByTerm[key].total += grade * units;
+        groupedByTerm[key].units += units;
+      });
+
+      // Only show regular "year" levels 1st–4th Year — bridging, 5th year,
+      // masteral/doctoral terms are excluded here to keep the strip readable.
+      // (Adjust the "<= 4" below if a program legitimately needs 5th year shown.)
+      const MAX_YEAR_LEVEL_TO_SHOW = 4;
+
+      const list = Object.values(groupedByTerm)
+        .filter(
+          (t) =>
+            t.level_type === "year" &&
+            Number(t.year_level_id) <= MAX_YEAR_LEVEL_TO_SHOW,
+        )
+        .map((t) => ({
+          label: `${ordinalYear(t.year_level_id)} - ${t.semester_description}`,
+          yearOrder: Number(t.year_level_id) || 0,
+          semOrder: Number(t.semester_id) || 0,
+          gwa: t.units > 0 ? t.total / t.units : null,
+        }))
+        // Ascending now: 1st Yr Sem 1 → ... → 4th Yr Sem 2, reads like a timeline
+        .sort((a, b) => (a.yearOrder - b.yearOrder) || (a.semOrder - b.semOrder));
+
+      setTermGwaList(list);
+    } catch (error) {
+      console.error("Failed to fetch per-semester GWA:", error);
+      setTermGwaList([]);
+    } finally {
+      setTermGwaLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchHolidays = async () => {
@@ -1502,8 +1572,98 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} lg={5}>
+
+          <Grid item xs={12}>
             <Card sx={{ ...cardSx, border: `2px solid ${borderColor}` }}>
+              <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+                  <Box sx={iconBoxSx}>
+                    <StarBorder />
+                  </Box>
+                  <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
+                    Per Semester General Weighted Average
+                  </Typography>
+                </Stack>
+
+                {termGwaLoading ? (
+                  <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                    Loading...
+                  </Typography>
+                ) : termGwaList.length === 0 ? (
+                  <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                    No GWA available yet.
+                  </Typography>
+                ) : (
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(84px, 100px))",
+                      gap: { xs: 1, sm: 1.25 },
+                      justifyContent: { xs: "space-between", sm: "flex-start" },
+                    }}
+                  >
+                    {termGwaList.map((t) => (
+                      <Box
+                        key={t.label}
+                        sx={{
+                          width: "100%",
+                          maxWidth: 100,
+                          aspectRatio: "1 / 1",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          textAlign: "center",
+                          border: `1px solid ${softBorder}`,
+                          borderRadius: "8px",
+                          backgroundColor: "#faf8f6",
+                          transition: "background-color 0.2s ease, transform 0.2s ease",
+                          px: 0.75,
+                          "&:hover": {
+                            backgroundColor: "rgba(155,47,53,0.05)",
+                            transform: "translateY(-2px)",
+                          },
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 9.5,
+                            fontWeight: 700,
+                            letterSpacing: "0.02em",
+                            textTransform: "uppercase",
+                            color: "text.secondary",
+                            lineHeight: 1.2,
+                            whiteSpace: "normal",
+                            wordBreak: "break-word",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {t.label}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            mt: 0.4,
+                            fontSize: { xs: 14, sm: 16 },
+                            fontWeight: 800,
+                            color: t.gwa !== null ? maroon : "#c9c3c0",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {t.gwa !== null ? t.gwa.toFixed(3) : "—"}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} lg={5}>
+            <Card sx={{ ...cardSx, border: `2px solid ${borderColor}`, mb: 2 }}>
               <CardContent sx={{ p: 0 }}>
                 <Grid container>
                   <Grid
@@ -1525,7 +1685,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         <StarBorder />
                       </Box>
                       <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
-                        Honors Standing
+                       Latin Honors Eligibility
                       </Typography>
                     </Stack>
                     <Box
@@ -1577,11 +1737,11 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         {honorStanding.error
                           ? "Unable to load your honors standing at this time."
                           : honorStanding.title
-                            ? "You are currently eligible to apply for Latin honors based on the configured rules."
+                            ? "You are currently eligible to apply for Latin honors based on the student handbook rules."
                             : honorStanding.standing === "disqualified"
-                              ? "You are currently disqualified from applying for Latin honors based on the configured rules."
+                              ? "You are currently disqualified from applying for Latin honors based on the student handbook rules."
                               : honorStanding.standing === "not_in_standing"
-                                ? "You are not currently in standing to apply for Latin honors based on the configured rules."
+                                ? "You are not currently in standing to apply for Latin honors based on the student handbook rules."
                                 : "There are no posted grades available for Latin honors evaluation yet."}
                       </Typography>
                     </Box>
@@ -1638,6 +1798,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     </Box>
                   </Grid>
                 </Grid>
+
                 <Divider />
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -1715,12 +1876,15 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
             </Card>
           </Grid>
 
+
+
           <Grid item xs={12} lg={7}>
             <Card
               sx={{
                 borderRadius: "14px",
                 border: `2px solid ${borderColor}`,
                 boxShadow: 3,
+                mb: 2,
                 height: { xs: 420, sm: 480, md: 600 },
                 display: "flex",
                 flexDirection: "column",

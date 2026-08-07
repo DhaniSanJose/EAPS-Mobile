@@ -2,23 +2,33 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
-import { Box, Typography, Button, Snackbar, Alert, FormControl, InputLabel, Select, MenuItem, TextField } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Button,
+  Snackbar,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+} from "@mui/material";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { Autocomplete } from "@mui/material";
 import { useMemo } from "react";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-
-const CurriculumCourseMap = () => {
+const ProgramPayment = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
+  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
 
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
@@ -36,9 +46,10 @@ const CurriculumCourseMap = () => {
     if (settings.title_color) setTitleColor(settings.title_color);
     if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
     if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);   // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);           // ✅ NEW
+    if (settings.main_button_color)
+      setMainButtonColor(settings.main_button_color);
+    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
+    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
 
     // 🏫 Logo
     if (settings.logo_url) {
@@ -65,10 +76,7 @@ const CurriculumCourseMap = () => {
     } else {
       setBranches([]);
     }
-
   }, [settings]);
-
-
 
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
@@ -95,12 +103,12 @@ const CurriculumCourseMap = () => {
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
         "unknown",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role":
+        userRole || localStorage.getItem("role") || "registrar",
     },
   });
 
   useEffect(() => {
-
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const storedID = localStorage.getItem("person_id");
@@ -124,12 +132,14 @@ const CurriculumCourseMap = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
       const allowed = response.data?.page_privilege === 1;
       setHasAccess(allowed);
       setCanEdit(allowed && Number(response.data?.can_edit) === 1);
     } catch (error) {
-      console.error('Error checking access:', error);
+      console.error("Error checking access:", error);
       setHasAccess(false);
       setCanEdit(false);
       if (error.response && error.response.data.message) {
@@ -141,14 +151,9 @@ const CurriculumCourseMap = () => {
     }
   };
 
-
-
   const [curriculum, setCurriculum] = useState({ year_id: "", program_id: "" });
   const [yearList, setYearList] = useState([]);
   const [programList, setProgramList] = useState([]);
-
-
-
 
   useEffect(() => {
     fetchYear();
@@ -174,10 +179,9 @@ const CurriculumCourseMap = () => {
     }
   };
 
-
   const handleCloseSnackbar = (event, reason) => {
     if (reason === "clickaway") return;
-    setSnackbar(prev => ({ ...prev, open: false }));
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   const [curriculumList, setCurriculumList] = useState([]);
@@ -201,9 +205,7 @@ const CurriculumCourseMap = () => {
 
   const fetchTaggedPrograms = async () => {
     try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/program_tagging_list`
-      );
+      const res = await axios.get(`${API_BASE_URL}/api/program_tagging_list`);
 
       const tagged = res.data.map((p) => ({
         ...p,
@@ -221,12 +223,7 @@ const CurriculumCourseMap = () => {
       }));
 
       const unique = Array.from(
-        new Map(
-          tagged.map((item) => [
-            item.program_tagging_id,
-            item,
-          ])
-        ).values()
+        new Map(tagged.map((item) => [item.program_tagging_id, item])).values(),
       );
 
       console.log("FETCHED PROGRAMS:", unique);
@@ -240,41 +237,40 @@ const CurriculumCourseMap = () => {
   const [tosf, setTosf] = useState(null);
 
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/tosf`)
-      .then(res => {
+    axios
+      .get(`${API_BASE_URL}/api/tosf`)
+      .then((res) => {
         setTosf(res.data[0]); // get first row
         console.log("TOSF:", res.data[0]);
       })
-      .catch(err => console.error("TOSF fetch error:", err));
+      .catch((err) => console.error("TOSF fetch error:", err));
   }, []);
-
-
 
   const [feeRules, setFeeRules] = useState([]);
 
-
   useEffect(() => {
-    axios.get(`${API_BASE_URL}/api/fee_rules`)
-      .then(res => {
+    axios
+      .get(`${API_BASE_URL}/api/fee_rules`)
+      .then((res) => {
         setFeeRules(res.data); // keep full objects
       })
-      .catch(err => console.error("Fee rules error:", err));
+      .catch((err) => console.error("Fee rules error:", err));
   }, []);
-
 
   const computeExtraFees = (semesterCourses) => {
     if (!feeRules.length) return [];
 
     return feeRules
-      .filter(fee => fee.applies_to_all === 1)
-      .filter(fee =>
-        semesterCourses.some(course =>
-          (fee.iscomputer_lab === 1 && course.iscomputer_lab === 1) ||
-          (fee.isnon_computer_lab === 1 && course.isnon_computer_lab === 1) ||
-          (fee.is_nstp === 1 && course.is_nstp === 1)
-        )
+      .filter((fee) => fee.applies_to_all === 1)
+      .filter((fee) =>
+        semesterCourses.some(
+          (course) =>
+            (fee.iscomputer_lab === 1 && course.iscomputer_lab === 1) ||
+            (fee.isnon_computer_lab === 1 && course.isnon_computer_lab === 1) ||
+            (fee.is_nstp === 1 && course.is_nstp === 1),
+        ),
       )
-      .map(fee => ({
+      .map((fee) => ({
         label: fee.description,
         amount: Number(fee.amount),
       }));
@@ -285,10 +281,10 @@ const CurriculumCourseMap = () => {
   const [selectedCampus, setSelectedCampus] = useState("");
   const [selectedAcademicProgram, setSelectedAcademicProgram] = useState("");
 
-
-
   const getBranchLabel = (branchId) => {
-    const branch = branches.find((item) => Number(item.id) === Number(branchId));
+    const branch = branches.find(
+      (item) => Number(item.id) === Number(branchId),
+    );
     return branch?.branch || "";
   };
 
@@ -324,33 +320,32 @@ const CurriculumCourseMap = () => {
     "1st Semester": 1,
     "Second Semester": 2,
     "2nd Semester": 2,
-    "Summer": 3,
+    Summer: 3,
   };
-
-
-
 
   const [miscFees, setMiscFees] = useState({});
 
-
   const fetchMiscFee = async (yearId, semId, programId, departmentId) => {
     const res = await axios.get(`${API_BASE_URL}/api/misc_fee`, {
-      params: { year_level_id: yearId, semester_id: semId, program_id: programId, dprtmnt_id: departmentId },
+      params: {
+        year_level_id: yearId,
+        semester_id: semId,
+        program_id: programId,
+        dprtmnt_id: departmentId,
+      },
     });
 
     console.log("RAW MISC API:", res.data); // DEBUG
     return res.data || null; // ✅ FIX (REMOVE [0])
   };
 
-
-
   // 🧠 Group by Year → Semester
   const groupedData = () => {
     const result = {};
 
     taggedPrograms
-      .filter(p => p.curriculum_id == selectedCurriculum)
-      .forEach(p => {
+      .filter((p) => p.curriculum_id == selectedCurriculum)
+      .forEach((p) => {
         if (!result[p.year_level_description]) {
           result[p.year_level_description] = {};
         }
@@ -370,8 +365,7 @@ const CurriculumCourseMap = () => {
     if (!canEdit) {
       setSnackbar({
         open: true,
-        message:
-          "You do not have permission to edit program payments",
+        message: "You do not have permission to edit program payments",
         severity: "error",
       });
       return;
@@ -381,10 +375,7 @@ const CurriculumCourseMap = () => {
       ...prev,
       [id]: {
         ...(prev[id] || {}),
-        [field]:
-          value === "" || value === null
-            ? ""
-            : Number(value),
+        [field]: value === "" || value === null ? "" : Number(value),
       },
     }));
   };
@@ -405,13 +396,17 @@ const CurriculumCourseMap = () => {
       const first = courses[0];
 
       // 🔥 SAVE MISC INTO fee_rules
-      await axios.put(`${API_BASE_URL}/api/misc_fee`, {
-        amount: miscFeeValue, // 👉 1790
-        year_level_id: first.year_level_id,
-        semester_id: first.semester_id,
-        program_id: first.program_id,
-        dprtmnt_id: first.dprtmnt_id,
-      }, getAuditConfig());
+      await axios.put(
+        `${API_BASE_URL}/api/misc_fee`,
+        {
+          amount: miscFeeValue, // 👉 1790
+          year_level_id: first.year_level_id,
+          semester_id: first.semester_id,
+          program_id: first.program_id,
+          dprtmnt_id: first.dprtmnt_id,
+        },
+        getAuditConfig(),
+      );
 
       // 🔁 SAVE PER-COURSE FEES — run all in parallel instead of one at a time
       await Promise.all(
@@ -432,12 +427,13 @@ const CurriculumCourseMap = () => {
               // NEW FLAGS
               is_nstp: updates?.is_nstp ?? course.is_nstp,
               iscomputer_lab: updates?.iscomputer_lab ?? course.iscomputer_lab,
-              islaboratory_fee: updates?.islaboratory_fee ?? course.islaboratory_fee,
+              islaboratory_fee:
+                updates?.islaboratory_fee ?? course.islaboratory_fee,
               misc_fee: miscFeeValue,
             },
-            getAuditConfig()
+            getAuditConfig(),
           );
-        })
+        }),
       );
 
       setSnackbar({
@@ -459,22 +455,21 @@ const CurriculumCourseMap = () => {
     }
   };
 
-
-
   const computeMiscFee = (semesterCourses) => {
     let total = 0;
 
     // ✅ BASE TOSF ONLY
     if (tosf) {
       total += Object.entries(tosf)
-        .filter(([key]) =>
-          ![
-            "tosf_id",
-            "school_id_fees",
-            "nstp_fees",
-            "computer_fees",
-            "laboratory_fees",
-          ].includes(key)
+        .filter(
+          ([key]) =>
+            ![
+              "tosf_id",
+              "school_id_fees",
+              "nstp_fees",
+              "computer_fees",
+              "laboratory_fees",
+            ].includes(key),
         )
         .reduce((sum, [, val]) => sum + Number(val || 0), 0);
     }
@@ -489,13 +484,12 @@ const CurriculumCourseMap = () => {
     }
 
     // ✅ COMPUTER (ONCE)
-    if (semesterCourses.some(c => c.iscomputer_lab == 1)) {
+    if (semesterCourses.some((c) => c.iscomputer_lab == 1)) {
       total += Number(tosf?.computer_fees || 0);
     }
 
     return total;
   };
-
 
   // const [idFee, setIdFee] = useState(null);
 
@@ -512,7 +506,6 @@ const CurriculumCourseMap = () => {
   //   setIdFee(res.data.find(f => f.fee_code === "ID_FEE") || null);
   // };
 
-
   // useEffect(() => {
   //   if (!taggedPrograms.length) return;
 
@@ -520,18 +513,14 @@ const CurriculumCourseMap = () => {
   //   if (p) fetchIdFee(p.program_id, p.dprtmnt_id);
   // }, [selectedCurriculum, taggedPrograms]);
 
-
-
-
-  const selectedCurriculumName = curriculumList.find(
-    (c) => c.curriculum_id === selectedCurriculum
-  )?.program_description +
-    (curriculumList.find(c => c.curriculum_id === selectedCurriculum)?.major
-      ? ` ${curriculumList.find(c => c.curriculum_id === selectedCurriculum)?.major}`
-      : "") || "";
+  const selectedCurriculumName =
+    curriculumList.find((c) => c.curriculum_id === selectedCurriculum)
+      ?.program_description +
+      (curriculumList.find((c) => c.curriculum_id === selectedCurriculum)?.major
+        ? ` ${curriculumList.find((c) => c.curriculum_id === selectedCurriculum)?.major}`
+        : "") || "";
 
   const [extraFees, setExtraFees] = useState([]);
-
 
   const fetchExtraFees = async () => {
     try {
@@ -550,20 +539,20 @@ const CurriculumCourseMap = () => {
     const yearId = yearLevelIdMap[year];
     const semId = semesterIdMap[sem];
 
-    return extraFees.filter(f =>
-      f.year_level_id == yearId &&
-      f.semester_id == semId &&
-      f.fee_code !== "ID_FEE" // ID handled separately
+    return extraFees.filter(
+      (f) =>
+        f.year_level_id == yearId &&
+        f.semester_id == semId &&
+        f.fee_code !== "ID_FEE", // ID handled separately
     );
   };
-
 
   useEffect(() => {
     if (!selectedCurriculum || !Object.keys(data).length) return;
 
     const loadMisc = async () => {
       const programsInCurriculum = taggedPrograms.filter(
-        (p) => p.curriculum_id == selectedCurriculum
+        (p) => p.curriculum_id == selectedCurriculum,
       );
 
       // Build a flat list of every (program, year, sem) combo we need to fetch
@@ -580,7 +569,10 @@ const CurriculumCourseMap = () => {
             const key = `${programId}-${yearId}-${semId}`;
 
             requests.push(
-              fetchMiscFee(yearId, semId, programId, deptId).then((fee) => [key, fee])
+              fetchMiscFee(yearId, semId, programId, deptId).then((fee) => [
+                key,
+                fee,
+              ]),
             );
           }
         }
@@ -600,33 +592,67 @@ const CurriculumCourseMap = () => {
     loadMisc();
   }, [selectedCurriculum, taggedPrograms]);
 
-
   const selectedCurriculumObj = curriculumList.find(
-    c => c.curriculum_id === selectedCurriculum
+    (c) => c.curriculum_id === selectedCurriculum,
   );
 
+  const [yearLevelList, setYearLevelList] = useState([]);
+  const [semesterList, setSemesterList] = useState([]);
 
+  useEffect(() => {
+    fetchYearLevels();
+    fetchSemesters();
+  }, []);
 
-
-  const yearOrder = {
-    "First Year": 1,
-    "Second Year": 2,
-    "Third Year": 3,
-    "Fourth Year": 4,
+  const fetchYearLevels = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+      setYearLevelList(res.data);
+    } catch (err) {
+      console.error("Error fetching year levels:", err);
+    }
   };
 
-  const semesterOrder = {
-    "First Semester": 1,
-    "Second Semester": 2,
+  const fetchSemesters = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/semesters`);
+      setSemesterList(res.data);
+    } catch (err) {
+      console.error("Error fetching semesters:", err);
+    }
   };
 
-  const yearLabelMap = {
-    "First Year": "1st Year",
-    "Second Year": "2nd Year",
-    "Third Year": "3rd Year",
-    "Fourth Year": "4th Year",
-    "Fifth Year": "5th Year",
+  const ordinalSuffix = (n) => {
+    if (n % 100 >= 11 && n % 100 <= 13) return "th";
+    switch (n % 10) {
+      case 1:
+        return "st";
+      case 2:
+        return "nd";
+      case 3:
+        return "rd";
+      default:
+        return "th";
+    }
   };
+
+  const yearOrder = yearLevelList.reduce((acc, yl) => {
+    acc[yl.year_level_description] = yl.year_level_id;
+    return acc;
+  }, {});
+
+  const semesterOrder = semesterList.reduce((acc, s) => {
+    acc[s.semester_description] = s.semester_id;
+    return acc;
+  }, {});
+
+  const yearLabelMap = yearLevelList.reduce((acc, yl) => {
+    acc[yl.year_level_description] =
+      yl.level_type === "year"
+        ? `${yl.year_level_id}${ordinalSuffix(yl.year_level_id)} Year`
+        : yl.year_level_description;
+    return acc;
+  }, {});
 
   const formatSchoolYear = (yearDesc) => {
     if (!yearDesc) return "";
@@ -644,21 +670,35 @@ const CurriculumCourseMap = () => {
         const semesterCourses = data[year][sem];
 
         const hasComputerLab = semesterCourses.some(
-          c => Number(editedFees[c.program_tagging_id]?.iscomputer_lab ?? c.iscomputer_lab) === 1
+          (c) =>
+            Number(
+              editedFees[c.program_tagging_id]?.iscomputer_lab ??
+                c.iscomputer_lab,
+            ) === 1,
         );
         const hasNonComputerLab = semesterCourses.some(
-          c => Number(editedFees[c.program_tagging_id]?.islaboratory_fee ?? c.islaboratory_fee) === 1
+          (c) =>
+            Number(
+              editedFees[c.program_tagging_id]?.islaboratory_fee ??
+                c.islaboratory_fee,
+            ) === 1,
         );
         const hasNSTP = semesterCourses.some(
-          c => Number(editedFees[c.program_tagging_id]?.is_nstp ?? c.is_nstp) === 1
+          (c) =>
+            Number(editedFees[c.program_tagging_id]?.is_nstp ?? c.is_nstp) ===
+            1,
         );
 
         const tuitionFeeAmount = semesterCourses.reduce(
           (sum, course) =>
             sum +
-            (editedFees[course.program_tagging_id]?.lec_fee ?? course.lec_fee ?? 0) +
-            (editedFees[course.program_tagging_id]?.lab_fee ?? course.lab_fee ?? 0),
-          0
+            (editedFees[course.program_tagging_id]?.lec_fee ??
+              course.lec_fee ??
+              0) +
+            (editedFees[course.program_tagging_id]?.lab_fee ??
+              course.lab_fee ??
+              0),
+          0,
         );
 
         const nstpFeeAmount = hasNSTP ? Number(tosf?.nstp_fees || 0) : 0;
@@ -712,7 +752,9 @@ const CurriculumCourseMap = () => {
       const isBlockedKey =
         e.key === "F12" ||
         e.key === "F11" ||
-        (e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+        (e.ctrlKey &&
+          e.shiftKey &&
+          (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
         (e.ctrlKey && e.key.toLowerCase() === "u") ||
         (e.ctrlKey && e.key.toLowerCase() === "p");
 
@@ -731,7 +773,6 @@ const CurriculumCourseMap = () => {
     };
   }, []);
 
-
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
   }
@@ -740,14 +781,11 @@ const CurriculumCourseMap = () => {
     return <Unauthorized />;
   }
 
-
   const cellStyle = {
     border: `1px solid ${borderColor}`,
     padding: "8px",
-    textAlign: "center"
+    textAlign: "center",
   };
-
-
 
   return (
     <Box
@@ -836,12 +874,12 @@ const CurriculumCourseMap = () => {
           const startYear = Number(option.year_description);
           const yearRange = !isNaN(startYear)
             ? `${startYear} - ${startYear + 1}`
-            : (option.year_description || "");
+            : option.year_description || "";
           return `${yearRange} - (${option.program_code}) ${option.program_description}${option.major ? ` (${option.major})` : ""}`;
         }}
         value={
           filteredCurriculumList.find(
-            (item) => item.curriculum_id === selectedCurriculum
+            (item) => item.curriculum_id === selectedCurriculum,
           ) || null
         }
         onChange={(event, newValue) => {
@@ -850,11 +888,12 @@ const CurriculumCourseMap = () => {
         filterOptions={(options, { inputValue }) => {
           const search = inputValue.toLowerCase();
 
-          return options.filter((option) =>
-            option.program_code?.toLowerCase().includes(search) ||
-            option.program_description?.toLowerCase().includes(search) ||
-            option.major?.toLowerCase().includes(search) ||
-            option.year_description?.toString().includes(search)
+          return options.filter(
+            (option) =>
+              option.program_code?.toLowerCase().includes(search) ||
+              option.program_description?.toLowerCase().includes(search) ||
+              option.major?.toLowerCase().includes(search) ||
+              option.year_description?.toString().includes(search),
           );
         }}
         renderInput={(params) => (
@@ -899,8 +938,11 @@ const CurriculumCourseMap = () => {
                 }}
               >
                 {formatSchoolYear(
-                  curriculumList.find(c => c.curriculum_id === selectedCurriculum)?.year_description
-                )} : {selectedCurriculumName}
+                  curriculumList.find(
+                    (c) => c.curriculum_id === selectedCurriculum,
+                  )?.year_description,
+                )}{" "}
+                : {selectedCurriculumName}
               </Typography>
               <Typography sx={{ mb: 2, fontStyle: "italic", color: "#555" }}>
                 All fees shown below are based on the selected curriculum year.
@@ -945,7 +987,12 @@ const CurriculumCourseMap = () => {
                         }}
                       >
                         <Box sx={{ position: "relative", pb: 7 }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <table
+                            style={{
+                              width: "100%",
+                              borderCollapse: "collapse",
+                            }}
+                          >
                             <thead>
                               {/* YEAR + SEM */}
                               <tr>
@@ -1002,33 +1049,64 @@ const CurriculumCourseMap = () => {
                             <tbody>
                               {/* ===== SUBJECT ROWS ===== */}
                               {semesterCourses.map((course, index) => {
-                                const edit = editedFees[course.program_tagging_id] || {};
-                                const lecFee = edit.lec_fee ?? course.lec_fee ?? 0;
-                                const labFee = edit.lab_fee ?? course.lab_fee ?? 0;
-
-
-
+                                const edit =
+                                  editedFees[course.program_tagging_id] || {};
+                                const lecFee =
+                                  edit.lec_fee ?? course.lec_fee ?? 0;
+                                const labFee =
+                                  edit.lab_fee ?? course.lab_fee ?? 0;
 
                                 const totalFee = lecFee + labFee;
 
-
-
                                 return (
-                                  <tr key={course.program_tagging_id} style={{
-                                    backgroundColor: index % 2 === 0 ? "#ffffff" : "lightgray",
-                                  }}>
-                                    <td style={{ ...cellStyle, textAlign: "center" }}>{index + 1}</td>
-                                    <td style={cellStyle}>{course.course_code}</td>
-                                    <td style={cellStyle}>{course.course_description}</td>
+                                  <tr
+                                    key={course.program_tagging_id}
+                                    style={{
+                                      backgroundColor:
+                                        index % 2 === 0
+                                          ? "#ffffff"
+                                          : "lightgray",
+                                    }}
+                                  >
+                                    <td
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "center",
+                                      }}
+                                    >
+                                      {index + 1}
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {course.course_code}
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {course.course_description}
+                                    </td>
 
-                                    <td style={{ ...cellStyle, textAlign: "center" }}>{course.course_unit}</td>
-                                    <td style={{ ...cellStyle, textAlign: "right" }}>
+                                    <td
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "center",
+                                      }}
+                                    >
+                                      {course.course_unit}
+                                    </td>
+                                    <td
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "right",
+                                      }}
+                                    >
                                       <input
                                         type="number"
                                         value={lecFee}
                                         readOnly={!canEdit}
                                         onChange={(e) =>
-                                          handleFeeChange(course.program_tagging_id, "lec_fee", e.target.value)
+                                          handleFeeChange(
+                                            course.program_tagging_id,
+                                            "lec_fee",
+                                            e.target.value,
+                                          )
                                         }
                                         style={{
                                           width: "90px",
@@ -1040,13 +1118,22 @@ const CurriculumCourseMap = () => {
                                       />
                                     </td>
 
-                                    <td style={{ ...cellStyle, textAlign: "right" }}>
+                                    <td
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "right",
+                                      }}
+                                    >
                                       <input
                                         type="number"
                                         value={labFee}
                                         readOnly={!canEdit}
                                         onChange={(e) =>
-                                          handleFeeChange(course.program_tagging_id, "lab_fee", e.target.value)
+                                          handleFeeChange(
+                                            course.program_tagging_id,
+                                            "lab_fee",
+                                            e.target.value,
+                                          )
                                         }
                                         style={{
                                           width: "90px",
@@ -1058,21 +1145,19 @@ const CurriculumCourseMap = () => {
                                       />
                                     </td>
 
-
-
-
-
                                     {/* NSTP */}
                                     <td style={cellStyle}>
                                       <FormControl size="small" fullWidth>
                                         <Select
-                                          value={Number(edit.is_nstp ?? course.is_nstp ?? 0)}
+                                          value={Number(
+                                            edit.is_nstp ?? course.is_nstp ?? 0,
+                                          )}
                                           disabled={!canEdit}
                                           onChange={(e) =>
                                             handleFeeChange(
                                               course.program_tagging_id,
                                               "is_nstp",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                         >
@@ -1088,15 +1173,15 @@ const CurriculumCourseMap = () => {
                                         <Select
                                           value={Number(
                                             edit.iscomputer_lab ??
-                                            course.iscomputer_lab ??
-                                            0
+                                              course.iscomputer_lab ??
+                                              0,
                                           )}
                                           disabled={!canEdit}
                                           onChange={(e) =>
                                             handleFeeChange(
                                               course.program_tagging_id,
                                               "iscomputer_lab",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                         >
@@ -1112,15 +1197,15 @@ const CurriculumCourseMap = () => {
                                         <Select
                                           value={Number(
                                             edit.islaboratory_fee ??
-                                            course.islaboratory_fee ??
-                                            0
+                                              course.islaboratory_fee ??
+                                              0,
                                           )}
                                           disabled={!canEdit}
                                           onChange={(e) =>
                                             handleFeeChange(
                                               course.program_tagging_id,
                                               "islaboratory_fee",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                         >
@@ -1130,76 +1215,126 @@ const CurriculumCourseMap = () => {
                                       </FormControl>
                                     </td>
                                     {/* TOTAL */}
-                                    <td style={{ ...cellStyle, textAlign: "right" }}>
+                                    <td
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "right",
+                                      }}
+                                    >
                                       {totalFee.toLocaleString()}
                                     </td>
                                   </tr>
                                 );
                               })}
 
-
-                              <tr style={{ fontWeight: "bold", backgroundColor: "#f0f0f0" }}>
+                              <tr
+                                style={{
+                                  fontWeight: "bold",
+                                  backgroundColor: "#f0f0f0",
+                                }}
+                              >
                                 {/* LABEL */}
-                                <td colSpan={6} style={{ ...cellStyle, textAlign: "right" }}>
+                                <td
+                                  colSpan={6}
+                                  style={{ ...cellStyle, textAlign: "right" }}
+                                >
                                   TOTAL UNITS / TOTAL FEES
                                 </td>
 
                                 {/* TOTAL UNITS */}
-                                <td style={{ ...cellStyle, textAlign: "center" }}>
+                                <td
+                                  style={{ ...cellStyle, textAlign: "center" }}
+                                >
                                   {semesterCourses.reduce(
-                                    (sum, course) => sum + Number(course.course_unit ?? 0),
-                                    0
+                                    (sum, course) =>
+                                      sum + Number(course.course_unit ?? 0),
+                                    0,
                                   )}
                                 </td>
 
                                 {/* TOTAL LEC */}
-                                <td style={{ ...cellStyle, textAlign: "center" }}>
-                                  {semesterCourses.reduce(
-                                    (sum, course) =>
-                                      sum + (editedFees[course.program_tagging_id]?.lec_fee ?? course.lec_fee ?? 0),
-                                    0
-                                  ).toLocaleString()}
-                                </td>
-
-                                {/* TOTAL LAB */}
-                                <td style={{ ...cellStyle, textAlign: "center" }}>
-                                  {semesterCourses.reduce(
-                                    (sum, course) =>
-                                      sum + (editedFees[course.program_tagging_id]?.lab_fee ?? course.lab_fee ?? 0),
-                                    0
-                                  ).toLocaleString()}
-                                </td>
-
-                                {/* ✅ TOTAL FEE = LEC + LAB */}
-                                <td style={{ ...cellStyle, textAlign: "center" }}>
+                                <td
+                                  style={{ ...cellStyle, textAlign: "center" }}
+                                >
                                   {semesterCourses
                                     .reduce(
                                       (sum, course) =>
                                         sum +
-                                        (editedFees[course.program_tagging_id]?.lec_fee ?? course.lec_fee ?? 0) +
-                                        (editedFees[course.program_tagging_id]?.lab_fee ?? course.lab_fee ?? 0),
-                                      0
+                                        (editedFees[course.program_tagging_id]
+                                          ?.lec_fee ??
+                                          course.lec_fee ??
+                                          0),
+                                      0,
                                     )
                                     .toLocaleString()}
                                 </td>
 
+                                {/* TOTAL LAB */}
+                                <td
+                                  style={{ ...cellStyle, textAlign: "center" }}
+                                >
+                                  {semesterCourses
+                                    .reduce(
+                                      (sum, course) =>
+                                        sum +
+                                        (editedFees[course.program_tagging_id]
+                                          ?.lab_fee ??
+                                          course.lab_fee ??
+                                          0),
+                                      0,
+                                    )
+                                    .toLocaleString()}
+                                </td>
+
+                                {/* ✅ TOTAL FEE = LEC + LAB */}
+                                <td
+                                  style={{ ...cellStyle, textAlign: "center" }}
+                                >
+                                  {semesterCourses
+                                    .reduce(
+                                      (sum, course) =>
+                                        sum +
+                                        (editedFees[course.program_tagging_id]
+                                          ?.lec_fee ??
+                                          course.lec_fee ??
+                                          0) +
+                                        (editedFees[course.program_tagging_id]
+                                          ?.lab_fee ??
+                                          course.lab_fee ??
+                                          0),
+                                      0,
+                                    )
+                                    .toLocaleString()}
+                                </td>
                               </tr>
 
-
-
                               {extraFeesForSem.map((fee) => (
-                                <tr key={fee.fee_code} style={{ backgroundColor: "#f9f9ff", fontWeight: "bold" }}>
-                                  <td colSpan={9} style={{ ...cellStyle, textAlign: "center" }}>
+                                <tr
+                                  key={fee.fee_code}
+                                  style={{
+                                    backgroundColor: "#f9f9ff",
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  <td
+                                    colSpan={9}
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                    }}
+                                  >
                                     {fee.description}:
                                   </td>
-                                  <td style={{ ...cellStyle, textAlign: "center" }}>
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                    }}
+                                  >
                                     {Number(fee.amount).toLocaleString()}
                                   </td>
                                 </tr>
                               ))}
-
-
-
 
                               <tr>
                                 <th
@@ -1214,51 +1349,81 @@ const CurriculumCourseMap = () => {
                                     color: titleColor,
                                   }}
                                 >
-
                                   Tuition Fee
                                 </th>
-
-
                               </tr>
 
-
-
-
-
-
                               <tr>
-                                <td colSpan={9}
-                                  style={{ ...cellStyle, textAlign: "left", backgroundColor: "#eef5ff", fontWeight: "bold" }}>
+                                <td
+                                  colSpan={9}
+                                  style={{
+                                    ...cellStyle,
+                                    textAlign: "left",
+                                    backgroundColor: "#eef5ff",
+                                    fontWeight: "bold",
+                                  }}
+                                >
                                   Tuition Fee:
                                 </td>
-                                <td style={{ ...cellStyle, textAlign: "center", backgroundColor: "#eef5ff" }}>
+                                <td
+                                  style={{
+                                    ...cellStyle,
+                                    textAlign: "center",
+                                    backgroundColor: "#eef5ff",
+                                  }}
+                                >
                                   {tuitionFeeAmount.toLocaleString()}
                                 </td>
                               </tr>
 
                               {hasNSTP && (
                                 <tr>
-                                  <td colSpan={9}
-                                    style={{ ...cellStyle, textAlign: "left", backgroundColor: "#eef5ff", fontWeight: "bold" }}>
+                                  <td
+                                    colSpan={9}
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "left",
+                                      backgroundColor: "#eef5ff",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
                                     NSTP Fee:
                                   </td>
-                                  <td style={{ ...cellStyle, backgroundColor: "#eef5ff" }}>
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      backgroundColor: "#eef5ff",
+                                    }}
+                                  >
                                     {nstpFeeAmount.toLocaleString()}
                                   </td>
                                 </tr>
                               )}
 
-                              <tr style={{ fontWeight: "bold", backgroundColor: "#f0f0f0" }}>
-                                <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>
+                              <tr
+                                style={{
+                                  fontWeight: "bold",
+                                  backgroundColor: "#f0f0f0",
+                                }}
+                              >
+                                <td
+                                  colSpan={9}
+                                  style={{ ...cellStyle, textAlign: "right" }}
+                                >
                                   TOTAL TUITION (Tuition + NSTP):
                                 </td>
-                                <td style={{ ...cellStyle, textAlign: "right", color: "red" }}>
-                                  {(tuitionFeeAmount + nstpFeeAmount).toLocaleString()}
+                                <td
+                                  style={{
+                                    ...cellStyle,
+                                    textAlign: "right",
+                                    color: "red",
+                                  }}
+                                >
+                                  {(
+                                    tuitionFeeAmount + nstpFeeAmount
+                                  ).toLocaleString()}
                                 </td>
                               </tr>
-
-
-
 
                               <tr>
                                 <th
@@ -1273,110 +1438,264 @@ const CurriculumCourseMap = () => {
                                     color: titleColor,
                                   }}
                                 >
-
                                   Miscellaneuos Fee
                                 </th>
-
                               </tr>
-
-
 
                               {/* ===== TOSF FEES ===== */}
                               {tosf && (
                                 <>
-                                  <tr><td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>Athletic Fee:</td><td style={cellStyle}>{tosf.athletic_fee}</td></tr>
-                                  <tr><td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>Cultural Fee:</td><td style={cellStyle}>{tosf.cultural_fee}</td></tr>
-                                  <tr><td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>Developmental Fee:</td><td style={cellStyle}>{tosf.developmental_fee}</td></tr>
-                                  <tr><td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>Guidance Fee:</td><td style={cellStyle}>{tosf.guidance_fee}</td></tr>
-                                  <tr><td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>Library Fee:</td><td style={cellStyle}>{tosf.library_fee}</td></tr>
-                                  <tr><td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>Medical & Dental Fee:</td><td style={cellStyle}>{tosf.medical_and_dental_fee}</td></tr>
-                                  <tr><td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>Registration Fee:</td><td style={cellStyle}>{tosf.registration_fee}</td></tr>
-
+                                  <tr>
+                                    <td
+                                      colSpan={9}
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Athletic Fee:
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {tosf.athletic_fee}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td
+                                      colSpan={9}
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Cultural Fee:
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {tosf.cultural_fee}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td
+                                      colSpan={9}
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Developmental Fee:
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {tosf.developmental_fee}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td
+                                      colSpan={9}
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Guidance Fee:
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {tosf.guidance_fee}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td
+                                      colSpan={9}
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Library Fee:
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {tosf.library_fee}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td
+                                      colSpan={9}
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Medical & Dental Fee:
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {tosf.medical_and_dental_fee}
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td
+                                      colSpan={9}
+                                      style={{
+                                        ...cellStyle,
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Registration Fee:
+                                    </td>
+                                    <td style={cellStyle}>
+                                      {tosf.registration_fee}
+                                    </td>
+                                  </tr>
                                 </>
                               )}
 
                               {isFirstYearFirstSem && (
                                 <tr>
-                                  <td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>
+                                  <td
+                                    colSpan={9}
+                                    style={{ ...cellStyle, textAlign: "left" }}
+                                  >
                                     School ID Fee:
                                   </td>
                                   <td style={cellStyle}>
-                                    {Number(tosf?.school_id_fees || 0).toLocaleString()}
+                                    {Number(
+                                      tosf?.school_id_fees || 0,
+                                    ).toLocaleString()}
                                   </td>
                                 </tr>
                               )}
 
                               {hasComputerLab && (
                                 <tr>
-                                  <td colSpan={9} style={{ ...cellStyle, textAlign: "left", backgroundColor: "#eef5ff", fontWeight: "bold" }}>
+                                  <td
+                                    colSpan={9}
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "left",
+                                      backgroundColor: "#eef5ff",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
                                     Computer Fee:
                                   </td>
-                                  <td style={{ ...cellStyle, backgroundColor: "#eef5ff" }}>
-                                    {Number(tosf?.computer_fees || 0).toLocaleString()}
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      backgroundColor: "#eef5ff",
+                                    }}
+                                  >
+                                    {Number(
+                                      tosf?.computer_fees || 0,
+                                    ).toLocaleString()}
                                   </td>
                                 </tr>
                               )}
 
                               {hasNonComputerLab && (
                                 <tr>
-                                  <td colSpan={9} style={{ ...cellStyle, textAlign: "left", backgroundColor: "#eef5ff", fontWeight: "bold" }}>
+                                  <td
+                                    colSpan={9}
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "left",
+                                      backgroundColor: "#eef5ff",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
                                     Laboratory Fee:
                                   </td>
-                                  <td style={{ ...cellStyle, backgroundColor: "#eef5ff" }}>
-                                    {Number(tosf?.laboratory_fees || 0).toLocaleString()}
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      backgroundColor: "#eef5ff",
+                                    }}
+                                  >
+                                    {Number(
+                                      tosf?.laboratory_fees || 0,
+                                    ).toLocaleString()}
                                   </td>
                                 </tr>
                               )}
 
-
-
                               {/* ===== EXTRA FEES ROWS (like NSTP) ===== */}
                               {computedExtraFees.map((fee, idx) => (
-                                <tr key={`extra-${idx}`} style={{ backgroundColor: "#fafafa", }}>
-                                  <td colSpan={9} style={{ ...cellStyle, textAlign: "left" }}>
+                                <tr
+                                  key={`extra-${idx}`}
+                                  style={{ backgroundColor: "#fafafa" }}
+                                >
+                                  <td
+                                    colSpan={9}
+                                    style={{ ...cellStyle, textAlign: "left" }}
+                                  >
                                     {fee.label}:
                                   </td>
 
-
-                                  <td style={{ ...cellStyle, textAlign: "center" }}>
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                    }}
+                                  >
                                     {Number(fee.amount).toLocaleString()}
                                   </td>
                                 </tr>
                               ))}
 
-
-
                               {semesterCourses && (
                                 <tr style={{ backgroundColor: "#eef5ff" }}>
-                                  <td colSpan={9} style={{ ...cellStyle, textAlign: "left", fontWeight: "bold" }}>
+                                  <td
+                                    colSpan={9}
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "left",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
                                     Total Miscellaneous Fee:
                                   </td>
-                                  <td style={{ ...cellStyle, textAlign: "center" }}>
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                    }}
+                                  >
                                     {miscAmount.toLocaleString()}
                                   </td>
                                 </tr>
                               )}
 
-
-
-                              <tr style={{ fontWeight: "bold", backgroundColor: "#f0f0f0" }}>
-                                <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>
+                              <tr
+                                style={{
+                                  fontWeight: "bold",
+                                  backgroundColor: "#f0f0f0",
+                                }}
+                              >
+                                <td
+                                  colSpan={9}
+                                  style={{ ...cellStyle, textAlign: "right" }}
+                                >
                                   TOTAL TUITION & FEES:
                                 </td>
 
-                                <td style={{ ...cellStyle, textAlign: "right", color: "red" }}>
-                                  {(tuitionFeeAmount + miscAmount + nstpFeeAmount).toLocaleString()}
+                                <td
+                                  style={{
+                                    ...cellStyle,
+                                    textAlign: "right",
+                                    color: "red",
+                                  }}
+                                >
+                                  {(
+                                    tuitionFeeAmount +
+                                    miscAmount +
+                                    nstpFeeAmount
+                                  ).toLocaleString()}
                                 </td>
                               </tr>
-
                             </tbody>
-
-
                           </table>
                           {/* SAVE BUTTON */}
                           {canEdit && (
                             <button
-                              onClick={() => handleSaveSemester(semesterCourses)}
+                              onClick={() =>
+                                handleSaveSemester(semesterCourses)
+                              }
                               style={{
                                 marginTop: 10,
                                 padding: "6px 14px",
@@ -1397,9 +1716,7 @@ const CurriculumCourseMap = () => {
                   })}
               </Box>
             </Box>
-          )
-          )
-      }
+          ))}
 
       {/* SNACKBAR */}
       <Snackbar
@@ -1414,8 +1731,6 @@ const CurriculumCourseMap = () => {
       </Snackbar>
     </Box>
   );
-
 };
 
-export default CurriculumCourseMap;
-
+export default ProgramPayment;

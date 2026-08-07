@@ -24,33 +24,33 @@ import MenuBookIcon from "@mui/icons-material/MenuBook";
 import ScienceIcon from "@mui/icons-material/Science";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
-// ─── Term Sorting ─────────────────────────────────────────────────
-const sortTerms = (terms) =>
+// ─── Term Sorting (API-driven, same approach as StudentGradePage) ──
+const ordinalSuffix = (n) => {
+  if (n % 100 >= 11 && n % 100 <= 13) return "th";
+  switch (n % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
+};
+
+const parseTerm = (term) => {
+  const parts = String(term || "").split(" ");
+  const yearLabel = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : term;
+  const semesterLabel = parts.slice(2).join(" ");
+  return { yearLabel, semesterLabel };
+};
+
+const sortTerms = (terms, yearOrder, semesterOrder) =>
   [...terms].sort((a, b) => {
-    const getYear = (term) => {
-      if (term.includes("First Year")) return 1;
-      if (term.includes("Second Year")) return 2;
-      if (term.includes("Third Year")) return 3;
-      if (term.includes("Fourth Year")) return 4;
-      if (term.includes("Fifth Year")) return 5;
-      return 0;
-    };
-    const getSem = (term) => {
-      if (term.includes("First Semester")) return 1;
-      if (term.includes("Second Semester")) return 2;
-      if (term.includes("Summer")) return 3;
-      return 0;
-    };
-    const yearA = getYear(a); const yearB = getYear(b);
-    if (yearA !== yearB) return yearB - yearA;
-    return getSem(b) - getSem(a);
+    const tA = parseTerm(a); const tB = parseTerm(b);
+    const yA = yearOrder[tA.yearLabel] || 0;
+    const yB = yearOrder[tB.yearLabel] || 0;
+    if (yA !== yB) return yB - yA;
+    return (semesterOrder[tB.semesterLabel] || 0) - (semesterOrder[tA.semesterLabel] || 0);
   });
 
-const yearLabelMap = {
-  "First Year": "1st Year", "Second Year": "2nd Year", "Third Year": "3rd Year",
-  "Fourth Year": "4th Year", "Fifth Year": "5th Year",
-};
-const formatYearLabel = (year) => yearLabelMap[year] || year;
 const formatAcademicYear = (year) => {
   if (!year) return "";
   if (typeof year === "string" && year.includes("-")) return year;
@@ -171,7 +171,7 @@ const StudentCurriculumSubjects = () => {
       setLoading(false);
     }
   };
-  
+
   const [department, setDepartment] = useState("");
 
   const resolveDepartmentByCurriculum = async (curriculumId) => {
@@ -185,6 +185,52 @@ const StudentCurriculumSubjects = () => {
     }
   };
 
+  // ─── Year Levels / Semesters (fetched from API, same as StudentGradePage) ──
+  const [yearLevelList, setYearLevelList] = useState([]);
+  const [semesterList, setSemesterList] = useState([]);
+
+  useEffect(() => {
+    fetchYearLevels();
+    fetchSemesters();
+  }, []);
+
+  const fetchYearLevels = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
+      setYearLevelList(res.data);
+    } catch (err) {
+      console.error("Error fetching year levels:", err);
+    }
+  };
+
+  const fetchSemesters = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/semesters`);
+      setSemesterList(res.data);
+    } catch (err) {
+      console.error("Error fetching semesters:", err);
+    }
+  };
+
+  const yearOrder = yearLevelList.reduce((acc, yl) => {
+    acc[yl.year_level_description] = yl.year_level_id;
+    return acc;
+  }, {});
+
+  const semesterOrder = semesterList.reduce((acc, s) => {
+    acc[s.semester_description] = s.semester_id;
+    return acc;
+  }, {});
+
+  const yearLabelMap = yearLevelList.reduce((acc, yl) => {
+    acc[yl.year_level_description] =
+      yl.level_type === "year"
+        ? `${yl.year_level_id}${ordinalSuffix(yl.year_level_id)} Year`
+        : yl.year_level_description;
+    return acc;
+  }, {});
+
+  const formatYearLabel = (year) => yearLabelMap[year] || year;
 
   // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -209,7 +255,7 @@ const StudentCurriculumSubjects = () => {
   const rawTerms = [...new Set(subjects.map(
     (row) => `${row.year_level_description} ${row.semester_description}`
   ))];
-  const sortedTerms = sortTerms(rawTerms);
+  const sortedTerms = sortTerms(rawTerms, yearOrder, semesterOrder);
   const headerBg = settings?.header_color || "#800000";
   const programInfo = subjects[0];
 
@@ -425,12 +471,12 @@ const StudentCurriculumSubjects = () => {
                       ))}
 
                       {/* Total row */}
-                      <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                        <TableCell sx={{ ...bodyCell, fontWeight: 700 }} colSpan={4}>TOTAL</TableCell>
-                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center" }}>{totalLec}</TableCell>
-                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center" }}>{totalLab}</TableCell>
-                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center" }}>{totalCourse}</TableCell>
-                        <TableCell sx={bodyCell}></TableCell>
+                      <TableRow sx={{ backgroundColor: headerBg, color: "white" }}>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, color: "white", height: "35px" }} colSpan={4}>TOTAL</TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}>{totalLec}</TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}>{totalLab}</TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}>{totalCourse}</TableCell>
+                        <TableCell sx={{ ...bodyCell, fontWeight: 700, textAlign: "center", color: "white", height: "35px" }}></TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>

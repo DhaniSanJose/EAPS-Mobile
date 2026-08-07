@@ -94,7 +94,8 @@ const CoursePanel = () => {
       localStorage.getItem("employee_id") ||
       localStorage.getItem("email") ||
       "unknown",
-    "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+    "x-audit-actor-role":
+      userRole || localStorage.getItem("role") || "registrar",
   });
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,7 +109,8 @@ const CoursePanel = () => {
     prereq: "",
     corequisite: "",
     is_academic_achiever: 1,
-    is_latin: 1
+    is_latin: 1,
+    is_gwa_included: 1,
   });
   const [courseList, setCourseList] = useState([]);
   const [honorRules, setHonorRules] = useState([]);
@@ -224,6 +226,7 @@ const CoursePanel = () => {
         prerequisite: item.prereq || "",
         is_academic_achiever: item.is_academic_achiever ?? 1,
         is_latin: item.is_latin ?? 1,
+        is_gwa_included: item.is_gwa_included ?? 1, // ✅ new
       }));
       setCourseList(data);
     } catch (err) {
@@ -321,12 +324,15 @@ const CoursePanel = () => {
   // ✅ UPDATED handleAddingCourse
   const handleAddingCourse = async () => {
     if (!course.course_code || !course.course_description) {
-      showSnack('Please fill all fields', 'warning');
+      showSnack("Please fill all fields", "warning");
       return;
     }
 
     if (!canCreate) {
-      showSnack('You do not have permission to create items on this page', 'error');
+      showSnack(
+        "You do not have permission to create items on this page",
+        "error",
+      );
       return;
     }
 
@@ -342,6 +348,7 @@ const CoursePanel = () => {
           corequisite: course.corequisite || null,
           is_academic_achiever: Number(course.is_academic_achiever) ?? 1,
           is_latin: Number(course.is_latin) ?? 1,
+          is_gwa_included: Number(course.is_gwa_included) ?? 1,
         },
         { headers: getPermissionHeaders() },
       );
@@ -385,6 +392,7 @@ const CoursePanel = () => {
       corequisite: item.corequisite ?? "",
       is_academic_achiever: item.is_academic_achiever ?? 1,
       is_latin: item.is_latin ?? 1,
+      is_gwa_included: item.is_gwa_included ?? 1,
     });
 
     setEditMode(true);
@@ -414,6 +422,7 @@ const CoursePanel = () => {
           lab_unit: parseFloat(course.lab_unit) || 0,
           prereq: course.prereq || null,
           corequisite: course.corequisite || null,
+          is_gwa_included: Number(course.is_gwa_included) ?? 1,
         },
         { headers: getPermissionHeaders() },
       );
@@ -475,7 +484,10 @@ const CoursePanel = () => {
     if (!file) return;
 
     if (!canCreate) {
-      showSnack("You do not have permission to create items on this page.", "error");
+      showSnack(
+        "You do not have permission to create items on this page.",
+        "error",
+      );
       event.target.value = "";
       return;
     }
@@ -912,6 +924,7 @@ const CoursePanel = () => {
                 "Lecture",
                 "Academic Achiever",
                 "Latin Honor",
+                "Include in GWA Calculation",
                 ...(showActionColumn ? ["Actions"] : []),
               ].map((header) => (
                 <th
@@ -945,10 +958,15 @@ const CoursePanel = () => {
               });
 
               return (
-                <tr key={c.course_id} style={{
-                  backgroundColor: index % 2 === 0 ? "#ffffff" : "lightgray",
-                }}>
-                  <td style={styles.tableCell}>{indexOfFirstItem + index + 1}</td>
+                <tr
+                  key={c.course_id}
+                  style={{
+                    backgroundColor: index % 2 === 0 ? "#ffffff" : "lightgray",
+                  }}
+                >
+                  <td style={styles.tableCell}>
+                    {indexOfFirstItem + index + 1}
+                  </td>
                   <td style={styles.tableCell}>{c.course_code}</td>
                   <td style={styles.tableCell}>{c.course_description}</td>
                   <td style={styles.tableCell}>{c.lec_unit}</td>
@@ -968,6 +986,10 @@ const CoursePanel = () => {
 
                   <td style={styles.tableCell}>
                     {Number(c.is_latin) === 1 ? "YES" : "NO"}
+                  </td>
+
+                  <td style={styles.tableCell}>
+                    {Number(c.is_gwa_included) === 1 ? "YES" : "NO"}
                   </td>
 
                   {showActionColumn && (
@@ -1254,8 +1276,8 @@ const CoursePanel = () => {
               fontSize: "0.95rem",
             }}
           >
-            Deleting this course will remove it permanently from the course list.
-            Any curriculum referencing this course may be affected.
+            Deleting this course will remove it permanently from the course
+            list. Any curriculum referencing this course may be affected.
           </Typography>
         </DialogContent>
 
@@ -1417,9 +1439,7 @@ const CoursePanel = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Typography fontWeight="bold">
-                Academic Achiever
-              </Typography>
+              <Typography fontWeight="bold">Academic Achiever</Typography>
 
               <Select
                 fullWidth
@@ -1437,9 +1457,7 @@ const CoursePanel = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Typography fontWeight="bold">
-                Latin Honor
-              </Typography>
+              <Typography fontWeight="bold">Latin Honor</Typography>
 
               <Select
                 fullWidth
@@ -1453,6 +1471,23 @@ const CoursePanel = () => {
               >
                 <MenuItem value={1}>YES</MenuItem>
                 <MenuItem value={0}>NO</MenuItem>
+              </Select>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Typography fontWeight="bold">Included in GWA</Typography>
+              <Select
+                fullWidth
+                value={course.is_gwa_included ?? 1}
+                onChange={(e) =>
+                  setCourse((prev) => ({
+                    ...prev,
+                    is_gwa_included: Number(e.target.value),
+                  }))
+                }
+              >
+                <MenuItem value={1}>YES</MenuItem>
+                <MenuItem value={0}>NO — Exclude from GWA</MenuItem>
               </Select>
             </Grid>
           </Grid>

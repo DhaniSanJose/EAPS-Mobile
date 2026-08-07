@@ -11,17 +11,7 @@ const GWA_UNIT_SQL =
 
 const GWA_EXCLUSION_SQL = `
   (
-    UPPER(REPLACE(COALESCE(ct.course_code, ''), ' ', '')) LIKE 'NSTP%'
-    OR UPPER(REPLACE(COALESCE(ct.course_code, ''), ' ', '')) LIKE 'NST%'
-    OR UPPER(COALESCE(ct.course_code, '')) LIKE '%CWTS%'
-    OR UPPER(COALESCE(ct.course_code, '')) LIKE '%CTWS%'
-    OR UPPER(COALESCE(ct.course_code, '')) LIKE '%LTS%'
-    OR UPPER(COALESCE(ct.course_code, '')) LIKE '%MTS%'
-    OR UPPER(REPLACE(COALESCE(ct.course_description, ''), ' ', '')) LIKE '%NSTP%'
-    OR UPPER(COALESCE(ct.course_description, '')) LIKE '%NATIONAL SERVICE TRAINING%'
-    OR UPPER(COALESCE(ct.course_description, '')) LIKE '%CIVIC WELFARE TRAINING%'
-    OR UPPER(COALESCE(ct.course_description, '')) LIKE '%LITERACY TRAINING SERVICE%'
-    OR UPPER(COALESCE(ct.course_description, '')) LIKE '%RESERVE OFFICERS TRAINING%'
+    ct.is_gwa_included = 0
     OR EXISTS (
       SELECT 1
       FROM program_tagging_table ptt_ex
@@ -447,6 +437,7 @@ router.get("/student_grade/:id", async (req, res) => {
         st.description AS section_description,
 
         ylt.year_level_description,
+        ylt.level_type,
         sst.year_level_id,
 
         smt.semester_description,
@@ -562,6 +553,7 @@ router.get("/student_grade/:id", async (req, res) => {
         pgt.program_description,
         st.description,
         ylt.year_level_description,
+        ylt.level_type,
         sst.year_level_id,
         smt.semester_description,
         smt.semester_id,
