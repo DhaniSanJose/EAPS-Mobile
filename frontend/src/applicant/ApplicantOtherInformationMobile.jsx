@@ -55,7 +55,7 @@ import AdmissionServices from "./ApplicantServicesSurvey";
  * form component, posts its HTML to the backend, and downloads the returned
  * PDF blob — instead of navigating to a separate route.
  */
-const ApplicantOtherInformationResponsive = (props) => {
+const ApplicantOtherInformationMobile = (props) => {
   const settings = useContext(SettingsContext);
   const navigate = useNavigate();
   const theme = useTheme();
@@ -1234,4 +1234,4 @@ const ApplicantOtherInformationResponsive = (props) => {
   );
 };
 
-export default ApplicantOtherInformationResponsive;
+export default ApplicantOtherInformationMobile;

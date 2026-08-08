@@ -65,7 +65,7 @@ import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
-const ReadmissionDashboard1 = () => {
+const StudentRegistrarPersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -4468,4 +4468,4 @@ const ReadmissionDashboard1 = () => {
   );
 };
 
-export default ReadmissionDashboard1;
+export default StudentRegistrarPersonalInformation;

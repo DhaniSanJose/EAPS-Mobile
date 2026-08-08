@@ -422,7 +422,7 @@ function ProfileUploadInput({ id, onChange }) {
 /* ─────────────────────────────────────────
    SideBar
 ───────────────────────────────────────── */
-const SideBar = ({
+const Sidebar = ({
     setIsAuthenticated,
     profileImage,
     setProfileImage,
@@ -1218,4 +1218,4 @@ const SideBar = ({
     );
 };
 
-export default SideBar;
+export default Sidebar;

@@ -32,7 +32,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const MedicalRequirements = () => {
+const StudentOnlineRequirementsRegistrar = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -1573,4 +1573,4 @@ const MedicalRequirements = () => {
   );
 };
 
-export default MedicalRequirements;
+export default StudentOnlineRequirementsRegistrar;

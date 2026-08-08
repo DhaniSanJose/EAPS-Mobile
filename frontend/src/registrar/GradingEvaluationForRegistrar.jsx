@@ -12,7 +12,7 @@ import { postAuditEvent } from "../utils/auditEvents";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 
-const ProgramEvaluationForRegistrar = () => {
+const GradingEvaluationForRegistrar = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const [titleColor, setTitleColor] = useState("#000000");
@@ -1298,4 +1298,4 @@ const ProgramEvaluationForRegistrar = () => {
   );
 };
 
-export default ProgramEvaluationForRegistrar;
+export default GradingEvaluationForRegistrar;

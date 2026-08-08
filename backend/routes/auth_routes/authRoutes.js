@@ -17,6 +17,11 @@ const { resolveUserMacAddress } = require("../../utils/macAddress");
 const {
   resolveRegistrarLoginFields,
 } = require("../../utils/registrarScopeService");
+// Shared academic-program window helper (also used by the /branches routes)
+const {
+  getNowInManila,
+  computeIsOpen,
+} = require("../../utils/registrationWindow");
 const crypto = require("crypto");
 const router = express.Router();
 const dns = require("dns").promises;
@@ -664,17 +669,58 @@ router.post("/register", async (req, res) => {
       .status(400)
       .json({ success: false, message: "Invalid branch selected" });
   }
-  const nowDate = new Date();
-  let isOpen = branch.registration_open;
-  if (branch.start_date && branch.end_date) {
-    isOpen =
-      nowDate >= new Date(branch.start_date) &&
-      nowDate <= new Date(branch.end_date);
-  }
-  if (!isOpen) {
+
+  // ════════════════════════════════════════════════════════════════════
+  //  REGISTRATION WINDOW CHECK
+  //  A branch no longer has its own independent admission-season schedule.
+  //  Registration is gated PURELY by the selected academic program's own
+  //  DAILY window (Undergraduate, Graduate, TechVoc each carry their own
+  //  start_date/end_date on the academicPrograms entry, evaluated against
+  //  Manila time, wrapping past midnight where needed e.g. 18:00 -> 06:00).
+  //  This is enforced server-side below via the default
+  //  { dailyWindow: true } behavior of computeIsOpen — never trust the
+  //  frontend-only check.
+  // ════════════════════════════════════════════════════════════════════
+  const nowManila = getNowInManila();
+
+  const selectedProgram = (branch.academicPrograms || []).find(
+    (p) => String(p.id) === String(academicProgram)
+  );
+
+  if (!selectedProgram) {
+    await insertRegistrationAuditLog({
+      actorId: normalizedEmail || "unknown",
+      outcome: "FAILED",
+      event: "failed to register",
+      reason: `Selected academic program (${academicProgram}) does not exist on this branch`,
+    });
     return res.status(400).json({
       success: false,
-      message: "Registration is closed for this branch",
+      message: "Invalid academic program selected.",
+    });
+  }
+
+  // Single live check: computeIsOpen now handles BOTH the manual master
+  // switch (manual_enabled) AND the daily hours window (start_date/end_date)
+  // in one place, so there's no risk of trusting a stale cached `open`
+  // value read straight from the DB before this request re-syncs it.
+  const programOpenNow = computeIsOpen(selectedProgram, nowManila, "open");
+  if (!programOpenNow) {
+    const startTime = selectedProgram.start_date?.split("T")[1] || "";
+    const endTime = selectedProgram.end_date?.split("T")[1] || "";
+    const hoursNote =
+      startTime && endTime
+        ? ` Registration hours: ${startTime}–${endTime} (Manila time), daily.`
+        : "";
+    await insertRegistrationAuditLog({
+      actorId: normalizedEmail || "unknown",
+      outcome: "FAILED",
+      event: "failed to register",
+      reason: `Attempted registration outside ${selectedProgram.name || "program"}'s daily window`,
+    });
+    return res.status(400).json({
+      success: false,
+      message: `${selectedProgram.name || "This program"}'s registration is closed right now.${hoursNote}`,
     });
   }
 

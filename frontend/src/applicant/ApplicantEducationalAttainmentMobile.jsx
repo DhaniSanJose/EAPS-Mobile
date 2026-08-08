@@ -247,7 +247,7 @@ const SchoolBlock = ({ suffix = "", person, errors, handleChange, isStacked }) =
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const ApplicantEducationalAttainmentResponsive = (props) => {
+const ApplicantEducationalAttainmentMobile = (props) => {
   const settings = useContext(SettingsContext);
   const navigate = useNavigate();
   const theme = useTheme();
@@ -1387,4 +1387,4 @@ const ApplicantEducationalAttainmentResponsive = (props) => {
   );
 };
 
-export default ApplicantEducationalAttainmentResponsive;
+export default ApplicantEducationalAttainmentMobile;

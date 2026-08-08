@@ -39,7 +39,7 @@ import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTa
 
 
 
-const RegistrarDashboard4 = () => {
+const ApplicantHealthMedicalRecords = () => {
     useAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1987,4 +1987,4 @@ const RegistrarDashboard4 = () => {
 };
 
 
-export default RegistrarDashboard4;
+export default ApplicantHealthMedicalRecords;

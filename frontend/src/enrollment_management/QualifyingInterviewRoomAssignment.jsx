@@ -25,7 +25,7 @@ import { useNavigate } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
 import DateField from "../components/DateField";
 
-const InterviewScheduleHoverTile = () => {
+const QualifyingInterviewRoomAssignment = () => {
   const navigate = useNavigate();
   const settings = useContext(SettingsContext);
 
@@ -601,4 +601,4 @@ const InterviewScheduleHoverTile = () => {
   );
 };
 
-export default InterviewScheduleHoverTile;
+export default QualifyingInterviewRoomAssignment;

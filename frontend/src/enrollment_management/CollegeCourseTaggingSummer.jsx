@@ -203,7 +203,7 @@ const logStudentBasicInfoSearch = async ({
   }
 };
 
-const CourseTaggingForSummerCollege = () => {
+const CollegeCourseTaggingSummer = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const theme = useTheme();
@@ -2268,4 +2268,4 @@ const CourseTaggingForSummerCollege = () => {
   );
 };
 
-export default CourseTaggingForSummerCollege;
+export default CollegeCourseTaggingSummer;

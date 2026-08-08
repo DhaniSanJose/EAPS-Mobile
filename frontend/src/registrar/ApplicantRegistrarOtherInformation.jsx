@@ -33,7 +33,7 @@ import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
-const AdminDashboard5 = () => {
+const ApplicantRegistrarOtherInformation = () => {
   useAuditMac();
 
   const settings = useContext(SettingsContext);
@@ -1348,4 +1348,4 @@ const AdminDashboard5 = () => {
 };
 
 
-export default AdminDashboard5;
+export default ApplicantRegistrarOtherInformation;

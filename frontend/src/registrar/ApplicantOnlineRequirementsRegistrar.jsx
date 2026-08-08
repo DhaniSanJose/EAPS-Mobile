@@ -44,7 +44,7 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
-const RegistrarRequirements = () => {
+const ApplicantOnlineRequirementsRegistrar = () => {
   useAuditMac();
 
   // ------------------------------------
@@ -1778,4 +1778,4 @@ const RegistrarRequirements = () => {
   );
 };
 
-export default RegistrarRequirements;
+export default ApplicantOnlineRequirementsRegistrar;

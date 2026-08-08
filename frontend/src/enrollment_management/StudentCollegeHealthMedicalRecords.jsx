@@ -34,7 +34,7 @@ import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 
-const OfficialStudentDashboard4 = () => {
+const StudentCollegeHealthMedicalRecords = () => {
     useAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1794,4 +1794,4 @@ const OfficialStudentDashboard4 = () => {
 };
 
 
-export default OfficialStudentDashboard4;
+export default StudentCollegeHealthMedicalRecords;

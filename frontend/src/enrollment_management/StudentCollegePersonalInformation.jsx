@@ -72,7 +72,7 @@ import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar"
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 
-const OfficialStudentDashboard1 = () => {
+const StudentCollegePersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -4471,4 +4471,4 @@ const OfficialStudentDashboard1 = () => {
   );
 };
 
-export default OfficialStudentDashboard1;
+export default StudentCollegePersonalInformation;

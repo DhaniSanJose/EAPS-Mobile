@@ -32,7 +32,7 @@ import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 
-const OfficialStudentDashboard3 = () => {
+const StudentCollegeEducationalAttainment = () => {
     useAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1543,4 +1543,4 @@ const OfficialStudentDashboard3 = () => {
 };
 
 
-export default OfficialStudentDashboard3;
+export default StudentCollegeEducationalAttainment;

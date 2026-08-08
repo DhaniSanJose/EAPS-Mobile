@@ -52,7 +52,7 @@ import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProce
 
 
 
-const ApplicantScoringReadOnly = () => {
+const RegistrarEntranceExamScore = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -2259,4 +2259,4 @@ const ApplicantScoringReadOnly = () => {
     );
 };
 
-export default ApplicantScoringReadOnly;
+export default RegistrarEntranceExamScore;

@@ -37,7 +37,7 @@ import useAuditMac from "../utils/useAuditMac";
 import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
 
-const RegistrarDashboard3 = () => {
+const ApplicantEducationalAttainment = () => {
     useAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -1789,4 +1789,4 @@ const RegistrarDashboard3 = () => {
 };
 
 
-export default RegistrarDashboard3;
+export default ApplicantEducationalAttainment;

@@ -56,7 +56,7 @@ import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
-const AssignScheduleToApplicantsInterviewer = () => {
+const CollegeQualifyingInterviewScheduleManagement = () => {
   useAuditMac();
   const socket = useRef(null);
   const settings = useContext(SettingsContext);
@@ -1327,7 +1327,12 @@ ${requirementsSection}
     `• Bring your Entrance Examination Permit during Qualifying / Interview.
 • Bring the Admission Form Process provided by the Admission Office.
 • Bring one (1) long brown envelope with a long plastic cover for your college copies.
-• Provide your Enrollment Officer with photocopies of all documents you previously submitted through the online application portal.`,
+• Provide your Enrollment Officer with photocopies of all documents you previously submitted through the online application portal.
+
+Please also bring:
+• One (1) black ballpen
+• One (1) sharpened pencils
+`,
   );
 
   const [schedules, setSchedules] = useState([]);
@@ -3218,4 +3223,4 @@ ${requirementsSection}
   );
 };
 
-export default AssignScheduleToApplicantsInterviewer;
+export default CollegeQualifyingInterviewScheduleManagement;

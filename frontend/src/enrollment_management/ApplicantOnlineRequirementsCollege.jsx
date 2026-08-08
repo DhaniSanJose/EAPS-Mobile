@@ -43,7 +43,7 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
-const RegistrarRequirements = () => {
+const ApplicantOnlineRequirementsCollege = () => {
   useAuditMac();
   // ------------------------------------
   const [requirements, setRequirements] = useState([]);
@@ -1776,4 +1776,4 @@ const RegistrarRequirements = () => {
   );
 };
 
-export default RegistrarRequirements;
+export default ApplicantOnlineRequirementsCollege;

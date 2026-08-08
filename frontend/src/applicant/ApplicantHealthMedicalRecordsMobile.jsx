@@ -151,7 +151,7 @@ const vaccineColumns = [
 ];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const ApplicantHealthMedicalRecordsResponsive = (props) => {
+const ApplicantHealthMedicalRecordsMobile = (props) => {
   const settings = useContext(SettingsContext);
   const navigate = useNavigate();
   const theme = useTheme();
@@ -1508,4 +1508,4 @@ const ApplicantHealthMedicalRecordsResponsive = (props) => {
   );
 };
 
-export default ApplicantHealthMedicalRecordsResponsive;
+export default ApplicantHealthMedicalRecordsMobile;

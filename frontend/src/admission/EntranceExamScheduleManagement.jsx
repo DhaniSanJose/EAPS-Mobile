@@ -271,9 +271,10 @@ const EntranceExamScheduleManagement = () => {
           ),
         );
 
-
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
+        const restricted = dedupeByProgramCode(
+          restrictToRegistrarCurriculum(merged),
+        );
         setCurriculumOptions(restricted);
         setAllCurriculums(restricted);
       } catch (error) {
@@ -421,9 +422,12 @@ const EntranceExamScheduleManagement = () => {
     if (!time) return "";
     const d = new Date(`1970-01-01T${time}`);
     if (isNaN(d.getTime())) return time;
-    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
-
 
   // ================= FUNCTIONS =================
   const [customCount, setCustomCount] = useState(0);
@@ -532,9 +536,9 @@ const EntranceExamScheduleManagement = () => {
           prev.map((s) =>
             Number(s.schedule_id) === Number(selectedSchedule)
               ? {
-                ...s,
-                current_occupancy: currentCount + (res.assigned?.length || 0),
-              }
+                  ...s,
+                  current_occupancy: currentCount + (res.assigned?.length || 0),
+                }
               : s,
           ),
         );
@@ -578,12 +582,12 @@ const EntranceExamScheduleManagement = () => {
         prev.map((s) =>
           Number(s.schedule_id) === Number(assignedScheduleId)
             ? {
-              ...s,
-              current_occupancy: Math.max(
-                Number(s.current_occupancy || 0) - 1,
-                0,
-              ),
-            }
+                ...s,
+                current_occupancy: Math.max(
+                  Number(s.current_occupancy || 0) - 1,
+                  0,
+                ),
+              }
             : s,
         ),
       );
@@ -683,9 +687,9 @@ const EntranceExamScheduleManagement = () => {
           prev.map((s) =>
             Number(s.schedule_id) === Number(selectedSchedule)
               ? {
-                ...s,
-                current_occupancy: currentCount + (res.assigned?.length || 0),
-              }
+                  ...s,
+                  current_occupancy: currentCount + (res.assigned?.length || 0),
+                }
               : s,
           ),
         );
@@ -738,12 +742,15 @@ const EntranceExamScheduleManagement = () => {
   const [finalPreview, setFinalPreview] = useState(""); // live full preview
 
   // ONLY editable part
-  const [customReminders, setCustomReminders] = useState(`Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
+  const [customReminders, setCustomReminders] =
+    useState(`Step 1: Check your Examination Date, Time, and Room Number indicated on your permit.
 
 Step 2: Bring all required items on the exam day:
 • Official Examination Permit with VERIFIED watermark
 • No. 2 Pencil (any brand)
+• One (1) black ballpen
 • 2 Short Bond Papers
+
 
 Step 3: Wear the proper attire:
 • Plain white T-shirt or plain white polo shirt (no prints, logos, or designs)
@@ -976,21 +983,25 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
     setCurrentPage(1);
   };
 
-
   useEffect(() => {
     const branchId = selectedCampusFilter || "1"; // fallback to Manila until a schedule is picked
     const fetchAdmissionContact = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/admission_contact/active`, {
-          params: { branch_id: branchId },
-        });
+        const res = await axios.get(
+          `${API_BASE_URL}/api/admission_contact/active`,
+          {
+            params: { branch_id: branchId },
+          },
+        );
         const contact = res.data || null;
         setAdmissionContact(contact);
 
         if (contact) {
-          setOfficeDays(`${contact.office_days_start} – ${contact.office_days_end}`);
+          setOfficeDays(
+            `${contact.office_days_start} – ${contact.office_days_end}`,
+          );
           setOfficeTime(
-            `${formatContactTime(contact.office_time_start)} – ${formatContactTime(contact.office_time_end)}`
+            `${formatContactTime(contact.office_time_start)} – ${formatContactTime(contact.office_time_end)}`,
           );
         } else {
           setOfficeDays("Not set in Admission Contact Management");
@@ -1066,7 +1077,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
     const matchesSemester =
       selectedSchoolSemester === "" ||
       normalize(personData.middle_code) ===
-      normalize(selectedSemester?.semester_code);
+        normalize(selectedSemester?.semester_code);
 
     return (
       emailNotSent &&
@@ -1446,11 +1457,11 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
                 value={
                   selectedSchedule
                     ? (() => {
-                      const s = getSelectedScheduleData();
-                      return s
-                        ? `${s.current_occupancy ?? 0}/${s.room_quota}`
-                        : "";
-                    })()
+                        const s = getSelectedScheduleData();
+                        return s
+                          ? `${s.current_occupancy ?? 0}/${s.room_quota}`
+                          : "";
+                      })()
                     : ""
                 }
                 InputProps={{ readOnly: true }}
@@ -2177,9 +2188,10 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
                               };
 
                               setEmailMessage(
-                                `Hello, ${person.first_name} ${person.middle_name
-                                  ? person.middle_name.charAt(0) + "."
-                                  : ""
+                                `Hello, ${person.first_name} ${
+                                  person.middle_name
+                                    ? person.middle_name.charAt(0) + "."
+                                    : ""
                                 } ${person.last_name}
 
 You have been assigned to the following Entrance Examination schedule:

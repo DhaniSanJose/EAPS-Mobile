@@ -12,7 +12,7 @@ import axios from "axios";
 import API_BASE_URL from "../apiConfig";
 import DownloadIcon from "@mui/icons-material/Download";
 
-const AdmissionServices = forwardRef((props, ref) => {
+const ApplicantServicesSurvey = forwardRef((props, ref) => {
     const settings = useContext(SettingsContext);
 
     const [titleColor, setTitleColor] = useState("#000000");
@@ -1654,4 +1654,4 @@ const AdmissionServices = forwardRef((props, ref) => {
     );
 });
 
-export default AdmissionServices;
+export default ApplicantServicesSurvey;

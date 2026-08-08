@@ -43,7 +43,7 @@ import {
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
 
-const InterviewerApplicantList = () => {
+const CollegeQualifyingInterviewerApplicantList = () => {
   const location = useLocation();
 
 
@@ -847,4 +847,4 @@ const InterviewerApplicantList = () => {
   );
 };
 
-export default InterviewerApplicantList;
+export default CollegeQualifyingInterviewerApplicantList;

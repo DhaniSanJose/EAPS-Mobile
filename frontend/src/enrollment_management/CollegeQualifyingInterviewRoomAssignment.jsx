@@ -43,7 +43,7 @@ import useAuditMac from "../utils/useAuditMac";
 
 
 
-const AssignQualifyingInterviewExam = () => {
+const CollegeQualifyingInterviewRoomAssignment = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -1526,4 +1526,4 @@ const AssignQualifyingInterviewExam = () => {
     );
 };
 
-export default AssignQualifyingInterviewExam;
+export default CollegeQualifyingInterviewRoomAssignment;

@@ -76,7 +76,7 @@ import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
-const RegistrarDashboard1 = () => {
+const ApplicantCollegePersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -4560,4 +4560,4 @@ const RegistrarDashboard1 = () => {
   );
 };
 
-export default RegistrarDashboard1;
+export default ApplicantCollegePersonalInformation;

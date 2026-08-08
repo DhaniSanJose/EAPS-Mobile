@@ -38,7 +38,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const DepartmentRegistration = () => {
+const DprtmntRegistration = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -1242,4 +1242,4 @@ const DepartmentRegistration = () => {
   );
 };
 
-export default DepartmentRegistration;
+export default DprtmntRegistration;

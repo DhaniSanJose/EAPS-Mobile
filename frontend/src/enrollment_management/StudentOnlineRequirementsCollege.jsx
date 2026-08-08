@@ -35,7 +35,7 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 
-const OfficialRequirements = () => {
+const StudentOnlineRequirementsCollege = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -1729,4 +1729,4 @@ const OfficialRequirements = () => {
   );
 };
 
-export default OfficialRequirements;
+export default StudentOnlineRequirementsCollege;

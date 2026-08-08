@@ -147,7 +147,7 @@ const btnPrimaryStyle = {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const ApplicantPersonalInformationResponsive = () => {
+const ApplicantPersonalInformationMobile = () => {
   const settings = useContext(SettingsContext);
   const navigate = useNavigate();
   const theme = useTheme();
@@ -2646,4 +2646,4 @@ const ApplicantPersonalInformationResponsive = () => {
   );
 };
 
-export default ApplicantPersonalInformationResponsive;
+export default ApplicantPersonalInformationMobile;

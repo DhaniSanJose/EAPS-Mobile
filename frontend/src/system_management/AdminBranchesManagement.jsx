@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  MenuItem
+  MenuItem,
 } from "@mui/material";
 
 import BusinessIcon from "@mui/icons-material/Business";
@@ -97,8 +97,6 @@ const AdminBranchesManagement = () => {
     }
   }, [settings]);
 
-
-
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
@@ -116,13 +114,14 @@ const AdminBranchesManagement = () => {
       ...getFlatAuditHeaders(),
       "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
       "x-page-id": pageId,
-      "x-audit-actor-id": employeeID || localStorage.getItem("employee_id") || "",
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-id":
+        employeeID || localStorage.getItem("employee_id") || "",
+      "x-audit-actor-role":
+        userRole || localStorage.getItem("role") || "registrar",
     },
   });
 
   useEffect(() => {
-
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const storedID = localStorage.getItem("person_id");
@@ -146,7 +145,9 @@ const AdminBranchesManagement = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -159,7 +160,7 @@ const AdminBranchesManagement = () => {
         setCanDelete(false);
       }
     } catch (error) {
-      console.error('Error checking access:', error);
+      console.error("Error checking access:", error);
       setHasAccess(false);
       setCanCreate(false);
       setCanEdit(false);
@@ -186,13 +187,12 @@ const AdminBranchesManagement = () => {
   const [snack, setSnack] = useState({
     open: false,
     message: "",
-    severity: "success"
+    severity: "success",
   });
 
   useEffect(() => {
     fetchBranches();
   }, []);
-
 
   const fetchBranches = async () => {
     try {
@@ -222,14 +222,26 @@ const AdminBranchesManagement = () => {
 
   const handleUpdate = async (branch) => {
     if (!canEdit) {
-      setSnack({ open: true, message: "You do not have permission to edit branches", severity: "error" });
+      setSnack({
+        open: true,
+        message: "You do not have permission to edit branches",
+        severity: "error",
+      });
       return;
     }
 
     try {
-      await axios.put(`${API_BASE_URL}/api/branches/${branch.id}`, branch, getAuditHeaders());
+      await axios.put(
+        `${API_BASE_URL}/api/branches/${branch.id}`,
+        branch,
+        getAuditHeaders(),
+      );
       setIsEditing(false);
-      setSnack({ open: true, message: "Saved successfully", severity: "success" });
+      setSnack({
+        open: true,
+        message: "Saved successfully",
+        severity: "success",
+      });
       fetchBranches();
     } catch {
       setSnack({ open: true, message: "Update failed", severity: "error" });
@@ -238,12 +250,19 @@ const AdminBranchesManagement = () => {
 
   const handleDelete = async (id) => {
     if (!canDelete) {
-      setSnack({ open: true, message: "You do not have permission to delete branches", severity: "error" });
+      setSnack({
+        open: true,
+        message: "You do not have permission to delete branches",
+        severity: "error",
+      });
       return;
     }
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/branches/${id}`, getAuditHeaders());
+      await axios.delete(
+        `${API_BASE_URL}/api/branches/${id}`,
+        getAuditHeaders(),
+      );
       setSnack({ open: true, message: "Deleted", severity: "success" });
       fetchBranches();
     } catch {
@@ -251,6 +270,69 @@ const AdminBranchesManagement = () => {
     }
   };
 
+  const computeIsOpenPreview = (prog) => {
+    const hasSchedule = !!(prog.start_date && prog.end_date);
+
+    // NO SCHEDULE: pure manual mode, switch decides.
+    if (!hasSchedule) {
+      const manualEnabled =
+        prog.manual_enabled === undefined || prog.manual_enabled === null
+          ? true
+          : Number(prog.manual_enabled) === 1;
+      return manualEnabled;
+    }
+
+    // SCHEDULE SET: fully automatic, switch is not consulted.
+    const [startDatePart, startTimePart] = prog.start_date.split("T");
+    const [endDatePart, endTimePart] = prog.end_date.split("T");
+
+    const nowManilaStr = new Date().toLocaleString("en-US", {
+      timeZone: "Asia/Manila",
+      hour12: false,
+    });
+    const now = new Date(nowManilaStr);
+
+    const todayDateOnly = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+
+    const [startYear, startMonthNum, startDay] = startDatePart
+      .split("-")
+      .map(Number);
+    const startDateOnly = new Date(startYear, startMonthNum - 1, startDay);
+
+    const [endYear, endMonthNum, endDay] = endDatePart.split("-").map(Number);
+    const endDateOnly = new Date(endYear, endMonthNum - 1, endDay);
+
+    const withinDateRange =
+      todayDateOnly >= startDateOnly && todayDateOnly <= endDateOnly;
+    if (!withinDateRange) return false;
+
+    if (!startTimePart || !endTimePart) return withinDateRange;
+
+    const [startHour, startMinute] = startTimePart.split(":").map(Number);
+    const [endHour, endMinute] = endTimePart.split(":").map(Number);
+
+    const nowTotal =
+      now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const startTotal = startHour * 3600 + startMinute * 60;
+    const endTotal = endHour * 3600 + endMinute * 60;
+
+    let isOpen;
+    if (startTotal < endTotal) {
+      isOpen = nowTotal >= startTotal && nowTotal < endTotal;
+    } else if (startTotal > endTotal) {
+      isOpen = nowTotal >= startTotal || nowTotal < endTotal;
+    } else {
+      isOpen = true;
+    }
+
+    if (todayDateOnly > endDateOnly) isOpen = false;
+
+    return isOpen;
+  };
 
   const formatLocal = (date) => {
     if (!date) return "";
@@ -286,7 +368,16 @@ const AdminBranchesManagement = () => {
   });
 
   return (
-    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+    <Box
+      sx={{
+        height: "calc(100vh - 150px)",
+        overflowY: "auto",
+        paddingRight: 1,
+        backgroundColor: "transparent",
+        mt: 1,
+        padding: 2,
+      }}
+    >
       <Typography
         variant="h4"
         sx={{
@@ -306,9 +397,6 @@ const AdminBranchesManagement = () => {
       <br />
       <br />
 
-
-
-
       {/* ADD FORM */}
 
       <Button
@@ -317,7 +405,7 @@ const AdminBranchesManagement = () => {
         sx={{
           mb: 3,
           borderRadius: 2,
-          fontWeight: 600
+          fontWeight: 600,
         }}
         onClick={() => {
           setEditingBranch(null);
@@ -329,8 +417,6 @@ const AdminBranchesManagement = () => {
         Add New Branch
       </Button>
 
-
-
       {/* LIST */}
       <Grid container spacing={3}>
         {branches.map((b, index) => (
@@ -340,7 +426,7 @@ const AdminBranchesManagement = () => {
                 border: `1px solid ${borderColor}`,
                 boxShadow: 4,
                 borderRadius: 3,
-                overflow: "hidden"
+                overflow: "hidden",
               }}
             >
               {/* HEADER */}
@@ -349,7 +435,7 @@ const AdminBranchesManagement = () => {
                   background: settings?.header_color || "#1976d2",
                   color: "#fff",
                   px: 2,
-                  py: 2
+                  py: 2,
                 }}
               >
                 <Stack
@@ -372,7 +458,7 @@ const AdminBranchesManagement = () => {
                       backgroundColor: b.registration_open ? "green" : "red",
                       color: "white",
                       fontWeight: "bold",
-                      border: "1px solid rgba(255,255,255,0.2)"
+                      border: "1px solid rgba(255,255,255,0.2)",
                     }}
                   />
                 </Stack>
@@ -406,81 +492,118 @@ const AdminBranchesManagement = () => {
                   {/* ACADEMIC PROGRAMS */}
                   <Divider />
 
-                  <Typography fontWeight={600}>
-                    Academic Programs
-                  </Typography>
+                  <Typography fontWeight={600}>Academic Programs</Typography>
 
-                  {(b.academicPrograms || []).map((prog, progIndex) => (
-                    <Stack
-                      key={prog.id}
-                      direction="row"
-                      alignItems="center"
-                      justifyContent="space-between"
-                    >
-                      <Typography>{prog.name}</Typography>
+                  {(b.academicPrograms || []).map((prog, progIndex) => {
+                    const hasSchedule = !!(prog.start_date && prog.end_date);
+                    const manualEnabled =
+                      prog.manual_enabled === undefined ||
+                      prog.manual_enabled === null
+                        ? true
+                        : Number(prog.manual_enabled) === 1;
+                    const isCurrentlyOpen = computeIsOpenPreview(prog);
 
-                      <Switch
-                        checked={prog.open === 1}
-                        onChange={(e) => {
-                          const updated = [...branches];
-                          updated[index].academicPrograms[progIndex].open =
-                            e.target.checked ? 1 : 0;
-
-                          setBranches(updated);
-                          setIsEditing(true);
+                    return (
+                      <Box
+                        key={prog.id}
+                        sx={{
+                          border: "1px solid #e0e0e0",
+                          borderRadius: 2,
+                          p: 1.5,
                         }}
-                      />
-                    </Stack>
-                  ))}
+                      >
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                        >
+                          <Typography fontWeight={600}>{prog.name}</Typography>
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            spacing={1}
+                          >
+                            <Chip
+                              label={
+                                !hasSchedule
+                                  ? manualEnabled
+                                    ? "Open (manual)"
+                                    : "No set schedule yet"
+                                  : isCurrentlyOpen
+                                    ? "Open right now"
+                                    : "Closed right now"
+                              }
+                              size="small"
+                              sx={{
+                                backgroundColor: !hasSchedule
+                                  ? manualEnabled
+                                    ? "green"
+                                    : "#9e9e9e"
+                                  : isCurrentlyOpen
+                                    ? "green"
+                                    : "red",
+                                color: "white",
+                                fontWeight: 600,
+                              }}
+                            />
+                            {!hasSchedule && (
+                              <Switch
+                                checked={manualEnabled}
+                                onChange={(e) => {
+                                  const updated = [...branches];
+                                  updated[index].academicPrograms[
+                                    progIndex
+                                  ].manual_enabled = e.target.checked ? 1 : 0;
+                                  setBranches(updated);
+                                  setIsEditing(true);
+                                }}
+                              />
+                            )}
+                          </Stack>
+                        </Stack>
 
-                  <Divider />
-
-                  <Typography fontWeight={600}>
-                    Open and Closing Registration
-                  </Typography>
-
-                  {/* TOGGLE */}
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <Typography>Registration</Typography>
-                    <Switch
-                      checked={b.registration_open === 1}
-                      onChange={(e) =>
-                        handleChange(
-                          index,
-                          "registration_open",
-                          e.target.checked ? 1 : 0
-                        )
-                      }
-                    />
-                  </Stack>
-
-                  {/* DATES */}
-                  <Stack
-                    direction={{ xs: "column", md: "row" }}
-                    spacing={2}
-                  >
-                    <TextField
-                      type="datetime-local"
-                      label="Start Date"
-                      InputLabelProps={{ shrink: true }}
-                      value={formatLocal(b.start_date)}
-                      onChange={(e) =>
-                        handleChange(index, "start_date", e.target.value)
-                      }
-                      fullWidth
-                    />
-
-                    <TextField
-                      type="datetime-local"
-                      label="End Date"
-                      InputLabelProps={{ shrink: true }}
-                      value={formatLocal(b.end_date)}
-                      onChange={(e) =>
-                        handleChange(index, "end_date", e.target.value)
-                      }
-                      fullWidth
-                    />
-                  </Stack>
+                        {/* Per-program daily window — independent hours for Undergrad/Grad/TechVoc */}
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1.5}
+                          sx={{ mt: 1 }}
+                        >
+                          <TextField
+                            type="datetime-local"
+                            label={`${prog.name} Start`}
+                            size="small"
+                            InputLabelProps={{ shrink: true }}
+                            value={formatLocal(prog.start_date)}
+                            onChange={(e) => {
+                              const updated = [...branches];
+                              updated[index].academicPrograms[
+                                progIndex
+                              ].start_date = e.target.value || null;
+                              setBranches(updated);
+                              setIsEditing(true);
+                            }}
+                            fullWidth
+                          />
+                          <TextField
+                            type="datetime-local"
+                            label={`${prog.name} End`}
+                            size="small"
+                            InputLabelProps={{ shrink: true }}
+                            value={formatLocal(prog.end_date)}
+                            onChange={(e) => {
+                              const updated = [...branches];
+                              updated[index].academicPrograms[
+                                progIndex
+                              ].end_date = e.target.value || null;
+                              setBranches(updated);
+                              setIsEditing(true);
+                            }}
+                            fullWidth
+                          />
+                        </Stack>
+                      </Box>
+                    );
+                  })}
 
                   {/* ACTIONS */}
                   <Stack direction="row" spacing={2}>
@@ -502,7 +625,7 @@ const AdminBranchesManagement = () => {
                       sx={{
                         borderRadius: 2,
                         backgroundColor: "#9E0000",
-                        color: "white"
+                        color: "white",
                       }}
                       onClick={() => handleDelete(b.id)}
                     >
@@ -537,8 +660,8 @@ const AdminBranchesManagement = () => {
           sx: {
             borderRadius: 3,
             overflow: "hidden",
-            boxShadow: 6
-          }
+            boxShadow: 6,
+          },
         }}
       >
         {/* HEADER */}
@@ -548,10 +671,12 @@ const AdminBranchesManagement = () => {
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",
-            py: 2
+            py: 2,
           }}
         >
-          {editingBranch ? "Edit Branch Information" : "New Branch Registration"}
+          {editingBranch
+            ? "Edit Branch Information"
+            : "New Branch Registration"}
         </DialogTitle>
 
         {/* CONTENT */}
@@ -575,8 +700,6 @@ const AdminBranchesManagement = () => {
             </Grid>
 
             <Grid item xs={12}>
-
-
               <Typography
                 variant="subtitle1"
                 fontWeight={700}
@@ -600,7 +723,7 @@ const AdminBranchesManagement = () => {
           sx={{
             px: 3,
             py: 2,
-            borderTop: "1px solid #e0e0e0"
+            borderTop: "1px solid #e0e0e0",
           }}
         >
           <Button
@@ -613,11 +736,10 @@ const AdminBranchesManagement = () => {
 
           <Button
             variant="contained"
-
             sx={{
               px: 4,
               fontWeight: 600,
-              textTransform: "none"
+              textTransform: "none",
             }}
             onClick={async () => {
               if (!branchName || !branchAddress) return;
@@ -628,26 +750,30 @@ const AdminBranchesManagement = () => {
                     `${API_BASE_URL}/api/branches/${editingBranch.id}`,
                     {
                       branch: branchName,
-                      address: branchAddress
+                      address: branchAddress,
                     },
-                    getAuditHeaders()
+                    getAuditHeaders(),
                   );
 
                   setSnack({
                     open: true,
                     message: "Branch updated successfully",
-                    severity: "success"
+                    severity: "success",
                   });
                 } else {
-                  await axios.post(`${API_BASE_URL}/api/branches`, {
-                    branch: branchName,
-                    address: branchAddress
-                  }, getAuditHeaders());
+                  await axios.post(
+                    `${API_BASE_URL}/api/branches`,
+                    {
+                      branch: branchName,
+                      address: branchAddress,
+                    },
+                    getAuditHeaders(),
+                  );
 
                   setSnack({
                     open: true,
                     message: "Branch added successfully",
-                    severity: "success"
+                    severity: "success",
                   });
                 }
 
@@ -657,13 +783,12 @@ const AdminBranchesManagement = () => {
                 setSnack({
                   open: true,
                   message: "Operation failed",
-                  severity: "error"
+                  severity: "error",
                 });
               }
             }}
           >
             <SaveIcon fontSize="small" /> Save
-
           </Button>
         </DialogActions>
       </Dialog>

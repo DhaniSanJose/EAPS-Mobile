@@ -47,7 +47,7 @@ import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
-const AdminDashboard1 = () => {
+const ApplicantRegistrarPersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -4053,4 +4053,4 @@ const AdminDashboard1 = () => {
   );
 };
 
-export default AdminDashboard1;
+export default ApplicantRegistrarPersonalInformation;

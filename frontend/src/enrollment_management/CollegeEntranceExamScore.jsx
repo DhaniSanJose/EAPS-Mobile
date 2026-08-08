@@ -49,7 +49,7 @@ import useAuditMac from "../utils/useAuditMac";
 import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
 
-const ApplicantScoringReadOnly = () => {
+const CollegeEntranceExamScore = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -2258,4 +2258,4 @@ const ApplicantScoringReadOnly = () => {
     );
 };
 
-export default ApplicantScoringReadOnly;
+export default CollegeEntranceExamScore;

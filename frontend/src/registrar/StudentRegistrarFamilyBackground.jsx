@@ -31,7 +31,7 @@ import StudentServicesSurvey from "../student/StudentServicesSurvey";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
-const ReadmissionDashboard2 = () => {
+const StudentRegistrarFamilyBackground = () => {
     useAuditMac();
 
     const settings = useContext(SettingsContext);
@@ -2345,4 +2345,4 @@ const ReadmissionDashboard2 = () => {
 };
 
 
-export default ReadmissionDashboard2;
+export default StudentRegistrarFamilyBackground;

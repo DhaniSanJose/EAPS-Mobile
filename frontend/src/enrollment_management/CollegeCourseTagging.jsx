@@ -216,7 +216,7 @@ const getStudentSearchErrorMessage = (error) =>
   error?.response?.data?.error ||
   "Unable to search student right now. Please try again.";
 
-const CourseTaggingForCollege = () => {
+const CollegeCourseTagging = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -3050,4 +3050,4 @@ const CourseTaggingForCollege = () => {
   );
 };
 
-export default CourseTaggingForCollege;
+export default CollegeCourseTagging;

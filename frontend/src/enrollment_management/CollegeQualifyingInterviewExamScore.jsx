@@ -56,7 +56,7 @@ import useAuditMac from "../utils/useAuditMac";
 import SaveIcon from "@mui/icons-material/Save";
 import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
-const QualifyingExamScore = () => {
+const CollegeQualifyingInterviewExamScore = () => {
   useAuditMac();
   const socket = useRef(null);
 
@@ -5065,4 +5065,4 @@ Thank you, best regards
   );
 };
 
-export default QualifyingExamScore;
+export default CollegeQualifyingInterviewExamScore;

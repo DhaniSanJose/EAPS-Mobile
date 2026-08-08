@@ -1,15 +1,36 @@
 /**
  * registrationWindow.js
  *
- * Shared helper for computing whether a branch's registration window
- * is open RIGHT NOW, based on Manila wall-clock time.
+ * Shared helper for computing whether an academic program's registration
+ * window is open RIGHT NOW, based on Manila wall-clock time.
  *
- * Why this exists as its own module:
- * Previously this logic was duplicated inline inside the
- * /registration-status/:branch_id route. Now that we also need to run
- * the exact same check when syncing the DB (in /branches GET), it has
- * to live in one place so both call sites can never drift out of sync
- * with each other.
+ * ── MODEL ────────────────────────────────────────────────────────────────
+ * Each academic program now has TWO independent controls:
+ *
+ *   1. `manual_enabled` (0/1) — the admin's master switch. This is what
+ *      the toggle in the admin UI controls. It is ALWAYS live and ALWAYS
+ *      interactive, whether or not a schedule is set.
+ *
+ *   2. `start_date` / `end_date` (optional daily hours window) — when set,
+ *      the program can only be open during that daily window (wrapping
+ *      past midnight if needed, e.g. 18:00 -> 06:00), evaluated in Manila
+ *      time, but ONLY while `manual_enabled` is also on.
+ *
+ * Combined truth table:
+ *   manual_enabled = 0                         -> always CLOSED
+ *   manual_enabled = 1, no schedule             -> always OPEN
+ *   manual_enabled = 1, schedule set             -> OPEN only inside the
+ *                                                    daily hour window,
+ *                                                    auto-flips at the
+ *                                                    exact minute/second
+ *
+ * `open` is a DERIVED/cached field — the live computed result of the rule
+ * above — kept in sync by syncProgramsOpenStatus/syncBranchesOpenStatus so
+ * other code (branch-derived open status, the applicant dropdown) can read
+ * it cheaply without recomputing. It is never the source of truth itself.
+ *
+ * A branch has no independent season of its own — a branch is open
+ * whenever ANY of its academic programs is currently open.
  */
 
 /**
@@ -26,47 +47,72 @@ const getNowInManila = () => {
 };
 
 /**
- * Computes whether a single branch should be considered "open" right now,
- * given its stored registration_open flag + start_date/end_date strings
- * (format: "YYYY-MM-DDTHH:mm", e.g. "2026-04-07T06:00").
+ * Computes whether a single academic program should be considered "open"
+ * right now.
  *
- * Branches WITHOUT a schedule (no start_date/end_date): pure manual
- * control via the registration_open toggle.
- *
- * Branches WITH a schedule: fully automatic. Saving start_date/end_date
- * is enough to open/close it on time -- no manual toggle needed. The
- * toggle's stored value is treated as a cache of this computed result,
- * not as a gate that blocks it.
- *
- * @param {object} branch - a branch object with registration_open, start_date, end_date
- * @param {Date} [now] - optional override for "current time" (mainly for testing); defaults to live Manila time
- * @returns {boolean} whether the branch's window is currently open
+ * @param {object} entity - academic-program object. Reads `manual_enabled`
+ *   (falls back to legacy `open` field if `manual_enabled` has never been
+ *   set, so existing saved data keeps working after this upgrade) plus
+ *   optional start_date/end_date ("YYYY-MM-DDTHH:mm" strings).
+ * @param {Date} [now] - optional override for "current time" (mainly for testing)
+ * @param {string} [flagKey] - unused for the manual-enable check now, kept
+ *   for call-site compatibility with existing callers.
+ * @param {object} [opts]
+ * @param {boolean} [opts.dailyWindow=true] - whether to enforce the hour-of-day
+ *   portion of start_date/end_date in addition to the date range.
+ * @returns {boolean} whether the entity is currently open
  */
-const computeIsOpen = (branch, now = getNowInManila()) => {
-  const hasSchedule = !!(branch.start_date && branch.end_date);
+const computeIsOpen = (
+  entity,
+  now = getNowInManila(),
+  flagKey = "open",
+  { dailyWindow = true } = {},
+) => {
+  const hasSchedule = !!(entity.start_date && entity.end_date);
 
-  // Branches WITHOUT a schedule: pure manual control via the toggle.
+  // ── NO SCHEDULE: pure manual mode. The switch is the only thing that
+  //    matters here — this is the on/off toggle case. ────────────────────
   if (!hasSchedule) {
-    return Number(branch.registration_open) === 1;
+    const manualEnabled =
+      entity.manual_enabled !== undefined && entity.manual_enabled !== null
+        ? Number(entity.manual_enabled) === 1
+        : Number(entity[flagKey]) === 1;
+    return manualEnabled;
   }
 
-  // Branches WITH a schedule: the schedule is authoritative.
-  const [startDatePart, startTimePart] = branch.start_date.split("T");
-  const [endDatePart, endTimePart] = branch.end_date.split("T");
+  // ── SCHEDULE SET: fully automatic. The manual switch is NOT consulted
+  //    at all once Start/End are filled in — the date/time window alone
+  //    decides open vs closed, flipping on its own at the exact moment.
+  //    No toggle needed; setting the schedule IS turning it on. ──────────
+  const [startDatePart, startTimePart] = entity.start_date.split("T");
+  const [endDatePart, endTimePart] = entity.end_date.split("T");
 
-  // Guard against malformed/legacy data that has a date but no "T" time part
+  // Build date-only values with (year, month, day) args, not a bare
+  // "YYYY-MM-DD" string — a bare ISO date string parses as UTC midnight,
+  // not local midnight, which would silently shift the range comparison
+  // hours off from the actual Manila wall-clock date.
+  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const [startYear, startMonthNum, startDay] = startDatePart.split("-").map(Number);
+  const startDateOnly = new Date(startYear, startMonthNum - 1, startDay);
+
+  const [endYear, endMonthNum, endDay] = endDatePart.split("-").map(Number);
+  const endDateOnly = new Date(endYear, endMonthNum - 1, endDay);
+
+  const withinDateRange = todayDateOnly >= startDateOnly && todayDateOnly <= endDateOnly;
+
+  // ── DATE-RANGE-ONLY CHECK: kept for backward compatibility. ────────────
+  if (!dailyWindow) {
+    return withinDateRange;
+  }
+
+  // Guard against malformed/legacy data that has a date but no "T" time part.
   if (!startTimePart || !endTimePart) {
-    return Number(branch.registration_open) === 1;
+    return withinDateRange;
   }
 
   const [startHour, startMinute] = startTimePart.split(":").map(Number);
   const [endHour, endMinute] = endTimePart.split(":").map(Number);
-
-  const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startDateOnly = new Date(startDatePart);
-  const endDateOnly = new Date(endDatePart);
-
-  const withinDateRange = todayDateOnly >= startDateOnly && todayDateOnly <= endDateOnly;
 
   let isOpen;
 
@@ -74,36 +120,66 @@ const computeIsOpen = (branch, now = getNowInManila()) => {
     isOpen = false;
   } else {
     // Compare at SECOND-level granularity, not minute-level.
-    // Using only hours+minutes would round 18:00:01 down to "18:00",
-    // making the window appear open for up to 59 extra seconds past
-    // the intended cutoff. Seconds matter here because the requirement
-    // is "closes immediately the instant the clock hits end time".
     const nowTotal = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     const startTotal = startHour * 3600 + startMinute * 60;
     const endTotal = endHour * 3600 + endMinute * 60;
 
     if (startTotal < endTotal) {
-      // Normal same-day window, e.g. 6:00 -> 18:00
+      // Normal same-day window, e.g. 6:00 -> 18:00 (Graduate)
       isOpen = nowTotal >= startTotal && nowTotal < endTotal;
-    } else {
-      // Cross-midnight window, e.g. 18:00 -> 6:00
+    } else if (startTotal > endTotal) {
+      // Cross-midnight window, e.g. 18:00 -> 6:00 (Undergraduate)
       isOpen = nowTotal >= startTotal || nowTotal < endTotal;
+    } else {
+      // start === end: treated as "open all day" within the date range
+      isOpen = true;
     }
   }
 
-  // Hard stop: once today's date is past the end date entirely, force closed,
-  // no matter what the time-of-day math says.
+  // Hard stop: once today's date is past the end date entirely, force closed.
   if (todayDateOnly > endDateOnly) {
     isOpen = false;
   }
 
   return isOpen;
 };
+/**
+ * Given one branch's academicPrograms array, returns a NEW array where
+ * every program's `open` flag (the cached/derived display value) has been
+ * recomputed live from computeIsOpen — for EVERY program, not just
+ * scheduled ones, since `open` now always mirrors the manual_enabled +
+ * schedule rule regardless of which mode the program is in.
+ *
+ * @param {Array} academicPrograms
+ * @param {Date} now
+ * @returns {{ programs: Array, changed: boolean }}
+ */
+const syncProgramsOpenStatus = (academicPrograms, now = getNowInManila()) => {
+  if (!Array.isArray(academicPrograms)) {
+    return { programs: academicPrograms, changed: false };
+  }
+
+  let changed = false;
+
+  const updated = academicPrograms.map((prog) => {
+    const liveIsOpen = computeIsOpen(prog, now, "open") ? 1 : 0;
+    const storedIsOpen = Number(prog.open) === 1 ? 1 : 0;
+
+    if (liveIsOpen !== storedIsOpen) {
+      changed = true;
+      return { ...prog, open: liveIsOpen };
+    }
+    return prog;
+  });
+
+  return { programs: updated, changed };
+};
 
 /**
  * Given the full branches array, returns a NEW array where every branch's
- * registration_open has been recomputed live. Also returns whether anything
- * actually changed, so callers can decide whether a DB write is needed.
+ * academicPrograms[].open have been recomputed live, and each branch's
+ * registration_open flag has been DERIVED from those programs (open if
+ * ANY academic program under that branch is currently open).
  *
  * @param {Array} branches
  * @returns {{ branches: Array, changed: boolean }}
@@ -113,21 +189,37 @@ const syncBranchesOpenStatus = (branches) => {
   let changed = false;
 
   const updated = branches.map((b) => {
-    // Only branches that HAVE a schedule are auto-managed.
-    // Branches with no start_date/end_date keep whatever the admin set manually.
-    if (!b.start_date || !b.end_date) return b;
+    let nextBranch = b;
 
-    const liveIsOpen = computeIsOpen(b, now) ? 1 : 0;
-    const storedIsOpen = Number(b.registration_open) === 1 ? 1 : 0;
-
-    if (liveIsOpen !== storedIsOpen) {
+    const { programs, changed: programsChanged } = syncProgramsOpenStatus(
+      nextBranch.academicPrograms,
+      now
+    );
+    if (programsChanged) {
       changed = true;
-      return { ...b, registration_open: liveIsOpen };
+      nextBranch = { ...nextBranch, academicPrograms: programs };
     }
-    return b;
+
+    const anyProgramOpen = (nextBranch.academicPrograms || []).some(
+      (p) => Number(p.open) === 1
+    );
+    const derivedOpen = anyProgramOpen ? 1 : 0;
+    const storedOpen = Number(nextBranch.registration_open) === 1 ? 1 : 0;
+
+    if (derivedOpen !== storedOpen) {
+      changed = true;
+      nextBranch = { ...nextBranch, registration_open: derivedOpen };
+    }
+
+    return nextBranch;
   });
 
   return { branches: updated, changed };
 };
 
-module.exports = { getNowInManila, computeIsOpen, syncBranchesOpenStatus };
+module.exports = {
+  getNowInManila,
+  computeIsOpen,
+  syncProgramsOpenStatus,
+  syncBranchesOpenStatus,
+};

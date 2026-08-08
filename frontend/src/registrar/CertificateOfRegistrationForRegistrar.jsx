@@ -35,7 +35,7 @@ import API_BASE_URL from "../apiConfig";
 import { postAuditEvent, getAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const CertificateOfRegistration = forwardRef(
+const CertificateOfRegistrationForRegistrar = forwardRef(
   (
     {
       student_number,
@@ -4326,4 +4326,4 @@ const CertificateOfRegistration = forwardRef(
   },
 );
 
-export default CertificateOfRegistration;
+export default CertificateOfRegistrationForRegistrar;

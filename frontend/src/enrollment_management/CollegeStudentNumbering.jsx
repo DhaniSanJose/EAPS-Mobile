@@ -59,7 +59,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 
-const StudentNumbering = () => {
+const CollegeStudentNumbering = () => {
     useAuditMac();
     const socket = useRef(null);
     const settings = useContext(SettingsContext);
@@ -1899,5 +1899,5 @@ const StudentNumbering = () => {
     );
 };
 
-export default StudentNumbering;
+export default CollegeStudentNumbering;
 

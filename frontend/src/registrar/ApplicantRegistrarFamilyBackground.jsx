@@ -33,7 +33,7 @@ import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
-const AdminDashboard2 = () => {
+const ApplicantRegistrarFamilyBackground = () => {
   useAuditMac();
 
   const settings = useContext(SettingsContext);
@@ -2655,4 +2655,4 @@ const AdminDashboard2 = () => {
 };
 
 
-export default AdminDashboard2;
+export default ApplicantRegistrarFamilyBackground;

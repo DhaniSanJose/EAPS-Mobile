@@ -151,7 +151,7 @@ const DeceasedBanner = ({ children }) => (
 const EXT_OPTIONS = ["Jr.", "Sr.", "I", "II", "III", "IV", "V"];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const ApplicantFamilyBackgroundResponsive = (props) => {
+const ApplicantFamilyBackgroundMobile = (props) => {
   const settings = useContext(SettingsContext);
   const navigate = useNavigate();
   const theme = useTheme();
@@ -2352,4 +2352,4 @@ const ApplicantFamilyBackgroundResponsive = (props) => {
   );
 };
 
-export default ApplicantFamilyBackgroundResponsive;
+export default ApplicantFamilyBackgroundMobile;

@@ -44,7 +44,7 @@ import {
 } from "../utils/registrarCurriculumRestriction";
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 
-const CertificateOfRegistrationForCollege = forwardRef(
+const CollegeCertificateOfRegistration = forwardRef(
   (
     {
       student_number,
@@ -4407,4 +4407,4 @@ const CertificateOfRegistrationForCollege = forwardRef(
   },
 );
 
-export default CertificateOfRegistrationForCollege;
+export default CollegeCertificateOfRegistration;

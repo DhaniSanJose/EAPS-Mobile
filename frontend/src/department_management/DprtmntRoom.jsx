@@ -36,7 +36,7 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
 
-const DepartmentRoom = () => {
+const DprtmntRoom = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -1090,4 +1090,4 @@ const DepartmentRoom = () => {
   );
 };
 
-export default DepartmentRoom;
+export default DprtmntRoom;

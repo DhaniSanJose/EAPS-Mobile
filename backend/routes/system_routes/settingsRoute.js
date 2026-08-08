@@ -3,8 +3,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { db } = require("../database/database");
-const { insertAuditLogAdmission, resolveAuditActor } = require("../../utils/auditLogger");
-const { computeIsOpen, syncBranchesOpenStatus } = require("../../utils/registrationWindow");
+const {
+  insertAuditLogAdmission,
+  resolveAuditActor,
+} = require("../../utils/auditLogger");
+const { syncBranchesOpenStatus } = require("../../utils/registrationWindow");
 const router = express.Router();
 
 const formatAuditActorRole = (role) => {
@@ -334,13 +337,16 @@ router.get("/branches", async (req, res) => {
     // This is what makes the admin dashboard "self-heal" even if nobody
     // opens this page exactly at the cutoff moment — the next request
     // (admin or applicant side) catches up the DB automatically.
-    const { branches: syncedBranches, changed } = syncBranchesOpenStatus(branches);
+    const { branches: syncedBranches, changed } =
+      syncBranchesOpenStatus(branches);
 
     if (changed) {
       await db.query("UPDATE company_settings SET branches = ? WHERE id = 1", [
         JSON.stringify(syncedBranches),
       ]);
-      console.log("🔄 Auto-synced registration_open for one or more branches based on schedule.");
+      console.log(
+        "🔄 Auto-synced registration_open for one or more branches based on schedule.",
+      );
     }
 
     res.json(syncedBranches);
@@ -557,27 +563,45 @@ router.delete("/branches/:id", async (req, res) => {
 
 router.get("/registration-status/:branch_id", async (req, res) => {
   const { branch_id } = req.params;
-
   try {
     const [rows] = await db.query(
       "SELECT branches FROM company_settings WHERE id = 1",
     );
-
-    if (rows.length === 0) {
+    if (rows.length === 0)
       return res.status(404).json({ message: "No settings found" });
+
+    let branches = JSON.parse(rows[0].branches || "[]");
+
+    // Make sure every branch has an academicPrograms array before syncing,
+    // same defaulting used by GET /branches.
+    branches = branches.map((b) => ({
+      ...b,
+      academicPrograms: b.academicPrograms || [
+        { id: 0, name: "Undergraduate", open: 1 },
+        { id: 1, name: "Graduate", open: 0 },
+        { id: 2, name: "Techvoc", open: 0 },
+      ],
+    }));
+
+    // Branches no longer have an independent admission season. Open/closed
+    // is DERIVED purely from whichever academic program(s) are currently
+    // inside their own daily hour window (Undergrad / Graduate / TechVoc),
+    // exactly like GET /branches does. No branch-level start_date/end_date
+    // is consulted here anymore.
+    const { branches: syncedBranches, changed } =
+      syncBranchesOpenStatus(branches);
+
+    if (changed) {
+      await db.query("UPDATE company_settings SET branches = ? WHERE id = 1", [
+        JSON.stringify(syncedBranches),
+      ]);
     }
 
-    const branches = JSON.parse(rows[0].branches || "[]");
-    const branch = branches.find((b) => b.id == branch_id);
-
-    if (!branch) {
-      return res.status(404).json({ message: "Branch not found" });
-    }
-
-    const isOpen = computeIsOpen(branch);
+    const branch = syncedBranches.find((b) => b.id == branch_id);
+    if (!branch) return res.status(404).json({ message: "Branch not found" });
 
     res.json({
-      registration_open: isOpen ? 1 : 0,
+      registration_open: Number(branch.registration_open) === 1 ? 1 : 0,
     });
   } catch (err) {
     console.error("STATUS ERROR:", err);

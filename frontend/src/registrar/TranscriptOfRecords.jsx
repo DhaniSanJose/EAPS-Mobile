@@ -32,7 +32,7 @@ import { FcPrint } from "react-icons/fc";
 import API_BASE_URL from "../apiConfig";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 
-const TOR = () => {
+const TranscriptOfRecords = () => {
   const settings = useContext(SettingsContext);
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -3531,4 +3531,4 @@ const TOR = () => {
   );
 };
 
-export default TOR;
+export default TranscriptOfRecords;

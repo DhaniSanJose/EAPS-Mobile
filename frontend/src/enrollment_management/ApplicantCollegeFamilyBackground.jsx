@@ -34,7 +34,7 @@ import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
 import CollegeApplicantProcessTabs from "../components/CollegeApplicantProcessTabs";
 
-const RegistrarDashboard2 = () => {
+const ApplicantCollegeFamilyBackground = () => {
   useAuditMac();
 
   const settings = useContext(SettingsContext);
@@ -2673,4 +2673,4 @@ const RegistrarDashboard2 = () => {
 };
 
 
-export default RegistrarDashboard2;
+export default ApplicantCollegeFamilyBackground;

@@ -39,7 +39,7 @@ import useAuditMac from "../utils/useAuditMac";
 import { io } from "socket.io-client";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
-const QualifyingExamScoreReadOnly = () => {
+const RegistrarQualifyingInterviewExamScore = () => {
   useAuditMac();
   const socket = useRef(null);
 
@@ -3181,4 +3181,4 @@ Thank you, best regards
   );
 };
 
-export default QualifyingExamScoreReadOnly;
+export default RegistrarQualifyingInterviewExamScore;

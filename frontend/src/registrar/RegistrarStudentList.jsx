@@ -67,7 +67,7 @@ const dedupeCurriculumOptions = (list) => {
     return [...seen.values()];
 };
 
-const StudentListForEnrollment = () => {
+const RegistrarStudentList = () => {
     const socket = useRef(null);
     const settings = useContext(SettingsContext);
     const [titleColor, setTitleColor] = useState("#000000");
@@ -1430,4 +1430,4 @@ const StudentListForEnrollment = () => {
     );
 };
 
-export default StudentListForEnrollment;
+export default RegistrarStudentList;

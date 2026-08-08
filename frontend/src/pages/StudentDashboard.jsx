@@ -312,6 +312,8 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
 
   const [dateTime, setDateTime] = useState(new Date());
 
+
+
   const formattedDate = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     day: "2-digit",
@@ -1597,9 +1599,11 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   <Box
                     sx={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(84px, 100px))",
-                      gap: { xs: 1, sm: 1.25 },
-                      justifyContent: { xs: "space-between", sm: "flex-start" },
+                      gridTemplateColumns: {
+                        xs: "repeat(4, 1fr)",
+                        sm: `repeat(${termGwaList.length}, 1fr)`,
+                      },
+                      gap: { xs: 0.75, sm: 1.25 },
                     }}
                   >
                     {termGwaList.map((t) => (
@@ -1607,8 +1611,8 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         key={t.label}
                         sx={{
                           width: "100%",
-                          maxWidth: 100,
-                          aspectRatio: "1 / 1",
+                          aspectRatio: { xs: "auto", sm: "1 / 1" }, // no forced square on mobile
+                          minHeight: { xs: 76, sm: "auto" },
                           display: "flex",
                           flexDirection: "column",
                           alignItems: "center",
@@ -1617,28 +1621,27 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                           border: `1px solid ${softBorder}`,
                           borderRadius: "8px",
                           backgroundColor: "#faf8f6",
-                          transition: "background-color 0.2s ease, transform 0.2s ease",
-                          px: 0.75,
-                          "&:hover": {
-                            backgroundColor: "rgba(155,47,53,0.05)",
-                            transform: "translateY(-2px)",
-                          },
+                          px: 0.5,
+                          py: { xs: 0.75, sm: 0 },
+                          minWidth: 0,
                         }}
                       >
                         <Typography
                           sx={{
-                            fontSize: 9.5,
+                            fontSize: { xs: 9, sm: 12 },
                             fontWeight: 700,
-                            letterSpacing: "0.02em",
+                            letterSpacing: "0.01em",
                             textTransform: "uppercase",
                             color: "text.secondary",
                             lineHeight: 1.2,
                             whiteSpace: "normal",
                             wordBreak: "break-word",
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
+                            // wrap fully on mobile since box height is now flexible;
+                            // clamp only where the box is still forced square (sm+)
+                            display: { xs: "block", sm: "-webkit-box" },
+                            WebkitLineClamp: { sm: 2 },
+                            WebkitBoxOrient: { sm: "vertical" },
+                            overflow: { xs: "visible", sm: "hidden" },
                           }}
                         >
                           {t.label}
@@ -1646,7 +1649,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         <Typography
                           sx={{
                             mt: 0.4,
-                            fontSize: { xs: 14, sm: 16 },
+                            fontSize: { xs: 12, sm: 24 },
                             fontWeight: 800,
                             color: t.gwa !== null ? maroon : "#c9c3c0",
                             lineHeight: 1,
@@ -1685,7 +1688,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         <StarBorder />
                       </Box>
                       <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
-                       Latin Honors Eligibility
+                        Latin Honors Eligibility
                       </Typography>
                     </Stack>
                     <Box

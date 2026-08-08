@@ -595,7 +595,7 @@ const ForgotPasswordTotpModal = ({
 };
 
 // page step machine is now just "identify" — the rest lives in the modal
-const RegistrarForgotPasswordQR = () => {
+const RegistrarForgotPassword = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const { device, isMobile, isTablet, isDesktop } = useResponsive();
@@ -872,4 +872,4 @@ const RegistrarForgotPasswordQR = () => {
   );
 };
 
-export default RegistrarForgotPasswordQR;
+export default RegistrarForgotPassword;

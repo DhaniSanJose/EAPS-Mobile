@@ -84,7 +84,7 @@ const downloadBlob = (blob, fileName) => {
     window.URL.revokeObjectURL(url);
 };
 
-const SearchCorForCollege = () => {
+const CollegeSearchCertificateOfRegistration = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
@@ -972,4 +972,4 @@ const SearchCorForCollege = () => {
     );
 };
 
-export default SearchCorForCollege;
+export default CollegeSearchCertificateOfRegistration;

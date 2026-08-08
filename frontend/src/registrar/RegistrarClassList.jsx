@@ -82,7 +82,7 @@ const dedupeCurriculumOptions = (list) => {
   return [...seen.values()];
 };
 
-const ClassRoster = () => {
+const RegistrarClassList = () => {
   const settings = useContext(SettingsContext);
 
   // ─── Theme colors ────────────────────────────────────────────────────────────
@@ -1117,4 +1117,4 @@ const ClassRoster = () => {
   );
 };
 
-export default ClassRoster;
+export default RegistrarClassList;
