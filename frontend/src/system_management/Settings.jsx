@@ -59,7 +59,14 @@ function SectionHeader({ icon, title, headerColor }) {
         gap: 1.25,
       }}
     >
-      <Box sx={{ color: C.white, display: "flex", alignItems: "center", opacity: 0.9 }}>
+      <Box
+        sx={{
+          color: C.white,
+          display: "flex",
+          alignItems: "center",
+          opacity: 0.9,
+        }}
+      >
         {icon}
       </Box>
       <Typography
@@ -76,7 +83,14 @@ function SectionHeader({ icon, title, headerColor }) {
   );
 }
 
-function LabeledField({ label, value, onChange, multiline, rows, borderColor }) {
+function LabeledField({
+  label,
+  value,
+  onChange,
+  multiline,
+  rows,
+  borderColor,
+}) {
   return (
     <Stack spacing={0.75}>
       <InputLabel
@@ -104,7 +118,10 @@ function LabeledField({ label, value, onChange, multiline, rows, borderColor }) 
             backgroundColor: C.cream,
             "& fieldset": { borderColor: borderColor },
             "&:hover fieldset": { borderColor: borderColor, opacity: 0.7 },
-            "&.Mui-focused fieldset": { borderColor: borderColor, borderWidth: "2px" },
+            "&.Mui-focused fieldset": {
+              borderColor: borderColor,
+              borderWidth: "2px",
+            },
           },
         }}
       />
@@ -112,7 +129,14 @@ function LabeledField({ label, value, onChange, multiline, rows, borderColor }) 
   );
 }
 
-function UploadButton({ label, icon, onChange, accept, headerColor, borderColor }) {
+function UploadButton({
+  label,
+  icon,
+  onChange,
+  accept,
+  headerColor,
+  borderColor,
+}) {
   return (
     <Button
       variant="outlined"
@@ -165,7 +189,11 @@ function Settings({ onUpdate }) {
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
 
-  const [snack, setSnack] = useState({ open: false, message: "", severity: "info" });
+  const [snack, setSnack] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
   const handleCloseSnack = (_, reason) => {
     if (reason !== "clickaway") setSnack((p) => ({ ...p, open: false }));
   };
@@ -202,7 +230,7 @@ function Settings({ onUpdate }) {
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
@@ -216,7 +244,9 @@ function Settings({ onUpdate }) {
       .then(({ data }) => {
         setCompanyName(data.company_name || "");
         setShortTerm(data.short_term || "");
-        setPreviewLogo(data.logo_url ? `${API_BASE_URL}${data.logo_url}` : null);
+        setPreviewLogo(
+          data.logo_url ? `${API_BASE_URL}${data.logo_url}` : null,
+        );
         setPreviewBg(data.bg_image ? `${API_BASE_URL}${data.bg_image}` : null);
         setHeaderColor(data.header_color || "#1976d2");
         setFooterText(data.footer_text || "");
@@ -228,7 +258,11 @@ function Settings({ onUpdate }) {
         setSubtitleColor(data.subtitle_color || "#555555");
       })
       .catch(() =>
-        setSnack({ open: true, message: "Failed to fetch settings", severity: "error" })
+        setSnack({
+          open: true,
+          message: "Failed to fetch settings",
+          severity: "error",
+        }),
       );
   }, []);
 
@@ -247,8 +281,14 @@ function Settings({ onUpdate }) {
     formData.append("border_color", borderColor);
     formData.append("title_color", titleColor);
     formData.append("subtitle_color", subtitleColor);
-    formData.append("audit_actor_id", localStorage.getItem("employee_id") || "");
-    formData.append("audit_actor_role", localStorage.getItem("role") || "registrar");
+    formData.append(
+      "audit_actor_id",
+      localStorage.getItem("employee_id") || "",
+    );
+    formData.append(
+      "audit_actor_role",
+      localStorage.getItem("role") || "registrar",
+    );
     const mac = getStoredUserMacAddress();
     if (mac) formData.append("user_mac_address", mac);
 
@@ -264,9 +304,17 @@ function Settings({ onUpdate }) {
         },
       });
       onUpdate?.();
-      setSnack({ open: true, message: "Settings updated successfully!", severity: "success" });
+      setSnack({
+        open: true,
+        message: "Settings updated successfully!",
+        severity: "success",
+      });
     } catch {
-      setSnack({ open: true, message: "Error updating settings", severity: "error" });
+      setSnack({
+        open: true,
+        message: "Error updating settings",
+        severity: "error",
+      });
     }
   };
 
@@ -277,65 +325,92 @@ function Settings({ onUpdate }) {
   const colorFields = [
     { label: "Header Color", value: headerColor, setter: setHeaderColor },
     { label: "Footer Color", value: footerColor, setter: setFooterColor },
-    { label: "Main Button / Sidebar BG Color", value: mainButtonColor, setter: setMainButtonColor },
-    { label: "Sub Button Color", value: subButtonColor, setter: setSubButtonColor },
+    {
+      label: "Main Button / Sidebar BG Color",
+      value: mainButtonColor,
+      setter: setMainButtonColor,
+    },
+    {
+      label: "Sub Button Color",
+      value: subButtonColor,
+      setter: setSubButtonColor,
+    },
     { label: "Border Color", value: borderColor, setter: setBorderColor },
     { label: "Title / Icons Color", value: titleColor, setter: setTitleColor },
     { label: "Subtitle Color", value: subtitleColor, setter: setSubtitleColor },
   ];
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
-    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', color: titleColor, fontSize: '36px' }}>
-         SETTINGS
+    <Box
+      sx={{
+        height: "calc(100vh - 150px)",
+        overflowY: "auto",
+        paddingRight: 1,
+        backgroundColor: "transparent",
+        mt: 1,
+        padding: 2,
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          mb: 2,
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}
+        >
+          SETTINGS
         </Typography>
-
-
       </Box>
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
 
-
-
-
       <br />
 
       {/* ── Two-column grid ──────────────────────────────────────────────── */}
-      <Box sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-        gap: 3,
-        alignItems: "start",
-      }}>
-
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+          gap: 3,
+          alignItems: "start",
+        }}
+      >
         {/* ══ LEFT ════════════════════════════════════════════════════════ */}
         <Stack spacing={3}>
-
           {/* Institution Info */}
           <Paper
             elevation={1}
-            sx={{ border: `1px solid ${resolvedBorder}`, borderRadius: 3, overflow: "hidden" }}
+            sx={{
+              border: `1px solid ${resolvedBorder}`,
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
           >
             <SectionHeader
               icon={<SchoolIcon fontSize="small" />}
@@ -343,9 +418,24 @@ function Settings({ onUpdate }) {
               headerColor={resolvedHeader}
             />
             <Stack spacing={2.5} sx={{ p: 3 }}>
-              <LabeledField label="School Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} borderColor={resolvedBorder} />
-              <LabeledField label="Short Term / Abbreviation" value={shortTerm} onChange={(e) => setShortTerm(e.target.value)} borderColor={resolvedBorder} />
-              <LabeledField label="Footer Text" value={footerText} onChange={(e) => setFooterText(e.target.value)} borderColor={resolvedBorder} />
+              <LabeledField
+                label="School Name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                borderColor={resolvedBorder}
+              />
+              <LabeledField
+                label="Short Term / Abbreviation"
+                value={shortTerm}
+                onChange={(e) => setShortTerm(e.target.value)}
+                borderColor={resolvedBorder}
+              />
+              <LabeledField
+                label="Footer Text"
+                value={footerText}
+                onChange={(e) => setFooterText(e.target.value)}
+                borderColor={resolvedBorder}
+              />
               <Stack spacing={1}>
                 <Typography
                   sx={{
@@ -371,17 +461,33 @@ function Settings({ onUpdate }) {
                     <Stack spacing={1.25}>
                       {branches.map((branch) => (
                         <Box key={branch.id || branch.branch}>
-                          <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: C.textMain }}>
-                            {branch.branch || branch.branch_name || "Unnamed Branch"}
+                          <Typography
+                            sx={{
+                              fontSize: "0.9rem",
+                              fontWeight: 700,
+                              color: C.textMain,
+                            }}
+                          >
+                            {branch.branch ||
+                              branch.branch_name ||
+                              "Unnamed Branch"}
                           </Typography>
-                          <Typography sx={{ fontSize: "0.82rem", color: C.textMuted, mt: 0.25 }}>
+                          <Typography
+                            sx={{
+                              fontSize: "0.82rem",
+                              color: C.textMuted,
+                              mt: 0.25,
+                            }}
+                          >
                             {branch.address || "No address set"}
                           </Typography>
                         </Box>
                       ))}
                     </Stack>
                   ) : (
-                    <Typography sx={{ fontSize: "0.82rem", color: C.textMuted }}>
+                    <Typography
+                      sx={{ fontSize: "0.82rem", color: C.textMuted }}
+                    >
                       No branches configured.
                     </Typography>
                   )}
@@ -393,7 +499,11 @@ function Settings({ onUpdate }) {
           {/* School Logo */}
           <Paper
             elevation={1}
-            sx={{ border: `1px solid ${resolvedBorder}`, borderRadius: 3, overflow: "hidden" }}
+            sx={{
+              border: `1px solid ${resolvedBorder}`,
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
           >
             <SectionHeader
               icon={<PhotoCameraIcon fontSize="small" />}
@@ -418,7 +528,8 @@ function Settings({ onUpdate }) {
                   alignItems="center"
                   spacing={2.5}
                   sx={{
-                    mt: 2.5, p: 2,
+                    mt: 2.5,
+                    p: 2,
                     backgroundColor: C.goldPale,
                     borderRadius: 2.5,
                     border: `1px solid ${resolvedBorder}`,
@@ -428,7 +539,8 @@ function Settings({ onUpdate }) {
                     component="img"
                     src={previewLogo}
                     sx={{
-                      width: 80, height: 80,
+                      width: 80,
+                      height: 80,
                       borderRadius: 2.5,
                       objectFit: "cover",
                       border: `2px solid ${resolvedHeader}`,
@@ -437,11 +549,25 @@ function Settings({ onUpdate }) {
                     }}
                   />
                   <Box>
-                    <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: resolvedHeader }}>
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.85rem",
+                        color: resolvedHeader,
+                      }}
+                    >
                       Logo Preview
                     </Typography>
-                    <Typography sx={{ fontSize: "0.75rem", color: C.textMuted, mt: 0.5, lineHeight: 1.5 }}>
-                      Appears on documents and the portal header and each Documents.
+                    <Typography
+                      sx={{
+                        fontSize: "0.75rem",
+                        color: C.textMuted,
+                        mt: 0.5,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Appears on documents and the portal header and each
+                      Documents.
                     </Typography>
                   </Box>
                 </Stack>
@@ -452,7 +578,11 @@ function Settings({ onUpdate }) {
           {/* Background Image */}
           <Paper
             elevation={1}
-            sx={{ border: `1px solid ${resolvedBorder}`, borderRadius: 3, overflow: "hidden" }}
+            sx={{
+              border: `1px solid ${resolvedBorder}`,
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
           >
             <SectionHeader
               icon={<ImageIcon fontSize="small" />}
@@ -472,22 +602,43 @@ function Settings({ onUpdate }) {
                 }}
               />
               {previewBg && (
-                <Box sx={{
-                  mt: 2.5, position: "relative",
-                  borderRadius: 2.5, overflow: "hidden",
-                  border: `1px solid ${resolvedBorder}`,
-                }}>
+                <Box
+                  sx={{
+                    mt: 2.5,
+                    position: "relative",
+                    borderRadius: 2.5,
+                    overflow: "hidden",
+                    border: `1px solid ${resolvedBorder}`,
+                  }}
+                >
                   <Box
                     component="img"
                     src={previewBg}
-                    sx={{ width: "100%", height: 400, objectFit: "cover", display: "block" }}
+                    sx={{
+                      width: "100%",
+                      height: 400,
+                      objectFit: "cover",
+                      display: "block",
+                    }}
                   />
-                  <Box sx={{
-                    position: "absolute", bottom: 0, left: 0, right: 0,
-                    background: `linear-gradient(transparent, ${resolvedHeader}cc)`,
-                    px: 2, py: 1.5,
-                  }}>
-                    <Typography sx={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.9)", fontWeight: 500 }}>
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      background: `linear-gradient(transparent, ${resolvedHeader}cc)`,
+                      px: 2,
+                      py: 1.5,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: "0.78rem",
+                        color: "rgba(255,255,255,0.9)",
+                        fontWeight: 500,
+                      }}
+                    >
                       Background Preview
                     </Typography>
                   </Box>
@@ -499,11 +650,14 @@ function Settings({ onUpdate }) {
 
         {/* ══ RIGHT ═══════════════════════════════════════════════════════ */}
         <Stack spacing={3}>
-
           {/* Theme Colors */}
           <Paper
             elevation={1}
-            sx={{ border: `1px solid ${resolvedBorder}`, borderRadius: 3, overflow: "hidden" }}
+            sx={{
+              border: `1px solid ${resolvedBorder}`,
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
           >
             <SectionHeader
               icon={<PaletteIcon fontSize="small" />}
@@ -520,20 +674,36 @@ function Settings({ onUpdate }) {
                     sx={{ py: 1.75 }}
                   >
                     <Box>
-                      <Typography sx={{ fontWeight: 600, fontSize: "0.88rem", color: C.textMain }}>
+                      <Typography
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: "0.88rem",
+                          color: C.textMain,
+                        }}
+                      >
                         {c.label}
                       </Typography>
-                      <Typography sx={{ fontSize: "0.72rem", color: C.textMuted, mt: 0.25, fontWeight: 500 }}>
+                      <Typography
+                        sx={{
+                          fontSize: "0.72rem",
+                          color: C.textMuted,
+                          mt: 0.25,
+                          fontWeight: 500,
+                        }}
+                      >
                         {c.value.toUpperCase()}
                       </Typography>
                     </Box>
 
                     {/* Clickable color swatch */}
                     <Box
-                      onClick={() => document.getElementById(`color-pick-${i}`).click()}
+                      onClick={() =>
+                        document.getElementById(`color-pick-${i}`).click()
+                      }
                       sx={{
                         position: "relative",
-                        width: 400, height: 38,
+                        width: 400,
+                        height: 38,
                         borderRadius: 2,
                         backgroundColor: c.value,
                         border: `2px solid ${resolvedBorder}`,
@@ -541,7 +711,8 @@ function Settings({ onUpdate }) {
                         boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
                         flexShrink: 0,
                         overflow: "hidden",
-                        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                        transition:
+                          "transform 0.15s ease, box-shadow 0.15s ease",
                         "&:hover": {
                           transform: "scale(1.07)",
                           boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
@@ -549,23 +720,41 @@ function Settings({ onUpdate }) {
                       }}
                     >
                       {/* Checkerboard hint */}
-                      <Box sx={{
-                        position: "absolute", inset: 0, zIndex: 0, opacity: 0.2,
-                        backgroundImage: `
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          zIndex: 0,
+                          opacity: 0.2,
+                          backgroundImage: `
                           linear-gradient(45deg,  #aaa 25%, transparent 25%),
                           linear-gradient(-45deg, #aaa 25%, transparent 25%),
                           linear-gradient(45deg,  transparent 75%, #aaa 75%),
                           linear-gradient(-45deg, transparent 75%, #aaa 75%)`,
-                        backgroundSize: "8px 8px",
-                        backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
-                      }} />
-                      <Box sx={{ position: "absolute", inset: 0, zIndex: 1, backgroundColor: c.value }} />
+                          backgroundSize: "8px 8px",
+                          backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          zIndex: 1,
+                          backgroundColor: c.value,
+                        }}
+                      />
                       <Input
                         type="color"
                         id={`color-pick-${i}`}
                         value={c.value}
                         onChange={(e) => c.setter(e.target.value)}
-                        sx={{ opacity: 0, width: 0, height: 0, position: "absolute", zIndex: 2 }}
+                        sx={{
+                          opacity: 0,
+                          width: 0,
+                          height: 0,
+                          position: "absolute",
+                          zIndex: 2,
+                        }}
                       />
                     </Box>
                   </Stack>
@@ -594,7 +783,14 @@ function Settings({ onUpdate }) {
               headerColor={resolvedHeader}
             />
             <Box sx={{ p: 3 }}>
-              <Typography sx={{ fontSize: "0.82rem", color: C.textMuted, mb: 2.5, lineHeight: 1.65 }}>
+              <Typography
+                sx={{
+                  fontSize: "0.82rem",
+                  color: C.textMuted,
+                  mb: 2.5,
+                  lineHeight: 1.65,
+                }}
+              >
                 Review all changes before saving. Updates will apply across the
                 Admission &amp; Enrollment portal immediately.
               </Typography>
@@ -613,7 +809,6 @@ function Settings({ onUpdate }) {
 
                   color: C.white,
                   border: `1px solid ${resolvedBorder}`,
-
                 }}
               >
                 Save Settings
@@ -626,9 +821,13 @@ function Settings({ onUpdate }) {
       {/* ── Hidden legacy TableContainer (preserved for compatibility) ─── */}
       <TableContainer component={Paper} sx={{ display: "none" }}>
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead
+            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+          >
             <TableRow>
-              <TableCell sx={{ color: "white", textAlign: "Center" }}>Settings</TableCell>
+              <TableCell sx={{ color: "white", textAlign: "Center" }}>
+                Settings
+              </TableCell>
             </TableRow>
           </TableHead>
         </Table>

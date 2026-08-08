@@ -115,7 +115,10 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
   }, [settings]);
 
   const [user, setUser] = useState(null);
-  const [adminData, setAdminData] = useState({ dprtmnt_id: "", dprtmnt_ids: [] });
+  const [adminData, setAdminData] = useState({
+    dprtmnt_id: "",
+    dprtmnt_ids: [],
+  });
   const [emailSender, setEmailSender] = useState("");
   const [loggedInPersonId, setLoggedInPersonId] = useState(null);
 
@@ -238,9 +241,7 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
       curriculumLookup.find(
         (c) => String(c.curriculum_id) === String(programId),
       ) ||
-      curriculumLookup.find(
-        (c) => String(c.program_id) === String(programId),
-      );
+      curriculumLookup.find((c) => String(c.program_id) === String(programId));
 
     const departmentId =
       curriculumMatch?.dprtmnt_id ||
@@ -248,18 +249,14 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
       adminData.dprtmnt_id;
 
     const programLabel =
-      [
-        curriculumMatch?.program_code,
-        curriculumMatch?.program_description,
-      ]
+      [curriculumMatch?.program_code, curriculumMatch?.program_description]
         .filter(Boolean)
         .join(" - ") || "the selected program";
 
     const departmentLabel =
       curriculumMatch?.dprtmnt_name ||
-      department.find(
-        (dep) => String(dep.dprtmnt_id) === String(departmentId),
-      )?.dprtmnt_name ||
+      department.find((dep) => String(dep.dprtmnt_id) === String(departmentId))
+        ?.dprtmnt_name ||
       "the selected department";
 
     if (!currentEmployeeId) {
@@ -338,7 +335,6 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
     fetchDepartments();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-
   useEffect(() => {
     const departmentIds =
       Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
@@ -357,7 +353,9 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
         );
 
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
+        const restricted = dedupeByProgramCode(
+          restrictToRegistrarCurriculum(merged),
+        );
         setCurriculumOptions(restricted);
         setAllCurriculums(restricted);
         setCurriculumLookup(restricted); // ✅ this was missing
@@ -540,7 +538,10 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
 
     sessionStorage.setItem("admin_edit_person_id", String(personId));
     sessionStorage.setItem("edit_person_id", String(personId));
-    sessionStorage.setItem("admin_edit_person_id_source", "applicant_list_college");
+    sessionStorage.setItem(
+      "admin_edit_person_id_source",
+      "applicant_list_college",
+    );
     sessionStorage.setItem("admin_edit_person_id_ts", String(Date.now()));
 
     // ✅ Always pass person_id in the URL
@@ -820,9 +821,9 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
           prev.map((s) =>
             Number(s.schedule_id) === Number(selectedSchedule)
               ? {
-                ...s,
-                current_occupancy: currentCount + (res.assigned?.length || 0),
-              }
+                  ...s,
+                  current_occupancy: currentCount + (res.assigned?.length || 0),
+                }
               : s,
           ),
         );
@@ -968,18 +969,18 @@ const CollegeQualifyingInterviewScheduleManagement = () => {
       return isNaN(d)
         ? "N/A"
         : d.toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        });
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          });
     };
 
     const formattedDate = sched.day_description
       ? new Date(sched.day_description).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
       : "N/A";
 
     // ✅ Only include the requirements section if the user explicitly
@@ -1241,7 +1242,11 @@ ${requirementsSection}
 
     if (emailTargets.length === 0) {
       setLoading2(false);
-      setSnack({ open: true, message: "No selected applicants found.", severity: "warning" });
+      setSnack({
+        open: true,
+        message: "No selected applicants found.",
+        severity: "warning",
+      });
       return;
     }
 
@@ -1251,7 +1256,11 @@ ${requirementsSection}
 
     if (uniquePrograms.length !== 1) {
       setLoading2(false);
-      setSnack({ open: true, message: "Please send emails by one program at a time.", severity: "warning" });
+      setSnack({
+        open: true,
+        message: "Please send emails by one program at a time.",
+        severity: "warning",
+      });
       return;
     }
 
@@ -1260,7 +1269,11 @@ ${requirementsSection}
       resolvedSender = await resolveSenderForApplicant(emailTargets[0]);
     } catch (err) {
       setLoading2(false);
-      setSnack({ open: true, message: err.message || "No active sender account is assigned.", severity: "warning" });
+      setSnack({
+        open: true,
+        message: err.message || "No active sender account is assigned.",
+        severity: "warning",
+      });
       return;
     }
 
@@ -1281,8 +1294,8 @@ ${requirementsSection}
       senderName: resolvedSender,
       message: finalPreview,
       user_person_id: loggedInPersonId,
-      department_id: departmentId,   // ✅ ADDED
-      program_id: programId,         // ✅ ADDED
+      department_id: departmentId, // ✅ ADDED
+      program_id: programId, // ✅ ADDED
       ...auditActor(),
     });
 
@@ -1354,7 +1367,8 @@ Please also bring:
   const [endDate, setEndDate] = useState("");
 
   const [selectedCampusFilter, setSelectedCampusFilter] = useState("");
-  const scopedDepartmentIds = getDepartmentIdsFromAdminData(adminData).map(String);
+  const scopedDepartmentIds =
+    getDepartmentIdsFromAdminData(adminData).map(String);
   const filteredDepartments = department.filter((dep) =>
     allCurriculums.some(
       (curriculum) =>
@@ -1369,9 +1383,9 @@ Please also bring:
   const showAllDepartmentsOption = scopedDepartmentIds.length !== 1;
   const selectedDepartmentFilterValue =
     selectedDepartmentFilter === "" ||
-      selectableDepartments.some(
-        (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
-      )
+    selectableDepartments.some(
+      (dep) => String(dep.dprtmnt_id) === String(selectedDepartmentFilter),
+    )
       ? selectedDepartmentFilter
       : "";
 
@@ -1380,7 +1394,8 @@ Please also bring:
       (!selectedCampusFilter ||
         String(curriculum.components) === String(selectedCampusFilter)) &&
       (!selectedDepartmentFilterValue ||
-        String(curriculum.dprtmnt_id) === String(selectedDepartmentFilterValue)),
+        String(curriculum.dprtmnt_id) ===
+          String(selectedDepartmentFilterValue)),
   );
 
   useEffect(() => {
@@ -1513,7 +1528,7 @@ Please also bring:
     const matchesSemester =
       selectedSchoolSemester === "" ||
       normalize(personData.middle_code) ===
-      normalize(selectedSemester?.semester_code);
+        normalize(selectedSemester?.semester_code);
 
     /* 📅 DATE */
     const createdAtDate = new Date(personData.created_at);
@@ -1957,11 +1972,11 @@ Please also bring:
                 value={
                   selectedSchedule
                     ? (() => {
-                      const s = getSelectedScheduleData();
-                      return s
-                        ? `${s.current_occupancy ?? 0}/${s.room_quota}`
-                        : "";
-                    })()
+                        const s = getSelectedScheduleData();
+                        return s
+                          ? `${s.current_occupancy ?? 0}/${s.room_quota}`
+                          : "";
+                      })()
                     : ""
                 }
                 InputProps={{ readOnly: true }}
@@ -2950,7 +2965,8 @@ Please also bring:
             value={
               department.find(
                 (dep) =>
-                  String(dep.dprtmnt_id) === String(selectedDepartmentFilterValue),
+                  String(dep.dprtmnt_id) ===
+                  String(selectedDepartmentFilterValue),
               )?.dprtmnt_name || ""
             }
             fullWidth

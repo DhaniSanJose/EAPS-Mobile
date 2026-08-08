@@ -121,6 +121,7 @@ const ExaminationPermitChangeCourse = () => {
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
   const [campusAddress, setCampusAddress] = useState("");
+
   const [titleColor, setTitleColor] = useState("#000000");
   const [borderColor, setBorderColor] = useState("#000000");
 
@@ -294,18 +295,26 @@ const ExaminationPermitChangeCourse = () => {
   const [isVerified, setIsVerified] = useState(false);
   const [verifiedAt, setVerifiedAt] = useState(null);
 
+  // ✅ NEW — one-time attendance QR token (separate from applicant profile link)
+  const [attendanceToken, setAttendanceToken] = useState(null);
+  const [attendanceStatus, setAttendanceStatus] = useState(null);
+
   useEffect(() => {
     if (selectedPerson?.applicant_number) {
       axios
-        .get(`${API_BASE_URL}/api/exam-schedule/${selectedPerson.applicant_number}`)
+        .get(`${API_BASE_URL}/api/exam-attendance/token/${selectedPerson.applicant_number}`)
         .then((res) => {
-          setExamSchedule(res.data);
+          setAttendanceToken(res.data?.qr_token || null);
+          setAttendanceStatus(res.data?.status || null);
         })
-        .catch(() => {
-          setExamSchedule(null);
+        .catch((err) => {
+          console.error("Error fetching attendance token:", err);
+          setAttendanceToken(null);
+          setAttendanceStatus(null);
         });
     } else {
-      setExamSchedule(null);
+      setAttendanceToken(null);
+      setAttendanceStatus(null);
     }
   }, [selectedPerson]);
 
@@ -326,6 +335,20 @@ const ExaminationPermitChangeCourse = () => {
       setVerifiedAt(null);
     }
   }, [selectedPerson]);
+
+  useEffect(() => {
+    if (selectedPerson?.applicant_number) {
+        axios
+            .get(`${API_BASE_URL}/api/applicant-schedule/${selectedPerson.applicant_number}`)
+            .then((res) => setExamSchedule(res.data))
+            .catch((err) => {
+                console.error("Error fetching exam schedule:", err);
+                setExamSchedule(null);
+            });
+    } else {
+        setExamSchedule(null);
+    }
+}, [selectedPerson]);
 
 
   useEffect(() => {
@@ -537,23 +560,23 @@ const ExaminationPermitChangeCourse = () => {
   const getSignatureImageSrc = (signature) =>
     signature?.signature_image ? `${API_BASE_URL}/uploads/${signature.signature_image}` : "";
 
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
 
   if (loading || hasAccess === null) return <LoadingOverlay open={loading} message="Loading..." />;
   if (!hasAccess) return <Unauthorized />;
@@ -1099,48 +1122,38 @@ const ExaminationPermitChangeCourse = () => {
               </td>
             </tr>
 
+            {/* Bldg. / Floor / Room No. — 3 even columns */}
             <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
-              <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px", gap: "8px" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Bldg. :</label>
+              <td colSpan={16}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Building:</label>
                   <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {examSchedule?.building_description || ""}
                   </span>
+                </div>
+              </td>
+              <td colSpan={8}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Floor :</label>
-                  <span style={{ minWidth: "40px", borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "center" }}>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "center" }}>
                     {examSchedule?.floor ? getOrdinal(Number(examSchedule.floor)) : ""}
                   </span>
                 </div>
               </td>
-
-              <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", marginTop: "-140px" }}>
-                    <label style={{ fontWeight: "bold", marginRight: "10px", width: "80px" }}>Room No.:</label>
-                    <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial", width: "150px" }}>
-                      {examSchedule?.room_description || ""}
-                    </span>
-                  </div>
-
-                  {selectedPerson?.applicant_number && (
-                    <div style={{ width: "4.5cm", height: "4.5cm", borderRadius: "4px", background: "#fff", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", overflow: "hidden", marginLeft: "10px" }}>
-                      <QRCodeSVG
-                        value={`${window.location.origin}/applicant_profile/${person.applicant_number}`}
-                        size={150}
-                        level="H"
-                      />
-                      <div style={{ position: "absolute", fontSize: "12px", fontWeight: "bold", color: "maroon", background: "white", padding: "2px 4px", borderRadius: "2px" }}>
-                        {selectedPerson.applicant_number}
-                      </div>
-                    </div>
-                  )}
+              <td colSpan={16}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Room No.:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
+                    {examSchedule?.room_description || ""}
+                  </span>
                 </div>
               </td>
             </tr>
 
+            {/* Date Verified / Scheduled by — 2 even columns */}
             <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
               <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-148px" }}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Date Verified:</label>
                   <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {verifiedAt
@@ -1149,19 +1162,66 @@ const ExaminationPermitChangeCourse = () => {
                   </span>
                 </div>
               </td>
-            </tr>
-
-            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
               <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-128px" }}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Scheduled by:</label>
-                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial" }}>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {scheduledBy || "N/A"}
                   </span>
                 </div>
               </td>
             </tr>
 
+            {/* Centered QR code — 200x200, applicant number centered inside */}
+            <tr>
+              <td colSpan={40} style={{ paddingTop: "18px", paddingBottom: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                  <div
+                    style={{
+                      width: "200px",
+                      height: "200px",
+                      border: "2px solid black",
+                      borderRadius: "6px",
+                      background: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {attendanceToken ? (
+                      <QRCodeSVG value={attendanceToken} size={150} level="H" />
+                    ) : (
+                      <span style={{ fontSize: "11px", color: "#888", textAlign: "center", padding: "0 10px" }}>
+                        No attendance QR yet
+                      </span>
+                    )}
+
+                    {selectedPerson?.applicant_number && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          color: "maroon",
+                          background: "white",
+                          padding: "2px 6px",
+                          borderRadius: "3px",
+                          textAlign: "center",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {selectedPerson.applicant_number}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
         <table className="student-table" style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", textAlign: "center", tableLayout: "fixed", border: "1px solid black" }}>

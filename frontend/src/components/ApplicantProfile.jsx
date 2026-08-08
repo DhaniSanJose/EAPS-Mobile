@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { SettingsContext } from "../App";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -11,7 +11,12 @@ import {
   Typography,
   Snackbar,
   Alert,
+  Autocomplete,
+  useMediaQuery,
+  useTheme,
+  Stack,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import QRScanner from "./QRScanner";
 import API_BASE_URL from "../apiConfig";
@@ -19,6 +24,11 @@ import { FcPrint } from "react-icons/fc";
 
 const ApplicantProfile = () => {
   const settings = useContext(SettingsContext);
+  const theme = useTheme();
+
+  // ---------------- Responsive breakpoints ----------------
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px (phones)
+  const isTablet = useMediaQuery(theme.breakpoints.down("md")); // <900px (phones + small tablets)
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -77,7 +87,6 @@ const ApplicantProfile = () => {
   const navigate = useNavigate();
 
   const [personId, setPersonId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState(applicantNumber || "");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -91,83 +100,26 @@ const ApplicantProfile = () => {
     setSnackbar({ open: true, message, type });
   };
 
-  const divToPrintRef = useRef();
-
-  const printDiv = () => {
-    const divToPrint = divToPrintRef.current;
-    if (divToPrint) {
-      const newWin = window.open("", "Print-Window");
-      newWin.document.open();
-      newWin.document.write(`
-        <html>
-          <head>
-            <title>Print</title>
-            <style>
-                @page {
-                size: A4;
-                margin: 0;
-              }
-  
-              html, body {
-                margin: 0;
-                padding: 0;
-                width: 210mm;
-                height: 297mm;
-                font-family: Arial;
-                overflow: hidden;
-              }
-  
-              *, *::before, *::after {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-              }
-  
-              .print-container {
-                width: 100%;
-                height: auto;
-                padding: 10px 20px;
-  
-                /* 🔹 Apply 10% zoom out */
-                transform: scale(0.90);
-            
-              }
-  
-              .student-table {
-                margin-top: -50px !important;
-              }
-  
-              button {
-                display: none;
-              }
-  
-              .dataField {
-                margin-top: 2px !important;
-              }
-  
-              svg.MuiSvgIcon-root {
-                margin-top: -53px;
-                width: 70px !important;
-                height: 70px !important;
-              }
-            </style>
-          </head>
-          <body onload="window.print(); setTimeout(() => window.close(), 100);">
-            <div class="print-container">
-              ${divToPrint.innerHTML}
-            </div>
-          </body>
-        </html>
-      `);
-      newWin.document.close();
-    } else {
-      console.error("divToPrintRef is not set.");
-    }
-  };
-
   const handleCloseSnackbar = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
+
+  // ---------------- Autocomplete search (same pattern as ExamAttendanceScanner) ----------------
+  const [applicants, setApplicants] = useState([]);
+  const [searchQuery, setSearchQuery] = useState(applicantNumber || "");
+  const [selectedApplicant, setSelectedApplicant] = useState(null);
+
+  useEffect(() => {
+    const fetchApplicants = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/upload_documents`);
+        setApplicants(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Error fetching applicants for search:", err);
+      }
+    };
+    fetchApplicants();
+  }, []);
 
   // 🔁 Auto-load when URL has applicant number
   useEffect(() => {
@@ -182,26 +134,27 @@ const ApplicantProfile = () => {
 
   const fetchSubmittedDocuments = async (pid) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/applicant-documents/${pid}`);
+      const res = await axios.get(
+        `${API_BASE_URL}/api/applicant-documents/${pid}`,
+      );
 
       if (Array.isArray(res.data)) {
         const allSubmitted = res.data.every(
-          doc => Number(doc.submitted_documents) === 1
+          (doc) => Number(doc.submitted_documents) === 1,
         );
 
         setFinalDocsCompleted(allSubmitted);
 
-        setSteps(prev => ({
+        setSteps((prev) => ({
           ...prev,
           step4: allSubmitted,
-          step5: allSubmitted && prev.step3 // example logic
+          step5: allSubmitted && prev.step3, // example logic
         }));
       }
     } catch (err) {
       console.error(err);
     }
   };
-
 
   const [steps, setSteps] = useState({
     step1: false,
@@ -223,14 +176,20 @@ const ApplicantProfile = () => {
     if (status === 0 || String(status).trim() === "0") return "PASSED";
     if (status === 1 || String(status).trim() === "1") return "FAILED";
 
-    const normalized = String(status ?? "").trim().toUpperCase();
+    const normalized = String(status ?? "")
+      .trim()
+      .toUpperCase();
     if (["PASSED", "PASS"].includes(normalized)) return "PASSED";
     if (["FAILED", "FAIL"].includes(normalized)) return "FAILED";
     return "";
   };
 
   const normalizeResultStatus = (status) => {
-    if (status === null || status === undefined || String(status).trim() === "") {
+    if (
+      status === null ||
+      status === undefined ||
+      String(status).trim() === ""
+    ) {
       return "";
     }
 
@@ -244,7 +203,11 @@ const ApplicantProfile = () => {
   };
 
   const normalizeCollegeApprovalStatus = (status) => {
-    if (status === null || status === undefined || String(status).trim() === "") {
+    if (
+      status === null ||
+      status === undefined ||
+      String(status).trim() === ""
+    ) {
       return "";
     }
 
@@ -272,7 +235,7 @@ const ApplicantProfile = () => {
     try {
       // 1️⃣ Get person_id
       const res = await axios.get(
-        `${API_BASE_URL}/api/person-by-applicant/${query}`
+        `${API_BASE_URL}/api/person-by-applicant/${query}`,
       );
 
       if (!res.data?.person_id) {
@@ -285,13 +248,13 @@ const ApplicantProfile = () => {
 
       // 2️⃣ Check document verification
       const verifiedRes = await axios.get(
-        `${API_BASE_URL}/api/document_status/check/${query}`
+        `${API_BASE_URL}/api/document_status/check/${query}`,
       );
 
       if (!verifiedRes.data.verified) {
         showSnackbar(
           "❌ Documents not yet verified. Not qualified for exam.",
-          "error"
+          "error",
         );
         setPersonId(null);
         return;
@@ -303,12 +266,18 @@ const ApplicantProfile = () => {
 
       try {
         const scoreRes = await axios.get(
-          `${API_BASE_URL}/api/applicant-scores/${query}`
+          `${API_BASE_URL}/api/applicant-scores/${query}`,
         );
 
-        entrance_exam_status = normalizeExamStatus(scoreRes.data?.entrance_exam_status);
-        qualifying_status = normalizeResultStatus(scoreRes.data?.qualifying_status);
-        interview_status = normalizeResultStatus(scoreRes.data?.interview_status);
+        entrance_exam_status = normalizeExamStatus(
+          scoreRes.data?.entrance_exam_status,
+        );
+        qualifying_status = normalizeResultStatus(
+          scoreRes.data?.qualifying_status,
+        );
+        interview_status = normalizeResultStatus(
+          scoreRes.data?.interview_status,
+        );
       } catch (err) {
         console.error("Score API failed:", err);
       }
@@ -318,11 +287,11 @@ const ApplicantProfile = () => {
 
       try {
         const statusRes = await axios.get(
-          `${API_BASE_URL}/api/interview_applicants/${query}`
+          `${API_BASE_URL}/api/interview_applicants/${query}`,
         );
 
         collegeApprovalStatus = normalizeCollegeApprovalStatus(
-          statusRes.data?.status
+          statusRes.data?.status,
         );
       } catch (err) {
         if (err.response?.status !== 404) {
@@ -337,7 +306,7 @@ const ApplicantProfile = () => {
 
       try {
         const registrarRes = await axios.get(
-          `${API_BASE_URL}/api/submitted-status/${pid}`
+          `${API_BASE_URL}/api/submitted-status/${pid}`,
         );
 
         isRegistrarApproved =
@@ -352,7 +321,7 @@ const ApplicantProfile = () => {
 
       try {
         const studentRes = await axios.get(
-          `${API_BASE_URL}/api/student_status/${pid}`
+          `${API_BASE_URL}/api/student_status/${pid}`,
         );
 
         hasStudentNumberLocal = studentRes.data?.hasStudentNumber;
@@ -370,12 +339,10 @@ const ApplicantProfile = () => {
 
         // separate step 2 states
         qualifyingDone:
-          qualifying_status === "PASSED" ||
-          qualifying_status === "FAILED",
+          qualifying_status === "PASSED" || qualifying_status === "FAILED",
         qualifyingStatus: qualifying_status,
         interviewDone:
-          interview_status === "PASSED" ||
-          interview_status === "FAILED",
+          interview_status === "PASSED" || interview_status === "FAILED",
         interviewStatus: interview_status,
 
         step3: isAccepted,
@@ -398,9 +365,8 @@ const ApplicantProfile = () => {
       if (!entrance_exam_status) {
         showSnackbar(
           "📝 The applicant is qualified to take the Entrance Examination. Please proceed with the examination process.",
-          "info"
+          "info",
         );
-
       } else if (
         entrance_exam_status === "PASSED" &&
         !newSteps.qualifyingDone &&
@@ -408,28 +374,24 @@ const ApplicantProfile = () => {
       ) {
         showSnackbar(
           "✅ The applicant has completed the Entrance Examination successfully and is now waiting to be contacted for the Qualifying Examination or Interview schedule.",
-          "success"
+          "success",
         );
-
-      } else if (
-        newSteps.qualifyingDone ||
-        newSteps.interviewDone
-      ) {
+      } else if (newSteps.qualifyingDone || newSteps.interviewDone) {
         showSnackbar(
           "🎤 The applicant has completed the Qualifying Examination and/or Interview process successfully.",
-          "success"
+          "success",
         );
       }
 
       if (collegeApprovalStatus === "ACCEPTED") {
         showSnackbar(
           "🏥 The applicant may now proceed with the Medical Examination as part of the admission requirements.",
-          "success"
+          "success",
         );
       } else if (collegeApprovalStatus === "REJECTED") {
         showSnackbar(
           "❌ The applicant has been rejected by the college.",
-          "error"
+          "error",
         );
       }
       // } else if (collegeApprovalStatus === "WAITING LIST") {
@@ -442,14 +404,14 @@ const ApplicantProfile = () => {
       if (isRegistrarApproved) {
         showSnackbar(
           "📄 The applicant has successfully submitted the original documents to the Registrar's Office and is now waiting for the student number to be generated.",
-          "success"
+          "success",
         );
       }
 
       if (hasStudentNumberLocal) {
         showSnackbar(
           "🎓 The student number has been successfully generated. The student is now waiting for subject tagging and class schedule assignment.",
-          "success"
+          "success",
         );
       }
 
@@ -461,7 +423,6 @@ const ApplicantProfile = () => {
     }
   };
 
-
   const handleSearch = () => {
     if (!searchQuery.trim()) return;
 
@@ -472,104 +433,161 @@ const ApplicantProfile = () => {
     fetchApplicantData(searchQuery.trim());
   };
 
+  // ✅ Selecting an option from the Autocomplete searches immediately,
+  // same behavior as ExamAttendanceScanner's handleSelectPerson
+  const handleSelectApplicant = (newValue) => {
+    setSelectedApplicant(newValue);
+    setSearchQuery(newValue?.applicant_number || "");
+
+    if (newValue?.applicant_number) {
+      setHasSearched(true);
+      navigate(`/applicant_profile/${newValue.applicant_number}`);
+      fetchApplicantData(newValue.applicant_number);
+    } else {
+      setPersonId(null);
+    }
+  };
+
   return (
     <Box
       sx={{
         height: "calc(100vh - 150px)",
         overflowY: "auto",
+        overflowX: "hidden",
         backgroundColor: "transparent",
-        p: 2,
-
+        p: isMobile ? 1.5 : 2,
       }}
     >
-      <Typography
-        variant="h4"
-        sx={{ fontWeight: "bold", color: titleColor, mb: 2 }}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: isMobile ? "flex-start" : "center",
+          gap: isMobile ? 1.5 : 3,
+          mb: 3,
+          flexDirection: isTablet ? "column" : "row",
+          flexWrap: "wrap",
+        }}
       >
-        APPLICANT PROFILE
-      </Typography>
+        {/* LEFT SIDE */}
+        <Typography
+          variant={isMobile ? "h6" : "h4"}
+          sx={{
+            fontWeight: "bold",
+            color: titleColor,
+            whiteSpace: isMobile ? "normal" : "nowrap",
+            lineHeight: 1.2,
+          }}
+        >
+          APPLICANT PROFILE
+        </Typography>
+
+        {/* SEARCH FIELD */}
+        <Stack
+          direction={isMobile ? "column" : "row"}
+          spacing={1.5}
+          sx={{
+            width: isTablet ? "100%" : "auto",
+            alignItems: isMobile ? "stretch" : "center",
+            flexWrap: "wrap",
+            marginLeft: isTablet ? 0 : "auto",
+          }}
+        >
+          <Autocomplete
+            options={applicants}
+            value={selectedApplicant}
+            inputValue={searchQuery}
+            isOptionEqualToValue={(option, value) =>
+              option?.applicant_number === value?.applicant_number
+            }
+            getOptionLabel={(option) =>
+              option
+                ? `${option.applicant_number || ""} - ${option.last_name || ""}, ${option.first_name || ""} ${option.middle_name || ""}`
+                : ""
+            }
+            onInputChange={(event, newInputValue, reason) => {
+              if (reason !== "reset") setSearchQuery(newInputValue);
+            }}
+            filterOptions={(options, state) => {
+              const query = state.inputValue.toLowerCase();
+              return options.filter((p) => {
+                const fullString =
+                  `${p.first_name ?? ""} ${p.middle_name ?? ""} ${p.last_name ?? ""} ${p.emailAddress ?? ""}`.toLowerCase();
+                return (
+                  (p.applicant_number || "").toLowerCase().includes(query) ||
+                  fullString.includes(query)
+                );
+              });
+            }}
+            onChange={(event, newValue) => handleSelectApplicant(newValue)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                handleSearch();
+              }
+            }}
+            sx={{ width: isTablet ? "100%" : 420 }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                variant="outlined"
+                placeholder="Search Applicant Name / Applicant ID"
+                size="small"
+                sx={{
+                  width: 450,
+                  backgroundColor: "#fff",
+                  borderRadius: 1,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                  },
+                }}
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+                }}
+              />
+            )}
+          />
+        </Stack>
+
+        {/* SEARCH BUTTON */}
+        <Button
+          variant="contained"
+          onClick={handleSearch}
+          fullWidth={isTablet}
+          sx={{
+            minWidth: isTablet ? "auto" : "160px",
+            height: "44px",
+            marginLeft: "40px",
+            fontWeight: "bold",
+          }}
+        >
+          Search
+        </Button>
+
+        {/* QR BUTTON */}
+        <Button
+          variant="contained"
+          color="secondary"
+          startIcon={<CameraAltIcon />}
+          onClick={() => setScannerOpen(true)}
+          fullWidth={isTablet}
+          sx={{
+            minWidth: isTablet ? "auto" : "175px",
+            height: "44px",
+
+            fontWeight: "bold",
+          }}
+        >
+          Scan QR
+        </Button>
+      </Box>
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
+      <br />
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        {/* Left side: Search and Scan */}
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-          <TextField
-            label="Enter Applicant Number"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            size="small"
-          />
-
-          <Button variant="contained" sx={{ width: "175px" }} onClick={handleSearch}>
-            Search
-          </Button>
-
-          <Button
-            variant="contained"
-            color="secondary"
-            sx={{ width: "175px" }}
-            startIcon={<CameraAltIcon />}
-            onClick={() => setScannerOpen(true)}
-          >
-            Scan QR
-          </Button>
-        </Box>
-
-        {/* Right side: Print Button */}
-        <button
-          onClick={printDiv}
-          style={{
-            padding: "10px 20px",
-            border: "2px solid black",
-            backgroundColor: "#f0f0f0",
-            color: "black",
-            borderRadius: "5px",
-            cursor: "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-            transition: "background-color 0.3s, transform 0.2s",
-          }}
-          onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-          onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-          onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <FcPrint size={20} />
-            Print Admission Form
-          </span>
-        </button>
-      </Box>
-
-      {/* QR Scanner */}
-      <QRScanner
-        open={scannerOpen}
-        onScan={(text) => {
-          let scanned = String(text || "").trim();
-          if (scanned.includes("/")) scanned = scanned.split("/").pop();
-
-          setScannerOpen(false);
-          setSearchQuery(scanned);
-          setHasSearched(true);
-          navigate(`/applicant_profile/${scanned}`);
-          fetchApplicantData(scanned);
-        }}
-        onClose={() => setScannerOpen(false)}
-      />
-
-      {/* RESULT */}
-      {hasSearched && (
-        <>
-          {personId ? (
-            <ApplicantExamPermit printRef={divToPrintRef} personId={personId} steps={steps} />
-          ) : (
-            <Typography color="error">
-              Invalid Applicant Number
-            </Typography>
-          )}
-        </>
-      )}
+      {/* Exam Permit — scales to fit mobile/tablet screens automatically */}
+      {personId && <ApplicantExamPermit personId={personId} steps={steps} />}
 
       {/* Snackbar */}
       <Snackbar
@@ -582,6 +600,18 @@ const ApplicantProfile = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <QRScanner
+        open={scannerOpen}
+        onScan={(text) => {
+          setScannerOpen(false);
+          setSearchQuery(text);
+          setHasSearched(true);
+          navigate(`/applicant_profile/${text}`);
+          fetchApplicantData(text);
+        }}
+        onClose={() => setScannerOpen(false)}
+      />
     </Box>
   );
 };

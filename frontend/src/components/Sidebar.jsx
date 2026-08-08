@@ -2,18 +2,59 @@ import React, { useState, useEffect, useContext } from "react";
 import { SettingsContext } from "../App";
 import { Link, useNavigate } from "react-router-dom";
 import {
-    AccountCircle, AdminPanelSettings, Assessment, Assignment, Badge,
-    CalendarToday, Campaign, ChangeCircle, Class, CollectionsBookmark,
-    DateRange, EditCalendar, EditNote, Email, EventNote,
-    FactCheck, FolderCopy, FormatListNumbered, HealthAndSafety, HelpOutline,
-    HistoryEdu, Info, Layers, ListAlt, ListAltOutlined, MedicalServices,
-    MeetingRoom, MenuBook, Numbers, PersonAdd, Psychology, School, Score,
-    Search, Security, SupervisorAccount, TableChart, Timeline, Apartment,
-    Business, LibraryBooks, People, LogoutOutlined, Settings, ExpandMore,
-    ExpandLess, Menu, Grading
+  AccountCircle,
+  AdminPanelSettings,
+  Assessment,
+  Assignment,
+  Badge,
+  CalendarToday,
+  Campaign,
+  ChangeCircle,
+  Class,
+  CollectionsBookmark,
+  DateRange,
+  EditCalendar,
+  EditNote,
+  Email,
+  EventNote,
+  FactCheck,
+  FolderCopy,
+  FormatListNumbered,
+  HealthAndSafety,
+  HelpOutline,
+  HistoryEdu,
+  Info,
+  Layers,
+  ListAlt,
+  ListAltOutlined,
+  MedicalServices,
+  MeetingRoom,
+  MenuBook,
+  Numbers,
+  PersonAdd,
+  Psychology,
+  School,
+  Score,
+  Search,
+  Security,
+  SupervisorAccount,
+  TableChart,
+  Timeline,
+  Apartment,
+  Business,
+  LibraryBooks,
+  People,
+  LogoutOutlined,
+  Settings,
+  ExpandMore,
+  ExpandLess,
+  Menu,
+  Grading,
+  PhotoCamera,
 } from "@mui/icons-material";
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import ContactsIcon from '@mui/icons-material/Contacts';
+
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import ContactsIcon from "@mui/icons-material/Contacts";
 import PaymentIcon from "@mui/icons-material/Payment";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
@@ -33,31 +74,38 @@ import API_BASE_URL from "../apiConfig";
 import { syncRegistrarScopeFromEmployeeResponse } from "../utils/registrarCurriculumRestriction";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import {
-    AccountTree,
-    Payments,
-    CloudUpload,
-    Grade,
-    EmojiEvents,
-    LockReset
+  AccountTree,
+  Payments,
+  CloudUpload,
+  Grade,
+  EmojiEvents,
+  LockReset,
 } from "@mui/icons-material";
-import HistoryIcon from '@mui/icons-material/History';
+import HistoryIcon from "@mui/icons-material/History";
 
-const GLOBAL_PAGE_IDS = [13, 15, 17, 38, 39, 40, 41, 42, 50, 56, 59, 62, 73, 80, 92, 96, 101, 104, 105, 106, 117];
+const GLOBAL_PAGE_IDS = [
+  13, 15, 17, 38, 39, 40, 41, 42, 50, 56, 59, 62, 73, 80, 92, 96, 101, 104, 105,
+  106, 117,
+];
 const GLOBAL_ACCESS_THRESHOLD = 10;
-
 
 /* ─────────────────────────────────────────
    Style builder
 ───────────────────────────────────────── */
-function buildStyles(s = {}, hasDept = true, collapsed = false, isMobile = false) {
-    const accent = s.main_button_color || "#8b1a1a";
-    const border = s.border_color || "#e8e8e8";
-    const subBtnColor = s.sub_button_color || "#f5f5f5";
+function buildStyles(
+  s = {},
+  hasDept = true,
+  collapsed = false,
+  isMobile = false,
+) {
+  const accent = s.main_button_color || "#8b1a1a";
+  const border = s.border_color || "#e8e8e8";
+  const subBtnColor = s.sub_button_color || "#f5f5f5";
 
-    const effectiveCollapsed = isMobile ? false : collapsed;
-    const W = effectiveCollapsed ? "75px" : "290px";
+  const effectiveCollapsed = isMobile ? false : collapsed;
+  const W = effectiveCollapsed ? "75px" : "290px";
 
-    return `
+  return `
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 
 .sb-root {
@@ -308,914 +356,2109 @@ function buildStyles(s = {}, hasDept = true, collapsed = false, isMobile = false
 const SIDEBAR_ICON_SIZE = 24;
 
 const ICON_CONTAINER_STYLE = {
-    width: 34,
-    height: 34,
-    borderRadius: "10px",
-    border: "gray",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all .2s ease",
+  width: 34,
+  height: 34,
+  borderRadius: "10px",
+  border: "gray",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "all .2s ease",
 };
 
 function injectStyles(settings, hasDept, collapsed, isMobile) {
-    let tag = document.getElementById("sb-styles");
-    if (!tag) { tag = document.createElement("style"); tag.id = "sb-styles"; document.head.appendChild(tag); }
-    tag.textContent = buildStyles(settings, hasDept, collapsed, isMobile);
+  let tag = document.getElementById("sb-styles");
+  if (!tag) {
+    tag = document.createElement("style");
+    tag.id = "sb-styles";
+    document.head.appendChild(tag);
+  }
+  tag.textContent = buildStyles(settings, hasDept, collapsed, isMobile);
 }
 
 /* ─────────────────────────────────────────
    Sub-components
 ───────────────────────────────────────── */
-function NavItem({ to, icon: Icon, label, active, onClick, sub = false, collapsed = false, onNavClick }) {
-    const cls = ["sb-item", active ? "active" : "", sub ? "sb-sub-item" : ""]
-        .filter(Boolean)
-        .join(" ");
+function NavItem({
+  to,
+  icon: Icon,
+  label,
+  active,
+  onClick,
+  sub = false,
+  collapsed = false,
+  onNavClick,
+}) {
+  const cls = ["sb-item", active ? "active" : "", sub ? "sb-sub-item" : ""]
+    .filter(Boolean)
+    .join(" ");
 
-    const handleClick = (e) => {
-        if (onClick) onClick(e);
-        if (onNavClick) onNavClick();
-    };
+  const handleClick = (e) => {
+    if (onClick) onClick(e);
+    if (onNavClick) onNavClick();
+  };
 
-    const inner = (
-        <>
-            {Icon && (
-                <span
-                    className="sb-icon"
-                    style={{
-                        ...ICON_CONTAINER_STYLE,
-                        border: active
-                            ? "1.5px solid white"
-                            : "1.5px solid rgba(0,0,0,.08)",
-                    }}
-                >
-                    <Icon sx={{ fontSize: SIDEBAR_ICON_SIZE }} />
-                </span>
-            )}
-            <span className="sb-item-label">{label}</span>
-        </>
-    );
+  const inner = (
+    <>
+      {Icon && (
+        <span
+          className="sb-icon"
+          style={{
+            ...ICON_CONTAINER_STYLE,
+            border: active
+              ? "1.5px solid white"
+              : "1.5px solid rgba(0,0,0,.08)",
+          }}
+        >
+          <Icon sx={{ fontSize: SIDEBAR_ICON_SIZE }} />
+        </span>
+      )}
+      <span className="sb-item-label">{label}</span>
+    </>
+  );
 
-    const node = onClick ? (
-        <div className={cls} onClick={handleClick}>
-            {inner}
-        </div>
-    ) : (
-        <Link to={to} className={cls} onClick={onNavClick}>
-            {inner}
-        </Link>
-    );
+  const node = onClick ? (
+    <div className={cls} onClick={handleClick}>
+      {inner}
+    </div>
+  ) : (
+    <Link to={to} className={cls} onClick={onNavClick}>
+      {inner}
+    </Link>
+  );
 
-    return collapsed ? (
-        <Tooltip title={label} placement="right" arrow>
-            {node}
-        </Tooltip>
-    ) : (
-        node
-    );
+  return collapsed ? (
+    <Tooltip title={label} placement="right" arrow>
+      {node}
+    </Tooltip>
+  ) : (
+    node
+  );
 }
 
 function GroupToggle({ label, icon: Icon, open, onToggle, collapsed = false }) {
-    const btn = (
-        <button
-            type="button"
-            className={`sb-group-btn${open ? " open" : ""}`}
-            onClick={onToggle}
+  const btn = (
+    <button
+      type="button"
+      className={`sb-group-btn${open ? " open" : ""}`}
+      onClick={onToggle}
+    >
+      {Icon && (
+        <span
+          className="sb-icon"
+          style={{
+            ...ICON_CONTAINER_STYLE,
+            border: open ? "1.5px solid black" : "1.5px solid rgba(0,0,0,.08)",
+          }}
         >
-            {Icon && (
-                <span
-                    className="sb-icon"
-                    style={{
-                        ...ICON_CONTAINER_STYLE,
-                        border: open
-                            ? "1.5px solid black"
-                            : "1.5px solid rgba(0,0,0,.08)",
-                    }}
-                >
-                    <Icon sx={{ fontSize: SIDEBAR_ICON_SIZE }} />
-                </span>
-            )}
-            <span className="sb-group-label">{label}</span>
-            <span className="sb-group-chevron">
-                {open ? (
-                    <ExpandLess sx={{ fontSize: 18 }} />
-                ) : (
-                    <ExpandMore sx={{ fontSize: 18 }} />
-                )}
-            </span>
-        </button>
-    );
+          <Icon sx={{ fontSize: SIDEBAR_ICON_SIZE }} />
+        </span>
+      )}
+      <span className="sb-group-label">{label}</span>
+      <span className="sb-group-chevron">
+        {open ? (
+          <ExpandLess sx={{ fontSize: 18 }} />
+        ) : (
+          <ExpandMore sx={{ fontSize: 18 }} />
+        )}
+      </span>
+    </button>
+  );
 
-    return collapsed ? (
-        <Tooltip title={label} placement="right" arrow>
-            {btn}
-        </Tooltip>
-    ) : (
-        btn
-    );
+  return collapsed ? (
+    <Tooltip title={label} placement="right" arrow>
+      {btn}
+    </Tooltip>
+  ) : (
+    btn
+  );
 }
 
 function ProfileUploadInput({ id, onChange }) {
-    return <input id={id} type="file" accept="image/*" onChange={onChange} style={{ display: "none" }} />;
+  return (
+    <input
+      id={id}
+      type="file"
+      accept="image/*"
+      onChange={onChange}
+      style={{ display: "none" }}
+    />
+  );
 }
 
 /* ─────────────────────────────────────────
    SideBar
 ───────────────────────────────────────── */
-const Sidebar = ({
-    setIsAuthenticated,
-    profileImage,
-    setProfileImage,
-    onCollapseChange,
-    mobileOpen,
-    onMobileClose,
+const SideBar = ({
+  setIsAuthenticated,
+  profileImage,
+  setProfileImage,
+  onCollapseChange,
+  mobileOpen,
+  onMobileClose,
 }) => {
-    const settings = useContext(SettingsContext);
-    const navigate = useNavigate();
+  const settings = useContext(SettingsContext);
+  const navigate = useNavigate();
 
-    const accentColor = settings?.main_button_color || "#8b1a1a";
-    const shortTerm = settings?.short_term || "EARIST";
+  const accentColor = settings?.main_button_color || "#8b1a1a";
+  const shortTerm = settings?.short_term || "EARIST";
 
-    const [collapsed, setCollapsed] = useState(false);
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-    const [role, setRole] = useState("");
-    const [userRole, setUserRole] = useState("");
-    const [employeeID, setEmployeeID] = useState("");
-    const [personData, setPersonData] = useState({ profile_image: "", fname: "", lname: "", role: "" });
-    const [userAccessList, setUserAccessList] = useState({});
-    const [accessDescription, setAccessDescription] = useState("");
-    const [dir, setDir] = useState("Admin1by1");
-    const [classRosterScope, setClassRosterScope] = useState(null);
-    const [globalAccessCount, setGlobalAccessCount] = useState(0);
-    const [groupOpen, setGroupOpen] = useState({});
+  const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [role, setRole] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [employeeID, setEmployeeID] = useState("");
+  const [personData, setPersonData] = useState({
+    profile_image: "",
+    fname: "",
+    lname: "",
+    role: "",
+  });
+  const [userAccessList, setUserAccessList] = useState({});
+  const [accessDescription, setAccessDescription] = useState("");
+  const [dir, setDir] = useState("Admin1by1");
+  const [classRosterScope, setClassRosterScope] = useState(null);
+  const [globalAccessCount, setGlobalAccessCount] = useState(0);
+  const [groupOpen, setGroupOpen] = useState({});
 
-    // ── Force password change gate ──
-    // Reads the flag from localStorage on mount; also listens for the custom
-    // "password_changed" event fired by the reset-password pages on success so
-    // the sidebar unlocks immediately without a full page reload.
-    const [forcePasswordChange, setForcePasswordChange] = useState(
-        () => localStorage.getItem("force_password_change") === "true"
-    );
+  // ── Force password change gate ──
+  // Reads the flag from localStorage on mount; also listens for the custom
+  // "password_changed" event fired by the reset-password pages on success so
+  // the sidebar unlocks immediately without a full page reload.
+  const [forcePasswordChange, setForcePasswordChange] = useState(
+    () => localStorage.getItem("force_password_change") === "true",
+  );
 
-    useEffect(() => {
-        const syncFlag = () => {
-            setForcePasswordChange(localStorage.getItem("force_password_change") === "true");
-        };
-        // "storage" fires when another tab changes localStorage
-        window.addEventListener("storage", syncFlag);
-        // "password_changed" is a custom event fired in the same tab by reset-password pages
-        window.addEventListener("password_changed", syncFlag);
-        return () => {
-            window.removeEventListener("storage", syncFlag);
-            window.removeEventListener("password_changed", syncFlag);
-        };
-    }, []);
-
-    // Detect mobile on resize
-    useEffect(() => {
-        const handleResize = () => {
-            const mobile = window.innerWidth < 768;
-            setIsMobile(mobile);
-            if (!mobile && mobileOpen) {
-                onMobileClose?.();
-            }
-        };
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, [mobileOpen, onMobileClose]);
-
-    // Lock body scroll when mobile drawer is open
-    useEffect(() => {
-        if (isMobile && mobileOpen) {
-            document.body.style.overflow = "hidden";
-        } else {
-            document.body.style.overflow = "";
-        }
-        return () => { document.body.style.overflow = ""; };
-    }, [isMobile, mobileOpen]);
-
-    const toggleGroup = (key) => {
-        if (collapsed && !isMobile) {
-            setCollapsed(false);
-            setTimeout(() => setGroupOpen(p => ({ ...p, [key]: true })), 260);
-        } else {
-            setGroupOpen(p => ({ ...p, [key]: !p[key] }));
-        }
+  useEffect(() => {
+    const syncFlag = () => {
+      setForcePasswordChange(
+        localStorage.getItem("force_password_change") === "true",
+      );
     };
-    const isGroupOpen = (key) => {
-        const effectiveCollapsed = isMobile ? false : collapsed;
-        return !effectiveCollapsed && groupOpen[key] === true;
+    // "storage" fires when another tab changes localStorage
+    window.addEventListener("storage", syncFlag);
+    // "password_changed" is a custom event fired in the same tab by reset-password pages
+    window.addEventListener("password_changed", syncFlag);
+    return () => {
+      window.removeEventListener("storage", syncFlag);
+      window.removeEventListener("password_changed", syncFlag);
     };
-    const hasDept = !!(personData?.dprtmnt_code);
+  }, []);
 
+  // Detect mobile on resize
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile && mobileOpen) {
+        onMobileClose?.();
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [mobileOpen, onMobileClose]);
+
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (isMobile && mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, mobileOpen]);
+
+  const toggleGroup = (key) => {
+    if (collapsed && !isMobile) {
+      setCollapsed(false);
+      setTimeout(() => setGroupOpen((p) => ({ ...p, [key]: true })), 260);
+    } else {
+      setGroupOpen((p) => ({ ...p, [key]: !p[key] }));
+    }
+  };
+  const isGroupOpen = (key) => {
     const effectiveCollapsed = isMobile ? false : collapsed;
+    return !effectiveCollapsed && groupOpen[key] === true;
+  };
+  const hasDept = !!personData?.dprtmnt_code;
 
-    useEffect(() => { injectStyles(settings, hasDept, collapsed, isMobile); }, [settings, hasDept, collapsed, isMobile]);
-    useEffect(() => { onCollapseChange?.(isMobile ? false : collapsed); }, [collapsed, isMobile, onCollapseChange]);
+  const effectiveCollapsed = isMobile ? false : collapsed;
 
-    /* auth */
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        const savedRole = localStorage.getItem("role");
-        const storedID = savedRole === "faculty"
-            ? localStorage.getItem("prof_id") || localStorage.getItem("employee_id")
-            : localStorage.getItem("person_id");
-        if (token && savedRole && storedID) {
-            try {
-                const decoded = JSON.parse(atob(token.split(".")[1]));
-                if (decoded.exp < Date.now() / 1000) {
-                    ["token", "role", "person_id", "prof_id", "employee_id"].forEach(k => localStorage.removeItem(k));
-                    setIsAuthenticated(false); navigate("/");
-                } else { setRole(savedRole); fetchPersonData(storedID, savedRole); setIsAuthenticated(true); }
-            } catch { ["token", "role", "prof_id", "employee_id"].forEach(k => localStorage.removeItem(k)); setIsAuthenticated(false); navigate("/"); }
-        } else { setIsAuthenticated(false); navigate("/"); }
-    }, []);
+  useEffect(() => {
+    injectStyles(settings, hasDept, collapsed, isMobile);
+  }, [settings, hasDept, collapsed, isMobile]);
+  useEffect(() => {
+    onCollapseChange?.(isMobile ? false : collapsed);
+  }, [collapsed, isMobile, onCollapseChange]);
 
-    /* access + scope */
-    useEffect(() => {
-        const email = localStorage.getItem("email");
-        const r = localStorage.getItem("role");
-        const id = r === "faculty"
-            ? localStorage.getItem("prof_id") || localStorage.getItem("employee_id")
-            : localStorage.getItem("person_id");
-        const empID = localStorage.getItem("employee_id");
-        if (!email || !r || !id) { window.location.href = "/login"; return; }
-        setUserRole(r);
-        if (r === "applicant") { setIsAuthenticated(true); return; }
-        if (r === "faculty") {
-            if (empID) setEmployeeID(empID);
-            setIsAuthenticated(true);
-            return;
+  /* auth */
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const savedRole = localStorage.getItem("role");
+    const storedID =
+      savedRole === "faculty"
+        ? localStorage.getItem("prof_id") || localStorage.getItem("employee_id")
+        : localStorage.getItem("person_id");
+    if (token && savedRole && storedID) {
+      try {
+        const decoded = JSON.parse(atob(token.split(".")[1]));
+        if (decoded.exp < Date.now() / 1000) {
+          ["token", "role", "person_id", "prof_id", "employee_id"].forEach(
+            (k) => localStorage.removeItem(k),
+          );
+          setIsAuthenticated(false);
+          navigate("/");
+        } else {
+          setRole(savedRole);
+          fetchPersonData(storedID, savedRole);
+          setIsAuthenticated(true);
         }
-        if (!empID) { window.location.href = "/login"; return; }
-        setEmployeeID(empID);
-        fetchUserAccessList(empID);
-        const determineScope = async (eid) => {
-            try {
-                const { data: emp } = await axios.get(`${API_BASE_URL}/api/employee/${eid}`);
-                syncRegistrarScopeFromEmployeeResponse(emp);
-                const mc = (emp?.accessList ?? []).filter(pid => GLOBAL_PAGE_IDS.includes(pid)).length;
-                setGlobalAccessCount(mc);
-                if (mc > GLOBAL_ACCESS_THRESHOLD) { setClassRosterScope("GLOBAL"); return; }
-                const { data: adm } = await axios.get(`${API_BASE_URL}/api/admin_data/${localStorage.getItem("email")}`);
-                const hasDepartmentScope =
-                    adm?.dprtmnt_id ||
-                    (Array.isArray(adm?.dprtmnt_ids) && adm.dprtmnt_ids.length > 0);
-                setClassRosterScope(hasDepartmentScope ? "DEPARTMENT" : "GLOBAL");
-            } catch { setClassRosterScope("GLOBAL"); }
-        };
-        determineScope(empID);
-    }, []);
-
-    useEffect(() => {
-        if (userRole === "faculty") return;
-        if (!employeeID) return;
-        axios.get(`${API_BASE_URL}/api/access_level/${employeeID}`)
-            .then(r => setAccessDescription(r.data?.access_description || "")).catch(() => { });
-    }, [employeeID, userRole]);
-
-    useEffect(() => {
-        const map = { applicant: "Applicant1by1", student: "Student1by1", faculty: "Faculty1by1" };
-        setDir(map[userRole] || "Admin1by1");
-    }, [userRole]);
-
-    const fetchPersonData = async (id, r) => {
-        try {
-            if (r === "faculty") {
-                const profID = localStorage.getItem("prof_id");
-                const employeeID = localStorage.getItem("employee_id");
-                const endpoint = profID
-                    ? `/api/get_prof_data_by_prof/${profID}`
-                    : `/api/get_prof_data_by_employee/${employeeID || id}`;
-                const res = await axios.get(`${API_BASE_URL}${endpoint}`);
-                const faculty = res.data[0] || {};
-                localStorage.setItem("prof_id", faculty.prof_id || "");
-                localStorage.setItem("employee_id", faculty.employee_id || employeeID || "");
-                if (faculty.employee_id || employeeID) setEmployeeID(faculty.employee_id || employeeID);
-                setPersonData(faculty);
-                return;
-            }
-            const res = await axios.get(`${API_BASE_URL}/api/person_data/${id}/${r}`);
-            setPersonData(res.data);
-        } catch { }
-    };
-
-    const fetchUserAccessList = async (eid) => {
-        try {
-            const { data } = await axios.get(`${API_BASE_URL}/api/page_access/${eid}`);
-            setUserAccessList(data.reduce((a, i) => { a[i.page_id] = i.page_privilege === 1; return a; }, {}));
-        } catch { }
-    };
-
-    const Logout = () => {
-        ["token", "email", "role", "person_id", "prof_id", "employee_id"].forEach(k => localStorage.removeItem(k));
-        // Also clear the force flag on logout so it doesn't bleed into the next session
-        localStorage.removeItem("force_password_change");
+      } catch {
+        ["token", "role", "prof_id", "employee_id"].forEach((k) =>
+          localStorage.removeItem(k),
+        );
         setIsAuthenticated(false);
         navigate("/");
-        onMobileClose?.();
-    };
-
-    const makeUploadHandler = (endpoint, uploadDir) => async (e) => {
-        const file = e.target.files[0]; if (!file) return;
-        if (role === "applicant") setProfileImage(URL.createObjectURL(file));
-        try {
-            const pid = localStorage.getItem("person_id");
-            const employeeID = localStorage.getItem("employee_id");
-            const r = localStorage.getItem("role");
-            const fd = new FormData();
-            fd.append("profile_picture", file);
-            if (r === "faculty") fd.append("employee_id", employeeID);
-            else fd.append("person_id", pid);
-            await axios.post(`${API_BASE_URL}${endpoint}`, fd);
-            const upd = r === "faculty"
-                ? await axios.get(`${API_BASE_URL}/api/get_prof_data_by_employee/${employeeID}`)
-                : await axios.get(`${API_BASE_URL}/api/person_data/${pid}/${r}`);
-            const updatedData = r === "faculty" ? upd.data[0] : upd.data;
-            setPersonData(updatedData);
-            const updatedProfileImage = `${API_BASE_URL}/uploads/${uploadDir}/${updatedData.profile_image}?t=${Date.now()}`;
-            setProfileImage(updatedProfileImage);
-            window.dispatchEvent(
-                new CustomEvent("profile-image-updated", {
-                    detail: {
-                        profileImage: updatedProfileImage,
-                        profileFile: updatedData.profile_image,
-                        role: r,
-                        uploadDir,
-                    },
-                }),
-            );
-        } catch (error) {
-            console.error("Profile upload failed:", error);
-        } finally {
-            e.target.value = "";
-        }
-    };
-
-    const uploadHandlers = {
-        registrar: makeUploadHandler("/api/update_registrar_profile", "Admin1by1"),
-        applicant: makeUploadHandler("/api/upload-profile-picture", "Applicant1by1"),
-        faculty: makeUploadHandler("/api/update_faculty", "Faculty1by1"),
-        student: makeUploadHandler("/api/update_student", "Student1by1"),
-    };
-
-    function accessObjToSet(list) {
-        const s = new Set(); for (const k in list) { if (list[k]) s.add(Number(k)); } return s;
+      }
+    } else {
+      setIsAuthenticated(false);
+      navigate("/");
     }
-    function getRegistrarDashboard(aSet) {
-        if (aSet.has(101)) return "/registrar_dashboard";
-        if (aSet.has(102)) return "/enrollment_officer_dashboard";
-        if (aSet.has(103)) return "/admission_officer_dashboard";
-        return "/registrar_dashboard";
+  }, []);
+
+  /* access + scope */
+  useEffect(() => {
+    const email = localStorage.getItem("email");
+    const r = localStorage.getItem("role");
+    const id =
+      r === "faculty"
+        ? localStorage.getItem("prof_id") || localStorage.getItem("employee_id")
+        : localStorage.getItem("person_id");
+    const empID = localStorage.getItem("employee_id");
+    if (!email || !r || !id) {
+      window.location.href = "/login";
+      return;
     }
-
-    const loc = typeof window !== "undefined" ? window.location.pathname : "";
-    const isActive = p => loc === p;
-    const isActivePrefix = px => loc.startsWith(px);
-    const isClassRosterActive = lp => loc === lp;
-
-    const avatarSrc = profileImage || (personData?.profile_image ? `${API_BASE_URL}/uploads/${dir}/${personData.profile_image}?t=${Date.now()}` : null);
-    const showUploadFor = ["registrar", "applicant", "faculty", "student"].includes(role);
-
-
-    const handleNavClick = () => {
-        if (isMobile) onMobileClose?.();
-    };
-
-    /* ── Resolve which Change Password path to use for the current role ── */
-    const changePasswordPath =
-        role === "applicant" ? "/applicant_reset_password"
-            : role === "faculty" ? "/faculty_reset_password"
-                : role === "student" ? "/student_reset_password"
-                    : role === "registrar" ? "/registrar_reset_password"
-                        : null;
-
-    /* ── menu definitions ── */
-    const admissionMenuGroups = [{
-        key: "admissionOffice", label: "Admission Office", icon: AdminPanelSettings, items: [
-            { title: "Applicant List", link: "/admission_applicant_list", icon: ListAltOutlined, page_id: 7 },
-            { title: "Applicant Profile", link: "/admission_personal_information", icon: AccountCircle, page_id: 1 },
-            { title: "Applicant Online Requirements", link: "/admission_online_requirements", icon: FolderCopy, page_id: 61 },
-            { title: "Verify Document Schedule Management", link: "/verify_document_schedule_management", icon: EditCalendar, page_id: 115 },
-            { title: "Entrance Exam Schedule Management", link: "/entrance_exam_schedule_management", icon: EditCalendar, page_id: 11 },
-            { title: "Examination Permit / Change Course / Form Process", link: "/examination_permit_change_course", icon: Badge, page_id: 48 },
-            { title: "Entrance Examination Scoring", link: "/applicant_entrance_exam_score", icon: Score, page_id: 8 },
-            { title: "Verify Document Room Assignment", link: "/verify_document_room_assignment ", icon: AccessTimeIcon, page_id: 118 },
-            { title: "Evaluator Applicant List", link: "/evaluator_schedule_room_list", icon: People, page_id: 120 },
-            { title: "Entrance Exam Room Assignment", link: "/entrance_exam_room_assignment", icon: AccessTimeIcon, page_id: 9 },
-            { title: "Proctor's Applicant List", link: "/admission_schedule_room_list", icon: People, page_id: 33 },
-            { title: "Subject Management", link: "/applicant_exam_subjects", icon: SchoolIcon, page_id: 145 },
-            { title: "Announcement", link: "/admission_announcement", icon: Campaign, page_id: 98 },
-            { title: "Request Account Deletion", link: "/application_process_admin", icon: PersonAdd, page_id: 139 },
-            { title: "Admission Contact Management", link: "/admission_contact_management", icon: ContactsIcon, page_id: 172 },
-        ]
-    }];
-    const enrollmentMenuGroups = [{
-        key: "enrollmentOfficer", label: "Enrollment Officer", icon: AssignmentIndIcon, items: [
-            { title: "Applicant List", link: "/applicant_list_college", icon: ListAlt, page_id: 6 },
-            { title: "Applicant Profile", link: "/applicant_college_personal_information", icon: AccountCircle, page_id: 43 },
-            { title: "Applicant Online Requirements", link: "/applicant_online_requirements_college", icon: FolderCopy, page_id: 49 },
-            { title: "Entrance Examination Score", link: "/college_entrance_examination_score", icon: Assessment, page_id: 151 },
-            { title: "Qualifying / Interview Schedule Management", link: "/college_qualifying_interview_schedule_management", icon: EditCalendar, page_id: 12 },
-            { title: "Qualifying / Interview Exam Score", link: "/college_qualifying_interview_score", icon: Assessment, page_id: 37 },
-            // { title: "Student Numbering", link: "/student_numbering_per_college", icon: FormatListNumbered, page_id: 60 },
-            { title: "Student List", link: "/college_student_list", icon: ListAlt, page_id: 137 },
-            { title: "Student Profile", link: "/student_college_personal_information", icon: AccountCircle, page_id: 43 },
-            { title: "Student Online Requirements", link: "/student_online_requirements_college", icon: FolderCopy, page_id: 124 },
-            { title: "Course Tagging", link: "/college_course_tagging", icon: Class, page_id: 124 },
-            { title: "Course Tagging For Summer", link: "/college_course_tagging_summer", icon: Class, page_id: 141 },
-            { title: "Search Certificate of Registration", link: "/college_search_certification_of_registration", icon: Search, page_id: 125 },
-            { title: "College Class List", link: "/college_class_list", icon: Class, page_id: 152 },
-            { title: "Student Grade File", link: "/college_student_grade_file", icon: Grading, page_id: 170 },
-            { title: "Qualifying / Interview Room Assignment", link: "/college_qualifying_interview_room_assignment", icon: AccessTimeIcon, page_id: 10 },
-            { title: "Qualfying / Interviewer Applicant List", link: "/qualifying_interview_room_assignment", icon: People, page_id: 36 },
-        ]
-    }];
-
-    const medicalMenuGroups = [{
-        key: "medicalDental", label: "Medical & Dental", icon: MedicalServices, items: [
-            { title: "Student List", link: "/medical_student_list", icon: ListAltOutlined, page_id: 24 },
-            { title: "Student Profile", link: "/medical_personal_information", icon: AccountCircle, page_id: 25 },
-            { title: "Student Online Requirements", link: "/medical_online_requirements", icon: FolderCopy, page_id: 30 },
-            { title: "Medical Requirements", link: "/medical_requirements_form", icon: MedicalServices, page_id: 31 },
-            { title: "Dental Assessment", link: "/dental_assessment", icon: HealthAndSafety, page_id: 19 },
-            { title: "Physical & Neuro Exam", link: "/physical_neuro_exam", icon: Psychology, page_id: 32 },
-        ]
-    }];
-
-    const registrarMenuGroups = [{
-        key: "registrarOffice", label: "Registrar's Office", icon: HistoryEdu, items: [
-            { title: "Applicant List", link: "/applicant_list_registrar", icon: ListAltOutlined, page_id: 80 },
-            { title: "Applicant Profile", link: "/applicant_registrar_personal_information", icon: AccountCircle, page_id: 161 },
-            { title: "Applicant Online Requirements", link: "/applicant_online_requirements_registrar", icon: FolderCopy, page_id: 160 },
-            { title: "Entrance Examination Score", link: "/registrar_entrance_examination_score", icon: Assessment, page_id: 168 },
-            { title: "Qualifying / Interview Scores", link: "/registrar_qualifying_interview_score", icon: Assessment, page_id: 169 },
-            { title: "Student Numbering Panel", link: "/student_numbering", icon: Numbers, page_id: 59 },
-            { title: "Student Number Admin", link: "/student_number_admin", icon: AdminPanelSettings, page_id: 167 },
-            { title: "Student List", link: "/registrar_student_list", icon: ListAltOutlined, page_id: 104 },
-            { title: "Student Profile", link: "/student_registrar_personal_information", icon: AccountCircle, page_id: 38 },
-            { title: "Student Online Requirements", link: "/student_online_requirements_registrar", icon: FolderCopy, page_id: 106 },
-            { title: "Registrar Course Tagging", link: "/registrar_course_tagging", icon: Class, page_id: 17 },
-            { title: "Registrar Course Tagging Summer", link: "/registrar_course_tagging_summer", icon: Class, page_id: 140 },
-            { title: "Registrar Search Certificate of Registration", link: "/registrar_search_certificate_of_registration", icon: Search, page_id: 153 },
-            { title: "Report of Grades", link: "/report_of_grades", icon: Assessment, page_id: 50 },
-            { title: "Transcript of Records", link: "/transcript_of_records", icon: HistoryEdu, page_id: 62 },
-            { title: "Registrar Class List", link: "/registrar_class_list", icon: Class, page_id: 15 },
-            { title: "Grading Evaluation", link: "/grading_evaluation_for_registrar", icon: FactCheck, page_id: 105 },
-            { title: "COR Exporting Module", link: "/cor_exporting_module", icon: FolderCopy, page_id: 117 },
-        ]
-    }];
-
-    const courseMenuGroups = [{
-        key: "courseManagement", label: "Course Management", icon: MenuBook, items: [
-            { title: "Program Tagging Panel", link: "/program_tagging", icon: CollectionsBookmark, page_id: 35 },
-            { title: "Program Panel", link: "/program_panel", icon: LibraryBooks, page_id: 34 },
-            { title: "Curriculum Panel", link: "/curriculum_panel", icon: EditNote, page_id: 18 },
-            { title: "Course Panel", link: "/course_panel", icon: MenuBook, page_id: 16 },
-            { title: "NSTP Tagging Panel", link: "/nstp_tagging", icon: MenuBook, page_id: 148 },
-            { title: "Program Payment", link: "/program_payment", icon: LibraryBooks, page_id: 111 },
-            { title: "Program Units", link: "/program_unit", icon: MenuBook, page_id: 113 },
-            { title: "Prerequisite", link: "/prerequisite", icon: MenuBook, page_id: 112 },
-        ]
-    }];
-
-    const departmentMenuGroups = [{
-        key: "departmentManagement", label: "Department Management", icon: Apartment, items: [
-            { title: "Schedule Plotting Form", link: "/select_college", icon: EventNote, page_id: 53 },
-            { title: "Department Section Panel", link: "/department_section_panel", icon: Apartment, page_id: 20 },
-            { title: "Department Panel", link: "/department_registration", icon: Assignment, page_id: 21 },
-            { title: "Department Room Panel", link: "/department_room", icon: MeetingRoom, page_id: 22 },
-            { title: "Department Section Tagging", link: "/department_section_tagging", icon: MeetingRoom, page_id: 149 },
-            { title: "Slot Monitoring Panel", link: "/section_slot_monitoring", icon: MeetingRoom, page_id: 123 },
-            { title: "Department Curriculum Panel", link: "/department_curriculum_panel", icon: MenuBook, page_id: 107 },
-            { title: "College Schedule Plotting", link: "/college_schedule_plotting", icon: EventNote, page_id: 108 },
-            { title: "Workload Management", link: "/workload_management", icon: EventNote, page_id: 171 },
-        ]
-    }];
-
-    const systemMenuGroups = [
-        { key: "roomManagement", label: "Room Management", icon: MeetingRoom, items: [{ title: "Room Registration", link: "/room_registration", icon: MeetingRoom, page_id: 52 }] },
-        { key: "requirementsManagement", label: "Requirements Management", icon: Assignment, items: [{ title: "Requirements Panel", link: "/requirements_form", icon: Assignment, page_id: 51 }] },
-        { key: "profileSettings", label: "Profile & Settings", icon: Settings, items: [{ title: `${shortTerm} Profile`, link: "/settings", icon: Settings, page_id: 74 }, { title: "Signature Upload", link: "/signature_upload", icon: Settings, page_id: 114 }] },
-        { key: "academicConfiguration", label: "Academic Configuration", icon: School, items: [{ title: "Grade Conversion Management", link: "/grade_conversion_admin", icon: Settings, page_id: 144 }, { title: "Change Grading Period", link: "/change_grade_period", icon: ChangeCircle, page_id: 14 }, { title: "Student Grade File", link: "/student_grade_file", icon: Grade, page_id: 126 }, { title: "Academic Achiever Awardee's", link: "/honors_report", icon: EmojiEvents, page_id: 146 }] },
-        { key: "branchAdministration", label: "Branch Administration", icon: AccountTree, items: [{ title: "Branch Management", link: "/admin_branches", icon: Settings, page_id: 138 }] },
-        { key: "communicationManagement", label: "Communication", icon: Campaign, items: [{ title: "Email Sender", link: "/email_template_manager", icon: Email, page_id: 67 }, { title: "Announcement", link: "/announcement", icon: Campaign, page_id: 66 }] },
-        { key: "slotConfiguration", label: "Slot Configuration", icon: School, items: [{ title: "Program Slot Remaining", link: "/program_slot_limit", icon: People, page_id: 110 }] },
-        { key: "sectionManagement", label: "Section Management", icon: Class, items: [{ title: "Section Panel Form", link: "/section_panel", icon: Class, page_id: 57 }, { title: "Section Slot Management", link: "/section_slot_management", icon: MeetingRoom, page_id: 167 }] },
-        { key: "semesterManagement", label: "Semester Management", icon: Timeline, items: [{ title: "Semester Panel Form", link: "/semester_panel", icon: Timeline, page_id: 58 }] },
-        { key: "yearManagement", label: "Year Management", icon: CalendarToday, items: [{ title: "Year Level Panel Form", link: "/year_level_panel", icon: Layers, page_id: 63 }, { title: "Year Panel Form", link: "/year_panel", icon: CalendarToday, page_id: 64 }, { title: "School Year Panel", link: "/school_year_panel", icon: DateRange, page_id: 55 }] },
-        { key: "evaluationManagement", label: "Evaluation Management", icon: Assessment, items: [{ title: "Evaluation Management", link: "/evaluation_crud", icon: HelpOutline, page_id: 23 }] },
-        { key: "paymentManagement", label: "Payment Management", icon: Payments, items: [{ title: "Payment Exporting Module", link: "/payment_exporting_module", icon: HelpOutline, page_id: 116 }, { title: "Receipt Counter Assignment", link: "/assign_receipt_counter", icon: HelpOutline, page_id: 122 }, { title: "Matriculation Payment", link: "/matriculation_payment", icon: HelpOutline, page_id: 121 }, { title: "TOSF Management", link: "/tosf_crud", icon: HelpOutline, page_id: 99 }] },
-        { key: "scholarshipManagement", label: "Scholarship Management", icon: School, items: [{ title: "Student Scholarship List", link: "/student_scholarship_list", icon: HelpOutline, page_id: 116 }] },
-        { key: "systemLogs", label: "System Logs", icon: HistoryEdu, items: [{ title: "Audit Logs", link: "/audit_logs", icon: HistoryEdu, page_id: 154 }] },
-        { key: "registrarResetPasswords", label: "Reset Password", icon: Settings, items: [{ title: "Registrar Reset Password", link: "/registrar_reset_password", icon: Settings, page_id: 73 }] },
-    ];
-
-    const accountMenuGroups = [
-        {
-            key: "accountCreation", label: "Account Creation", icon: PersonAdd,
-            items: [
-                { title: "Add Faculty Accounts", link: "/register_prof", icon: PersonAdd, page_id: 70 },
-                { title: "Add Registrar Account", link: "/register_registrar", icon: AdminPanelSettings, page_id: 71 },
-                { title: "Create Student Account", link: "/student_accounts", icon: School, page_id: 143 },
-                { title: "Add/Delete Applicant Account", link: "/application_process_super_admin", icon: School, page_id: 147 },
-            ],
-        },
-        {
-            key: "facultyManagement", label: "Faculty Management", icon: SupervisorAccount,
-            items: [
-                { title: "Professor Education", link: "/superadmin_professor_education", icon: School, page_id: 109 },
-            ],
-        },
-        {
-            key: "applicantManagement", label: "Applicant Management", icon: Badge,
-            items: [
-                { title: "Applicant Information", link: "/applicant_admin_personal_information", icon: Info, page_id: 75 },
-                { title: "Applicant Online Requirements", link: "/applicant_online_requirements_admin", icon: Assignment, page_id: 84 },
-                { title: "Archive", link: "/archived", icon: FolderCopy, page_id: 142 },
-                { title: "Upload Applicants", link: "/upload_applicants", icon: FolderCopy, page_id: 166 },
-            ],
-        },
-        {
-            key: "studentManagement", label: "Student Management", icon: School,
-            items: [
-                { title: "Student Information", link: "/student_admin_personal_information", icon: Info, page_id: 86 },
-                { title: "Student Online Requirements", link: "/student_online_requirements_admin", icon: Assignment, page_id: 150 },
-                { title: "Edit Personal Information", link: "/admin_student_edit_permissions1", icon: FolderCopy, page_id: 155 },
-                { title: "Edit Family Background", link: "/admin_student_edit_permissions2", icon: FolderCopy, page_id: 156 },
-                { title: "Edit Educational Background", link: "/admin_student_edit_permissions3", icon: FolderCopy, page_id: 157 },
-                { title: "Edit Health & Medical Records", link: "/admin_student_edit_permissions4", icon: FolderCopy, page_id: 158 },
-                { title: "Edit Other Information", link: "/admin_student_edit_permissions5", icon: FolderCopy, page_id: 159 },
-                { title: "Migration Data Panel", link: "/migration_data_panel", icon: Settings, page_id: 114 },
-            ],
-        },
-        {
-            key: "accessControl", label: "Access Control", icon: Security,
-            items: [
-                { title: "User Page Access", link: "/user_page_access", icon: Security, page_id: 72 },
-                { title: "Page Table", link: "/page_crud", icon: TableChart, page_id: 72 },
-            ],
-        },
-        {
-            key: "passwordManagement", label: "Password Management", icon: LockReset,
-            items: [
-                { title: "Applicant Reset Password", link: "/superadmin_applicant_reset_password", icon: People, page_id: 81 },
-                { title: "Student Reset Password", link: "/superadmin_student_reset_password", icon: School, page_id: 91 },
-                { title: "Faculty Reset Password", link: "/superadmin_faculty_reset_password", icon: SupervisorAccount, page_id: 82 },
-                { title: "Registrar Reset Password", link: "/superadmin_registrar_reset_password", icon: AdminPanelSettings, page_id: 83 },
-            ],
-        },
-    ];
-
-    const sectionMenus = {
-        admission: admissionMenuGroups, enrollment: enrollmentMenuGroups,
-        medical: medicalMenuGroups, registrar: registrarMenuGroups,
-        course: courseMenuGroups, department: departmentMenuGroups,
-        system: systemMenuGroups, account: accountMenuGroups,
-    };
-    const managementItems = [
-        { key: "admission", title: "Admission Management", path: "/admission_dashboard", icon: Business, page_id: 92 },
-        { key: "enrollment", title: "Enrollment Management", path: "/admission_dashboard", icon: Business, page_id: 92 },
-        { key: "medical", title: "Medical Management", path: "/admission_dashboard", icon: Business, page_id: 92 },
-        { key: "registrar", title: "Registrar Management", path: "/admission_dashboard", icon: Business, page_id: 92 },
-        { key: "course", title: "Course Management", path: "/course_management", icon: LibraryBooks, page_id: 93 },
-        { key: "department", title: "Department Management", path: "/department_dashboard", icon: Apartment, page_id: 94 },
-        { key: "system", title: "System Management", path: "/system_dashboard", icon: Settings, page_id: 95 },
-        { key: "account", title: "Account Management", path: "/account_dashboard", icon: People, page_id: 96 },
-    ];
-
-    const accessSet = accessObjToSet(userAccessList);
-    const registrarDashboard = getRegistrarDashboard(accessSet);
-
-    const renderSection = (item) => {
-        if (!userAccessList[item.page_id]) return null;
-        const groups = sectionMenus[item.key];
-        const hasVisible = groups
-            ? groups.some(g => g.items.some(si => si.page_id === undefined || userAccessList[si.page_id]))
-            : true;
-        if (!hasVisible) return null;
-
-        const isAcct = item.key === "account";
-        const visGroups = groups
-            ? groups.filter(g => g.items.some(si => si.page_id === undefined || userAccessList[si.page_id]))
-            : [];
-        const onlySettings = isAcct && visGroups.length === 1 && visGroups[0].key === "accountSettings";
-
-        return (
-            <div key={item.key}>
-                <div className="sb-section-label">{item.title}</div>
-                {onlySettings ? (
-                    visGroups[0].items
-                        .filter(si => si.page_id === undefined || userAccessList[si.page_id])
-                        .map(si => (
-                            <NavItem key={si.link} to={si.link} icon={si.icon} label={si.title}
-                                active={si.activeCheck ? si.activeCheck() : isActive(si.link)}
-                                collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                        ))
-                ) : groups ? (
-                    groups.map(group => {
-                        const vis = group.items.filter(si => si.page_id === undefined || userAccessList[si.page_id]);
-                        if (!vis.length) return null;
-                        const gKey = `${item.key}_${group.key}`;
-                        const open = isGroupOpen(gKey);
-                        return (
-                            <div key={gKey}>
-                                <GroupToggle label={group.label} icon={group.icon} open={open}
-                                    onToggle={() => toggleGroup(gKey)} collapsed={effectiveCollapsed} />
-                                {open && !effectiveCollapsed && vis.map(si => (
-                                    <NavItem key={si.link} to={si.link} icon={si.icon} label={si.title}
-                                        active={si.activeCheck ? si.activeCheck() : isActive(si.link)}
-                                        sub collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                ))}
-                            </div>
-                        );
-                    })
-                ) : (
-                    <NavItem to={item.path} icon={item.icon} label={`Open ${item.title}`}
-                        active={isActive(item.path)} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                )}
-                <Divider sx={{ bgcolor: "#f0f0f0", my: "5px" }} />
-            </div>
+    setUserRole(r);
+    if (r === "applicant") {
+      setIsAuthenticated(true);
+      return;
+    }
+    if (r === "faculty") {
+      if (empID) setEmployeeID(empID);
+      setIsAuthenticated(true);
+      return;
+    }
+    if (!empID) {
+      window.location.href = "/login";
+      return;
+    }
+    setEmployeeID(empID);
+    fetchUserAccessList(empID);
+    const determineScope = async (eid) => {
+      try {
+        const { data: emp } = await axios.get(
+          `${API_BASE_URL}/api/employee/${eid}`,
         );
+        syncRegistrarScopeFromEmployeeResponse(emp);
+        const mc = (emp?.accessList ?? []).filter((pid) =>
+          GLOBAL_PAGE_IDS.includes(pid),
+        ).length;
+        setGlobalAccessCount(mc);
+        if (mc > GLOBAL_ACCESS_THRESHOLD) {
+          setClassRosterScope("GLOBAL");
+          return;
+        }
+        const { data: adm } = await axios.get(
+          `${API_BASE_URL}/api/admin_data/${localStorage.getItem("email")}`,
+        );
+        const hasDepartmentScope =
+          adm?.dprtmnt_id ||
+          (Array.isArray(adm?.dprtmnt_ids) && adm.dprtmnt_ids.length > 0);
+        setClassRosterScope(hasDepartmentScope ? "DEPARTMENT" : "GLOBAL");
+      } catch {
+        setClassRosterScope("GLOBAL");
+      }
     };
+    determineScope(empID);
+  }, []);
 
-    /* ── render ── */
+  useEffect(() => {
+    if (userRole === "faculty") return;
+    if (!employeeID) return;
+    axios
+      .get(`${API_BASE_URL}/api/access_level/${employeeID}`)
+      .then((r) => setAccessDescription(r.data?.access_description || ""))
+      .catch(() => {});
+  }, [employeeID, userRole]);
+
+  useEffect(() => {
+    const map = {
+      applicant: "Applicant1by1",
+      student: "Student1by1",
+      faculty: "Faculty1by1",
+    };
+    setDir(map[userRole] || "Admin1by1");
+  }, [userRole]);
+
+  const fetchPersonData = async (id, r) => {
+    try {
+      if (r === "faculty") {
+        const profID = localStorage.getItem("prof_id");
+        const employeeID = localStorage.getItem("employee_id");
+        const endpoint = profID
+          ? `/api/get_prof_data_by_prof/${profID}`
+          : `/api/get_prof_data_by_employee/${employeeID || id}`;
+        const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+        const faculty = res.data[0] || {};
+        localStorage.setItem("prof_id", faculty.prof_id || "");
+        localStorage.setItem(
+          "employee_id",
+          faculty.employee_id || employeeID || "",
+        );
+        if (faculty.employee_id || employeeID)
+          setEmployeeID(faculty.employee_id || employeeID);
+        setPersonData(faculty);
+        return;
+      }
+      const res = await axios.get(`${API_BASE_URL}/api/person_data/${id}/${r}`);
+      setPersonData(res.data);
+    } catch {}
+  };
+
+  const fetchUserAccessList = async (eid) => {
+    try {
+      const { data } = await axios.get(
+        `${API_BASE_URL}/api/page_access/${eid}`,
+      );
+      setUserAccessList(
+        data.reduce((a, i) => {
+          a[i.page_id] = i.page_privilege === 1;
+          return a;
+        }, {}),
+      );
+    } catch {}
+  };
+
+  const Logout = () => {
+    ["token", "email", "role", "person_id", "prof_id", "employee_id"].forEach(
+      (k) => localStorage.removeItem(k),
+    );
+    // Also clear the force flag on logout so it doesn't bleed into the next session
+    localStorage.removeItem("force_password_change");
+    setIsAuthenticated(false);
+    navigate("/");
+    onMobileClose?.();
+  };
+
+  const makeUploadHandler = (endpoint, uploadDir) => async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (role === "applicant") setProfileImage(URL.createObjectURL(file));
+    try {
+      const pid = localStorage.getItem("person_id");
+      const employeeID = localStorage.getItem("employee_id");
+      const r = localStorage.getItem("role");
+      const fd = new FormData();
+      fd.append("profile_picture", file);
+      if (r === "faculty") fd.append("employee_id", employeeID);
+      else fd.append("person_id", pid);
+      await axios.post(`${API_BASE_URL}${endpoint}`, fd);
+      const upd =
+        r === "faculty"
+          ? await axios.get(
+              `${API_BASE_URL}/api/get_prof_data_by_employee/${employeeID}`,
+            )
+          : await axios.get(`${API_BASE_URL}/api/person_data/${pid}/${r}`);
+      const updatedData = r === "faculty" ? upd.data[0] : upd.data;
+      setPersonData(updatedData);
+      const updatedProfileImage = `${API_BASE_URL}/uploads/${uploadDir}/${updatedData.profile_image}?t=${Date.now()}`;
+      setProfileImage(updatedProfileImage);
+      window.dispatchEvent(
+        new CustomEvent("profile-image-updated", {
+          detail: {
+            profileImage: updatedProfileImage,
+            profileFile: updatedData.profile_image,
+            role: r,
+            uploadDir,
+          },
+        }),
+      );
+    } catch (error) {
+      console.error("Profile upload failed:", error);
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const uploadHandlers = {
+    registrar: makeUploadHandler("/api/update_registrar_profile", "Admin1by1"),
+    applicant: makeUploadHandler(
+      "/api/upload-profile-picture",
+      "Applicant1by1",
+    ),
+    faculty: makeUploadHandler("/api/update_faculty", "Faculty1by1"),
+    student: makeUploadHandler("/api/update_student", "Student1by1"),
+  };
+
+  function accessObjToSet(list) {
+    const s = new Set();
+    for (const k in list) {
+      if (list[k]) s.add(Number(k));
+    }
+    return s;
+  }
+  function getRegistrarDashboard(aSet) {
+    if (aSet.has(101)) return "/registrar_dashboard";
+    if (aSet.has(102)) return "/enrollment_officer_dashboard";
+    if (aSet.has(103)) return "/admission_officer_dashboard";
+    return "/registrar_dashboard";
+  }
+
+  const loc = typeof window !== "undefined" ? window.location.pathname : "";
+  const isActive = (p) => loc === p;
+  const isActivePrefix = (px) => loc.startsWith(px);
+  const isClassRosterActive = (lp) => loc === lp;
+
+  const avatarSrc =
+    profileImage ||
+    (personData?.profile_image
+      ? `${API_BASE_URL}/uploads/${dir}/${personData.profile_image}?t=${Date.now()}`
+      : null);
+  const showUploadFor = [
+    "registrar",
+    "applicant",
+    "faculty",
+    "student",
+  ].includes(role);
+
+  const handleNavClick = () => {
+    if (isMobile) onMobileClose?.();
+  };
+
+  /* ── Resolve which Change Password path to use for the current role ── */
+  const changePasswordPath =
+    role === "applicant"
+      ? "/applicant_reset_password"
+      : role === "faculty"
+        ? "/faculty_reset_password"
+        : role === "student"
+          ? "/student_reset_password"
+          : role === "registrar"
+            ? "/registrar_reset_password"
+            : null;
+
+  /* ── menu definitions ── */
+  const admissionMenuGroups = [
+    {
+      key: "admissionOffice",
+      label: "Admission Office",
+      icon: AdminPanelSettings,
+      items: [
+        {
+          title: "Applicant List",
+          link: "/admission_applicant_list",
+          icon: ListAltOutlined,
+          page_id: 7,
+        },
+        {
+          title: "Applicant Profile",
+          link: "/admission_personal_information",
+          icon: AccountCircle,
+          page_id: 1,
+        },
+        {
+          title: "Applicant Online Requirements",
+          link: "/admission_online_requirements",
+          icon: FolderCopy,
+          page_id: 61,
+        },
+        {
+          title: "Verify Document Schedule Management",
+          link: "/verify_document_schedule_management",
+          icon: EditCalendar,
+          page_id: 115,
+        },
+        {
+          title: "Entrance Exam Schedule Management",
+          link: "/entrance_exam_schedule_management",
+          icon: EditCalendar,
+          page_id: 11,
+        },
+        {
+          title: "Examination Permit / Change Course / Form Process",
+          link: "/examination_permit_change_course",
+          icon: Badge,
+          page_id: 48,
+        },
+        {
+          title: "Entrance Examination Scoring",
+          link: "/applicant_entrance_exam_score",
+          icon: Score,
+          page_id: 8,
+        },
+        {
+          title: "Verify Document Room Assignment",
+          link: "/verify_document_room_assignment ",
+          icon: AccessTimeIcon,
+          page_id: 118,
+        },
+        {
+          title: "Evaluator Applicant List",
+          link: "/evaluator_schedule_room_list",
+          icon: People,
+          page_id: 120,
+        },
+        {
+          title: "Entrance Exam Room Assignment",
+          link: "/entrance_exam_room_assignment",
+          icon: AccessTimeIcon,
+          page_id: 9,
+        },
+        {
+          title: "Proctor's Applicant List",
+          link: "/admission_schedule_room_list",
+          icon: People,
+          page_id: 33,
+        },
+        {
+          title: "Entrance Exam QR Code Scanner",
+          link: "/exam_attendance_scanner",
+          icon: PhotoCamera,
+          page_id: 171,
+        },
+        {
+          title: "Subject Management",
+          link: "/applicant_exam_subjects",
+          icon: SchoolIcon,
+          page_id: 145,
+        },
+        {
+          title: "Announcement",
+          link: "/admission_announcement",
+          icon: Campaign,
+          page_id: 98,
+        },
+        {
+          title: "Request Account Deletion",
+          link: "/application_process_admin",
+          icon: PersonAdd,
+          page_id: 139,
+        },
+        {
+          title: "Admission Contact Management",
+          link: "/admission_contact_management",
+          icon: ContactsIcon,
+          page_id: 172,
+        },
+      ],
+    },
+  ];
+  const enrollmentMenuGroups = [
+    {
+      key: "enrollmentOfficer",
+      label: "Enrollment Officer",
+      icon: AssignmentIndIcon,
+      items: [
+        {
+          title: "Applicant List",
+          link: "/applicant_list_college",
+          icon: ListAlt,
+          page_id: 6,
+        },
+        {
+          title: "Applicant Profile",
+          link: "/applicant_college_personal_information",
+          icon: AccountCircle,
+          page_id: 43,
+        },
+        {
+          title: "Applicant Online Requirements",
+          link: "/applicant_online_requirements_college",
+          icon: FolderCopy,
+          page_id: 49,
+        },
+        {
+          title: "Entrance Examination Score",
+          link: "/college_entrance_examination_score",
+          icon: Assessment,
+          page_id: 151,
+        },
+        {
+          title: "Qualifying / Interview Schedule Management",
+          link: "/college_qualifying_interview_schedule_management",
+          icon: EditCalendar,
+          page_id: 12,
+        },
+        {
+          title: "Qualifying / Interview Exam Score",
+          link: "/college_qualifying_interview_score",
+          icon: Assessment,
+          page_id: 37,
+        },
+        // { title: "Student Numbering", link: "/student_numbering_per_college", icon: FormatListNumbered, page_id: 60 },
+        {
+          title: "Student List",
+          link: "/college_student_list",
+          icon: ListAlt,
+          page_id: 137,
+        },
+        {
+          title: "Student Profile",
+          link: "/student_college_personal_information",
+          icon: AccountCircle,
+          page_id: 43,
+        },
+        {
+          title: "Student Online Requirements",
+          link: "/student_online_requirements_college",
+          icon: FolderCopy,
+          page_id: 124,
+        },
+        {
+          title: "Course Tagging",
+          link: "/college_course_tagging",
+          icon: Class,
+          page_id: 124,
+        },
+        {
+          title: "Course Tagging For Summer",
+          link: "/college_course_tagging_summer",
+          icon: Class,
+          page_id: 141,
+        },
+        {
+          title: "Search Certificate of Registration",
+          link: "/college_search_certification_of_registration",
+          icon: Search,
+          page_id: 125,
+        },
+        {
+          title: "College Class List",
+          link: "/college_class_list",
+          icon: Class,
+          page_id: 152,
+        },
+        {
+          title: "Student Grade File",
+          link: "/college_student_grade_file",
+          icon: Grading,
+          page_id: 170,
+        },
+        {
+          title: "Qualifying / Interview Room Assignment",
+          link: "/college_qualifying_interview_room_assignment",
+          icon: AccessTimeIcon,
+          page_id: 10,
+        },
+        {
+          title: "Qualfying / Interviewer Applicant List",
+          link: "/qualifying_interview_room_assignment",
+          icon: People,
+          page_id: 36,
+        },
+      ],
+    },
+  ];
+
+  const medicalMenuGroups = [
+    {
+      key: "medicalDental",
+      label: "Medical & Dental",
+      icon: MedicalServices,
+      items: [
+        {
+          title: "Student List",
+          link: "/medical_student_list",
+          icon: ListAltOutlined,
+          page_id: 24,
+        },
+        {
+          title: "Student Profile",
+          link: "/medical_personal_information",
+          icon: AccountCircle,
+          page_id: 25,
+        },
+        {
+          title: "Student Online Requirements",
+          link: "/medical_online_requirements",
+          icon: FolderCopy,
+          page_id: 30,
+        },
+        {
+          title: "Medical Requirements",
+          link: "/medical_requirements_form",
+          icon: MedicalServices,
+          page_id: 31,
+        },
+        {
+          title: "Dental Assessment",
+          link: "/dental_assessment",
+          icon: HealthAndSafety,
+          page_id: 19,
+        },
+        {
+          title: "Physical & Neuro Exam",
+          link: "/physical_neuro_exam",
+          icon: Psychology,
+          page_id: 32,
+        },
+      ],
+    },
+  ];
+
+  const registrarMenuGroups = [
+    {
+      key: "registrarOffice",
+      label: "Registrar's Office",
+      icon: HistoryEdu,
+      items: [
+        {
+          title: "Applicant List",
+          link: "/applicant_list_registrar",
+          icon: ListAltOutlined,
+          page_id: 80,
+        },
+        {
+          title: "Applicant Profile",
+          link: "/applicant_registrar_personal_information",
+          icon: AccountCircle,
+          page_id: 161,
+        },
+        {
+          title: "Applicant Online Requirements",
+          link: "/applicant_online_requirements_registrar",
+          icon: FolderCopy,
+          page_id: 160,
+        },
+        {
+          title: "Entrance Examination Score",
+          link: "/registrar_entrance_examination_score",
+          icon: Assessment,
+          page_id: 168,
+        },
+        {
+          title: "Qualifying / Interview Scores",
+          link: "/registrar_qualifying_interview_score",
+          icon: Assessment,
+          page_id: 169,
+        },
+        {
+          title: "Student Numbering Panel",
+          link: "/student_numbering",
+          icon: Numbers,
+          page_id: 59,
+        },
+        {
+          title: "Student Number Admin",
+          link: "/student_number_admin",
+          icon: AdminPanelSettings,
+          page_id: 167,
+        },
+        {
+          title: "Student List",
+          link: "/registrar_student_list",
+          icon: ListAltOutlined,
+          page_id: 104,
+        },
+        {
+          title: "Student Profile",
+          link: "/student_registrar_personal_information",
+          icon: AccountCircle,
+          page_id: 38,
+        },
+        {
+          title: "Student Online Requirements",
+          link: "/student_online_requirements_registrar",
+          icon: FolderCopy,
+          page_id: 106,
+        },
+        {
+          title: "Registrar Course Tagging",
+          link: "/registrar_course_tagging",
+          icon: Class,
+          page_id: 17,
+        },
+        {
+          title: "Registrar Course Tagging Summer",
+          link: "/registrar_course_tagging_summer",
+          icon: Class,
+          page_id: 140,
+        },
+        {
+          title: "Registrar Search Certificate of Registration",
+          link: "/registrar_search_certificate_of_registration",
+          icon: Search,
+          page_id: 153,
+        },
+        {
+          title: "Report of Grades",
+          link: "/report_of_grades",
+          icon: Assessment,
+          page_id: 50,
+        },
+        {
+          title: "Transcript of Records",
+          link: "/transcript_of_records",
+          icon: HistoryEdu,
+          page_id: 62,
+        },
+        {
+          title: "Registrar Class List",
+          link: "/registrar_class_list",
+          icon: Class,
+          page_id: 15,
+        },
+        {
+          title: "Grading Evaluation",
+          link: "/grading_evaluation_for_registrar",
+          icon: FactCheck,
+          page_id: 105,
+        },
+        {
+          title: "COR Exporting Module",
+          link: "/cor_exporting_module",
+          icon: FolderCopy,
+          page_id: 117,
+        },
+      ],
+    },
+  ];
+
+  const courseMenuGroups = [
+    {
+      key: "courseManagement",
+      label: "Course Management",
+      icon: MenuBook,
+      items: [
+        {
+          title: "Program Tagging Panel",
+          link: "/program_tagging",
+          icon: CollectionsBookmark,
+          page_id: 35,
+        },
+        {
+          title: "Program Panel",
+          link: "/program_panel",
+          icon: LibraryBooks,
+          page_id: 34,
+        },
+        {
+          title: "Curriculum Panel",
+          link: "/curriculum_panel",
+          icon: EditNote,
+          page_id: 18,
+        },
+        {
+          title: "Course Panel",
+          link: "/course_panel",
+          icon: MenuBook,
+          page_id: 16,
+        },
+        {
+          title: "NSTP Tagging Panel",
+          link: "/nstp_tagging",
+          icon: MenuBook,
+          page_id: 148,
+        },
+        {
+          title: "Program Payment",
+          link: "/program_payment",
+          icon: LibraryBooks,
+          page_id: 111,
+        },
+        {
+          title: "Program Units",
+          link: "/program_unit",
+          icon: MenuBook,
+          page_id: 113,
+        },
+        {
+          title: "Prerequisite",
+          link: "/prerequisite",
+          icon: MenuBook,
+          page_id: 112,
+        },
+      ],
+    },
+  ];
+
+  const departmentMenuGroups = [
+    {
+      key: "departmentManagement",
+      label: "Department Management",
+      icon: Apartment,
+      items: [
+        {
+          title: "Schedule Plotting Form",
+          link: "/select_college",
+          icon: EventNote,
+          page_id: 53,
+        },
+        {
+          title: "Department Section Panel",
+          link: "/department_section_panel",
+          icon: Apartment,
+          page_id: 20,
+        },
+        {
+          title: "Department Panel",
+          link: "/department_registration",
+          icon: Assignment,
+          page_id: 21,
+        },
+        {
+          title: "Department Room Panel",
+          link: "/department_room",
+          icon: MeetingRoom,
+          page_id: 22,
+        },
+        {
+          title: "Department Section Tagging",
+          link: "/department_section_tagging",
+          icon: MeetingRoom,
+          page_id: 149,
+        },
+        {
+          title: "Slot Monitoring Panel",
+          link: "/section_slot_monitoring",
+          icon: MeetingRoom,
+          page_id: 123,
+        },
+        {
+          title: "Department Curriculum Panel",
+          link: "/department_curriculum_panel",
+          icon: MenuBook,
+          page_id: 107,
+        },
+        {
+          title: "College Schedule Plotting",
+          link: "/college_schedule_plotting",
+          icon: EventNote,
+          page_id: 108,
+        },
+        {
+          title: "Workload Management",
+          link: "/workload_management",
+          icon: EventNote,
+          page_id: 171,
+        },
+      ],
+    },
+  ];
+
+  const systemMenuGroups = [
+    {
+      key: "roomManagement",
+      label: "Room Management",
+      icon: MeetingRoom,
+      items: [
+        {
+          title: "Room Registration",
+          link: "/room_registration",
+          icon: MeetingRoom,
+          page_id: 52,
+        },
+      ],
+    },
+    {
+      key: "requirementsManagement",
+      label: "Requirements Management",
+      icon: Assignment,
+      items: [
+        {
+          title: "Requirements Panel",
+          link: "/requirements_form",
+          icon: Assignment,
+          page_id: 51,
+        },
+      ],
+    },
+    {
+      key: "profileSettings",
+      label: "Profile & Settings",
+      icon: Settings,
+      items: [
+        {
+          title: `${shortTerm} Profile`,
+          link: "/settings",
+          icon: Settings,
+          page_id: 74,
+        },
+        {
+          title: "Signature Upload",
+          link: "/signature_upload",
+          icon: Settings,
+          page_id: 114,
+        },
+      ],
+    },
+    {
+      key: "academicConfiguration",
+      label: "Academic Configuration",
+      icon: School,
+      items: [
+        {
+          title: "Grade Conversion Management",
+          link: "/grade_conversion_admin",
+          icon: Settings,
+          page_id: 144,
+        },
+        {
+          title: "Change Grading Period",
+          link: "/change_grade_period",
+          icon: ChangeCircle,
+          page_id: 14,
+        },
+        {
+          title: "Student Grade File",
+          link: "/student_grade_file",
+          icon: Grade,
+          page_id: 126,
+        },
+        {
+          title: "Academic Achiever Awardee's",
+          link: "/honors_report",
+          icon: EmojiEvents,
+          page_id: 146,
+        },
+      ],
+    },
+    {
+      key: "branchAdministration",
+      label: "Branch Administration",
+      icon: AccountTree,
+      items: [
+        {
+          title: "Branch Management",
+          link: "/admin_branches",
+          icon: Settings,
+          page_id: 138,
+        },
+      ],
+    },
+    {
+      key: "communicationManagement",
+      label: "Communication",
+      icon: Campaign,
+      items: [
+        {
+          title: "Email Sender",
+          link: "/email_template_manager",
+          icon: Email,
+          page_id: 67,
+        },
+        {
+          title: "Announcement",
+          link: "/announcement",
+          icon: Campaign,
+          page_id: 66,
+        },
+      ],
+    },
+    {
+      key: "slotConfiguration",
+      label: "Slot Configuration",
+      icon: School,
+      items: [
+        {
+          title: "Program Slot Remaining",
+          link: "/program_slot_limit",
+          icon: People,
+          page_id: 110,
+        },
+      ],
+    },
+    {
+      key: "sectionManagement",
+      label: "Section Management",
+      icon: Class,
+      items: [
+        {
+          title: "Section Panel Form",
+          link: "/section_panel",
+          icon: Class,
+          page_id: 57,
+        },
+        {
+          title: "Section Slot Management",
+          link: "/section_slot_management",
+          icon: MeetingRoom,
+          page_id: 167,
+        },
+      ],
+    },
+    {
+      key: "semesterManagement",
+      label: "Semester Management",
+      icon: Timeline,
+      items: [
+        {
+          title: "Semester Panel Form",
+          link: "/semester_panel",
+          icon: Timeline,
+          page_id: 58,
+        },
+      ],
+    },
+    {
+      key: "yearManagement",
+      label: "Year Management",
+      icon: CalendarToday,
+      items: [
+        {
+          title: "Year Level Panel Form",
+          link: "/year_level_panel",
+          icon: Layers,
+          page_id: 63,
+        },
+        {
+          title: "Year Panel Form",
+          link: "/year_panel",
+          icon: CalendarToday,
+          page_id: 64,
+        },
+        {
+          title: "School Year Panel",
+          link: "/school_year_panel",
+          icon: DateRange,
+          page_id: 55,
+        },
+      ],
+    },
+    {
+      key: "evaluationManagement",
+      label: "Evaluation Management",
+      icon: Assessment,
+      items: [
+        {
+          title: "Evaluation Management",
+          link: "/evaluation_crud",
+          icon: HelpOutline,
+          page_id: 23,
+        },
+      ],
+    },
+    {
+      key: "paymentManagement",
+      label: "Payment Management",
+      icon: Payments,
+      items: [
+        {
+          title: "Payment Exporting Module",
+          link: "/payment_exporting_module",
+          icon: HelpOutline,
+          page_id: 116,
+        },
+        {
+          title: "Receipt Counter Assignment",
+          link: "/assign_receipt_counter",
+          icon: HelpOutline,
+          page_id: 122,
+        },
+        {
+          title: "Matriculation Payment",
+          link: "/matriculation_payment",
+          icon: HelpOutline,
+          page_id: 121,
+        },
+        {
+          title: "TOSF Management",
+          link: "/tosf_crud",
+          icon: HelpOutline,
+          page_id: 99,
+        },
+      ],
+    },
+    {
+      key: "scholarshipManagement",
+      label: "Scholarship Management",
+      icon: School,
+      items: [
+        {
+          title: "Student Scholarship List",
+          link: "/student_scholarship_list",
+          icon: HelpOutline,
+          page_id: 116,
+        },
+      ],
+    },
+    {
+      key: "systemLogs",
+      label: "System Logs",
+      icon: HistoryEdu,
+      items: [
+        {
+          title: "Audit Logs",
+          link: "/audit_logs",
+          icon: HistoryEdu,
+          page_id: 154,
+        },
+      ],
+    },
+    {
+      key: "registrarResetPasswords",
+      label: "Reset Password",
+      icon: Settings,
+      items: [
+        {
+          title: "Registrar Reset Password",
+          link: "/registrar_reset_password",
+          icon: Settings,
+          page_id: 73,
+        },
+      ],
+    },
+  ];
+
+  const accountMenuGroups = [
+    {
+      key: "accountCreation",
+      label: "Account Creation",
+      icon: PersonAdd,
+      items: [
+        {
+          title: "Add Faculty Accounts",
+          link: "/register_prof",
+          icon: PersonAdd,
+          page_id: 70,
+        },
+        {
+          title: "Add Registrar Account",
+          link: "/register_registrar",
+          icon: AdminPanelSettings,
+          page_id: 71,
+        },
+        {
+          title: "Create Student Account",
+          link: "/student_accounts",
+          icon: School,
+          page_id: 143,
+        },
+        {
+          title: "Add/Delete Applicant Account",
+          link: "/application_process_super_admin",
+          icon: School,
+          page_id: 147,
+        },
+      ],
+    },
+    {
+      key: "facultyManagement",
+      label: "Faculty Management",
+      icon: SupervisorAccount,
+      items: [
+        {
+          title: "Professor Education",
+          link: "/superadmin_professor_education",
+          icon: School,
+          page_id: 109,
+        },
+      ],
+    },
+    {
+      key: "applicantManagement",
+      label: "Applicant Management",
+      icon: Badge,
+      items: [
+        {
+          title: "Applicant Information",
+          link: "/applicant_admin_personal_information",
+          icon: Info,
+          page_id: 75,
+        },
+        {
+          title: "Applicant Online Requirements",
+          link: "/applicant_online_requirements_admin",
+          icon: Assignment,
+          page_id: 84,
+        },
+        { title: "Archive", link: "/archived", icon: FolderCopy, page_id: 142 },
+        {
+          title: "Upload Applicants",
+          link: "/upload_applicants",
+          icon: FolderCopy,
+          page_id: 166,
+        },
+      ],
+    },
+    {
+      key: "studentManagement",
+      label: "Student Management",
+      icon: School,
+      items: [
+        {
+          title: "Student Information",
+          link: "/student_admin_personal_information",
+          icon: Info,
+          page_id: 86,
+        },
+        {
+          title: "Student Online Requirements",
+          link: "/student_online_requirements_admin",
+          icon: Assignment,
+          page_id: 150,
+        },
+        {
+          title: "Edit Personal Information",
+          link: "/admin_student_edit_permissions1",
+          icon: FolderCopy,
+          page_id: 155,
+        },
+        {
+          title: "Edit Family Background",
+          link: "/admin_student_edit_permissions2",
+          icon: FolderCopy,
+          page_id: 156,
+        },
+        {
+          title: "Edit Educational Background",
+          link: "/admin_student_edit_permissions3",
+          icon: FolderCopy,
+          page_id: 157,
+        },
+        {
+          title: "Edit Health & Medical Records",
+          link: "/admin_student_edit_permissions4",
+          icon: FolderCopy,
+          page_id: 158,
+        },
+        {
+          title: "Edit Other Information",
+          link: "/admin_student_edit_permissions5",
+          icon: FolderCopy,
+          page_id: 159,
+        },
+        {
+          title: "Migration Data Panel",
+          link: "/migration_data_panel",
+          icon: Settings,
+          page_id: 114,
+        },
+      ],
+    },
+    {
+      key: "accessControl",
+      label: "Access Control",
+      icon: Security,
+      items: [
+        {
+          title: "User Page Access",
+          link: "/user_page_access",
+          icon: Security,
+          page_id: 72,
+        },
+        {
+          title: "Page Table",
+          link: "/page_crud",
+          icon: TableChart,
+          page_id: 72,
+        },
+      ],
+    },
+    {
+      key: "passwordManagement",
+      label: "Password Management",
+      icon: LockReset,
+      items: [
+        {
+          title: "Applicant Reset Password",
+          link: "/superadmin_applicant_reset_password",
+          icon: People,
+          page_id: 81,
+        },
+        {
+          title: "Student Reset Password",
+          link: "/superadmin_student_reset_password",
+          icon: School,
+          page_id: 91,
+        },
+        {
+          title: "Faculty Reset Password",
+          link: "/superadmin_faculty_reset_password",
+          icon: SupervisorAccount,
+          page_id: 82,
+        },
+        {
+          title: "Registrar Reset Password",
+          link: "/superadmin_registrar_reset_password",
+          icon: AdminPanelSettings,
+          page_id: 83,
+        },
+      ],
+    },
+  ];
+
+  const sectionMenus = {
+    admission: admissionMenuGroups,
+    enrollment: enrollmentMenuGroups,
+    medical: medicalMenuGroups,
+    registrar: registrarMenuGroups,
+    course: courseMenuGroups,
+    department: departmentMenuGroups,
+    system: systemMenuGroups,
+    account: accountMenuGroups,
+  };
+  const managementItems = [
+    {
+      key: "admission",
+      title: "Admission Management",
+      path: "/admission_dashboard",
+      icon: Business,
+      page_id: 92,
+    },
+    {
+      key: "enrollment",
+      title: "Enrollment Management",
+      path: "/admission_dashboard",
+      icon: Business,
+      page_id: 92,
+    },
+    {
+      key: "medical",
+      title: "Medical Management",
+      path: "/admission_dashboard",
+      icon: Business,
+      page_id: 92,
+    },
+    {
+      key: "registrar",
+      title: "Registrar Management",
+      path: "/admission_dashboard",
+      icon: Business,
+      page_id: 92,
+    },
+    {
+      key: "course",
+      title: "Course Management",
+      path: "/course_management",
+      icon: LibraryBooks,
+      page_id: 93,
+    },
+    {
+      key: "department",
+      title: "Department Management",
+      path: "/department_dashboard",
+      icon: Apartment,
+      page_id: 94,
+    },
+    {
+      key: "system",
+      title: "System Management",
+      path: "/system_dashboard",
+      icon: Settings,
+      page_id: 95,
+    },
+    {
+      key: "account",
+      title: "Account Management",
+      path: "/account_dashboard",
+      icon: People,
+      page_id: 96,
+    },
+  ];
+
+  const accessSet = accessObjToSet(userAccessList);
+  const registrarDashboard = getRegistrarDashboard(accessSet);
+
+  const renderSection = (item) => {
+    if (!userAccessList[item.page_id]) return null;
+    const groups = sectionMenus[item.key];
+    const hasVisible = groups
+      ? groups.some((g) =>
+          g.items.some(
+            (si) => si.page_id === undefined || userAccessList[si.page_id],
+          ),
+        )
+      : true;
+    if (!hasVisible) return null;
+
+    const isAcct = item.key === "account";
+    const visGroups = groups
+      ? groups.filter((g) =>
+          g.items.some(
+            (si) => si.page_id === undefined || userAccessList[si.page_id],
+          ),
+        )
+      : [];
+    const onlySettings =
+      isAcct &&
+      visGroups.length === 1 &&
+      visGroups[0].key === "accountSettings";
+
     return (
-        <>
-            {/* Mobile backdrop overlay */}
+      <div key={item.key}>
+        <div className="sb-section-label">{item.title}</div>
+        {onlySettings ? (
+          visGroups[0].items
+            .filter(
+              (si) => si.page_id === undefined || userAccessList[si.page_id],
+            )
+            .map((si) => (
+              <NavItem
+                key={si.link}
+                to={si.link}
+                icon={si.icon}
+                label={si.title}
+                active={si.activeCheck ? si.activeCheck() : isActive(si.link)}
+                collapsed={effectiveCollapsed}
+                onNavClick={handleNavClick}
+              />
+            ))
+        ) : groups ? (
+          groups.map((group) => {
+            const vis = group.items.filter(
+              (si) => si.page_id === undefined || userAccessList[si.page_id],
+            );
+            if (!vis.length) return null;
+            const gKey = `${item.key}_${group.key}`;
+            const open = isGroupOpen(gKey);
+            return (
+              <div key={gKey}>
+                <GroupToggle
+                  label={group.label}
+                  icon={group.icon}
+                  open={open}
+                  onToggle={() => toggleGroup(gKey)}
+                  collapsed={effectiveCollapsed}
+                />
+                {open &&
+                  !effectiveCollapsed &&
+                  vis.map((si) => (
+                    <NavItem
+                      key={si.link}
+                      to={si.link}
+                      icon={si.icon}
+                      label={si.title}
+                      active={
+                        si.activeCheck ? si.activeCheck() : isActive(si.link)
+                      }
+                      sub
+                      collapsed={effectiveCollapsed}
+                      onNavClick={handleNavClick}
+                    />
+                  ))}
+              </div>
+            );
+          })
+        ) : (
+          <NavItem
+            to={item.path}
+            icon={item.icon}
+            label={`Open ${item.title}`}
+            active={isActive(item.path)}
+            collapsed={effectiveCollapsed}
+            onNavClick={handleNavClick}
+          />
+        )}
+        <Divider sx={{ bgcolor: "#f0f0f0", my: "5px" }} />
+      </div>
+    );
+  };
+
+  /* ── render ── */
+  return (
+    <>
+      {/* Mobile backdrop overlay */}
+      <div
+        className={`sb-overlay${isMobile && mobileOpen ? " visible" : ""}`}
+        onClick={onMobileClose}
+      />
+
+      <div
+        className={`sb-root hidden-print${isMobile && mobileOpen ? " mobile-open" : ""}`}
+      >
+        {/* ── header ── */}
+        <div className="sb-header">
+          <Tooltip
+            title={
+              effectiveCollapsed
+                ? `${personData?.fname || ""} ${personData?.lname || ""}`.trim() ||
+                  role
+                : ""
+            }
+            placement="right"
+            arrow
+          >
             <div
-                className={`sb-overlay${isMobile && mobileOpen ? " visible" : ""}`}
-                onClick={onMobileClose}
-            />
+              style={{
+                display: "flex",
+                flexDirection: effectiveCollapsed ? "column" : "row",
+                alignItems: "center",
+                gap: effectiveCollapsed ? "10px" : "12px",
+                padding: "10px 12px",
+              }}
+            >
+              {!isMobile && (
+                <button
+                  className="sb-hamburger"
+                  onClick={() => setCollapsed((c) => !c)}
+                  title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "black",
+                  }}
+                >
+                  <div
+                    style={{
+                      ...ICON_CONTAINER_STYLE,
+                      border: "1.5px solid black",
+                    }}
+                  >
+                    <Menu
+                      sx={{ fontSize: SIDEBAR_ICON_SIZE, color: "black" }}
+                    />
+                  </div>
+                </button>
+              )}
 
-            <div className={`sb-root hidden-print${isMobile && mobileOpen ? " mobile-open" : ""}`}>
+              <div
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {avatarSrc ? (
+                  <Avatar
+                    src={avatarSrc}
+                    sx={{
+                      width: effectiveCollapsed ? 36 : 44,
+                      height: effectiveCollapsed ? 36 : 44,
+                      border: "1.5px solid black",
+                      boxShadow: "0 2px 8px rgba(0,0,0,.15)",
+                      transition: "all .25s ease",
+                    }}
+                  />
+                ) : (
+                  <Avatar
+                    sx={{
+                      width: effectiveCollapsed ? 36 : 44,
+                      height: effectiveCollapsed ? 36 : 44,
+                      bgcolor: "rgba(255,255,255,.2)",
+                      fontSize: 15,
+                      border: "1.5px solid black",
+                      boxShadow: "0 2px 8px rgba(0,0,0,.15)",
+                      transition: "all .25s ease",
+                    }}
+                  >
+                    {personData?.fname?.[0] || "?"}
+                  </Avatar>
+                )}
 
-                {/* ── header ── */}
-                <div className="sb-header">
-                    <Tooltip
-                        title={effectiveCollapsed ? (`${personData?.fname || ""} ${personData?.lname || ""}`.trim() || role) : ""}
-                        placement="right"
-                        arrow
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: effectiveCollapsed ? "column" : "row",
-                                alignItems: "center",
-                                gap: effectiveCollapsed ? "10px" : "12px",
-                                padding: "10px 12px"
-                            }}
-                        >
-                            {!isMobile && (
-                                <button
-                                    className="sb-hamburger"
-                                    onClick={() => setCollapsed(c => !c)}
-                                    title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                                    style={{
-                                        background: "transparent",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        color: "black"
-                                    }}
-                                >
-                                    <div style={{ ...ICON_CONTAINER_STYLE, border: "1.5px solid black" }}>
-                                        <Menu sx={{ fontSize: SIDEBAR_ICON_SIZE, color: "black" }} />
-                                    </div>
-                                </button>
-                            )}
+                {showUploadFor &&
+                  !effectiveCollapsed &&
+                  !forcePasswordChange && (
+                    <>
+                      <label
+                        htmlFor="sb-upload"
+                        style={{
+                          position: "absolute",
+                          bottom: -2,
+                          right: -2,
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          background: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <AddCircleIcon
+                          sx={{ fontSize: 13, color: accentColor }}
+                        />
+                      </label>
+                      <ProfileUploadInput
+                        id="sb-upload"
+                        onChange={uploadHandlers[role]}
+                      />
+                    </>
+                  )}
+              </div>
 
-                            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                                {avatarSrc ? (
-                                    <Avatar
-                                        src={avatarSrc}
-                                        sx={{
-                                            width: effectiveCollapsed ? 36 : 44,
-                                            height: effectiveCollapsed ? 36 : 44,
-                                            border: "1.5px solid black",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,.15)",
-                                            transition: "all .25s ease"
-                                        }}
-                                    />
-                                ) : (
-                                    <Avatar
-                                        sx={{
-                                            width: effectiveCollapsed ? 36 : 44,
-                                            height: effectiveCollapsed ? 36 : 44,
-                                            bgcolor: "rgba(255,255,255,.2)",
-                                            fontSize: 15,
-                                            border: "1.5px solid black",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,.15)",
-                                            transition: "all .25s ease"
-                                        }}
-                                    >
-                                        {personData?.fname?.[0] || "?"}
-                                    </Avatar>
-                                )}
-
-                                {showUploadFor && !effectiveCollapsed && !forcePasswordChange && (
-                                    <>
-                                        <label
-                                            htmlFor="sb-upload"
-                                            style={{
-                                                position: "absolute", bottom: -2, right: -2,
-                                                width: 18, height: 18, borderRadius: "50%",
-                                                background: "white", display: "flex",
-                                                alignItems: "center", justifyContent: "center",
-                                                cursor: "pointer"
-                                            }}
-                                        >
-                                            <AddCircleIcon sx={{ fontSize: 13, color: accentColor }} />
-                                        </label>
-                                        <ProfileUploadInput id="sb-upload" onChange={uploadHandlers[role]} />
-                                    </>
-                                )}
-                            </div>
-
-                            {!effectiveCollapsed && (
-                                <div style={{ display: "flex", flexDirection: "column", overflow: "hidden", flex: 1 }}>
-                                    <div style={{ color: "black", fontWeight: 600, fontSize: 14, lineHeight: 1.25, wordBreak: "break-word", overflowWrap: "break-word", maxWidth: "100%" }}>
-                                        {personData?.fname ? `${personData.fname} ${personData.lname}` : role || "User"}
-                                    </div>
-                                    <div style={{ color: "black", fontSize: 12, lineHeight: 1.2, wordBreak: "break-word", overflowWrap: "break-word", maxWidth: "100%" }}>
-                                        {role === "registrar"
-                                            ? `${accessDescription} · ${personData?.employee_id || ""}`
-                                            : role === "student" ? `Student · ${personData?.student_number || ""}`
-                                                : role === "faculty" ? `Faculty · ${personData?.employee_id || ""}`
-                                                    : role === "applicant" ? `Applicant · ${personData?.applicant_number || ""}`
-                                                        : role ? role.charAt(0).toUpperCase() + role.slice(1) : ""}
-                                    </div>
-                                    {hasDept && (
-                                        <div style={{ color: "black", fontSize: 11 }}>
-                                            {personData.dprtmnt_code} Department
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {isMobile && (
-                                <button
-                                    onClick={onMobileClose}
-                                    style={{
-                                        marginLeft: "auto", background: "transparent", border: "none",
-                                        cursor: "pointer", display: "flex", alignItems: "center", padding: 4
-                                    }}
-                                    aria-label="Close menu"
-                                >
-                                    <Menu sx={{ fontSize: 24, color: "black" }} />
-                                </button>
-                            )}
-                        </div>
-                    </Tooltip>
+              {!effectiveCollapsed && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    flex: 1,
+                  }}
+                >
+                  <div
+                    style={{
+                      color: "black",
+                      fontWeight: 600,
+                      fontSize: 14,
+                      lineHeight: 1.25,
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                      maxWidth: "100%",
+                    }}
+                  >
+                    {personData?.fname
+                      ? `${personData.fname} ${personData.lname}`
+                      : role || "User"}
+                  </div>
+                  <div
+                    style={{
+                      color: "black",
+                      fontSize: 12,
+                      lineHeight: 1.2,
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                      maxWidth: "100%",
+                    }}
+                  >
+                    {role === "registrar"
+                      ? `${accessDescription} · ${personData?.employee_id || ""}`
+                      : role === "student"
+                        ? `Student · ${personData?.student_number || ""}`
+                        : role === "faculty"
+                          ? `Faculty · ${personData?.employee_id || ""}`
+                          : role === "applicant"
+                            ? `Applicant · ${personData?.applicant_number || ""}`
+                            : role
+                              ? role.charAt(0).toUpperCase() + role.slice(1)
+                              : ""}
+                  </div>
+                  {hasDept && (
+                    <div style={{ color: "black", fontSize: 11 }}>
+                      {personData.dprtmnt_code} Department
+                    </div>
+                  )}
                 </div>
+              )}
 
-                {/* ── scrollable nav ── */}
-                <div className="sb-scroll">
+              {isMobile && (
+                <button
+                  onClick={onMobileClose}
+                  style={{
+                    marginLeft: "auto",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: 4,
+                  }}
+                  aria-label="Close menu"
+                >
+                  <Menu sx={{ fontSize: 24, color: "black" }} />
+                </button>
+              )}
+            </div>
+          </Tooltip>
+        </div>
 
-                    {/* ═══════════════════════════════════════════════════
+        {/* ── scrollable nav ── */}
+        <div className="sb-scroll">
+          {/* ═══════════════════════════════════════════════════
               LOCKED STATE — force_password_change is true
               Only the Change Password item is shown.
           ════════════════════════════════════════════════════ */}
-                    {forcePasswordChange && changePasswordPath ? (
-                        <>
-                            <div className="sb-section-label">Action required</div>
+          {forcePasswordChange && changePasswordPath ? (
+            <>
+              <div className="sb-section-label">Action required</div>
 
-                            {/* Warning banner — hidden when sidebar is collapsed */}
-                            {!effectiveCollapsed && (
-                                <div style={{
-                                    margin: "4px 8px 10px",
-                                    padding: "10px 12px",
-                                    borderRadius: 8,
-                                    background: "#fff3cd",
-                                    border: "1px solid #ffc107",
-                                    fontSize: 12,
-                                    color: "#856404",
-                                    lineHeight: 1.5,
-                                }}>
-                                    You must change your password before accessing other features.
-                                </div>
-                            )}
+              {/* Warning banner — hidden when sidebar is collapsed */}
+              {!effectiveCollapsed && (
+                <div
+                  style={{
+                    margin: "4px 8px 10px",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    background: "#fff3cd",
+                    border: "1px solid #ffc107",
+                    fontSize: 12,
+                    color: "#856404",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  You must change your password before accessing other features.
+                </div>
+              )}
 
-                            <NavItem
-                                to={changePasswordPath}
-                                icon={LockResetIcon}
-                                label="Change Password"
-                                active={isActive(changePasswordPath)}
-                                collapsed={effectiveCollapsed}
-                                onNavClick={handleNavClick}
-                            />
-                        </>
-                    ) : (
-                        /* ═══════════════════════════════════════════════════
+              <NavItem
+                to={changePasswordPath}
+                icon={LockResetIcon}
+                label="Change Password"
+                active={isActive(changePasswordPath)}
+                collapsed={effectiveCollapsed}
+                onNavClick={handleNavClick}
+              />
+            </>
+          ) : (
+            /* ═══════════════════════════════════════════════════
                            NORMAL STATE — full navigation
                         ════════════════════════════════════════════════════ */
-                        <>
-                            {/* REGISTRAR */}
-                            {role === "registrar" && (
-                                <>
-                                    <div className="sb-section-label">Navigation</div>
-                                    <NavItem to={registrarDashboard} icon={DashboardIcon} label="Dashboard"
-                                        active={isActive(registrarDashboard)} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <Divider sx={{ bgcolor: "#f0f0f0", my: "5px" }} />
-                                    {managementItems.map(renderSection)}
-                                    <div className="sb-divider" />
-                                </>
-                            )}
+            <>
+              {/* REGISTRAR */}
+              {role === "registrar" && (
+                <>
+                  <div className="sb-section-label">Navigation</div>
+                  <NavItem
+                    to={registrarDashboard}
+                    icon={DashboardIcon}
+                    label="Dashboard"
+                    active={isActive(registrarDashboard)}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <Divider sx={{ bgcolor: "#f0f0f0", my: "5px" }} />
+                  {managementItems.map(renderSection)}
+                  <div className="sb-divider" />
+                </>
+              )}
 
-                            {/* APPLICANT */}
-                            {role === "applicant" && (
-                                <>
-                                    <div className="sb-section-label">Navigation</div>
-                                    <NavItem to="/applicant_dashboard" icon={DashboardIcon} label="Dashboard"
-                                        active={isActivePrefix("/applicant_dashboard")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem icon={AssignmentIndIcon} label="Applicant Profile"
-                                        active={isActivePrefix("/applicant_personal_information/")} collapsed={effectiveCollapsed}
-                                        onClick={() => {
-                                            let keys = JSON.parse(localStorage.getItem("dashboardKeys"));
-                                            if (!keys) {
-                                                const g = () => Math.random().toString(36).substring(2, 10);
-                                                keys = { step1: g(), step2: g(), step3: g(), step4: g(), step5: g() };
-                                                localStorage.setItem("dashboardKeys", JSON.stringify(keys));
-                                            }
-                                            if (isMobile) onMobileClose?.();
-                                            window.location.href = `/applicant_personal_information/${keys.step1}`;
-                                        }} />
-                                    <NavItem to="/applicant_online_requirements" icon={CloudUploadIcon} label="Upload Requirements"
-                                        active={isActivePrefix("/applicant_online_requirements")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <div className="sb-section-label">Setting</div>
-                                    <NavItem to="/applicant_reset_password" icon={LockResetIcon} label="Change Password"
-                                        active={isActivePrefix("/applicant_reset_password")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                </>
-                            )}
+              {/* APPLICANT */}
+              {role === "applicant" && (
+                <>
+                  <div className="sb-section-label">Navigation</div>
+                  <NavItem
+                    to="/applicant_dashboard"
+                    icon={DashboardIcon}
+                    label="Dashboard"
+                    active={isActivePrefix("/applicant_dashboard")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    icon={AssignmentIndIcon}
+                    label="Applicant Profile"
+                    active={isActivePrefix("/applicant_personal_information/")}
+                    collapsed={effectiveCollapsed}
+                    onClick={() => {
+                      let keys = JSON.parse(
+                        localStorage.getItem("dashboardKeys"),
+                      );
+                      if (!keys) {
+                        const g = () =>
+                          Math.random().toString(36).substring(2, 10);
+                        keys = {
+                          step1: g(),
+                          step2: g(),
+                          step3: g(),
+                          step4: g(),
+                          step5: g(),
+                        };
+                        localStorage.setItem(
+                          "dashboardKeys",
+                          JSON.stringify(keys),
+                        );
+                      }
+                      if (isMobile) onMobileClose?.();
+                      window.location.href = `/applicant_personal_information/${keys.step1}`;
+                    }}
+                  />
+                  <NavItem
+                    to="/applicant_online_requirements"
+                    icon={CloudUploadIcon}
+                    label="Upload Requirements"
+                    active={isActivePrefix("/applicant_online_requirements")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <div className="sb-section-label">Setting</div>
+                  <NavItem
+                    to="/applicant_reset_password"
+                    icon={LockResetIcon}
+                    label="Change Password"
+                    active={isActivePrefix("/applicant_reset_password")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                </>
+              )}
 
-                            {/* FACULTY */}
-                            {role === "faculty" && (
-                                <>
-                                    <div className="sb-section-label">Navigation</div>
-                                    <NavItem to="/faculty_dashboard" icon={DashboardIcon} label="Dashboard" active={isActive("/faculty_dashboard")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/faculty_workload" icon={WorkIcon} label="Workload" active={isActive("/faculty_workload")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/faculty_masterlist" icon={ListAltIcon} label="Class List" active={isActive("/faculty_masterlist")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/grading_sheet" icon={AssignmentTurnedInIcon} label="Grading Management" active={isActive("/grading_sheet")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/faculty_evaluation" icon={SchoolIcon} label="Faculty Evaluation" active={isActive("/faculty_evaluation")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <div className="sb-section-label">Setting</div>
-                                    <NavItem to="/faculty_reset_password" icon={Settings} label="Change Password" active={isActive("/faculty_reset_password")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                </>
-                            )}
+              {/* FACULTY */}
+              {role === "faculty" && (
+                <>
+                  <div className="sb-section-label">Navigation</div>
+                  <NavItem
+                    to="/faculty_dashboard"
+                    icon={DashboardIcon}
+                    label="Dashboard"
+                    active={isActive("/faculty_dashboard")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/faculty_workload"
+                    icon={WorkIcon}
+                    label="Workload"
+                    active={isActive("/faculty_workload")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/faculty_masterlist"
+                    icon={ListAltIcon}
+                    label="Class List"
+                    active={isActive("/faculty_masterlist")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/grading_sheet"
+                    icon={AssignmentTurnedInIcon}
+                    label="Grading Management"
+                    active={isActive("/grading_sheet")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/faculty_evaluation"
+                    icon={SchoolIcon}
+                    label="Faculty Evaluation"
+                    active={isActive("/faculty_evaluation")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <div className="sb-section-label">Setting</div>
+                  <NavItem
+                    to="/faculty_reset_password"
+                    icon={Settings}
+                    label="Change Password"
+                    active={isActive("/faculty_reset_password")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                </>
+              )}
 
-                            {/* STUDENT */}
-                            {role === "student" && (
-                                <>
-                                    <div className="sb-section-label">Navigation</div>
-                                    <NavItem to="/student_dashboard" icon={DashboardIcon} label="Dashboard" active={isActive("/student_dashboard")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_schedule" icon={EventNoteIcon} label="Schedule" active={isActive("/student_schedule")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_grades_page" icon={GradeIcon} label="Grades" active={isActive("/student_grades_page")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_curriculum_subjects" icon={MenuBook} label="Curriculum" active={isActive("/student_curriculum_subjects")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_faculty_evaluation" icon={AssignmentTurnedInIcon} label="Faculty Evaluation" active={isActive("/student_faculty_evaluation")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_personal_information" icon={PersonIcon} label="Student Profile" active={/^\/student_dashboard[1-5]$/.test(loc)} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_online_requirements" icon={FolderCopy} label="Student Online Requirements" active={isActive("/student_online_requirements")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_account_balance" icon={PaymentIcon} label="Student Account Balance" active={isActive("/student_account_balance")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <NavItem to="/student_history" icon={HistoryIcon} label="History Logs" active={isActive("/student_history")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                    <div className="sb-section-label">Setting</div>
-                                    <NavItem to="/student_reset_password" icon={Settings} label="Change Password" active={isActive("/student_reset_password")} collapsed={effectiveCollapsed} onNavClick={handleNavClick} />
-                                </>
-                            )}
+              {/* STUDENT */}
+              {role === "student" && (
+                <>
+                  <div className="sb-section-label">Navigation</div>
+                  <NavItem
+                    to="/student_dashboard"
+                    icon={DashboardIcon}
+                    label="Dashboard"
+                    active={isActive("/student_dashboard")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_schedule"
+                    icon={EventNoteIcon}
+                    label="Schedule"
+                    active={isActive("/student_schedule")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_grades_page"
+                    icon={GradeIcon}
+                    label="Grades"
+                    active={isActive("/student_grades_page")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_curriculum_subjects"
+                    icon={MenuBook}
+                    label="Curriculum"
+                    active={isActive("/student_curriculum_subjects")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_faculty_evaluation"
+                    icon={AssignmentTurnedInIcon}
+                    label="Faculty Evaluation"
+                    active={isActive("/student_faculty_evaluation")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_personal_information"
+                    icon={PersonIcon}
+                    label="Student Profile"
+                    active={/^\/student_dashboard[1-5]$/.test(loc)}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_online_requirements"
+                    icon={FolderCopy}
+                    label="Student Online Requirements"
+                    active={isActive("/student_online_requirements")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_account_balance"
+                    icon={PaymentIcon}
+                    label="Student Account Balance"
+                    active={isActive("/student_account_balance")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <NavItem
+                    to="/student_history"
+                    icon={HistoryIcon}
+                    label="History Logs"
+                    active={isActive("/student_history")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                  <div className="sb-section-label">Setting</div>
+                  <NavItem
+                    to="/student_reset_password"
+                    icon={Settings}
+                    label="Change Password"
+                    active={isActive("/student_reset_password")}
+                    collapsed={effectiveCollapsed}
+                    onNavClick={handleNavClick}
+                  />
+                </>
+              )}
 
-                            <div style={{ height: 12 }} />
-                        </>
-                    )}
+              <div style={{ height: 12 }} />
+            </>
+          )}
+        </div>
 
-                </div>
-
-                {/* ── footer ── */}
-                <div className="sb-footer">
-                    <Tooltip
-                        title={effectiveCollapsed ? "Logout" : ""}
-                        placement="right"
-                        arrow
-                    >
-                        <div
-                            className="sb-logout"
-                            onClick={Logout}
-                            style={{ backgroundColor: "black" }}
-                        >
-                            <span
-                                className="sb-logout-icon"
-                                style={{
-                                    ...ICON_CONTAINER_STYLE,
-                                    border: "1.5px solid rgba(0,0,0,.08)",
-                                }}
-                            >
-                                <LogoutOutlined sx={{ fontSize: SIDEBAR_ICON_SIZE, color: "white" }} />
-                            </span>
-                            <span className="sb-logout-label">Logout</span>
-                        </div>
-                    </Tooltip>
-                </div>
+        {/* ── footer ── */}
+        <div className="sb-footer">
+          <Tooltip
+            title={effectiveCollapsed ? "Logout" : ""}
+            placement="right"
+            arrow
+          >
+            <div
+              className="sb-logout"
+              onClick={Logout}
+              style={{ backgroundColor: "black" }}
+            >
+              <span
+                className="sb-logout-icon"
+                style={{
+                  ...ICON_CONTAINER_STYLE,
+                  border: "1.5px solid rgba(0,0,0,.08)",
+                }}
+              >
+                <LogoutOutlined
+                  sx={{ fontSize: SIDEBAR_ICON_SIZE, color: "white" }}
+                />
+              </span>
+              <span className="sb-logout-label">Logout</span>
             </div>
-        </>
-    );
+          </Tooltip>
+        </div>
+      </div>
+    </>
+  );
 };
 
-export default Sidebar;
+export default SideBar;

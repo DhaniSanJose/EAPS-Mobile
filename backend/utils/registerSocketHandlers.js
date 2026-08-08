@@ -4,6 +4,7 @@ const {
   insertAuditLogEnrollment,
 } = require("./auditLogger");
 const { logStudentHistoryFromActor } = require("./studentHistoryLogger");
+const { ensureAttendanceQr } = require("../utils/examAttendance");
 
 const getConfiguredSenderAccounts = () =>
   [
@@ -194,7 +195,42 @@ module.exports = function registerSocketHandlers({
   };
 
 
+  app.get("/api/applicant-schedule/:applicantNumber", async (req, res) => {
+    try {
+      const { applicantNumber } = req.params;
 
+      const [rows] = await db.query(
+        `SELECT
+          s.schedule_id,
+          s.day_description,
+          s.building_description,
+          s.room_description,
+          s.start_time,
+          s.end_time,
+          s.proctor,
+          s.room_quota,
+          s.created_at AS schedule_created_at,   -- ✅ aliased to match frontend's examSchedule.schedule_created_at
+          ea.email_sent   --  include email_sent
+       FROM entrance_exam_schedule s
+       INNER JOIN exam_applicants ea
+         ON ea.schedule_id = s.schedule_id
+       WHERE ea.applicant_id = ?
+         AND COALESCE(ea.email_sent, 0) = 1`,
+        [applicantNumber],
+      );
+
+      if (rows.length === 0) {
+        return res
+          .status(404)
+          .json({ error: "No schedule found for this applicant." });
+      }
+
+      res.json(rows[0]);
+    } catch (err) {
+      console.error("Error fetching applicant schedule:", err.message);
+      res.status(500).json({ error: "Failed to fetch applicant schedule" });
+    }
+  });
 
 
 
@@ -401,42 +437,7 @@ ${shortTerm} Information System
 
 
 
-    app.get("/api/applicant-schedule/:applicantNumber", async (req, res) => {
-      try {
-        const { applicantNumber } = req.params;
 
-        const [rows] = await db.query(
-          `SELECT
-          s.schedule_id,
-          s.day_description,
-          s.building_description,
-          s.room_description,
-          s.start_time,
-          s.end_time,
-          s.proctor,
-          s.room_quota,
-          s.created_at,
-          ea.email_sent   --  include email_sent
-       FROM entrance_exam_schedule s
-       INNER JOIN exam_applicants ea
-         ON ea.schedule_id = s.schedule_id
-       WHERE ea.applicant_id = ?
-         AND COALESCE(ea.email_sent, 0) = 1`,
-          [applicantNumber],
-        );
-
-        if (rows.length === 0) {
-          return res
-            .status(404)
-            .json({ error: "No schedule found for this applicant." });
-        }
-
-        res.json(rows[0]);
-      } catch (err) {
-        console.error("Error fetching applicant schedule:", err.message);
-        res.status(500).json({ error: "Failed to fetch applicant schedule" });
-      }
-    });
 
     // Get applicants assigned to a proctor
 
@@ -709,7 +710,7 @@ WHERE proctor LIKE ?
 
 
 
-  socket.on("assign-student-number", async (payload) => {
+    socket.on("assign-student-number", async (payload) => {
       const conn = await db3.getConnection();
       const copiedRequirementFilesForRollback = [];
       let copiedProfileFileForRollback = "";
@@ -879,7 +880,7 @@ WHERE proctor LIKE ?
           person_data.citizenship,              // 29 citizenship
           person_data.religion,                 // 30 religion
           person_data.civilStatus,
-          person_data.spouse,          
+          person_data.spouse,
           person_data.facebook_account,
           person_data.tribeEthnicGroup,         // 32 tribeEthnicGroup
           person_data.cellphoneNumber,          // 33 cellphoneNumber
@@ -2355,7 +2356,6 @@ Click the link below to log in:
 
         /* ================================
            3  Get Applicants
-            FIXED JOIN HERE
         ================================= */
         const [rows] = await db.query(
           `
@@ -2380,7 +2380,7 @@ Click the link below to log in:
           ON ea.schedule_id = s.schedule_id
 
         JOIN applicant_numbering_table an
-          ON ea.applicant_id = an.applicant_number   --  CORRECT
+          ON ea.applicant_id = an.applicant_number
 
         JOIN person_table p
           ON an.person_id = p.person_id
@@ -2427,7 +2427,7 @@ Click the link below to log in:
         };
 
         /* ================================
-           5  Send Email
+           5  Send Email  (UPDATED: attaches attendance QR)
         ================================= */
         const sendEmail = async (row) => {
           if (!row.emailAddress) {
@@ -2437,12 +2437,42 @@ Click the link below to log in:
 
           const finalMessage = applyTemplate(message, row);
 
+          // ✅ NEW: generate (or reuse) this applicant's one-time attendance QR
+          // for THIS schedule, and get the local file path to the PNG.
+          let qrPath = null;
+          try {
+            const qrResult = await ensureAttendanceQr(
+              db,
+              row.schedule_id,
+              row.applicant_number,
+            );
+            qrPath = qrResult.qrPath;
+          } catch (qrErr) {
+            console.error(
+              `Failed to generate attendance QR for ${row.applicant_number}:`,
+              qrErr,
+            );
+          }
+
           const mailOptions = {
             from: `"${officeName}" <${process.env.EMAIL_USER}>`,
             to: row.emailAddress,
             subject: subject || "Entrance Exam Schedule",
-            text: finalMessage,
+            text: qrPath
+              ? `${finalMessage}\n\nYour Attendance QR Code is attached. Present this at the exam room — it can only be scanned once.`
+              : finalMessage,
           };
+
+          // ✅ NEW: attach the QR image if it was generated successfully
+          if (qrPath) {
+            mailOptions.attachments = [
+              {
+                filename: "attendance_qr.png",
+                path: qrPath,
+                cid: "attendanceqr",
+              },
+            ];
+          }
 
           try {
             await transporter.sendMail(mailOptions);

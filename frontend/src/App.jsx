@@ -62,7 +62,7 @@ const ApplicantAdminHealthMedicalRecords = lazy(() => import("./account_manageme
 const ApplicantAdminOtherInformation = lazy(() => import("./account_management/ApplicantAdminOtherInformation"));
 const SuperAdminApplicantResetPassword = lazy(() => import("./account_management/SuperAdminApplicantResetPassword"));
 const SuperAdminStudentResetPassword = lazy(() => import("./account_management/SuperAdminStudentResetPassword"));
-
+const ExamAttendanceScanner = lazy(() => import("./admission/ExamAttendanceScanner"));
 const SuperAdminFacultyResetPassword = lazy(() => import("./account_management/SuperAdminFacultyResetPassword"));
 const SuperAdminProfessorEducation = lazy(() => import("./account_management/SuperAdminProfessorEducation"));
 const SuperAdminRegistrarPassword = lazy(() => import("./account_management/SuperAdminRegistrarResetPassword"));
@@ -712,7 +712,7 @@ function App() {
                       <Route path="/admin_student_edit_permissions3" element={<ProtectedRoute><StudentEditPermissions3 /></ProtectedRoute>} />
                       <Route path="/admin_student_edit_permissions4" element={<ProtectedRoute><StudentEditPermissions4 /></ProtectedRoute>} />
                       <Route path="/admin_student_edit_permissions5" element={<ProtectedRoute><StudentEditPermissions5 /></ProtectedRoute>} />
-
+                      <Route path="/exam_attendance_scanner" element={<ProtectedRoute><ExamAttendanceScanner /></ProtectedRoute>} />
                       <Route path="/superadmin_faculty_reset_password" element={<ProtectedRoute><SuperAdminFacultyResetPassword /></ProtectedRoute>} />
                       <Route path="/superadmin_registrar_reset_password" element={<ProtectedRoute><SuperAdminRegistrarPassword /></ProtectedRoute>} />
                       <Route path="/superadmin_professor_education" element={<ProtectedRoute><SuperAdminProfessorEducation /></ProtectedRoute>} />

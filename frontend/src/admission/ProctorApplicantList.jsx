@@ -13,6 +13,10 @@ import {
   TableBody,
   Paper,
   TableContainer,
+  Chip,
+  ToggleButton,
+  ToggleButtonGroup,
+  Grid
 } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 import { Search } from "@mui/icons-material";
@@ -244,8 +248,69 @@ const ProctorApplicantList = () => {
     fetchCurriculums();
   }, []);
 
+  // ---------------- Applicant List / Attendance toggle ----------------
+  const [viewMode, setViewMode] = useState("applicants"); // "applicants" | "attendance"
+  const [attendanceRows, setAttendanceRows] = useState([]);
 
+  const statusChip = (status) => {
+    if (status === "present")
+      return <Chip label="Present" color="success" size="small" />;
+    if (status === "absent")
+      return <Chip label="Absent" color="error" size="small" />;
+    return <Chip label="Not Yet Arrived" size="small" />;
+  };
 
+  const fetchAttendance = async (scheduleId) => {
+    if (!scheduleId) return;
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/exam-attendance/schedule/${scheduleId}`,
+      );
+      setAttendanceRows(res.data || []);
+    } catch (err) {
+      console.error("Error fetching attendance:", err);
+    }
+  };
+
+  // Poll attendance every 10s while the Attendance tab is active
+  useEffect(() => {
+    if (viewMode !== "attendance" || !proctor?.schedule_id) return;
+    fetchAttendance(proctor.schedule_id);
+    const interval = setInterval(
+      () => fetchAttendance(proctor.schedule_id),
+      10000,
+    );
+    return () => clearInterval(interval);
+  }, [viewMode, proctor?.schedule_id]);
+
+  // Reset back to Applicant List whenever a new schedule/proctor loads
+  useEffect(() => {
+    setViewMode("applicants");
+    setAttendanceRows([]);
+  }, [proctor?.schedule_id]);
+
+  const handleMarkAbsent = async () => {
+    if (
+      !proctor?.schedule_id ||
+      !window.confirm("Mark everyone who hasn't scanned as ABSENT?")
+    )
+      return;
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/exam-attendance/mark-absent/${proctor.schedule_id}`,
+        auditActor(),
+      );
+      fetchAttendance(proctor.schedule_id);
+    } catch (err) {
+      console.error("Error marking absent:", err);
+    }
+  };
+
+  const presentCount = attendanceRows.filter((r) => r.status === "present").length;
+  const absentCount = attendanceRows.filter((r) => r.status === "absent").length;
+  const notArrivedCount = attendanceRows.filter(
+    (r) => r.status === "not_arrived",
+  ).length;
 
   const handleExportProctorApplicantListPdf = async () => {
     const resolvedAddress = campusAddress || settings?.address || "No address set in Settings";
@@ -329,7 +394,7 @@ const ProctorApplicantList = () => {
           <th style="width:10%">Applicant ID</th>
           <th style="width:30%">Applicant Name</th>
           <th style="width:40%">Program</th>
-          <th style="width:20%">Signature</th>
+         
         </tr>
       </thead>
       <tbody>
@@ -346,7 +411,7 @@ const ProctorApplicantList = () => {
                 <td>${a.applicant_number}</td>
                 <td class="applicant-name">${a.last_name}, ${a.first_name} ${a.middle_name || ""}</td>
                 <td>${program}</td>
-                <td></td>
+              
               </tr>
             `;
         })
@@ -416,6 +481,20 @@ const ProctorApplicantList = () => {
     });
   };
 
+  const headerFieldSx = {
+    border: `1px solid ${borderColor}`,
+    "& .MuiOutlinedInput-root": {
+      backgroundColor: settings?.header_color || "#1976d2",
+      borderRadius: 0,
+      "& fieldset": { border: "none" },
+    },
+    "& .MuiOutlinedInput-input": {
+      color: "white",
+      textAlign: "center",
+      fontWeight: "bold",
+    },
+  };
+
   // Put this at the very bottom before the return
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
@@ -461,312 +540,650 @@ const ProctorApplicantList = () => {
         justifyContent="space-between"
         alignItems="center"
         mb={2}
+        gap={2}
+        flexWrap="wrap"
       >
+        {/* LEFT: TITLE */}
         <Typography
           variant="h4"
           sx={{
             fontWeight: "bold",
             color: titleColor,
             fontSize: "36px",
+            whiteSpace: "nowrap",
           }}
         >
           PROCTOR APPLICANT LIST
         </Typography>
 
-        <TextField
-          variant="outlined"
-          placeholder="Search Proctor Name / Email"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1); // reset page when searching
-            handleSearch(); // 🔍 auto-search as you type
-          }}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
-      </Box>
-
-      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-
-      <br />
-      <br />
-
-      <AdmissionRoomAssignmentTabs />
-
-      <br />
-      <br />
-      {proctor && (
+        {/* RIGHT: CONTROLS */}
         <Box
           sx={{
-            display: "flex",
-            gap: 4,
-            flexWrap: "wrap",
-
-            mb: 2,
-            fontSize: "16px",
-          }}
-        >
-          <span>
-            <b>Proctor:</b> {proctor.proctor || "N/A"} |{" "}
-          </span>
-          <span>
-            <b>Building:</b> {proctor.building_description || "N/A"} |{" "}
-          </span>
-          <span>
-            <b>Room:</b> {proctor.room_description || "N/A"} |{" "}
-          </span>
-          <span>
-            <b>Schedule:</b> {formatDateLong(proctor?.day_description)} |{" "}
-          </span>
-
-          <span>
-            <b>Time: </b>
-            {proctor.start_time
-              ? new Date(`1970-01-01T${proctor.start_time}`).toLocaleTimeString(
-                "en-US",
-                {
-                  hour: "numeric",
-                  minute: "2-digit",
-                  hour12: true,
-                },
-              )
-              : ""}{" "}
-            -{" "}
-            {proctor.end_time
-              ? new Date(`1970-01-01T${proctor.end_time}`).toLocaleTimeString(
-                "en-US",
-                {
-                  hour: "numeric",
-                  minute: "2-digit",
-                  hour12: true,
-                },
-              )
-              : ""}
-          </span>
-        </Box>
-      )}
-
-      {applicants.length > 0 && (
-        <Button
-          onClick={handleExportProctorApplicantListPdf}
-          variant="outlined"
-          sx={{
-            padding: "5px 20px",
-            border: "2px solid black",
-            backgroundColor: "#f0f0f0",
-            color: "black",
-            borderRadius: "5px",
-            fontSize: "14px",
-            fontWeight: "bold",
-            height: "40px",
             display: "flex",
             alignItems: "center",
-            gap: 1, // 8px gap between icon and text
-            userSelect: "none",
-            transition: "background-color 0.3s, transform 0.2s",
-            "&:hover": {
-              backgroundColor: "#d3d3d3",
-            },
-            "&:active": {
-              transform: "scale(0.95)",
-            },
-          }}
-          startIcon={<FcPrint size={20} />}
-        >
-          Download Applicant List
-        </Button>
-      )}
-      <br />
-
-      {applicants.length === 0 && (
-        <Box
-          sx={{
-            border: `2px dashed ${borderColor}`,
-            borderRadius: 2,
-            p: 3,
-            textAlign: "center",
-            backgroundColor: "#fafafa",
+            gap: 1.5,
+            ml: "auto",
+            flexWrap: "wrap",
           }}
         >
-          <Typography sx={{ fontWeight: "bold" }}>
-            There are no applicants for this schedule.
-          </Typography>
-        </Box>
-      )}
+          {/* VIEW TOGGLE */}
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            size="small"
+            disabled={!proctor}
+            onChange={(e, newMode) => {
+              if (newMode) setViewMode(newMode);
+            }}
+            sx={{
+              backgroundColor: "#f0f0f0",
+              borderRadius: "20px",
+              p: 0.5,
+              flexShrink: 0,
+              opacity: proctor ? 1 : 0.5,
 
-      {/* TableContainer */}
-      {applicants.length > 0 && (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead
-              sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
-            >
-              <TableRow>
-                <TableCell
-                  sx={{
-                    color: "white",
-                    textAlign: "center",
-                    border: `2px solid ${borderColor}`,
-                  }}
-                >
-                  #
-                </TableCell>
-                <TableCell
-                  sx={{
-                    color: "white",
-                    textAlign: "center",
-                    border: `2px solid ${borderColor}`,
-                  }}
-                >
-                  Applicant
-                </TableCell>
-                <TableCell
-                  sx={{
-                    color: "white",
-                    textAlign: "center",
-                    border: `2px solid ${borderColor}`,
-                  }}
-                >
-                  Name
-                </TableCell>
-                <TableCell
-                  sx={{
-                    color: "white",
-                    textAlign: "center",
-                    border: `2px solid ${borderColor}`,
-                  }}
-                >
-                  Program
-                </TableCell>
-                <TableCell
-                  sx={{
-                    color: "white",
-                    textAlign: "center",
-                    border: `2px solid ${borderColor}`,
-                  }}
-                >
-                  Building
-                </TableCell>
-                <TableCell
-                  sx={{
-                    color: "white",
-                    textAlign: "center",
-                    border: `2px solid ${borderColor}`,
-                  }}
-                >
-                  Room
-                </TableCell>
-                <TableCell
-                  sx={{
-                    color: "white",
-                    textAlign: "center",
-                    border: `2px solid ${borderColor}`,
-                  }}
-                >
-                  Action
-                </TableCell>
-              </TableRow>
-            </TableHead>
+              "& .MuiToggleButtonGroup-grouped": {
+                border: "none",
+                borderRadius: "20px !important",
+              },
 
-            <TableBody
-              sx={{
-                border: `1px solid ${borderColor}`,
-                "& .MuiTableRow-root:nth-of-type(odd)": {
-                  backgroundColor: "#ffffff",
+              "& .MuiToggleButton-root": {
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "13px",
+                px: 2,
+                py: 0.5,
+                color: "#757575",
+
+                "&.Mui-selected": {
+                  backgroundColor: settings?.header_color || "#1976d2",
+                  color: "#fff",
                 },
-                "& .MuiTableRow-root:nth-of-type(even)": {
-                  backgroundColor: "lightgray",
+
+                "&.Mui-selected:hover": {
+                  backgroundColor: settings?.header_color || "#1976d2",
+                },
+              },
+            }}
+          >
+            <ToggleButton value="applicants">
+              Applicant List
+            </ToggleButton>
+
+            <ToggleButton value="attendance">
+              Attendance
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          {/* SEARCH */}
+          <TextField
+            variant="outlined"
+            placeholder="Search Proctor Name / Email"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              handleSearch();
+            }}
+               sx={{
+              width: 450,
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+
+          {/* DOWNLOAD APPLICANT LIST */}
+          {viewMode === "applicants" && applicants.length > 0 && (
+            <Button
+              onClick={handleExportProctorApplicantListPdf}
+              startIcon={<FcPrint size={20} />}
+              sx={{
+                height: "40px",
+                px: 2,
+                border: "2px solid black",
+                backgroundColor: "#f0f0f0",
+                color: "black",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                whiteSpace: "nowrap",
+                textTransform: "none",
+
+                "&:hover": {
+                  backgroundColor: "#d3d3d3",
+                },
+
+                "&:active": {
+                  transform: "scale(0.97)",
                 },
               }}
             >
-              {applicants.map((a, idx) => (
-                <TableRow key={idx}>
-                  <TableCell
-                    align="center"
-                    sx={{ border: `2px solid ${borderColor}` }}
-                  >
-                    {idx + 1}
-                  </TableCell>
-                  <TableCell
-                    align="left"
-                    sx={{ border: `2px solid ${borderColor}` }}
-                  >
-                    {a.applicant_number}
-                  </TableCell>
-                  <TableCell
-                    align="left"
-                    sx={{ border: `2px solid ${borderColor}` }}
-                  >
-                    {`${a.last_name}, ${a.first_name} ${a.middle_name || ""}`}
-                  </TableCell>
-                  <TableCell
-                    align="left"
-                    sx={{ border: `2px solid ${borderColor}` }}
-                  >
-                    {(() => {
-                      const item = curriculumOptions.find(
-                        (x) =>
-                          x.curriculum_id?.toString() === a.program?.toString(),
-                      );
+              Download Applicant List
+            </Button>
+          )}
+        </Box>
+      </Box>
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
-                      return item
-                        ? `(${item.program_code}) - ${item.program_description} ${item.major || ""}`
-                        : "N/A";
-                    })()}
-                  </TableCell>
 
-                  <TableCell
-                    align="left"
-                    sx={{ border: `2px solid ${borderColor}` }}
-                  >
-                    {a.building_description ||
-                      proctor?.building_description ||
-                      "N/A"}{" "}
-                    {/* ✅ NEW */}
-                  </TableCell>
-                  <TableCell
-                    align="left"
-                    sx={{ border: `2px solid ${borderColor}` }}
-                  >
-                    {a.room_description || proctor?.room_description || "N/A"}{" "}
-                    {/* ✅ NEW */}
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ border: `2px solid ${borderColor}` }}
-                  >
-                    <IconButton
-                      color="error"
-                      onClick={() => {
-                        setApplicantToDelete(a);
-                        setOpenDeleteDialog(true);
-                      }}
+
+      <br />
+      <br />
+      <TableContainer
+        component={Paper}
+        sx={{ width: "100%", border: `1px solid ${borderColor}` }}
+      >
+        <Table>
+          <TableHead
+            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+          >
+            <TableRow>
+              <TableCell sx={{ color: "white", textAlign: "Center" }}>
+             Proctor Applicant List / Applicant Attendance Report
+              </TableCell>
+            </TableRow>
+          </TableHead>
+        </Table>
+      </TableContainer>
+      {proctor && (
+
+        <Box
+          sx={{
+            display: "flex",
+            width: "100%",
+            mb: 2,
+          }}
+        >
+          <Paper
+            sx={{
+              width: "100%",
+              p: 3,
+              border: `1px solid ${borderColor}`,
+              bgcolor: "white",
+              boxShadow: "0 3px 12px rgba(0,0,0,0.1)",
+              mb: 2,
+            }}
+          >
+            <Grid container spacing={2}>
+              {/* Proctor */}
+              <Grid item xs={12} md={2.4}>
+                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                  Proctor:
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={proctor?.proctor || "N/A"}
+                  InputProps={{ readOnly: true }}
+                  variant="outlined"
+                  sx={{
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 2,
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    bgcolor: "#f9f9f9",
+                  }}
+                />
+              </Grid>
+
+              {/* Building */}
+              <Grid item xs={12} md={2.4}>
+                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                  Building:
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={proctor?.building_description || "N/A"}
+                  InputProps={{ readOnly: true }}
+                  variant="outlined"
+                  sx={{
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 2,
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    bgcolor: "#f9f9f9",
+                  }}
+                />
+              </Grid>
+
+              {/* Room */}
+              <Grid item xs={12} md={2.4}>
+                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                  Room:
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={proctor?.room_description || "N/A"}
+                  InputProps={{ readOnly: true }}
+                  variant="outlined"
+                  sx={{
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 2,
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    bgcolor: "#f9f9f9",
+                  }}
+                />
+              </Grid>
+
+              {/* Schedule */}
+              <Grid item xs={12} md={2.4}>
+                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                  Schedule:
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={formatDateLong(proctor?.day_description) || "N/A"}
+                  InputProps={{ readOnly: true }}
+                  variant="outlined"
+                  sx={{
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 2,
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    bgcolor: "#f9f9f9",
+                  }}
+                />
+              </Grid>
+
+              {/* Time */}
+              <Grid item xs={12} md={2.4}>
+                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                  Time:
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={
+                    proctor?.start_time && proctor?.end_time
+                      ? `${new Date(`1970-01-01T${proctor.start_time}`).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })} - ${new Date(`1970-01-01T${proctor.end_time}`).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}`
+                      : "N/A"
+                  }
+                  InputProps={{ readOnly: true }}
+                  variant="outlined"
+                  sx={{
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 2,
+                    "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                    bgcolor: "#f9f9f9",
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+        </Box>
+      )}
+
+      {viewMode === "applicants" && (
+        <>
+          {applicants.length === 0 && (
+            <Box
+              sx={{
+                border: `1px dashed ${borderColor}`,
+                borderRadius: 2,
+                p: 3,
+                textAlign: "center",
+                backgroundColor: "#fafafa",
+              }}
+            >
+              <Typography sx={{ fontWeight: "bold" }}>
+                There are no applicants for this schedule.
+              </Typography>
+            </Box>
+          )}
+
+          {/* TableContainer */}
+          {applicants.length > 0 && (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead
+                  sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+                >
+                  <TableRow>
+                    <TableCell
                       sx={{
-                        backgroundColor: "#ffebee",
-                        border: "2px solid red",
-                        "&:hover": { backgroundColor: "#ffcdd2" },
-                        borderRadius: "8px",
+                        color: "white",
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
                       }}
                     >
-                      <CloseIcon />
-                    </IconButton>
+                      #
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: "white",
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
+                      }}
+                    >
+                      Applicant
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: "white",
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
+                      }}
+                    >
+                      Name
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: "white",
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
+                      }}
+                    >
+                      Program
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: "white",
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
+                      }}
+                    >
+                      Building
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: "white",
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
+                      }}
+                    >
+                      Room
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: "white",
+                        textAlign: "center",
+                        border: `1px solid ${borderColor}`,
+                      }}
+                    >
+                      Action
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody
+                  sx={{
+                    border: `1px solid ${borderColor}`,
+                    "& .MuiTableRow-root:nth-of-type(odd)": {
+                      backgroundColor: "#ffffff",
+                    },
+                    "& .MuiTableRow-root:nth-of-type(even)": {
+                      backgroundColor: "lightgray",
+                    },
+                  }}
+                >
+                  {applicants.map((a, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell
+                        align="center"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        {idx + 1}
+                      </TableCell>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        {a.applicant_number}
+                      </TableCell>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        {`${a.last_name}, ${a.first_name} ${a.middle_name || ""}`}
+                      </TableCell>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        {(() => {
+                          const item = curriculumOptions.find(
+                            (x) =>
+                              x.curriculum_id?.toString() === a.program?.toString(),
+                          );
+
+                          return item
+                            ? `(${item.program_code}) - ${item.program_description} ${item.major || ""}`
+                            : "N/A";
+                        })()}
+                      </TableCell>
+
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        {a.building_description ||
+                          proctor?.building_description ||
+                          "N/A"}{" "}
+                        {/* ✅ NEW */}
+                      </TableCell>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        {a.room_description || proctor?.room_description || "N/A"}{" "}
+                        {/* ✅ NEW */}
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        <IconButton
+                          color="error"
+                          onClick={() => {
+                            setApplicantToDelete(a);
+                            setOpenDeleteDialog(true);
+                          }}
+                          sx={{
+                            backgroundColor: "#ffebee",
+                            border: "2px solid red",
+                            "&:hover": { backgroundColor: "#ffcdd2" },
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <CloseIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </>
+      )}
+
+      {viewMode === "attendance" && proctor && (
+        <>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
+              mb: 2,
+            }}
+          >
+            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 2,
+                  py: 0.75,
+                  borderRadius: "20px",
+                  backgroundColor: "#e8f5e9",
+                  border: "1px solid #a5d6a7",
+                }}
+              >
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#2e7d32" }} />
+                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#2e7d32" }}>
+                  Present: {presentCount}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 2,
+                  py: 0.75,
+                  borderRadius: "20px",
+                  backgroundColor: "#ffebee",
+                  border: "1px solid #ef9a9a",
+                }}
+              >
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#c62828" }} />
+                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#c62828" }}>
+                  Absent: {absentCount}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 2,
+                  py: 0.75,
+                  borderRadius: "20px",
+                  backgroundColor: "#f5f5f5",
+                  border: "1px solid #e0e0e0",
+                }}
+              >
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#757575" }} />
+                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#616161" }}>
+                  Not Yet Arrived: {notArrivedCount}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Button
+              variant="contained"
+              onClick={handleMarkAbsent}
+              sx={{
+                backgroundColor: "#d32f2f",
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "13px",
+             
+                px: 2.5,
+                boxShadow: "none",
+                "&:hover": { backgroundColor: "#b71c1c", boxShadow: "none" },
+              }}
+            >
+              Mark Remaining as Absent
+            </Button>
+          </Box>
+
+          <TableContainer
+            component={Paper}
+            sx={{ border: `1px solid ${borderColor}` }}
+          >
+            <Table>
+              <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                <TableRow>
+                  <TableCell
+                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                  >
+                    #
+                  </TableCell>
+                  <TableCell
+                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                  >
+                    Applicant ID
+                  </TableCell>
+                  <TableCell
+                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                  >
+                    Name
+                  </TableCell>
+                  <TableCell
+                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                  >
+                    Status
+                  </TableCell>
+                  <TableCell
+                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                  >
+                    Scanned At
+                  </TableCell>
+                  <TableCell
+                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                  >
+                    Scanned By
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  "& .MuiTableRow-root:nth-of-type(odd)": {
+                    backgroundColor: "#ffffff",
+                  },
+                  "& .MuiTableRow-root:nth-of-type(even)": {
+                    backgroundColor: "lightgray",
+                  },
+                }}
+              >
+                {attendanceRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      sx={{ textAlign: "center", p: 2, border: `1px solid ${borderColor}` }}
+                    >
+                      No applicants found for this schedule.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  attendanceRows.map((r, i) => (
+                    <TableRow key={r.applicant_id}>
+                      <TableCell align="center" sx={{ border: `1px solid ${borderColor}` }}>
+                        {i + 1}
+                      </TableCell>
+                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                        {r.applicant_id}
+                      </TableCell>
+                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                        {`${r.last_name}, ${r.first_name} ${r.middle_name || ""}`}
+                      </TableCell>
+                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                        {statusChip(r.status)}
+                      </TableCell>
+                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                        {r.scanned_at
+                          ? new Date(r.scanned_at).toLocaleString("en-US", {
+                            timeZone: "Asia/Manila",
+                          })
+                          : "—"}
+                      </TableCell>
+                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                        {r.scanned_by || "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
       )}
 
       {/* ✅ Snackbar */}

@@ -748,7 +748,7 @@ const EntranceExamScheduleManagement = () => {
 Step 2: Bring all required items on the exam day:
 • Official Examination Permit with VERIFIED watermark
 • No. 2 Pencil (any brand)
-• One (1) black ballpen
+• One (1) blackballpen
 • 2 Short Bond Papers
 
 

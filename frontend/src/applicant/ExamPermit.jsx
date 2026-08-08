@@ -72,6 +72,8 @@ const ExamPermit = ({ personId }) => {
     const [campusAddress, setCampusAddress] = useState("");
     const [isVerified, setIsVerified] = useState(false);
     const [verifiedAt, setVerifiedAt] = useState(null);
+    const [attendanceToken, setAttendanceToken] = useState(null);
+    const [attendanceStatus, setAttendanceStatus] = useState(null);
 
     // ✅ PRIMARY fetch — gets person, applicant_number, verification, schedule, programs, registrar
     useEffect(() => {
@@ -80,11 +82,9 @@ const ExamPermit = ({ personId }) => {
 
         const fetchData = async () => {
             try {
-                // Fetch person
                 const res = await axios.get(`${API_BASE_URL}/api/person/${pid}`);
                 let personData = res.data;
 
-                // Fetch applicant number separately
                 const applicantRes = await axios.get(`${API_BASE_URL}/api/applicant_number/${pid}`);
                 if (applicantRes.data?.applicant_number) {
                     personData.applicant_number = applicantRes.data.applicant_number;
@@ -95,30 +95,53 @@ const ExamPermit = ({ personId }) => {
                 if (applicantRes.data?.applicant_number) {
                     const applicant_number = applicantRes.data.applicant_number;
 
-                    // ✅ Use document-verification to get verified_at correctly
-                    const verifyRes = await axios.get(
-                        `${API_BASE_URL}/api/document-verification/${applicant_number}`
-                    );
-                    setIsVerified(Boolean(verifyRes.data?.verified));
-                    setVerifiedAt(verifyRes.data?.verified ? verifyRes.data.verified_at : null);
+                    try {
+                        const verifyRes = await axios.get(
+                            `${API_BASE_URL}/api/document-verification/${applicant_number}`
+                        );
+                        setIsVerified(Boolean(verifyRes.data?.verified));
+                        setVerifiedAt(verifyRes.data?.verified ? verifyRes.data.verified_at : null);
+                    } catch (verErr) {
+                        console.error("Error fetching verification status:", verErr);
+                    }
 
-                    // Load exam schedule
-                    const schedRes = await axios.get(
-                        `${API_BASE_URL}/api/exam-schedule/${applicant_number}`
-                    );
-                    setExamSchedule(schedRes.data);
+                    // ✅ FIXED — correct endpoint (was /api/exam-schedule/:x, which doesn't exist)
+                    try {
+                        const schedRes = await axios.get(
+                            `${API_BASE_URL}/api/applicant-schedule/${applicant_number}`
+                        );
+                        setExamSchedule(schedRes.data);
+                    } catch (schedErr) {
+                        console.error("Error fetching exam schedule:", schedErr);
+                        setExamSchedule(null);
+                    }
+
+                    try {
+                        const attRes = await axios.get(
+                            `${API_BASE_URL}/api/exam-attendance/token/${applicant_number}`
+                        );
+                        setAttendanceToken(attRes.data?.qr_token || null);
+                        setAttendanceStatus(attRes.data?.status || null);
+                    } catch (attErr) {
+                        console.error("Error fetching attendance token:", attErr);
+                        setAttendanceToken(null);
+                        setAttendanceStatus(null);
+                    }
                 }
 
-                // Fetch programs
-                const progRes = await axios.get(`${API_BASE_URL}/api/applied_program`);
-                setCurriculumOptions(progRes.data);
-
-                // Fetch registrar (Scheduled By)
-                const registrarRes = await axios.get(`${API_BASE_URL}/api/scheduled-by/registrar`);
-                if (registrarRes.data?.fullName) {
-                    setScheduledBy(registrarRes.data.fullName);
+                try {
+                    const progRes = await axios.get(`${API_BASE_URL}/api/applied_program`);
+                    setCurriculumOptions(progRes.data);
+                } catch (progErr) {
+                    console.error("Error fetching programs:", progErr);
                 }
 
+                try {
+                    const registrarRes = await axios.get(`${API_BASE_URL}/api/scheduled-by/registrar`);
+                    if (registrarRes.data?.fullName) setScheduledBy(registrarRes.data.fullName);
+                } catch (regErr) {
+                    console.error("Error fetching registrar name:", regErr);
+                }
             } catch (err) {
                 console.error("Error fetching exam permit data:", err);
             }
@@ -397,67 +420,38 @@ const ExamPermit = ({ personId }) => {
                         </td>
                     </tr>
 
-                    {/* Bldg + Room + QR */}
+                    {/* Bldg. / Floor / Room No. — 3 even columns */}
                     <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
-                        <td colSpan={20}>
-                            <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-85px", gap: "8px" }}>
-                                <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Bldg. :</label>
+                        <td colSpan={16}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Building:</label>
                                 <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                                     {examSchedule?.building_description || ""}
                                 </span>
+                            </div>
+                        </td>
+                        <td colSpan={8}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                 <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Floor :</label>
-                                <span style={{ minWidth: "40px", borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
+                                <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "center" }}>
                                     {examSchedule?.floor || ""}
                                 </span>
                             </div>
                         </td>
-                        <td colSpan={20}>
-                            <div style={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "space-between" }}>
-                                <div style={{ display: "flex", alignItems: "center", marginTop: "-130px" }}>
-                                    <label style={{ fontWeight: "bold", marginRight: "10px", width: "80px" }}>Room No.:</label>
-                                    <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial", width: "150px" }}>
-                                        {examSchedule?.room_description || ""}
-                                    </span>
-                                </div>
-                                {person?.applicant_number && (
-                                    <div style={{
-                                        width: "4.5cm",
-                                        height: "4.5cm",
-                                        borderRadius: "4px",
-                                        background: "#fff",
-                                        display: "flex",
-                                        justifyContent: "center",
-                                        alignItems: "center",
-                                        position: "relative",
-                                        overflow: "hidden",
-                                        marginLeft: "10px",
-                                    }}>
-                                        <QRCodeSVG
-                                            value={`${window.location.origin}/applicant_profile/${person.applicant_number}`}
-                                            size={150}
-                                            level="H"
-                                        />
-                                        <div style={{
-                                            position: "absolute",
-                                            fontSize: "12px",
-                                            fontWeight: "bold",
-                                            color: "maroon",
-                                            background: "white",
-                                            padding: "2px 4px",
-                                            borderRadius: "2px",
-                                        }}>
-                                            {person.applicant_number}
-                                        </div>
-                                    </div>
-                                )}
+                        <td colSpan={16}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Room No.:</label>
+                                <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
+                                    {examSchedule?.room_description || ""}
+                                </span>
                             </div>
                         </td>
                     </tr>
 
-                    {/* Date Verified */}
+                    {/* Date Verified / Scheduled by — 2 even columns */}
                     <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
                         <td colSpan={20}>
-                            <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-148px" }}>
+                            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                                 <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Date Verified:</label>
                                 <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                                     {verifiedAt
@@ -466,19 +460,70 @@ const ExamPermit = ({ personId }) => {
                                 </span>
                             </div>
                         </td>
-                    </tr>
-
-                    {/* Scheduled By */}
-                    <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
                         <td colSpan={20}>
-                            <div style={{ display: "flex", alignItems: "center", width: "100%", marginTop: "-128px" }}>
+                            <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
                                 <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Scheduled by:</label>
-                                <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial" }}>
+                                <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                                     {scheduledBy || "N/A"}
                                 </span>
                             </div>
                         </td>
                     </tr>
+
+                    {/* Centered QR code — 200x200, applicant number centered on top of it */}
+                    <tr>
+
+                        
+                        <td colSpan={40} style={{ paddingTop: "18px", paddingBottom: "10px" }}>
+                            <div style={{ display: "flex", justifyContent: "center" }}>
+                                <div
+                                    style={{
+                                        width: "200px",
+                                        height: "200px",
+                                        border: `2px solid ${borderColor}`,
+                                        borderRadius: "6px",
+                                        background: "#fff",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        position: "relative",
+                                        overflow: "hidden",
+                                    }}
+                                >
+                                    {attendanceToken ? (
+                                        <QRCodeSVG value={attendanceToken} size={150} level="H" />
+                                    ) : (
+                                        <span style={{ fontSize: "11px", color: "#888", textAlign: "center", padding: "0 10px" }}>
+                                            No attendance QR yet
+                                        </span>
+                                    )}
+
+                                    {person?.applicant_number && (
+                                        <div
+                                            style={{
+                                                position: "absolute",
+                                                top: "50%",
+                                                left: "50%",
+                                                transform: "translate(-50%, -50%)",
+                                                fontSize: "12px",
+                                                fontWeight: "bold",
+                                                color: "maroon",
+                                                background: "white",
+                                                padding: "2px 6px",
+                                                borderRadius: "3px",
+                                                textAlign: "center",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {person.applicant_number}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+
+                
                 </tbody>
             </table>
 

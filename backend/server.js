@@ -169,7 +169,11 @@ const downloadableFormsRoute = require("./routes/forms/downloadableFormsRoute");
 const changeCourseFormRoute = require("./routes/forms/changeCourseFormRoute");
 const controlNumberRoute = require("./routes/forms/controlNumberRoute");
 const admissionContact = require("./routes/system_routes/admissionContact");
+const examAttendanceRoute = require("./routes/admission_routes/examAttendanceRoute");
+const entranceExamScheduleRoute = require("./routes/applicant_routes/entranceExamSchedule");
 
+app.use("/api", examAttendanceRoute);
+app.use("/api", entranceExamScheduleRoute);
 app.use("/api", admissionContact);
 app.use("/api", workload);
 app.use("/api", uploadApplicants);
