@@ -1,7 +1,10 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
 
-const { insertAuditLogAdmission, insertAuditLogEnrollment } = require("../../utils/auditLogger");
+const {
+  insertAuditLogAdmission,
+  insertAuditLogEnrollment,
+} = require("../../utils/auditLogger");
 
 const router = express.Router();
 
@@ -55,7 +58,10 @@ const insertPdfExportAudit = async (
     ).trim();
 
     if (printAction === "PRINTING_APPLICANT_DOCS") {
-      const applicantName = buildPersonPrintName(req.body || {}, "Unknown Applicant");
+      const applicantName = buildPersonPrintName(
+        req.body || {},
+        "Unknown Applicant",
+      );
 
       await insertAuditLogAdmission({
         actorId,
@@ -68,7 +74,10 @@ const insertPdfExportAudit = async (
     }
 
     if (printAction === "PRINTING_STUDENT_DOCS") {
-      const studentName = buildPersonPrintName(req.body || {}, "Unknown Student");
+      const studentName = buildPersonPrintName(
+        req.body || {},
+        "Unknown Student",
+      );
 
       await insertAuditLogEnrollment({
         actorId,
@@ -81,7 +90,10 @@ const insertPdfExportAudit = async (
     }
 
     if (printAction === "DOWNLOAD_EXAM_PDF") {
-      const applicantName = buildPersonPrintName(req.body || {}, "Unknown Applicant");
+      const applicantName = buildPersonPrintName(
+        req.body || {},
+        "Unknown Applicant",
+      );
 
       await insertAuditLogAdmission({
         actorId,
@@ -105,7 +117,10 @@ const insertPdfExportAudit = async (
       }),
     });
   } catch (auditErr) {
-    console.error(`${legacyAction || documentLabel} PDF audit log failed:`, auditErr);
+    console.error(
+      `${legacyAction || documentLabel} PDF audit log failed:`,
+      auditErr,
+    );
   }
 };
 
@@ -119,9 +134,16 @@ const launchBrowser = () =>
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
-const buildOutputFilename = (prefix, { last_name, first_name, applicant_number }) => {
-  const safeLastName = String(last_name || "Applicant").trim().replace(/\s+/g, "_");
-  const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+const buildOutputFilename = (
+  prefix,
+  { last_name, first_name, applicant_number },
+) => {
+  const safeLastName = String(last_name || "Applicant")
+    .trim()
+    .replace(/\s+/g, "_");
+  const safeFirstName = String(first_name || "")
+    .trim()
+    .replace(/\s+/g, "_");
   const applicantSuffix = applicant_number ? `_${applicant_number}` : "";
   return `${prefix}_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${applicantSuffix}.pdf`;
 };
@@ -158,7 +180,7 @@ router.post("/generate-admission-form-pdf", async (req, res) => {
     // not the COR route's 816px pattern — that mismatch is what caused the
     // blank second page.
     await page.setViewport({
-      width: 794,   // 210mm @ 96dpi
+      width: 794, // 210mm @ 96dpi
       height: 1123, // 297mm @ 96dpi
       deviceScaleFactor: 2,
     });
@@ -166,7 +188,11 @@ router.post("/generate-admission-form-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -279,9 +305,13 @@ router.post("/generate-admission-form-pdf", async (req, res) => {
       preferCSSPageSize: false,
       // Matches @page { size: 8.5in 11in; margin: 0.25in; } from the
       // component's own embedded print styles.
-      margin: { top: "0.25in", bottom: "0.25in", left: "0.25in", right: "0.25in" },
+      margin: {
+        top: "0.25in",
+        bottom: "0.25in",
+        left: "0.25in",
+        right: "0.25in",
+      },
     });
-
 
     if (!pdfBuffer || pdfBuffer.length === 0) {
       throw new Error("Generated PDF buffer is empty");
@@ -336,7 +366,11 @@ router.post("/generate-registrar-form-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -432,7 +466,12 @@ router.post("/generate-registrar-form-pdf", async (req, res) => {
       preferCSSPageSize: false,
       // Matches @page { size: 8.5in 11in; margin: 0.25in; } from the
       // component's own embedded print styles.
-      margin: { top: "0.25in", bottom: "0.25in", left: "0.25in", right: "0.25in" },
+      margin: {
+        top: "0.25in",
+        bottom: "0.25in",
+        left: "0.25in",
+        right: "0.25in",
+      },
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {
@@ -480,7 +519,7 @@ router.post("/generate-personal-data-form-pdf", async (req, res) => {
     const page = await browser.newPage();
 
     await page.setViewport({
-      width: 794,   // 210mm @ 96dpi
+      width: 794, // 210mm @ 96dpi
       height: 1123, // 297mm @ 96dpi
       deviceScaleFactor: 2,
     });
@@ -488,7 +527,11 @@ router.post("/generate-personal-data-form-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -660,7 +703,11 @@ router.post("/generate-ecat-form-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -793,7 +840,7 @@ router.post("/generate-admission-services-pdf", async (req, res) => {
     const page = await browser.newPage();
 
     await page.setViewport({
-      width: 794,   // 210mm @ 96dpi
+      width: 794, // 210mm @ 96dpi
       height: 1123, // 297mm @ 96dpi
       deviceScaleFactor: 2,
     });
@@ -801,7 +848,11 @@ router.post("/generate-admission-services-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -957,7 +1008,7 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
     // container width (width: "8.5in" in ExamPermit.jsx) are both sized
     // for Letter, unlike the other admission/registrar forms.
     await page.setViewport({
-      width: 816,  // 8.5in @ 96dpi
+      width: 816, // 8.5in @ 96dpi
       height: 1056, // 11in @ 96dpi
       deviceScaleFactor: 2,
     });
@@ -965,7 +1016,11 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -1032,7 +1087,12 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
       preferCSSPageSize: false,
       // Matches @page { size: 8.5in 11in; margin: 0.25in; } from the
       // component's own embedded print styles.
-      margin: { top: "0.25in", bottom: "0.25in", left: "0.25in", right: "0.25in" },
+      margin: {
+        top: "0.25in",
+        bottom: "0.25in",
+        left: "0.25in",
+        right: "0.25in",
+      },
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {
@@ -1097,7 +1157,11 @@ router.post("/generate-exam-scores-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -1296,7 +1360,11 @@ router.post("/generate-applicant-list-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -1494,7 +1562,11 @@ router.post("/generate-schedule-applicant-list-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -1691,7 +1763,11 @@ router.post("/generate-qualifying-interview-score-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -1883,7 +1959,11 @@ router.post("/generate-student-list-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -2069,7 +2149,7 @@ router.post("/generate-report-of-grades-pdf", async (req, res) => {
     const page = await browser.newPage();
 
     await page.setViewport({
-      width: 794,   // 210mm @ 96dpi
+      width: 794, // 210mm @ 96dpi
       height: 1123, // 297mm @ 96dpi
       deviceScaleFactor: 2,
     });
@@ -2077,7 +2157,11 @@ router.post("/generate-report-of-grades-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -2186,8 +2270,12 @@ router.post("/generate-report-of-grades-pdf", async (req, res) => {
       throw new Error("Generated PDF buffer is empty");
     }
 
-    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
-    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const safeLastName = String(last_name || "Student")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const numberSuffix = student_number ? `_${student_number}` : "";
     const fileName = `Report_Of_Grades_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
 
@@ -2234,7 +2322,7 @@ router.post("/generate-tor-pdf", async (req, res) => {
     // .page-card min-width/min-height in TOR.jsx's on-screen CSS and the
     // @page { size: 215.9mm 330.2mm; } print rule.
     await page.setViewport({
-      width: 816,   // 215.9mm @ 96dpi
+      width: 816, // 215.9mm @ 96dpi
       height: 1248, // 330.2mm @ 96dpi
       deviceScaleFactor: 2,
     });
@@ -2242,7 +2330,11 @@ router.post("/generate-tor-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -2348,8 +2440,12 @@ router.post("/generate-tor-pdf", async (req, res) => {
       throw new Error("Generated PDF buffer is empty");
     }
 
-    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
-    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const safeLastName = String(last_name || "Student")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const numberSuffix = student_number ? `_${student_number}` : "";
     const fileName = `TOR_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
 
@@ -2408,7 +2504,11 @@ router.post("/generate-class-list-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -2530,7 +2630,11 @@ router.post("/generate-class-program-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -2671,7 +2775,7 @@ router.post("/generate-medical-certificate-pdf", async (req, res) => {
     const page = await browser.newPage();
 
     await page.setViewport({
-      width: 794,   // 210mm @ 96dpi
+      width: 794, // 210mm @ 96dpi
       height: 1123, // 297mm @ 96dpi
       deviceScaleFactor: 2,
     });
@@ -2679,7 +2783,11 @@ router.post("/generate-medical-certificate-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -2756,15 +2864,24 @@ router.post("/generate-medical-certificate-pdf", async (req, res) => {
       format: "A4",
       printBackground: true,
       preferCSSPageSize: false,
-      margin: { top: "0.25in", bottom: "0.25in", left: "0.25in", right: "0.25in" },
+      margin: {
+        top: "0.25in",
+        bottom: "0.25in",
+        left: "0.25in",
+        right: "0.25in",
+      },
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {
       throw new Error("Generated PDF buffer is empty");
     }
 
-    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
-    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const safeLastName = String(last_name || "Student")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const numberSuffix = student_number ? `_${student_number}` : "";
     const fileName = `Medical_Certificate_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
 
@@ -2837,7 +2954,10 @@ router.post("/generate-health-record-pdf", async (req, res) => {
 </body>
 </html>`.trim();
 
-    await page.setContent(wrappedHtml, { waitUntil: "networkidle0", timeout: 60000 });
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
     await waitForImages(page);
     await new Promise((r) => setTimeout(r, 400));
 
@@ -2850,8 +2970,12 @@ router.post("/generate-health-record-pdf", async (req, res) => {
 
     if (!pdfBuffer?.length) throw new Error("Generated PDF buffer is empty");
 
-    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
-    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const safeLastName = String(last_name || "Student")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const numberSuffix = student_number ? `_${student_number}` : "";
     const fileName = `Health_Record_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
 
@@ -2868,7 +2992,13 @@ router.post("/generate-health-record-pdf", async (req, res) => {
     return res.end(pdfBuffer);
   } catch (err) {
     console.error("Health Record PDF ERROR:", err);
-    return res.status(500).json({ message: "PDF generation failed", error: err.message, stack: err.stack });
+    return res
+      .status(500)
+      .json({
+        message: "PDF generation failed",
+        error: err.message,
+        stack: err.stack,
+      });
   } finally {
     if (browser) await browser.close();
   }
@@ -2890,7 +3020,7 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
 
     // American Legal: 8.5in x 13in. Use a wide viewport so the form can
     // lay out at its natural ~63rem width before we scale it down.
-    const LEGAL_WIDTH_PX = 816;  // 8.5in @ 96dpi
+    const LEGAL_WIDTH_PX = 816; // 8.5in @ 96dpi
     const LEGAL_HEIGHT_PX = 1248; // 13in @ 96dpi
     const PRINT_MARGIN_IN = 0.2;
     const PRINT_MARGIN_PX = PRINT_MARGIN_IN * 96;
@@ -2904,7 +3034,11 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -3075,9 +3209,15 @@ router.post("/generate-faculty-workload-pdf", async (req, res) => {
       throw new Error("Generated PDF buffer is empty");
     }
 
-    const safeLastName = String(last_name || "Faculty").trim().replace(/\s+/g, "_");
-    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
-    const employeeSuffix = employee_id ? `_${String(employee_id).trim().replace(/\s+/g, "_")}` : "";
+    const safeLastName = String(last_name || "Faculty")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
+    const employeeSuffix = employee_id
+      ? `_${String(employee_id).trim().replace(/\s+/g, "_")}`
+      : "";
     const fileName = `Faculty_Workload_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${employeeSuffix}.pdf`;
 
     await insertPdfExportAudit(req, {
@@ -3109,8 +3249,12 @@ router.post("/generate-grading-sheet-pdf", async (req, res) => {
   let browser;
 
   try {
-    const { html, footerLeft = "", footerCenter = "", fileNamePrefix = "" } =
-      req.body;
+    const {
+      html,
+      footerLeft = "",
+      footerCenter = "",
+      fileNamePrefix = "",
+    } = req.body;
 
     if (!html || typeof html !== "string") {
       return res.status(400).json({ message: "No HTML received" });
@@ -3135,7 +3279,11 @@ router.post("/generate-grading-sheet-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -3205,10 +3353,11 @@ router.post("/generate-grading-sheet-pdf", async (req, res) => {
       throw new Error("Generated PDF buffer is empty");
     }
 
-    const safePrefix = String(fileNamePrefix || "GradingSheet")
-      .trim()
-      .replace(/[^\w.-]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "GradingSheet";
+    const safePrefix =
+      String(fileNamePrefix || "GradingSheet")
+        .trim()
+        .replace(/[^\w.-]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "GradingSheet";
     const fileName = `${safePrefix}.pdf`;
 
     await insertPdfExportAudit(req, {
@@ -3258,7 +3407,11 @@ router.post("/generate-faculty-evaluation-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -3316,8 +3469,12 @@ router.post("/generate-faculty-evaluation-pdf", async (req, res) => {
       throw new Error("Generated PDF buffer is empty");
     }
 
-    const safeLastName = String(last_name || "Faculty").trim().replace(/\s+/g, "_");
-    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const safeLastName = String(last_name || "Faculty")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const employeeSuffix = employee_id
       ? `_${String(employee_id).trim().replace(/\s+/g, "_")}`
       : "";
@@ -3370,7 +3527,11 @@ router.post("/generate-student-schedule-pdf", async (req, res) => {
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
     page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
     page.on("requestfailed", (request) =>
-      console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText),
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
     );
 
     await page.setRequestInterception(true);
@@ -3636,7 +3797,7 @@ router.post("/generate-student-schedule-pdf", async (req, res) => {
     // Puppeteer's print `scale` option only as much as needed to fit
     // within one page's usable height (A4 height minus top/bottom margins).
     const contentHeightPx = await page.evaluate(
-      () => document.documentElement.scrollHeight
+      () => document.documentElement.scrollHeight,
     );
 
     const A4_HEIGHT_PX = 1123; // A4 @ 96dpi
@@ -3663,8 +3824,12 @@ router.post("/generate-student-schedule-pdf", async (req, res) => {
       throw new Error("Generated PDF buffer is empty");
     }
 
-    const safeLastName = String(last_name || "Student").trim().replace(/\s+/g, "_");
-    const safeFirstName = String(first_name || "").trim().replace(/\s+/g, "_");
+    const safeLastName = String(last_name || "Student")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
     const numberSuffix = student_number ? `_${student_number}` : "";
     const fileName = `Class_Schedule_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
 
@@ -3891,8 +4056,8 @@ router.post("/generate-cor-pdf", async (req, res) => {
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      preferCSSPageSize: false,   // let Puppeteer control the page size
-      scale: 1,                   // no scaling — we sized the viewport correctly
+      preferCSSPageSize: false, // let Puppeteer control the page size
+      scale: 1, // no scaling — we sized the viewport correctly
       margin: {
         top: "6mm",
         bottom: "6mm",
@@ -3936,6 +4101,325 @@ router.post("/generate-cor-pdf", async (req, res) => {
     if (browser) {
       await browser.close();
     }
+  }
+});
+
+router.post("/generate-student-grades-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, student_number, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      color: #000;
+    }
+
+    .print-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+    }
+
+    .print-header img {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .header-text {
+      text-align: center;
+    }
+
+    .header-text p {
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .header-text .republic {
+      font-size: 10px;
+    }
+
+    .header-text .school-name {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .header-text .address {
+      font-size: 10px;
+    }
+
+    .header-text .program-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    .header-text .semester {
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .schedule-title {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      margin: 6px 0 10px;
+      text-transform: uppercase;
+    }
+
+    .student-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 4px 24px;
+      font-size: 10.5px;
+      border: 1.5px solid #000;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+    }
+
+    .student-meta .meta-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 220px;
+    }
+
+    .student-meta .meta-col-right {
+      text-align: right;
+    }
+
+    .student-meta p {
+      margin: 0;
+    }
+
+    .student-meta strong {
+      font-weight: 700;
+    }
+
+    .term-section {
+      border: 1.5px solid #000;
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+    }
+
+    .term-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-bottom: 1.5px solid #000;
+    }
+
+    table.grade-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table.grade-table th,
+    table.grade-table td {
+      border: 1px solid #000;
+      padding: 3px 5px;
+      font-size: 9px;
+      text-align: left;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+
+    table.grade-table {
+      border-left: none;
+      border-right: none;
+    }
+    table.grade-table tr:first-child th {
+      border-top: none;
+    }
+    table.grade-table tr:last-child td {
+      border-bottom: none;
+    }
+    table.grade-table th:first-child,
+    table.grade-table td:first-child {
+      border-left: none;
+    }
+    table.grade-table th:last-child,
+    table.grade-table td:last-child {
+      border-right: none;
+    }
+
+    table.grade-table th {
+      background-color: #e8e8e8;
+      text-align: center;
+      font-weight: 700;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    table.grade-table td.center {
+      text-align: center;
+    }
+
+    table.grade-table td.grade-cell {
+      font-weight: 700;
+    }
+
+    .term-gwa {
+      text-align: right;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-top: 1.5px solid #000;
+    }
+
+    button { display: none; }
+  </style>
+</head>
+<body>
+  ${html}
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    // ── Cap the export at ~3 pages ──────────────────────────────────
+    const contentHeightPx = await page.evaluate(
+      () => document.documentElement.scrollHeight,
+    );
+
+    const A4_HEIGHT_PX = 1123; // A4 @ 96dpi
+    const MARGIN_PX = 37.8; // 10mm top + 10mm bottom
+    const usableHeightPerPagePx = A4_HEIGHT_PX - MARGIN_PX * 2;
+    const MAX_PAGES = 3;
+    const maxAllowedHeightPx = usableHeightPerPagePx * MAX_PAGES;
+
+    let scale = 1;
+    if (contentHeightPx > maxAllowedHeightPx) {
+      scale = Math.max(0.55, maxAllowedHeightPx / contentHeightPx);
+    }
+
+    // ── "Page X of Y" footer, repeated on every page ────────────────
+    // Same footerTemplate pattern as /generate-class-list-pdf and
+    // /generate-grading-sheet-pdf: Puppeteer's pageNumber/totalPages
+    // classes are populated automatically per physical page, so this
+    // works even though the letterhead/table content flows freely
+    // without any manual page-break markup.
+    const footerTemplate = `
+      <div style="width:100%;box-sizing:border-box;padding:4px 10mm 0;font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#000;border-top:1px solid #000;display:flex;justify-content:flex-end;align-items:center;">
+        <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+      </div>
+    `;
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      displayHeaderFooter: true,
+      headerTemplate: "<div></div>",
+      footerTemplate,
+      // Bottom margin bumped from 10mm to 14mm so the footer band has
+      // room and doesn't overlap the last table row — same adjustment
+      // used on the Class List / Grading Sheet routes.
+      margin: { top: "10mm", bottom: "14mm", left: "10mm", right: "10mm" },
+      scale,
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Student")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
+    const numberSuffix = student_number ? `_${student_number}` : "";
+    const fileName = `Grades_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Student Grades",
+      legacyAction: "STUDENT_GRADES_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Student Grades PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Student Grades PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
   }
 });
 

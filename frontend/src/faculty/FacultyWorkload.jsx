@@ -510,7 +510,7 @@ const WORKLOAD_HEIGHT_REGULAR = "h-[1.075rem]";
 const WORKLOAD_HEIGHT_PAIR = "h-[1rem]";
 const WORKLOAD_HEIGHT_OTHER_FUNCTIONS = "h-[1rem]";
 const WORKLOAD_HEIGHT_OTHER_FUNCTIONS_GROUP = "h-[4rem]";
-const WORKLOAD_HEIGHT_TOTAL = "h-[1.05rem]";
+const WORKLOAD_HEIGHT_TOTAL = WORKLOAD_HEIGHT_PAIR;
 
 const WORKLOAD_LABEL_WIDTH = "w-[11rem] shrink-0 flex-none";
 const WORKLOAD_OTHER_GROUP_WIDTH = "w-[4.3rem] shrink-0 flex-none";
@@ -588,14 +588,41 @@ const isTemporarySubstitutionEntry = (entry) =>
   isWorkloadFlagEnabled(entry?.is_temporary_substitution);
 
 const EXTRA_TEACHING_LOAD_ROW_COUNT = 5;
+const FTE_CALCULATOR_ROW_COUNT = 11;
+
+const formatCourseUnit = (unit) => {
+  if (unit == null || unit === "") return "";
+  const numericUnit = Number(unit);
+  if (!Number.isFinite(numericUnit)) return String(unit);
+  return Number.isInteger(numericUnit) ? String(numericUnit) : String(numericUnit);
+};
 
 const formatExtraTeachingAssignment = (entry) => {
   if (!entry) return "";
-  const parts = [entry.course_code, entry.program_code, entry.section_description].filter(
+  const parts = [entry.course_code, entry.course_description].filter(
     Boolean
   );
   return parts.join(" - ");
 };
+
+const formatExtraTeachingClass = (entry) => {
+  if (!entry) return "";
+  const parts = [entry.program_code, entry.section_description].filter(
+    Boolean
+  );
+  return parts.join(" - ");
+};
+
+const getRegularTeachingAssignmentKey = (entry) =>
+  [
+    entry?.course_id,
+    entry?.department_section_id,
+    entry?.course_code,
+    entry?.program_code,
+    entry?.section_description,
+  ]
+    .map((value) => String(value || ""))
+    .join("|");
 
 const getWorkloadCategory = (entry) => {
   if (isTemporarySubstitutionEntry(entry)) {
@@ -727,8 +754,12 @@ const buildDailyWorkloadDistribution = (scheduleEntries) => {
 
 const formatWorkloadHours = (hours) => {
   if (!hours) return "";
-  const rounded = Math.round(hours * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return (Math.round(hours * 10) / 10).toFixed(1);
+};
+
+const formatFteHours = (hours) => {
+  if (!hours) return "";
+  return (Math.round(hours * 10) / 10).toFixed(1);
 };
 
 const FacultyWorkload = () => {
@@ -782,6 +813,9 @@ const FacultyWorkload = () => {
     mname: "",
     lname: "",
     profile_image: "",
+    bachelor: "",
+    master: "",
+    doctor: "",
   });
   const [activeAcademicTerm, setActiveAcademicTerm] = useState({
     semester_description: "",
@@ -874,6 +908,9 @@ const FacultyWorkload = () => {
         mname: first.mname,
         lname: first.lname,
         profile_image: first.profile_image,
+        bachelor: "",
+        master: "",
+        doctor: "",
       };
 
       setPerson(profInfo);
@@ -886,6 +923,24 @@ const FacultyWorkload = () => {
   useEffect(() => {
     if (!profData.prof_id) return;
 
+    const fetchProfessorEducation = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/person_prof_list`);
+        const education = (response.data || []).find(
+          (row) => String(row.person_id) === String(profData.prof_id)
+        );
+
+        setPerson((prev) => ({
+          ...prev,
+          bachelor: education?.bachelor || "",
+          master: education?.master || "",
+          doctor: education?.doctor || "",
+        }));
+      } catch (err) {
+        console.error("Error fetching professor education:", err);
+      }
+    };
+
     const fetchSchedule = async () => {
       try {
         const response = await axios.get(
@@ -897,6 +952,7 @@ const FacultyWorkload = () => {
       }
     };
 
+    fetchProfessorEducation();
     fetchSchedule();
   }, [profData.prof_id]);
 
@@ -915,6 +971,64 @@ const FacultyWorkload = () => {
     [schedule]
   );
 
+  const regularTeachingAssignments = useMemo(() => {
+    const uniqueAssignments = new Map();
+
+    schedule.forEach((entry) => {
+      if (getWorkloadCategory(entry) !== "regular") return;
+
+      const key = getRegularTeachingAssignmentKey(entry);
+      if (!uniqueAssignments.has(key)) {
+        uniqueAssignments.set(key, {
+          ...entry,
+          fteHours: 0,
+        });
+      }
+
+      const assignment = uniqueAssignments.get(key);
+      assignment.fteHours += getScheduleDurationHours(entry);
+    });
+
+    return Array.from(uniqueAssignments.values());
+  }, [schedule]);
+
+  const totalFteHours = useMemo(
+    () =>
+      regularTeachingAssignments.reduce(
+        (sum, entry) => sum + (Number(entry.fteHours) || 0),
+        0
+      ),
+    [regularTeachingAssignments]
+  );
+
+  const renderFteCalculatorRows = () => {
+    const rows = Array.from(
+      { length: FTE_CALCULATOR_ROW_COUNT },
+      (_, index) => regularTeachingAssignments[index] || null
+    );
+
+    return rows.map((entry, index) => (
+      <div className="flex flex-col" key={`fte-regular-${index}`}>
+        <div className="flex">
+          <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center truncate px-1">
+            {formatExtraTeachingAssignment(entry)}
+          </div>
+          <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center">
+            {entry ? formatCourseUnit(entry.course_unit) : ""}
+          </div>
+          <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center truncate px-1">
+            {formatExtraTeachingClass(entry)}
+          </div>
+          <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
+          <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
+          <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]">
+            {entry ? formatFteHours(entry.fteHours) : ""}
+          </div>
+        </div>
+      </div>
+    ));
+  };
+
   const renderExtraTeachingLoadRows = (entries, loadTypeLabel) => {
     const rows = Array.from(
       { length: EXTRA_TEACHING_LOAD_ROW_COUNT },
@@ -928,46 +1042,55 @@ const FacultyWorkload = () => {
     return (
       <>
         {rows.map((entry, index) => (
-          <div className="flex max-h-[2rem]" key={`${loadTypeLabel}-${index}`}>
-            <div className="border border-black border-t-0 border-l-0 min-h-[2rem] flex items-center justify-center w-[9rem] px-1">
+          <div className="flex h-[2rem] max-h-[2rem] overflow-hidden" key={`${loadTypeLabel}-${index}`}>
+            <div className="border border-black border-t-0 border-l-0 h-[2rem] max-h-[2rem] overflow-hidden flex items-center justify-center w-[9rem] px-1">
               <span className="text-[10px] tracking-[-1px] text-center truncate w-full">
                 {formatExtraTeachingAssignment(entry)}
               </span>
             </div>
-            <div className="border border-black border-t-0 border-l-0 min-h-[2rem] flex items-center justify-center w-[2rem]">
-              <span className="text-[10px] tracking-[-1px]"></span>
-            </div>
-            <div className="border border-black border-t-0 border-l-0 min-h-[2rem] flex items-center justify-center w-[3.5rem] px-1">
-              <span className="text-[10px] tracking-[-1px] text-center">
-                {entry ? loadTypeLabel : ""}
+            <div className="border border-black border-t-0 border-l-0 h-[2rem] max-h-[2rem] overflow-hidden flex items-center justify-center w-[2rem]">
+              <span className="text-[10px] tracking-[-1px]">
+                {entry ? formatCourseUnit(entry.course_unit) : ""}
               </span>
             </div>
-            <div className="border border-black border-t-0 border-l-0 min-h-[2rem] flex items-center justify-center w-[6rem] px-1">
+            <div className="border border-black border-t-0 border-l-0 h-[2rem] max-h-[2rem] overflow-hidden flex items-center justify-center w-[3.5rem] px-1">
+              <span className="text-[9px] tracking-[-1px] leading-tight text-center"></span>
+            </div>
+            <div className="border border-black border-t-0 border-l-0 h-[2rem] max-h-[2rem] overflow-hidden flex items-center justify-center w-[6rem] px-1">
               <span className="text-[10px] tracking-[-1px] text-center truncate w-full">
-                {entry?.room_description || ""}
+                {formatExtraTeachingClass(entry)}
               </span>
             </div>
-            <div className="border border-black border-t-0 border-l-0 min-h-[2rem] flex items-center border-r-0 justify-center w-[3.5rem]">
+            <div className="border border-black border-t-0 border-l-0 h-[2rem] max-h-[2rem] overflow-hidden flex items-center border-r-0 justify-center w-[3.5rem]">
               <span className="text-[10px] tracking-[-1px]"></span>
             </div>
           </div>
         ))}
-        <div>
-          <div>
-            <div className="border border border-black border-l-0 border-t-0 border-b-0 max-w-[8.97rem] text-[10px] text-center font-bold">
+        <div className="flex">
+          <div
+            className={`border border border-black border-l-0 border-t-0 text-[10px] text-center font-bold flex items-center justify-center w-[9rem] ${WORKLOAD_HEIGHT_TOTAL}`}
+          >
               TOTAL
-            </div>
-            <div className="border border border-black border-l-0 border-b-0 border-t-0 text-[10px] min-w-[2rem] text-center">
-              {formatWorkloadHours(totalHours)}
-            </div>
           </div>
+          <div
+            className={`border border border-black border-l-0 border-t-0 text-[10px] text-center flex items-center justify-center w-[2rem] ${WORKLOAD_HEIGHT_TOTAL}`}
+          >
+              {formatWorkloadHours(totalHours)}
+          </div>
+          <div className={`border border border-black border-l-0 border-t-0 w-[3.5rem] ${WORKLOAD_HEIGHT_TOTAL}`}></div>
+          <div className={`border border border-black border-l-0 border-t-0 w-[6rem] ${WORKLOAD_HEIGHT_TOTAL}`}></div>
+          <div className={`border border border-black border-l-0 border-r-0 border-t-0 w-[3.5rem] ${WORKLOAD_HEIGHT_TOTAL}`}></div>
         </div>
       </>
     );
   };
 
   const renderWorkloadCells = (categoryKey, options = {}) => {
-    const { totalClassName = "", rowHeight = WORKLOAD_HEIGHT_PAIR } = options;
+    const {
+      totalClassName = "",
+      rowHeight = WORKLOAD_HEIGHT_PAIR,
+      cellStyle = {},
+    } = options;
     const backgroundColor = workloadColorMap[categoryKey] || "";
 
     return WORKLOAD_DAY_COLUMNS.map(({ key, className }) => (
@@ -975,7 +1098,7 @@ const FacultyWorkload = () => {
         key={`${categoryKey}-${key}`}
         className={`${className} ${rowHeight} ${key === "TOTAL" ? totalClassName : ""
           }`}
-        style={{ backgroundColor }}
+        style={{ backgroundColor, ...cellStyle }}
       >
         {formatWorkloadHours(dailyWorkload[categoryKey][key])}
       </div>
@@ -1500,7 +1623,7 @@ const FacultyWorkload = () => {
                       {profData.fname} {profData.mname} {profData.lname}
                     </p>
                     <p className="text-[11px] employee-status">
-                      Status Rank: Insdivuctor I
+                      Status Rank: 
                     </p>
                   </div>
                   <div className="img">
@@ -1536,7 +1659,7 @@ const FacultyWorkload = () => {
                     </p>
                   </div>
                   <div className="w-[48rem] border border-black flex items-center justify-center designation-details">
-                    <p className="text-[11px]">Chief, INFORMATION SYSTEM</p>
+                    <p className="text-[11px]"></p>
                   </div>
                 </div>
               </div>
@@ -1556,7 +1679,7 @@ const FacultyWorkload = () => {
                       BACHELOR'S DEGREE
                     </div>
                     <p className="educ-content text-[12px] h-full flex items-center ml-1">
-                      BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY
+                      {profData.bachelor || ""}
                     </p>
                   </div>
                   <div className="border border-black border-b-0 border-l-0 w-[48rem] h-[2rem] p-0 flex  educ-details">
@@ -1564,7 +1687,7 @@ const FacultyWorkload = () => {
                       MASTER'S DEGREE
                     </div>
                     <p className="educ-content text-[12px] h-full flex items-center ml-1">
-                      MASTER OF INFORMATION TECHNOLOGY (CITY OF MALABON)
+                      {profData.master || ""}
                     </p>
                   </div>
                   <div className="border border-black border-b-0 border-l-0 w-[48rem] h-[2rem] p-0 flex  educ-details">
@@ -1572,7 +1695,7 @@ const FacultyWorkload = () => {
                       DOCTORAL'S DEGREE
                     </div>
                     <p className="educ-content text-[12px]  h-full flex items-center ml-1 MIN-">
-                      DOCTOR OF INFORMATION TECHNOLOGY (AMA, ongoing)
+                      {profData.doctor || ""}
                     </p>
                   </div>
                   <div className="border border-black border-l-0 w-[48rem] h-[2rem] p-0 flex educ-details">
@@ -3464,10 +3587,11 @@ const FacultyWorkload = () => {
                   </div>
                   <div className="flex flex-col">
                     <div className="flex">
-                      <div className={`border border border-black border-l-0 border-b-0 text-[8px] flex items-center justify-center font-[400] ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_TOTAL}`}>
+                      <div className={`border border border-black border-l-0 text-[8px] flex items-center justify-center font-[400] ${WORKLOAD_LABEL_WIDTH} ${WORKLOAD_HEIGHT_TOTAL}`}>
                         <i className="font-bold">Total</i>
                       </div>
                       {renderWorkloadCells("grandTotal", {
+                        cellStyle: { borderBottom: "1px solid #000" },
                         rowHeight: WORKLOAD_HEIGHT_TOTAL,
                       })}
                     </div>
@@ -3479,24 +3603,24 @@ const FacultyWorkload = () => {
                       EXTRA TEACHING LOADS FOR HONORARIUM
                     </div>
                   </div>
-                  <div className="flex max-h-[2.15rem]">
-                    <div className="border border-black border-l-0 bg-[#eaeaea] min-h-[2.15rem] flex items-center justify-center w-[9rem]">
+                  <div className="flex h-[2.15rem] max-h-[2.15rem] overflow-hidden">
+                    <div className="border border-black border-l-0 bg-[#eaeaea] h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[9rem]">
                       <span className="text-[10px] tracking-[-1px]">
                         Teaching Assignment
                       </span>
                     </div>
-                    <div className="border border-black border-l-0 bg-[#eaeaea] min-h-[2.15rem] flex items-center justify-center w-[2rem]">
+                    <div className="border border-black border-l-0 bg-[#eaeaea] h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[2rem]">
                       <span className="text-[10px] tracking-[-1px]">Units</span>
                     </div>
-                    <div className="border border-black border-l-0 bg-[#eaeaea] min-h-[2.15rem] flex items-center justify-center w-[3.5rem]">
+                    <div className="border border-black border-l-0 bg-[#eaeaea] h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[3.5rem]">
                       <span className="text-[10px] tracking-[-1px]">
                         Load Type
                       </span>
                     </div>
-                    <div className="border border-black border-l-0 bg-[#eaeaea] min-h-[2.15rem] flex items-center justify-center w-[6rem]">
+                    <div className="border border-black border-l-0 bg-[#eaeaea] h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[6rem]">
                       <span className="text-[10px] tracking-[-1px]">Class</span>
                     </div>
-                    <div className="border border-black border-l-0 bg-[#eaeaea] min-h-[2.15rem] flex items-center border-r-0 justify-center w-[3.5rem]">
+                    <div className="border border-black border-l-0 bg-[#eaeaea] h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center border-r-0 justify-center w-[3.5rem]">
                       <span className="text-[10px] tracking-[-1px]">
                         Class Type
                       </span>
@@ -3537,94 +3661,16 @@ const FacultyWorkload = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3.0rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex">
-                      <div className="border border border-black border-l-0 border-b-0 w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] w-[3.8rem] h-[1rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[8px] tracking-[-1px] h-[1rem] w-[3rem] text-center"></div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
-                    </div>
-                  </div>
+                  {renderFteCalculatorRows()}
                   <div className="flex flex-col">
                     <div className="flex">
                       <div className="border border border-black border-l-0 border-b-0 border-r-0 min-w-[19.5rem] text-[10px] h-[1rem] text-center"></div>
                       <div className="border border border-black border-l-0 border-b-0 text-[10px] min-w-[14.4rem] h-[1rem] font-bold text-center bg-[#c0c0c0]">
                         Total FTE
                       </div>
-                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]"></div>
+                      <div className="border border border-black border-l-0 border-b-0 text-[10px] border-r-0 text-center h-[1rem] w-[3.1rem]">
+                        {formatFteHours(totalFteHours)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3634,24 +3680,24 @@ const FacultyWorkload = () => {
                       EXTRA TEACHING LOADS FOR SERVICE CREDIT
                     </div>
                   </div>
-                  <div className="flex max-h-[2.15rem]">
-                    <div className="border border-black bg-[#eaeaea]  border-l-0 min-h-[2.15rem] flex items-center justify-center w-[9rem]">
+                  <div className="flex h-[2.15rem] max-h-[2.15rem] overflow-hidden">
+                    <div className="border border-black bg-[#eaeaea] border-l-0 h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[9rem]">
                       <span className="text-[10px] tracking-[-1px]">
                         Teaching Assignment
                       </span>
                     </div>
-                    <div className="border border-black bg-[#eaeaea] border-l-0 min-h-[2.15rem] flex items-center justify-center w-[2rem]">
+                    <div className="border border-black bg-[#eaeaea] border-l-0 h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[2rem]">
                       <span className="text-[10px] tracking-[-1px]">Units</span>
                     </div>
-                    <div className="border border-black bg-[#eaeaea] border-l-0 min-h-[2.15rem] flex items-center justify-center w-[3.5rem]">
+                    <div className="border border-black bg-[#eaeaea] border-l-0 h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[3.5rem]">
                       <span className="text-[10px] tracking-[-1px]">
                         Load Type
                       </span>
                     </div>
-                    <div className="border border-black bg-[#eaeaea] border-l-0 min-h-[2.15rem] flex items-center justify-center w-[6rem]">
+                    <div className="border border-black bg-[#eaeaea] border-l-0 h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center justify-center w-[6rem]">
                       <span className="text-[10px] tracking-[-1px]">Class</span>
                     </div>
-                    <div className="border border-black bg-[#eaeaea] border-l-0 min-h-[2.15rem] flex items-center border-r-0 justify-center w-[3.5rem]">
+                    <div className="border border-black bg-[#eaeaea] border-l-0 h-[2.15rem] max-h-[2.15rem] overflow-hidden flex items-center border-r-0 justify-center w-[3.5rem]">
                       <span className="text-[10px] tracking-[-1px]">
                         Class Type
                       </span>

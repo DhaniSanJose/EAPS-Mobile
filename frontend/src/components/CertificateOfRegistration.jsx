@@ -301,6 +301,8 @@ const CertificateOfRegistration = forwardRef(
     const [corActiveSchoolYearId, setCorActiveSchoolYearId] = useState("");
     const [major, setMajor] = useState(null);
     const [savedUnifast, setSavedUnifast] = useState(false);
+    const [scholarshipTypes, setScholarshipTypes] = useState([]);
+    const [selectedPaymentData, setSelectedPaymentData] = useState(null);
 
     // Track when all critical data is loaded
     const [dataLoaded, setDataLoaded] = useState({
@@ -355,6 +357,7 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       if (!student_number?.trim()) {
         setSavedUnifast(false);
+        setSelectedPaymentData(null);
         return;
       }
       let cancelled = false;
@@ -370,6 +373,63 @@ const CertificateOfRegistration = forwardRef(
         cancelled = true;
       };
     }, [student_number]);
+
+    useEffect(() => {
+      if (!student_number?.trim() || !savedUnifast) {
+        setSelectedPaymentData(null);
+        return;
+      }
+
+      let cancelled = false;
+
+      const fetchSavedPaymentData = async () => {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/api/get_student_data_unifast`);
+          const rows = Array.isArray(res.data) ? res.data : [];
+          const matched = rows
+            .filter(
+              (item) =>
+                String(item?.student_number) === String(student_number) &&
+                Number(item?.status) === 1 &&
+                (!corActiveSchoolYearId ||
+                  Number(item?.active_school_year_id ?? item?.activeSchoolYearId ?? 0) ===
+                    Number(corActiveSchoolYearId)),
+            )
+            .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
+
+          if (!cancelled) {
+            setSelectedPaymentData(matched[0] || null);
+          }
+        } catch (error) {
+          console.error("Failed to fetch saved UNIFAST payment data:", error);
+          if (!cancelled) {
+            setSelectedPaymentData(null);
+          }
+        }
+      };
+
+      fetchSavedPaymentData();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [student_number, corActiveSchoolYearId, savedUnifast]);
+
+    useEffect(() => {
+      const fetchScholarship = async () => {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/api/scholarship_types`);
+          const activeTypes = Array.isArray(res.data)
+            ? res.data.filter((item) => Number(item.scholarship_status) === 1)
+            : [];
+          setScholarshipTypes(activeTypes);
+        } catch (error) {
+          console.error("Error fetching scholarship types:", error);
+        }
+      };
+
+      fetchScholarship();
+    }, []);
 
     useEffect(() => {
       if (currId) {
@@ -726,6 +786,15 @@ const CertificateOfRegistration = forwardRef(
     const LEFT_LABEL_WIDTH = "7.6em"; // fits "Email Address"
     const MID_LABEL_WIDTH = "6.2em"; // fits "Year Level"
     const RIGHT_LABEL_WIDTH = "10.5em"; // fits "Scholarship/Discount"
+    const unifastScholarshipCode =
+      data[0]?.scholarship_code ||
+      data[0]?.scholarship_name ||
+      scholarshipTypes.find((item) => {
+        const label = String(item?.scholarship_code || item?.scholarship_name || "");
+        return label.toUpperCase().includes("UNIFAST");
+      })?.scholarship_code ||
+      "";
+    const showFreeTuitionStamp = savedUnifast;
 
     const totalCourseUnits = enrolled.reduce(
       (sum, item) => sum + toWholeUnit(item.course_unit),
@@ -1315,7 +1384,7 @@ const CertificateOfRegistration = forwardRef(
                       >
                         {renderDetailField(
                           "Scholarship/Discount",
-                          savedUnifast ? "UNIFAST-FHE" : "",
+                          unifastScholarshipCode || (savedUnifast ? "UNIFAST-FHE" : ""),
                           RIGHT_LABEL_WIDTH,
                         )}
                       </td>
@@ -3661,16 +3730,18 @@ const CertificateOfRegistration = forwardRef(
                           paddingLeft: "50px", // ?? margin-left effect
                         }}
                       >
-                        <img
-                          src={FreeTuitionImage}
-                          alt="EARIST MIS FEE"
-                          style={{
-                            width: "420px",
-                            height: "236px",
-                            objectFit: "contain",
-                            display: "block",
-                          }}
-                        />
+                        {showFreeTuitionStamp && (
+                          <img
+                            src={FreeTuitionImage}
+                            alt="EARIST MIS FEE"
+                            style={{
+                              width: "420px",
+                              height: "236px",
+                              objectFit: "contain",
+                              display: "block",
+                            }}
+                          />
+                        )}
                       </td>
 
                       {/* RIGHT SIDE */}

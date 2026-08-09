@@ -15,6 +15,11 @@ const isLineEligibleForAccountType = (line, accountTypeId) => {
   return Number(line.account_type) === Number(accountTypeId);
 };
 
+const isTuitionLine = (line) =>
+  Boolean(line?.is_tuition) ||
+  Number(line?.fee_rate_id) === 0 ||
+  String(line?.fee_code || "").toUpperCase() === "TUITION";
+
 const sortFeeLines = (lines) =>
   [...lines].sort(
     (a, b) =>
@@ -50,12 +55,42 @@ const buildVirtualTuitionLine = (
     id: "tuition",
     fee_code: "TUITION",
     fee_name: "Tuition Fees",
-    sort_order: -1,
+    sort_order: 0,
     account_type: null,
     amount: normalizeAmount(tuitionFees),
     paid_amount: normalizeAmount(tuitionPaidAmount),
     is_paid: 0,
     is_tuition: true,
+  };
+};
+
+const resolveTuitionLine = (
+  feeLines = [],
+  tuitionFees = 0,
+  tuitionIsPaid = false,
+  tuitionPaidAmount = 0
+) => {
+  const existing = feeLines.find(isTuitionLine);
+  if (!existing) {
+    return buildVirtualTuitionLine(
+      tuitionFees,
+      tuitionIsPaid,
+      tuitionPaidAmount
+    );
+  }
+
+  return {
+    ...existing,
+    id: existing.id ?? "tuition",
+    fee_code: "TUITION",
+    fee_name: existing.fee_name || "Tuition Fees",
+    sort_order: 0,
+    account_type: null,
+    amount: normalizeAmount(existing.amount ?? tuitionFees),
+    paid_amount: normalizeAmount(existing.paid_amount ?? tuitionPaidAmount),
+    is_paid: Number(existing?.is_paid) === 1 || tuitionIsPaid ? 1 : 0,
+    is_tuition: true,
+    fee_rate_id: Number(existing?.fee_rate_id ?? 0),
   };
 };
 
@@ -66,14 +101,15 @@ const getUnpaidLinesForCashier = (
   tuitionIsPaid = false,
   tuitionPaidAmount = 0
 ) => {
-  const tuitionLine = buildVirtualTuitionLine(
+  const tuitionLine = resolveTuitionLine(
+    feeLines,
     tuitionFees,
     tuitionIsPaid,
     tuitionPaidAmount
   );
   const catalogLines = (feeLines || []).filter(
     (line) =>
-      !line?.is_tuition &&
+      !isTuitionLine(line) &&
       getLineRemaining(line) > 0 &&
       isLineEligibleForAccountType(line, accountTypeId)
   );
@@ -89,12 +125,19 @@ const computeGlobalBalance = (
   tuitionIsPaid = false,
   tuitionPaidAmount = 0
 ) => {
-  let balance = getTuitionRemaining(
+  const tuitionLine = resolveTuitionLine(
+    feeLines,
     tuitionFees,
     tuitionIsPaid,
     tuitionPaidAmount
   );
+
+  let balance = tuitionLine
+    ? getLineRemaining(tuitionLine)
+    : getTuitionRemaining(tuitionFees, tuitionIsPaid, tuitionPaidAmount);
+
   for (const line of feeLines) {
+    if (isTuitionLine(line)) continue;
     balance += getLineRemaining(line);
   }
   return normalizeAmount(balance);
@@ -121,11 +164,11 @@ const computeScopedBalance = (
 
 const buildLineBalances = (feeLines, accountTypeId = null) => {
   const tuitionLines = (feeLines || []).filter(
-    (line) => line?.is_tuition && getLineRemaining(line) > 0
+    (line) => isTuitionLine(line) && getLineRemaining(line) > 0
   );
   const catalogLines = (feeLines || []).filter(
     (line) =>
-      !line?.is_tuition &&
+      !isTuitionLine(line) &&
       getLineRemaining(line) > 0 &&
       isLineEligibleForAccountType(line, accountTypeId)
   );
@@ -154,8 +197,13 @@ const applyPaymentWaterfall = (
 
   for (const [priority, line] of linesWithBalance.entries()) {
     const currentBalance = normalizeAmount(line.balance);
+    const displayPriority = line?.is_tuition
+      ? 0
+      : Number.isFinite(Number(line.sort_order))
+        ? Number(line.sort_order)
+        : priority;
     const allocationBase = {
-      priority,
+      priority: displayPriority,
       key: line.fee_code,
       label: line.fee_name,
       matriculation_fee_line_id: line.id,

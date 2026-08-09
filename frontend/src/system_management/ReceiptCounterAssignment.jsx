@@ -746,6 +746,7 @@ const ReceiptCounterAssignment = () => {
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5" }}><strong>Employee ID</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Name</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Email Address</strong></TableCell>
+                            <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Account Type</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5" }}><strong>Position</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Action</strong></TableCell>
                         </TableRow>
@@ -766,6 +767,13 @@ const ReceiptCounterAssignment = () => {
                         {currentEmployees.map((employee) => {
                             const assignment = assignmentMap[employee.employee_id];
                             const isAssigned = Boolean(assignment);
+                            const accountTypeLabel =
+                                assignment?.account_type_description ||
+                                accountTypes.find(
+                                    (accountType) =>
+                                        String(accountType.id) === String(assignment?.account_type_id)
+                                )?.description ||
+                                "N/A";
 
                             return (
                                 <TableRow key={employee.id}>
@@ -776,6 +784,7 @@ const ReceiptCounterAssignment = () => {
                                         ${capitalize(employee.last_name)}`}
                                     </TableCell>
                                     <TableCell sx={{ border: `1px solid ${borderColor}` }}>{employee.email}</TableCell>
+                                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{accountTypeLabel}</TableCell>
                                     <TableCell sx={{ border: `1px solid ${borderColor}` }}>{employee.position}</TableCell>
                                     <TableCell sx={{ display: 'flex', borderRight: `1px solid ${borderColor}`, borderBottom: `1px solid ${borderColor}`, alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                                         <Button

@@ -4773,6 +4773,8 @@ Click the link below to log in:
         st.description AS section_description,
         rt.room_description,
         COALESCE(cst.course_code, wt.workload_code) AS course_code,
+        cst.course_description,
+        cst.course_unit,
         wt.workload_color,
         cst.course_id,
         t.department_section_id,
@@ -7159,6 +7161,114 @@ Click the link below to log in:
     } catch (err) {
       console.error("Error fetching person data:", err);
       res.status(500).json({ error: "Database error" });
+    }
+  });
+
+  app.get("/api/cor-student-suggestions", async (req, res) => {
+    const query = String(req.query.query || "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 20);
+    const activeSchoolYearId = String(req.query.active_school_year_id || "").trim();
+    const splitIds = (value) =>
+      String(value || "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+    const dprtmntIds = splitIds(req.query.dprtmnt_ids);
+    const curriculumIds = splitIds(req.query.curriculum_ids);
+    const programIds = splitIds(req.query.program_ids);
+
+    if (query.length < 2) {
+      return res.json([]);
+    }
+
+    try {
+      const like = `%${query}%`;
+      const startsWith = `${query}%`;
+      const whereParts = [
+        `(
+          CAST(snt.student_number AS CHAR) LIKE ?
+          OR pt.first_name LIKE ?
+          OR pt.middle_name LIKE ?
+          OR pt.last_name LIKE ?
+          OR CONCAT_WS(' ', pt.first_name, pt.middle_name, pt.last_name) LIKE ?
+          OR CONCAT_WS(' ', pt.last_name, pt.first_name, pt.middle_name) LIKE ?
+        )`,
+      ];
+      const params = [like, like, like, like, like, like];
+      const scopeParts = [];
+      const scopeParams = [];
+
+      if (dprtmntIds.length > 0) {
+        scopeParts.push(`dct.dprtmnt_id IN (${dprtmntIds.map(() => "?").join(", ")})`);
+        scopeParams.push(...dprtmntIds);
+      }
+
+      if (curriculumIds.length > 0) {
+        scopeParts.push(`es.curriculum_id IN (${curriculumIds.map(() => "?").join(", ")})`);
+        scopeParams.push(...curriculumIds);
+      }
+
+      if (programIds.length > 0) {
+        scopeParts.push(`ct.program_id IN (${programIds.map(() => "?").join(", ")})`);
+        scopeParams.push(...programIds);
+      }
+
+      const scopedJoinSql =
+        scopeParts.length > 0
+          ? `
+        INNER JOIN (
+          SELECT DISTINCT es.student_number
+          FROM enrolled_subject AS es
+          LEFT JOIN dprtmnt_curriculum_table AS dct
+            ON es.curriculum_id = dct.curriculum_id
+          LEFT JOIN curriculum_table AS ct
+            ON es.curriculum_id = ct.curriculum_id
+          WHERE 1 = 1
+            ${activeSchoolYearId ? "AND es.active_school_year_id = ?" : ""}
+            AND (${scopeParts.join(" OR ")})
+        ) AS scoped_students
+          ON scoped_students.student_number = snt.student_number
+      `
+          : "";
+
+      const [rows] = await db3.query(
+        `
+        SELECT
+          snt.student_number,
+          pt.person_id,
+          pt.first_name,
+          pt.middle_name,
+          pt.last_name
+        FROM student_numbering_table AS snt
+        ${scopedJoinSql}
+        INNER JOIN person_table AS pt
+          ON snt.person_id = pt.person_id
+        WHERE ${whereParts.join(" AND ")}
+        ORDER BY
+          CASE
+            WHEN CAST(snt.student_number AS CHAR) LIKE ? THEN 0
+            WHEN pt.last_name LIKE ? THEN 1
+            WHEN pt.first_name LIKE ? THEN 2
+            ELSE 3
+          END,
+          snt.student_number ASC
+        LIMIT ?
+        `,
+        [
+          ...(scopeParts.length > 0 && activeSchoolYearId ? [activeSchoolYearId] : []),
+          ...(scopeParts.length > 0 ? scopeParams : []),
+          ...params,
+          startsWith,
+          startsWith,
+          startsWith,
+          limit,
+        ],
+      );
+
+      res.json(rows);
+    } catch (err) {
+      console.error("Error fetching COR student suggestions:", err);
+      res.status(500).json({ message: "Failed to fetch student suggestions" });
     }
   });
 

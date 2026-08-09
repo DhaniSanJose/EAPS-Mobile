@@ -28,6 +28,7 @@ import {
   Divider,
   Card,
   CardContent,
+  IconButton,
 } from "@mui/material";
 import EARISTLogo from "../assets/EARISTLogo.png";
 import Unauthorized from "../components/Unauthorized";
@@ -192,7 +193,7 @@ const RowActions = ({ canEdit, canDelete, onEdit, onDelete }) => (
 
 // ---------------------------------------------------------------------------
 
-const TOSFCrud = () => {
+const TOSF = () => {
   const settings = useContext(SettingsContext);
 
   const feeCategoryOptions = [
@@ -325,6 +326,12 @@ const TOSFCrud = () => {
   const [selectedScholarshipId, setSelectedScholarshipId] = useState(null);
   const [scholarshipTypes, setScholarshipTypes] = useState([]);
   const [scholarshipForm, setScholarshipForm] = useState({
+    scholarship_code: "",
+    scholarship_name: "",
+    scholarship_status: 1,
+  });
+  const [scholarshipEditForm, setScholarshipEditForm] = useState({
+    scholarship_code: "",
     scholarship_name: "",
     scholarship_status: 1,
   });
@@ -425,7 +432,7 @@ const TOSFCrud = () => {
     fee_name: "",
     fee_category: 5,
     is_active: 1,
-    sort_order: 0,
+    sort_order: 1,
     fee_group: "",
     account_type: "",
   };
@@ -641,6 +648,14 @@ const TOSFCrud = () => {
     return `Display order ${sortOrder} is already assigned to ${feeLabel}. Please choose a different order number.`;
   };
 
+  const validateSortOrder = (sortOrder) => {
+    const parsed = Number(sortOrder);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return "Display order must be 1 or greater.";
+    }
+    return "";
+  };
+
   const resetFeeCatalogForm = () => {
     setFeeCatalogForm(defaultFeeCatalogForm);
   };
@@ -668,6 +683,11 @@ const TOSFCrud = () => {
     }
 
     const sortOrderConflict = getSortOrderConflictMessage(feeCatalogForm.sort_order);
+    const sortOrderError = validateSortOrder(feeCatalogForm.sort_order);
+    if (sortOrderError) {
+      showSnackbar(sortOrderError, "warning");
+      return;
+    }
     if (sortOrderConflict) {
       showSnackbar(sortOrderConflict, "warning");
       return;
@@ -694,6 +714,11 @@ const TOSFCrud = () => {
       feeCatalogEditForm.sort_order,
       feeCatalogEditId
     );
+    const sortOrderError = validateSortOrder(feeCatalogEditForm.sort_order);
+    if (sortOrderError) {
+      showSnackbar(sortOrderError, "warning");
+      return;
+    }
     if (sortOrderConflict) {
       showSnackbar(sortOrderConflict, "warning");
       return;
@@ -1125,36 +1150,21 @@ const TOSFCrud = () => {
 
   const resetScholarshipForm = () => {
     setScholarshipForm({
+      scholarship_code: "",
       scholarship_name: "",
       scholarship_status: 1,
     });
-    setEditingScholarshipId(null);
   };
 
   const saveScholarshipType = async () => {
-    if (editingScholarshipId && !canEdit) {
-      showSnackbar("You do not have permission to edit this item", "error");
-      return;
-    }
-
-    if (!editingScholarshipId && !canCreate) {
+    if (!canCreate) {
       showSnackbar("You do not have permission to create items on this page", "error");
       return;
     }
 
     try {
-      if (editingScholarshipId) {
-        await axios.put(
-          `${API_BASE_URL}/api/update_scholarship_type/${editingScholarshipId}`,
-          scholarshipForm,
-          permissionHeaders,
-        );
-        showSnackbar("Scholarship type updated successfully!");
-      } else {
-        await axios.post(`${API_BASE_URL}/api/insert_scholarship_type`, scholarshipForm, permissionHeaders);
-        showSnackbar("Scholarship type added successfully!");
-      }
-
+      await axios.post(`${API_BASE_URL}/api/insert_scholarship_type`, scholarshipForm, permissionHeaders);
+      showSnackbar("Scholarship type added successfully!");
       resetScholarshipForm();
       fetchScholarshipTypes();
     } catch (error) {
@@ -1165,10 +1175,6 @@ const TOSFCrud = () => {
 
   const handleScholarshipSubmit = async (e) => {
     e.preventDefault();
-    if (editingScholarshipId) {
-      setScholarshipUpdateDialogOpen(true);
-      return;
-    }
     await saveScholarshipType();
   };
 
@@ -1177,11 +1183,48 @@ const TOSFCrud = () => {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-    setScholarshipForm({
+    setScholarshipEditForm({
+      scholarship_code: item.scholarship_code || "",
       scholarship_name: item.scholarship_name || "",
       scholarship_status: Number(item.scholarship_status ?? 1),
     });
     setEditingScholarshipId(item.id);
+    setScholarshipUpdateDialogOpen(true);
+  };
+
+  const resetScholarshipEditForm = () => {
+    setScholarshipEditForm({
+      scholarship_code: "",
+      scholarship_name: "",
+      scholarship_status: 1,
+    });
+    setEditingScholarshipId(null);
+    setScholarshipUpdateDialogOpen(false);
+  };
+
+  const saveScholarshipEdit = async () => {
+    if (!editingScholarshipId) {
+      return;
+    }
+
+    if (!canEdit) {
+      showSnackbar("You do not have permission to edit this item", "error");
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/update_scholarship_type/${editingScholarshipId}`,
+        scholarshipEditForm,
+        permissionHeaders,
+      );
+      showSnackbar("Scholarship type updated successfully!");
+      resetScholarshipEditForm();
+      fetchScholarshipTypes();
+    } catch (error) {
+      console.error("Error updating scholarship type:", error);
+      showSnackbar("Error updating scholarship type", "error");
+    }
   };
 
   const resetScholarshipRuleForm = () => {
@@ -1191,7 +1234,7 @@ const TOSFCrud = () => {
       scholarship_id: selectedScholarshipForRules || "",
       fee_rate_id: "",
       discount_type: 0,
-      discount_value: "",
+      discount_value: "Full Discount",
       year_level_id: 0,
       school_year_id: activeSchoolYear?.year_id == null ? "" : String(activeSchoolYear.year_id),
       semester_id: activeSchoolYear?.semester_id == null ? "" : String(activeSchoolYear.semester_id),
@@ -1207,7 +1250,7 @@ const TOSFCrud = () => {
       setScholarshipRuleForm((prev) => ({
         ...prev,
         discount_type: nextDiscountType,
-        discount_value: nextDiscountType === 0 ? "" : prev.discount_value,
+        discount_value: nextDiscountType === 0 ? "Full Discount" : "",
       }));
       return;
     }
@@ -1233,7 +1276,7 @@ const TOSFCrud = () => {
         scholarship_id: Number(scholarshipRuleForm.scholarship_id || selectedScholarshipForRules),
         fee_rate_id: Number(scholarshipRuleForm.fee_rate_id),
         discount_type: Number(scholarshipRuleForm.discount_type),
-        discount_value: Number(scholarshipRuleForm.discount_type) === 0 || scholarshipRuleForm.discount_value === ""
+        discount_value: Number(scholarshipRuleForm.discount_type) === 0 || scholarshipRuleForm.discount_value === "" || scholarshipRuleForm.discount_value === "Full Discount"
           ? null
           : Number(scholarshipRuleForm.discount_value),
         year_level_id: Number(scholarshipRuleForm.year_level_id || 0),
@@ -1285,7 +1328,7 @@ const TOSFCrud = () => {
       scholarship_id: String(rule.scholarship_id ?? selectedScholarshipForRules ?? ""),
       fee_rate_id: String(rule.fee_rate_id ?? ""),
       discount_type: Number(rule.discount_type ?? 0),
-      discount_value: Number(rule.discount_type ?? 0) === 0 ? "" : String(rule.discount_value ?? ""),
+      discount_value: Number(rule.discount_type ?? 0) === 0 ? "Full Discount" : String(rule.discount_value ?? ""),
       year_level_id: Number(rule.year_level_id ?? 0),
       school_year_id: rule.school_year_id == null ? "" : String(rule.school_year_id),
       semester_id: rule.semester_id == null ? "" : String(rule.semester_id),
@@ -1413,13 +1456,24 @@ const TOSFCrud = () => {
   const getScholarshipSemesterLabel = (value) =>
     scholarshipRuleOptions.semesters.find((item) => String(item.semester_id) === String(value))
       ?.semester_description || value || "-";
-  const getScholarshipDiscountTypeLabel = (value) => {
-    const labels = {
-      0: "Full Discount",
-      1: "Percentage",
-      2: "Number",
-    };
-    return labels[Number(value)] || "Full Discount";
+  const getScholarshipDiscountDisplayLabel = (rule) => {
+    const type = Number(rule?.discount_type ?? 0);
+    const value = rule?.discount_value;
+
+    if (type === 0 || value == null || value === "" || value === "Full Discount") {
+      return "Full Discount";
+    }
+
+    const normalizedValue = Number(value);
+    if (!Number.isFinite(normalizedValue)) {
+      return String(value);
+    }
+
+    if (type === 1) {
+      return `${normalizedValue}%`;
+    }
+
+    return `${normalizedValue.toLocaleString()}`;
   };
   const formatScholarshipAcademicYear = (year) => {
     if (!year) return "";
@@ -1438,6 +1492,33 @@ const TOSFCrud = () => {
   };
 
   const headerColor = settings?.header_color || "#1976d2";
+  const verificationDialogPaperSx = {
+    borderRadius: "16px",
+    overflow: "hidden",
+    boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+  };
+  const verificationDialogTitleSx = {
+    bgcolor: headerColor,
+    color: "white",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontWeight: "bold",
+    px: 3,
+    py: 2,
+  };
+  const verificationDialogCloseSx = {
+    color: "white",
+    border: "2px solid rgba(255,255,255,0.6)",
+    borderRadius: "50%",
+    width: 38,
+    height: 38,
+    padding: 0,
+    "&:hover": {
+      backgroundColor: "rgba(255,255,255,0.2)",
+      border: "2px solid white",
+    },
+  };
 
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", backgroundColor: "transparent", mt: 1, p: { xs: 1.5, md: 2.5 } }}>
@@ -1532,7 +1613,15 @@ const TOSFCrud = () => {
                 </Grid>
                 <Grid item xs={6} sm={4} md={1}>
                   <Typography sx={fieldLabelSx}>ORDER</Typography>
-                  <TextField name="sort_order" type="number" value={feeCatalogForm.sort_order} onChange={handleFeeCatalogChange} size="small" fullWidth />
+                  <TextField
+                    name="sort_order"
+                    type="number"
+                    value={feeCatalogForm.sort_order}
+                    onChange={handleFeeCatalogChange}
+                    size="small"
+                    fullWidth
+                    inputProps={{ min: 1, step: 1 }}
+                  />
                 </Grid>
                 <Grid item xs={6} sm={4} md={1}>
                   <Typography sx={fieldLabelSx}>STATUS</Typography>
@@ -1719,7 +1808,11 @@ const TOSFCrud = () => {
             <SectionHeading icon={<SchoolIcon />} title="Scholarship Types" subtitle="Define the scholarships available to students." accentColor={headerColor} />
             <form onSubmit={handleScholarshipSubmit}>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={8}>
+                <Grid item xs={12} sm={4}>
+                  <Typography sx={fieldLabelSx}>SCHOLARSHIP CODE</Typography>
+                  <TextField name="scholarship_code" value={scholarshipForm.scholarship_code} onChange={handleScholarshipChange} size="small" required fullWidth />
+                </Grid>
+                <Grid item xs={12} sm={4}>
                   <Typography sx={fieldLabelSx}>SCHOLARSHIP NAME</Typography>
                   <TextField name="scholarship_name" value={scholarshipForm.scholarship_name} onChange={handleScholarshipChange} size="small" required fullWidth />
                 </Grid>
@@ -1733,14 +1826,9 @@ const TOSFCrud = () => {
               </Grid>
 
               <Box sx={{ mt: 2, textAlign: "right" }}>
-                {(showCreateActions || (editingScholarshipId && canEdit)) && (
+                {showCreateActions && (
                   <Button type="submit" variant="contained" sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor }}>
-                    {editingScholarshipId ? "Update Scholarship Type" : (<><SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save</>)}
-                  </Button>
-                )}
-                {editingScholarshipId && (
-                  <Button onClick={resetScholarshipForm} color="error" variant="outlined" startIcon={<CloseIcon fontSize="small" />} sx={{ ml: 2, textTransform: "none", borderRadius: "8px" }}>
-                    Cancel
+                    <><SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save</>
                   </Button>
                 )}
               </Box>
@@ -1748,10 +1836,11 @@ const TOSFCrud = () => {
 
             <Divider sx={{ my: 3 }} />
 
-            <CleanTable headers={["ID", "Scholarship Name", "Status", "Created At", "Actions"]} showActionColumn={showActionColumn} headerColor={headerColor} emptyMessage="No scholarship types found.">
+            <CleanTable headers={["#", "Scholarship Code", "Scholarship Name", "Status", "Created At", "Actions"]} showActionColumn={showActionColumn} headerColor={headerColor} emptyMessage="No scholarship types found.">
               {scholarshipTypes.map((item, index) => (
                 <TableRow key={item.id}>
                   <TableCell>{index + 1}</TableCell>
+                  <TableCell>{item.scholarship_code || "-"}</TableCell>
                   <TableCell>{item.scholarship_name}</TableCell>
                   <TableCell><StatusChip active={Number(item.scholarship_status) === 1} /></TableCell>
                   <TableCell>{item.created_at ? new Date(Number(item.created_at) * 1000).toLocaleString() : "-"}</TableCell>
@@ -1796,7 +1885,10 @@ const TOSFCrud = () => {
                   >
                     <option value="">-- Select --</option>
                     {scholarshipTypes.map((s) => (
-                      <option key={s.id} value={s.id}>{s.scholarship_name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.scholarship_code ? `${s.scholarship_code} - ` : ""}
+                        {s.scholarship_name}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
@@ -1833,15 +1925,15 @@ const TOSFCrud = () => {
                   <Typography sx={fieldLabelSx}>DISCOUNT VALUE</Typography>
                   <TextField
                     name="discount_value"
-                    type="number"
+                    type="text"
                     value={scholarshipRuleForm.discount_value}
                     onChange={handleScholarshipRuleChange}
                     size="small"
                     fullWidth
                     disabled={Number(scholarshipRuleForm.discount_type) === 0}
                     required={Number(scholarshipRuleForm.discount_type) !== 0}
-                    placeholder={Number(scholarshipRuleForm.discount_type) === 0 ? "Full discount" : ""}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", step: 1, min: 0 }}
+                    placeholder={Number(scholarshipRuleForm.discount_type) === 0 ? "Full Discount" : ""}
+                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6} md={2}>
@@ -1899,18 +1991,17 @@ const TOSFCrud = () => {
             <Divider sx={{ my: 3 }} />
 
             <CleanTable
-              headers={["ID", "Fee Rate", "Discount Type", "Discount Value", "Year Level", "School Year", "Semester", "Status", "Actions"]}
+              headers={["#", "Fee Rate", "Discount", "Year Level", "School Year", "Semester", "Status", "Actions"]}
               showActionColumn={showActionColumn}
               headerColor={headerColor}
               emptyMessage={selectedScholarshipForRules ? "No scholarship fees found." : "Select a scholarship to manage fees."}
-              colSpanOverride={showActionColumn ? 9 : 8}
+              colSpanOverride={showActionColumn ? 8 : 7}
             >
-              {selectedScholarshipForRules && scholarshipRules.map((rule) => (
+              {selectedScholarshipForRules && scholarshipRules.map((rule, index) => (
                 <TableRow key={rule.id}>
-                  <TableCell>{rule.id}</TableCell>
+                  <TableCell>{index + 1}</TableCell>
                   <TableCell>{getScholarshipFeeRateLabel(rule)}</TableCell>
-                  <TableCell>{getScholarshipDiscountTypeLabel(rule.discount_type)}</TableCell>
-                  <TableCell>{rule.discount_value == null ? "-" : Number(rule.discount_value || 0).toLocaleString()}</TableCell>
+                  <TableCell>{getScholarshipDiscountDisplayLabel(rule)}</TableCell>
                   <TableCell>{getScholarshipYearLevelLabel(rule.year_level_id)}</TableCell>
                   <TableCell>{getScholarshipSchoolYearLabel(rule.school_year_id)}</TableCell>
                   <TableCell>{getScholarshipSemesterLabel(rule.semester_id)}</TableCell>
@@ -1932,17 +2023,45 @@ const TOSFCrud = () => {
       {/* ================================================================ */}
 
       {/* Fee Groups — CRUD modal, opened from the Fee Catalog header */}
-      <Dialog open={feeGroupsModalOpen} onClose={() => setFeeGroupsModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
-          <CategoryIcon fontSize="small" sx={{ color: headerColor }} />
-          Fee Groups
+      <Dialog
+        open={feeGroupsModalOpen}
+        onClose={() => setFeeGroupsModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <CategoryIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Fee Groups
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                Group fees together for reporting and display
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setFeeGroupsModalOpen(false)} sx={verificationDialogCloseSx}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 2 }}>
-            Group fees together for reporting and display.
-          </Typography>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
           <form onSubmit={handleFeeGroupSubmit}>
-            <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
+            <Typography sx={{fontWeight: 600, fontSize: "0.72rem", letterSpacing: "0.04em", color: "text.secondary", mb: 0.5, pt: 2.5}}>DESCRIPTION</Typography>
             <Stack direction="row" spacing={1.5}>
               <TextField name="description" value={feeGroupForm.description} onChange={handleFeeGroupChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
               {showCreateActions && (
@@ -1969,7 +2088,7 @@ const TOSFCrud = () => {
             ))}
           </CleanTable>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
           <Button onClick={() => setFeeGroupsModalOpen(false)} variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>
             Close
           </Button>
@@ -1977,17 +2096,45 @@ const TOSFCrud = () => {
       </Dialog>
 
       {/* Account Types — CRUD modal, opened from the Fee Catalog header */}
-      <Dialog open={accountTypesModalOpen} onClose={() => setAccountTypesModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
-          <AccountBalanceIcon fontSize="small" sx={{ color: headerColor }} />
-          Account Types
+      <Dialog
+        open={accountTypesModalOpen}
+        onClose={() => setAccountTypesModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <AccountBalanceIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Account Types
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                Classify fees by the accounting bucket they post to
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setAccountTypesModalOpen(false)} sx={verificationDialogCloseSx}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 2 }}>
-            Classify fees by the accounting bucket they post to.
-          </Typography>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
           <form onSubmit={handleAccountTypeSubmit}>
-            <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
+            <Typography sx={{fontWeight: 600, fontSize: "0.72rem", letterSpacing: "0.04em", color: "text.secondary", mb: 0.5, pt: 2.5}}>DESCRIPTION</Typography>
             <Stack direction="row" spacing={1.5}>
               <TextField name="description" value={accountTypeForm.description} onChange={handleAccountTypeChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
               {showCreateActions && (
@@ -2014,17 +2161,51 @@ const TOSFCrud = () => {
             ))}
           </CleanTable>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
           <Button onClick={() => setAccountTypesModalOpen(false)} variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={feeCatalogEditDialogOpen} onClose={closeFeeCatalogEditDialog} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Fee</DialogTitle>
+      <Dialog
+        open={feeCatalogEditDialogOpen}
+        onClose={closeFeeCatalogEditDialog}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", md: 860 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <EditIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Edit Fee
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                Update the selected fee catalog entry
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={closeFeeCatalogEditDialog} sx={verificationDialogCloseSx}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
         <form onSubmit={handleFeeCatalogEditSubmit}>
-          <DialogContent>
+          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
               <Grid item xs={12} md={4}>
                 <Typography sx={fieldLabelSx}>FEE CODE</Typography>
@@ -2062,7 +2243,15 @@ const TOSFCrud = () => {
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>ORDER</Typography>
-                <TextField name="sort_order" type="number" value={feeCatalogEditForm.sort_order} onChange={handleFeeCatalogEditChange} size="small" fullWidth />
+                <TextField
+                  name="sort_order"
+                  type="number"
+                  value={feeCatalogEditForm.sort_order}
+                  onChange={handleFeeCatalogEditChange}
+                  size="small"
+                  fullWidth
+                  inputProps={{ min: 1, step: 1 }}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>STATUS</Typography>
@@ -2073,45 +2262,147 @@ const TOSFCrud = () => {
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
             <Button onClick={closeFeeCatalogEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
             <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Fee</Button>
           </DialogActions>
         </form>
       </Dialog>
 
-      <Dialog open={feeGroupEditDialogOpen} onClose={closeFeeGroupEditDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Fee Group</DialogTitle>
+      <Dialog
+        open={feeGroupEditDialogOpen}
+        onClose={closeFeeGroupEditDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <CategoryIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Edit Fee Group
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                Update the selected fee group
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={closeFeeGroupEditDialog} sx={verificationDialogCloseSx}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
         <form onSubmit={handleFeeGroupEditSubmit}>
-          <DialogContent>
+          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
             <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
             <TextField name="description" value={feeGroupEditForm.description} onChange={handleFeeGroupEditChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
             <Button onClick={closeFeeGroupEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
             <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Fee Group</Button>
           </DialogActions>
         </form>
       </Dialog>
 
-      <Dialog open={accountTypeEditDialogOpen} onClose={closeAccountTypeEditDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Account Type</DialogTitle>
+      <Dialog
+        open={accountTypeEditDialogOpen}
+        onClose={closeAccountTypeEditDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <AccountBalanceIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Edit Account Type
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                Update the selected account type
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={closeAccountTypeEditDialog} sx={verificationDialogCloseSx}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
         <form onSubmit={handleAccountTypeEditSubmit}>
-          <DialogContent>
+          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
             <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
             <TextField name="description" value={accountTypeEditForm.description} onChange={handleAccountTypeEditChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
             <Button onClick={closeAccountTypeEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
             <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Account Type</Button>
           </DialogActions>
         </form>
       </Dialog>
 
-      <Dialog open={feeRateEditDialogOpen} onClose={closeFeeRateEditDialog} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Fee Rate</DialogTitle>
+      <Dialog
+        open={feeRateEditDialogOpen}
+        onClose={closeFeeRateEditDialog}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", md: 860 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <PriceChangeIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Edit Fee Rate
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                Update the selected fee rate details
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={closeFeeRateEditDialog} sx={verificationDialogCloseSx}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
         <form onSubmit={handleFeeRateEditSubmit}>
-          <DialogContent>
+          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>FEE</Typography>
@@ -2173,59 +2464,209 @@ const TOSFCrud = () => {
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
             <Button onClick={closeFeeRateEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
             <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Rate</Button>
           </DialogActions>
         </form>
       </Dialog>
 
-      <Dialog open={feeCatalogDeleteDialogOpen} onClose={() => { setFeeCatalogDeleteDialogOpen(false); setSelectedFeeCatalog(null); }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete Fee</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+      <Dialog
+        open={feeCatalogDeleteDialogOpen}
+        onClose={() => { setFeeCatalogDeleteDialogOpen(false); setSelectedFeeCatalog(null); }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Delete Fee
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                This action cannot be undone
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={() => { setFeeCatalogDeleteDialogOpen(false); setSelectedFeeCatalog(null); }}
+            sx={verificationDialogCloseSx}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
             Are you sure you want to delete {selectedFeeCatalog?.fee_name || "this fee"}?
             This is dangerous because all rate records connected to this fee will also be deleted.
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
           <Button onClick={() => { setFeeCatalogDeleteDialogOpen(false); setSelectedFeeCatalog(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
           <Button onClick={executeFeeCatalogDelete} color="error" sx={{ textTransform: "none" }}>Delete Fee</Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={feeGroupDeleteDialogOpen} onClose={() => { setFeeGroupDeleteDialogOpen(false); setSelectedFeeGroup(null); }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete Fee Group</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+      <Dialog
+        open={feeGroupDeleteDialogOpen}
+        onClose={() => { setFeeGroupDeleteDialogOpen(false); setSelectedFeeGroup(null); }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 420 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Delete Fee Group
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                This action cannot be undone
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={() => { setFeeGroupDeleteDialogOpen(false); setSelectedFeeGroup(null); }}
+            sx={verificationDialogCloseSx}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
             Are you sure you want to delete {selectedFeeGroup?.description || "this fee group"}? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
           <Button onClick={() => { setFeeGroupDeleteDialogOpen(false); setSelectedFeeGroup(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
           <Button onClick={executeFeeGroupDelete} color="error" sx={{ textTransform: "none" }}>Delete Fee Group</Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={accountTypeDeleteDialogOpen} onClose={() => { setAccountTypeDeleteDialogOpen(false); setSelectedAccountType(null); }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete Account Type</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete {selectedAccountType?.description || "this account type"}? This action cannot be undone.
+      <Dialog
+        open={accountTypeDeleteDialogOpen}
+        onClose={() => { setAccountTypeDeleteDialogOpen(false); setSelectedAccountType(null); }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 420 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Delete Account Type
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                This action cannot be undone
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={() => { setAccountTypeDeleteDialogOpen(false); setSelectedAccountType(null); }}
+            sx={verificationDialogCloseSx}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
+            Are you sure you want to delete Account Type: <b>{selectedAccountType?.description || "this account type"}</b>? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
           <Button onClick={() => { setAccountTypeDeleteDialogOpen(false); setSelectedAccountType(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
           <Button onClick={executeAccountTypeDelete} color="error" sx={{ textTransform: "none" }}>Delete Account Type</Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={feeRateDeleteDialogOpen} onClose={() => { setFeeRateDeleteDialogOpen(false); setSelectedFeeRate(null); }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete Fee Rate</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Are you sure you want to delete this fee rate? This action cannot be undone.</DialogContentText>
+      <Dialog
+        open={feeRateDeleteDialogOpen}
+        onClose={() => { setFeeRateDeleteDialogOpen(false); setSelectedFeeRate(null); }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 420 } } }}
+      >
+        <DialogTitle sx={verificationDialogTitleSx}>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box
+              sx={{
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "50%",
+                width: 40,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                Delete Fee Rate
+              </Typography>
+              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                This action cannot be undone
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={() => { setFeeRateDeleteDialogOpen(false); setSelectedFeeRate(null); }}
+            sx={verificationDialogCloseSx}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
+            Are you sure you want to delete this fee rate? This action cannot be undone.
+          </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
           <Button onClick={() => { setFeeRateDeleteDialogOpen(false); setSelectedFeeRate(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
           <Button onClick={executeFeeRateDelete} color="error" sx={{ textTransform: "none" }}>Delete Rate</Button>
         </DialogActions>
@@ -2237,21 +2678,66 @@ const TOSFCrud = () => {
         </Alert>
       </Snackbar>
 
-      <Dialog open={scholarshipUpdateDialogOpen} onClose={() => setScholarshipUpdateDialogOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Confirm Update</DialogTitle>
+      <Dialog open={scholarshipUpdateDialogOpen} onClose={resetScholarshipEditForm}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Edit Scholarship Type</DialogTitle>
         <DialogContent>
-          <DialogContentText>Do you want to save the updated scholarship type?</DialogContentText>
+          <Box sx={{ pt: 1 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Typography sx={fieldLabelSx}>SCHOLARSHIP CODE</Typography>
+                <TextField
+                  name="scholarship_code"
+                  value={scholarshipEditForm.scholarship_code}
+                  onChange={(e) => setScholarshipEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))}
+                  size="small"
+                  required
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography sx={fieldLabelSx}>SCHOLARSHIP NAME</Typography>
+                <TextField
+                  name="scholarship_name"
+                  value={scholarshipEditForm.scholarship_name}
+                  onChange={(e) => setScholarshipEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))}
+                  size="small"
+                  required
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography sx={fieldLabelSx}>STATUS</Typography>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="scholarship_status"
+                  value={scholarshipEditForm.scholarship_status}
+                  onChange={(e) =>
+                    setScholarshipEditForm((prev) => ({
+                      ...prev,
+                      scholarship_status: Number(e.target.value),
+                    }))
+                  }
+                  size="small"
+                  fullWidth
+                >
+                  <option value={1}>Active</option>
+                  <option value={0}>Inactive</option>
+                </TextField>
+              </Grid>
+            </Grid>
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setScholarshipUpdateDialogOpen(false)} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={async () => { setScholarshipUpdateDialogOpen(false); await saveScholarshipType(); }} variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Yes, Update</Button>
+          <Button onClick={resetScholarshipEditForm} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
+          <Button onClick={async () => { await saveScholarshipEdit(); }} variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Save Changes</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={scholarshipDeleteDialogOpen} onClose={() => { setScholarshipDeleteDialogOpen(false); setSelectedScholarshipId(null); }}>
         <DialogTitle sx={{ fontWeight: 700 }}>Delete Confirmation</DialogTitle>
         <DialogContent>
-          <DialogContentText>Are you sure you want to delete this scholarship type? This action cannot be undone.</DialogContentText>
+          <DialogContentText sx={{ pt: 2.5 }}>Are you sure you want to delete this scholarship type? This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => { setScholarshipDeleteDialogOpen(false); setSelectedScholarshipId(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
@@ -2273,7 +2759,7 @@ const TOSFCrud = () => {
       <Dialog open={scholarshipRuleDeleteDialogOpen} onClose={() => { setScholarshipRuleDeleteDialogOpen(false); setSelectedScholarshipRuleId(null); }}>
         <DialogTitle sx={{ fontWeight: 700 }}>Delete Confirmation</DialogTitle>
         <DialogContent>
-          <DialogContentText>Are you sure you want to delete this scholarship fee? This action cannot be undone.</DialogContentText>
+          <DialogContentText sx={{ pt: 2.5 }}>Are you sure you want to delete this scholarship fee? This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => { setScholarshipRuleDeleteDialogOpen(false); setSelectedScholarshipRuleId(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
@@ -2284,5 +2770,4 @@ const TOSFCrud = () => {
   );
 };
 
-export default TOSFCrud;    
- 
+export default TOSF;    

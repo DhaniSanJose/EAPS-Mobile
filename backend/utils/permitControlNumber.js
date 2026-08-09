@@ -1,7 +1,11 @@
-const generatePermitControlNumber = async (db, db3, { personId, applicantNumber }) => {
+const generatePermitControlNumber = async (
+  db,
+  db3,
+  { personId, applicantNumber },
+) => {
   if (!personId) throw new Error("personId is required");
 
-  // 1. Confirm this applicant is FULLY verified, and get the verification date
+  // 1. Confirm this applicant is FULLY verified
   const [[person]] = await db.query(
     `SELECT applyingAs FROM person_table WHERE person_id = ? LIMIT 1`,
     [personId],
@@ -15,7 +19,9 @@ const generatePermitControlNumber = async (db, db3, { personId, applicantNumber 
     [person.applyingAs],
   );
   if (requiredRows.length === 0) {
-    throw new Error("No verifiable requirements configured for this applicant type.");
+    throw new Error(
+      "No verifiable requirements configured for this applicant type.",
+    );
   }
   const requiredIds = requiredRows.map((r) => r.id);
   const placeholders = requiredIds.map(() => "?").join(",");
@@ -39,16 +45,16 @@ const generatePermitControlNumber = async (db, db3, { personId, applicantNumber 
     throw err;
   }
 
-  // "Date Verified" = the latest verified_at among the required docs
-  const latestRow = uploadRows.reduce((latest, row) => {
-    const rowDate = row.verified_at || row.created_at;
-    if (!latest) return row;
-    const latestDate = latest.verified_at || latest.created_at;
-    return new Date(rowDate) > new Date(latestDate) ? row : latest;
-  }, null);
-
-  const verifiedDate = new Date(latestRow.verified_at || latestRow.created_at);
-  const verifiedMonth = String(verifiedDate.getMonth() + 1).padStart(2, "0");
+  // ─────────────────────────────────────────────────────────────────────
+  // ✅ FIX: the month segment of the control number ("...-09-...") must
+  // reflect the month the permit is actually being GENERATED (i.e. today),
+  // not the month the applicant's documents happened to get verified.
+  // Previously this used `verified_at`/`created_at` from requirement_uploads,
+  // so a permit generated in September still showed "07" because the
+  // applicant was verified back in July.
+  // ─────────────────────────────────────────────────────────────────────
+  const currentDate = new Date();
+  const currentMonth = String(currentDate.getMonth() + 1).padStart(2, "0");
 
   // 2. Get the active school year + academic year label — this table lives in ENROLLMENT (db3)
   const [[activeYear]] = await db3.query(
@@ -67,13 +73,24 @@ const generatePermitControlNumber = async (db, db3, { personId, applicantNumber 
   // 3. Return existing control number if already generated for this person + school year
   //    control_number_sequence / document_control_numbers live in ADMISSION (db)
   const [[existing]] = await db.query(
-    `SELECT control_number FROM document_control_numbers
-     WHERE form_type = 'permit' AND person_id = ? AND active_school_year_id = ?
-     LIMIT 1`,
+    `SELECT seq_number FROM document_control_numbers
+   WHERE form_type = 'permit' AND person_id = ? AND active_school_year_id = ?
+   LIMIT 1`,
     [personId, activeYear.active_school_year_id],
   );
-  if (existing) return existing.control_number;
 
+  if (existing) {
+    const controlNumber = `${academicYear}-${currentMonth}-${String(existing.seq_number).padStart(5, "0")}`;
+
+    await db.query(
+      `UPDATE document_control_numbers
+     SET control_number = ?, verified_month = ?
+     WHERE form_type = 'permit' AND person_id = ? AND active_school_year_id = ?`,
+      [controlNumber, currentMonth, personId, activeYear.active_school_year_id],
+    );
+
+    return controlNumber;
+  }
   // 4. Otherwise atomically bump the sequence — scoped ONLY by (form_type, active_school_year_id).
   const conn = await db.getConnection();
   try {
@@ -93,17 +110,25 @@ const generatePermitControlNumber = async (db, db3, { personId, applicantNumber 
     );
 
     const seq = seqRow.next_seq;
-    const controlNumber = `${academicYear}-${verifiedMonth}-${String(seq).padStart(5, "0")}`;
+    const controlNumber = `${academicYear}-${currentMonth}-${String(seq).padStart(5, "0")}`;
 
     await conn.query(
       `INSERT INTO document_control_numbers
         (form_type, person_id, applicant_number, active_school_year_id, academic_year, verified_month, seq_number, control_number, action_type)
        VALUES ('permit', ?, ?, ?, ?, ?, ?, ?, 'permit')`,
-      [personId, applicantNumber || null, activeYear.active_school_year_id, academicYear, verifiedMonth, seq, controlNumber],
+      [
+        personId,
+        applicantNumber || null,
+        activeYear.active_school_year_id,
+        academicYear,
+        currentMonth,
+        seq,
+        controlNumber,
+      ],
     );
 
     await conn.commit();
-    return controlNumber; // e.g. "2627-06-00001"
+    return controlNumber; // e.g. "2627-09-00001"
   } catch (err) {
     await conn.rollback();
     throw err;

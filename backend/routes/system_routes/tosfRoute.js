@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require("multer");
-const { db, db3 } = require('../database/database');
+const { db, db3, ensureScholarshipTypeCodeColumn } = require('../database/database');
 const {
   CanCreate,
   CanDelete,
@@ -9,6 +9,10 @@ const {
 const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 
 const router = express.Router();
+
+ensureScholarshipTypeCodeColumn().catch((err) => {
+  console.error("Failed to ensure scholarship_type.scholarship_code column:", err);
+});
 
 const formatAuditActorRole = (role) => {
   const safeRole = String(role || "registrar").trim();
@@ -69,7 +73,7 @@ const normalizeFeeCatalogPayload = (body) => ({
   feeName: String(body.fee_name || "").trim(),
   feeCategory: normalizeTinyInt(body.fee_category, FEE_CATEGORY.OTHER),
   isActive: normalizeTinyInt(body.is_active, 1) === 1 ? 1 : 0,
-  sortOrder: normalizeTinyInt(body.sort_order, 0),
+  sortOrder: Math.max(1, normalizeTinyInt(body.sort_order, 1)),
   feeGroup: normalizeNullableInt(body.fee_group),
   accountType: normalizeNullableInt(body.account_type),
 });
@@ -138,7 +142,7 @@ const findDuplicateFeeRate = async (conn, payload, excludeFeeRateId = null) => {
 router.get("/scholarship_types", async (req, res) => {
   try {
     const [rows] = await db3.query(
-      "SELECT id, scholarship_name, rfd, tfd, mfd, nfd, afd, scholarship_status, created_at FROM scholarship_type ORDER BY id DESC"
+      "SELECT id, scholarship_code, scholarship_name, rfd, tfd, mfd, nfd, afd, scholarship_status, created_at FROM scholarship_type ORDER BY id DESC"
     );
     res.json(rows);
   } catch (error) {
@@ -148,7 +152,7 @@ router.get("/scholarship_types", async (req, res) => {
 });
 
 router.post("/insert_scholarship_type", CanCreate, async (req, res) => {
-  const { scholarship_name, scholarship_status, created_at } = req.body;
+  const { scholarship_code, scholarship_name, scholarship_status, created_at } = req.body;
 
   if (!scholarship_name || !String(scholarship_name).trim()) {
     return res.status(400).json({ message: "scholarship_name is required" });
@@ -163,12 +167,14 @@ router.post("/insert_scholarship_type", CanCreate, async (req, res) => {
     await db3.query(
       `INSERT INTO scholarship_type (
         id,
+        scholarship_code,
         scholarship_name,
         scholarship_status,
         created_at
-      ) VALUES (?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?)`,
       [
         nextId,
+        scholarship_code == null ? "" : String(scholarship_code).trim(),
         String(scholarship_name).trim(),
         scholarship_status ?? 1,
         created_at ?? Math.floor(Date.now() / 1000),
@@ -191,7 +197,7 @@ router.post("/insert_scholarship_type", CanCreate, async (req, res) => {
 
 router.put("/update_scholarship_type/:id", CanEdit, async (req, res) => {
   const { id } = req.params;
-  const { scholarship_name, scholarship_status } = req.body;
+  const { scholarship_code, scholarship_name, scholarship_status } = req.body;
 
   if (!scholarship_name || !String(scholarship_name).trim()) {
     return res.status(400).json({ message: "scholarship_name is required" });
@@ -200,9 +206,10 @@ router.put("/update_scholarship_type/:id", CanEdit, async (req, res) => {
   try {
     const [result] = await db3.query(
       `UPDATE scholarship_type
-       SET scholarship_name = ?, scholarship_status = ?
+       SET scholarship_code = ?, scholarship_name = ?, scholarship_status = ?
        WHERE id = ?`,
       [
+        scholarship_code == null ? "" : String(scholarship_code).trim(),
         String(scholarship_name).trim(),
         scholarship_status ?? 1,
         id
@@ -566,6 +573,9 @@ router.post("/tosf/fee-catalog", CanCreate, async (req, res) => {
   if (!payload.feeCode || !payload.feeName) {
     return res.status(400).json({ message: "fee_code and fee_name are required" });
   }
+  if (payload.sortOrder < 1) {
+    return res.status(400).json({ message: "sort_order must be 1 or greater" });
+  }
 
   try {
     const [result] = await db3.query(
@@ -606,6 +616,9 @@ router.put("/tosf/fee-catalog/:fee_id", CanEdit, async (req, res) => {
 
   if (!payload.feeCode || !payload.feeName) {
     return res.status(400).json({ message: "fee_code and fee_name are required" });
+  }
+  if (payload.sortOrder < 1) {
+    return res.status(400).json({ message: "sort_order must be 1 or greater" });
   }
 
   try {
@@ -1114,4 +1127,3 @@ router.get("/tosf/matriculation/:matriculation_id/fee-lines", async (req, res) =
 });
 
 module.exports = router;
-  

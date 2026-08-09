@@ -153,6 +153,32 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
+  const [gwaPrintStatus, setGwaPrintStatus] = useState({
+    overall: false,
+    per_semester: false,
+    loading: true,
+  });
+
+  useEffect(() => {
+    axios
+      .get(`${API_BASE_URL}/api/honors/gwa_printing_status`)
+      .then((res) =>
+        setGwaPrintStatus({
+          overall: Boolean(res.data?.overall),
+          per_semester: Boolean(res.data?.per_semester),
+          loading: false,
+        }),
+      )
+      .catch((err) => {
+        console.error("Failed to fetch GWA printing status:", err);
+        setGwaPrintStatus({
+          overall: false,
+          per_semester: false,
+          loading: false,
+        });
+      });
+  }, []);
+
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
@@ -312,8 +338,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
 
   const [dateTime, setDateTime] = useState(new Date());
 
-
-
   const formattedDate = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     day: "2-digit",
@@ -410,7 +434,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       downloadBlob(
         downloadRes.data,
         job?.file_name ||
-        `${studentNumberForExport}_Certificate_Of_Registration.pdf`,
+          `${studentNumberForExport}_Certificate_Of_Registration.pdf`,
       );
 
       setExportProgress(100);
@@ -419,7 +443,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       console.error("Failed to generate COR PDF:", error);
       window.alert(
         error?.message ||
-        "Failed to generate Certificate of Registration PDF. Please try again.",
+          "Failed to generate Certificate of Registration PDF. Please try again.",
       );
     } finally {
       setIsGeneratingCorPdf(false);
@@ -475,7 +499,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     return `${num}${s[(v - 20) % 10] || s[v] || s[0]} Yr`;
   };
 
-
   const fetchTermGwa = async (id) => {
     setTermGwaLoading(true);
     try {
@@ -525,7 +548,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           gwa: t.units > 0 ? t.total / t.units : null,
         }))
         // Ascending now: 1st Yr Sem 1 → ... → 4th Yr Sem 2, reads like a timeline
-        .sort((a, b) => (a.yearOrder - b.yearOrder) || (a.semOrder - b.semOrder));
+        .sort((a, b) => a.yearOrder - b.yearOrder || a.semOrder - b.semOrder);
 
       setTermGwaList(list);
     } catch (error) {
@@ -804,7 +827,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     0,
   );
   const paidAmount = assessmentRows.reduce(
-    (sum, row) => sum + Number(row.payment ?? 0),
+    (sum, row) => sum + Number(row.payment_total ?? row.payment ?? 0),
     0,
   );
   const remainingBalance = assessmentRows.reduce(
@@ -1029,7 +1052,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
             [
               "Section",
               `${studentDetails.program_code || ""}${studentDetails.section_description ? ` ${studentDetails.section_description}` : ""}` ||
-              "N/A",
+                "N/A",
             ],
             ["Year Level", studentYearLevel],
           ].map(([label, value], idx, arr) => (
@@ -1039,9 +1062,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                 px: 2,
                 textAlign: "center",
                 borderRight:
-                  idx < arr.length - 1
-                    ? "1px solid rgba(0,0,0,0.2)"
-                    : "none",
+                  idx < arr.length - 1 ? "1px solid rgba(0,0,0,0.2)" : "none",
                 "&:first-of-type": { pl: 0 },
               }}
             >
@@ -1345,36 +1366,38 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary" }}
                       >
-                        Student Account Balance is only displayed for
-                        officially enrolled students.
+                        Student Account Balance is only displayed for officially
+                        enrolled students.
                       </Typography>
                     </Box>
                   </Stack>
-                ) : remainingBalance > 0 && (
-                  <Stack
-                    direction="row"
-                    spacing={1.5}
-                    sx={{
-                      mt: 2,
-                      p: 1.4,
-                      borderRadius: "8px",
-                      bgcolor: "#fff0ee",
-                      color: "#c41922",
-                    }}
-                  >
-                    <WarningAmber fontSize="small" />
-                    <Box>
-                      <Typography sx={{ fontSize: 12, fontWeight: 700 }}>
-                        You have a remaining balance.
-                      </Typography>
-                      <Typography
-                        sx={{ fontSize: 12, color: "text.secondary" }}
-                      >
-                        Grade viewing and some student services may be
-                        unavailable until it is settled.
-                      </Typography>
-                    </Box>
-                  </Stack>
+                ) : (
+                  remainingBalance > 0 && (
+                    <Stack
+                      direction="row"
+                      spacing={1.5}
+                      sx={{
+                        mt: 2,
+                        p: 1.4,
+                        borderRadius: "8px",
+                        bgcolor: "#fff0ee",
+                        color: "#c41922",
+                      }}
+                    >
+                      <WarningAmber fontSize="small" />
+                      <Box>
+                        <Typography sx={{ fontSize: 12, fontWeight: 700 }}>
+                          You have a remaining balance.
+                        </Typography>
+                        <Typography
+                          sx={{ fontSize: 12, color: "text.secondary" }}
+                        >
+                          Grade viewing and some student services may be
+                          unavailable until it is settled.
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  )
                 )}
               </CardContent>
             </Card>
@@ -1578,7 +1601,12 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           <Grid item xs={12}>
             <Card sx={{ ...cardSx, border: `2px solid ${borderColor}` }}>
               <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  alignItems="center"
+                  sx={{ mb: 2 }}
+                >
                   <Box sx={iconBoxSx}>
                     <StarBorder />
                   </Box>
@@ -1587,7 +1615,11 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   </Typography>
                 </Stack>
 
-                {termGwaLoading ? (
+                {!gwaPrintStatus.loading && !gwaPrintStatus.per_semester ? (
+                  <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                    Per-semester GWA is currently closed by the Registrar.
+                  </Typography>
+                ) : termGwaLoading || gwaPrintStatus.loading ? (
                   <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
                     Loading...
                   </Typography>
@@ -1611,7 +1643,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         key={t.label}
                         sx={{
                           width: "100%",
-                          aspectRatio: { xs: "auto", sm: "1 / 1" }, // no forced square on mobile
+                          aspectRatio: { xs: "auto", sm: "1 / 1" },
                           minHeight: { xs: 76, sm: "auto" },
                           display: "flex",
                           flexDirection: "column",
@@ -1636,8 +1668,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                             lineHeight: 1.2,
                             whiteSpace: "normal",
                             wordBreak: "break-word",
-                            // wrap fully on mobile since box height is now flexible;
-                            // clamp only where the box is still forced square (sm+)
                             display: { xs: "block", sm: "-webkit-box" },
                             WebkitLineClamp: { sm: 2 },
                             WebkitBoxOrient: { sm: "vertical" },
@@ -1710,25 +1740,27 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                         {honorStanding.loading
                           ? "Loading..."
                           : honorStanding.title ||
-                          (honorStanding.standing === "disqualified"
-                            ? "Disqualified"
-                            : honorStanding.standing === "not_in_standing"
-                              ? "Not In Standing"
-                              : "No Current Standing")}
+                            (honorStanding.standing === "disqualified"
+                              ? "Disqualified"
+                              : honorStanding.standing === "not_in_standing"
+                                ? "Not In Standing"
+                                : "No Current Standing")}
                       </Typography>
-                      {!honorStanding.loading && honorStanding.overallGwa && (
-                        <Typography
-                          sx={{
-                            mt: 0.75,
-                            color: maroon,
-                            fontSize: 14,
-                            fontWeight: 700,
-                          }}
-                        >
-                          Weighted Overall GWA:{" "}
-                          {Number(honorStanding.overallGwa).toFixed(4)}
-                        </Typography>
-                      )}
+                      {!honorStanding.loading &&
+                        honorStanding.overallGwa &&
+                        gwaPrintStatus.overall && (
+                          <Typography
+                            sx={{
+                              mt: 0.75,
+                              color: maroon,
+                              fontSize: 14,
+                              fontWeight: 700,
+                            }}
+                          >
+                            Weighted Overall GWA:{" "}
+                            {Number(honorStanding.overallGwa).toFixed(4)}
+                          </Typography>
+                        )}
                       <Typography
                         sx={{
                           mt: 1.25,
@@ -1878,8 +1910,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
               </CardContent>
             </Card>
           </Grid>
-
-
 
           <Grid item xs={12} lg={7}>
             <Card

@@ -1,6 +1,8 @@
 const express = require("express");
 const nodemailer = require("nodemailer");
 const { db, db3 } = require("../database/database");
+const { getMatriculationFeeLines } = require("../../utils/matriculationFeeLines");
+const { getMatriculationPaymentLine } = require("../../utils/matriculationPaymentLines");
 const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 
 const router = express.Router();
@@ -110,7 +112,32 @@ router.get("/get_student_data_matriculation", async (req, res) => {
             INNER JOIN person_table pt ON snt.person_id = pt.person_id
         WHERE sst.enrolled_status = 1 GROUP BY m.student_number, m.active_school_year_id;
     `);
-    res.json(rows);
+
+    const rowsWithPaymentData = await Promise.all(
+      rows.map(async (row) => {
+        const paymentLine = await getMatriculationPaymentLine(db3, row.id);
+        const feeLines = await getMatriculationFeeLines(db3, row.id);
+        const computedBalance =
+          paymentLine?.balance ??
+          Math.max(Number(row.total_tosf || 0) - Number(row.payment || 0), 0);
+
+        return {
+          ...row,
+          tuition_fees: paymentLine?.tuition_fees ?? row.tuition_fees ?? 0,
+          total_tosf: paymentLine?.total_tosf ?? row.total_tosf ?? 0,
+          payment: paymentLine?.payment ?? row.payment ?? 0,
+          balance: computedBalance,
+          balance_status: Number(row.balance ?? 0),
+          tuition_is_paid:
+            paymentLine?.tuition_is_paid ?? row.tuition_is_paid ?? 0,
+          tuition_paid_amount:
+            paymentLine?.tuition_paid_amount ?? row.tuition_paid_amount ?? 0,
+          fee_lines: Array.isArray(feeLines) ? feeLines : [],
+        };
+      }),
+    );
+
+    res.json(rowsWithPaymentData);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error while fetching data" });
@@ -198,7 +225,7 @@ router.post("/verify-temp-password", async (req, res) => {
   }
 
   const entry = tempPasswords.get(String(email));
-  
+
   if (!entry) {
     return res.status(400).json({ message: "No temporary password found" });
   }
@@ -214,7 +241,7 @@ router.post("/verify-temp-password", async (req, res) => {
 
   tempPasswords.delete(String(email));
 
-  
+
   res.json({ success: true });
 });
 

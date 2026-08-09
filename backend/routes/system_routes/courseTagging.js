@@ -62,6 +62,49 @@ const getRemainingEnrolledCourseLabels = async (
   );
 };
 
+const getSavedScholarshipDetails = async (studentNumber, activeSchoolYearId = null) => {
+  const buildQuery = (tableName) => {
+    const schoolYearClause = activeSchoolYearId ? `AND ${tableName}.active_school_year_id = ?` : "";
+    const params = activeSchoolYearId ? [studentNumber, activeSchoolYearId] : [studentNumber];
+
+    return {
+      sql: `
+        SELECT
+          ${tableName}.scholarship_id,
+          st.scholarship_code,
+          st.scholarship_name,
+          ${tableName}.active_school_year_id
+        FROM ${tableName}
+        LEFT JOIN scholarship_type st ON st.id = ${tableName}.scholarship_id
+        WHERE ${tableName}.student_number = ?
+          AND ${tableName}.status = 1
+          ${schoolYearClause}
+        ORDER BY ${tableName}.id DESC
+        LIMIT 1
+      `,
+      params,
+    };
+  };
+
+  const [unifastRows] = await db3.query(
+    buildQuery("unifast").sql,
+    buildQuery("unifast").params,
+  );
+  if (unifastRows.length > 0) {
+    return { ...unifastRows[0], scholarship_source: "unifast" };
+  }
+
+  const [matriculationRows] = await db3.query(
+    buildQuery("matriculation").sql,
+    buildQuery("matriculation").params,
+  );
+  if (matriculationRows.length > 0) {
+    return { ...matriculationRows[0], scholarship_source: "matriculation" };
+  }
+
+  return null;
+};
+
 const logCourseTaggingStudentHistory = async ({
   req,
   action,
@@ -1274,6 +1317,10 @@ router.post("/student-tagging/dprtmnt", async (req, res) => {
     const totalComputerLab = Number(feeResult[0]?.total_computer_lab || 0);
     const totalLaboratory = Number(feeResult[0]?.total_laboratory || 0);
     const isEnrolled = student.enrolled_status === 1;
+    const savedScholarship = await getSavedScholarshipDetails(
+      student.student_number,
+      student.active_school_year_id || active_school_year_id || null,
+    );
 
     const effectiveProgram =
       student.active_curriculum && student.active_curriculum !== 0
@@ -1307,6 +1354,32 @@ router.post("/student-tagging/dprtmnt", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "24h" },
     );
+
+    const corData = {
+      student_number: student.student_number,
+      person_id: student.person_id,
+      profile_img: student.profile_img,
+      lrnNumber: student.lrnNumber,
+      cellphoneNumber: student.cellphoneNumber,
+      last_name: student.last_name,
+      middle_name: student.middle_name,
+      campus: student.campus,
+      first_name: student.first_name,
+      extension: student.extension,
+      gender: student.gender,
+      age: student.age,
+      email: student.emailAddress,
+      curriculum: student.active_curriculum,
+      yearlevel: student.year_level_id,
+      program: student.program_description,
+      program_code: student.program_code,
+      college: student.dprtmnt_name,
+      active_school_year_id: student.active_school_year_id,
+      scholarship_id: savedScholarship?.scholarship_id ?? null,
+      scholarship_code: savedScholarship?.scholarship_code || "",
+      scholarship_name: savedScholarship?.scholarship_name || "",
+      scholarship_source: savedScholarship?.scholarship_source || "",
+    };
 
     res.json({
       message: "Search successful",
@@ -1342,6 +1415,7 @@ router.post("/student-tagging/dprtmnt", async (req, res) => {
       program: student.program,
       profile_img: student.profile_img,
       extension: student.extension,
+      corData,
     });
   } catch (err) {
     console.error("SQL error:", err);
@@ -1564,6 +1638,11 @@ router.post("/student-tagging-batch", async (req, res) => {
         const totalNstpCount = Number(feeResult[0]?.total_nstp || 0);
         const totalComputerLab = Number(feeResult[0]?.total_computer_lab || 0);
         const totalLaboratory = Number(feeResult[0]?.total_laboratory || 0);
+        const savedScholarship = await getSavedScholarshipDetails(
+          student.student_number,
+          student.active_school_year_id || active_school_year_id || null,
+        );
+
         const corData = {
           student_number: student.student_number,
           person_id: student.person_id,
@@ -1584,8 +1663,13 @@ router.post("/student-tagging-batch", async (req, res) => {
           program_code: student.program_code,
           college: student.dprtmnt_name,
           active_school_year_id: student.active_school_year_id,
+          scholarship_id: savedScholarship?.scholarship_id ?? null,
+          scholarship_code: savedScholarship?.scholarship_code || "",
+          scholarship_name: savedScholarship?.scholarship_name || "",
+          scholarship_source: savedScholarship?.scholarship_source || "",
         };
 
+        console.log("Data: ", corData);
         const token2 = webtoken.sign(
           {
             id: student.student_status_id,
@@ -1918,7 +2002,7 @@ router.post("/check-student-balance", async (req, res) => {
       `SELECT
           id,
           student_number,
-          COALESCE(NULLIF(balance, ''), '0') AS balance,
+          COALESCE(NULLIF(balance, ''), '0') AS balance_status,
           COALESCE(NULLIF(total_tosf, ''), '0') AS total_tosf,
           COALESCE(NULLIF(payment, ''), '0') AS payment
        FROM matriculation
@@ -1930,19 +2014,34 @@ router.post("/check-student-balance", async (req, res) => {
     );
 
     const matriculation = rows[0] || null;
+    const [[balanceRow]] = await db3.query(
+      `SELECT COALESCE(NULLIF(mpl.balance, ''), '0') AS balance
+       FROM matriculation_payment_lines mpl
+       INNER JOIN matriculation m ON m.id = mpl.matriculation_id
+       WHERE m.student_number = ?
+         AND (? IS NULL OR m.active_school_year_id = ?)
+       ORDER BY mpl.id DESC
+       LIMIT 1`,
+      [student_number, activeSchoolYearId, activeSchoolYearId],
+    );
+
+    const legacyBalance = Number(
+      String(matriculation?.balance_status ?? "0").replace(/,/g, ""),
+    );
     const balance = Number(
-      String(matriculation?.balance ?? "0").replace(/,/g, ""),
+      String(balanceRow?.balance ?? (legacyBalance > 1 ? legacyBalance : "0")).replace(/,/g, ""),
     );
     const safeBalance = Number.isFinite(balance) && balance > 0 ? balance : 0;
+    const hasBalance = Number(matriculation?.balance_status || 0) === 1 || safeBalance > 0;
 
     return res.json({
-      hasBalance: safeBalance > 0,
+      hasBalance,
       balance: safeBalance,
       payment_type: matriculation ? "matriculation" : null,
       matriculation_id: matriculation?.id || null,
       active_school_year_id: activeSchoolYearId,
       message:
-        safeBalance > 0
+        hasBalance
           ? "Student still has a remaining matriculation balance."
           : "Student has no remaining matriculation balance.",
     });

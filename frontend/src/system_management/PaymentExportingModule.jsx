@@ -347,7 +347,7 @@ const PaymentExportingModule = () => {
             "Last Name": row.last_name,
             "Given Name": row.given_name,
             "MI": row.middle_initial,
-            "Degree Program": row.degree_program,
+            "Degree Program": row.program_description || row.degree_program,
             "Year Level": row.year_level,
             "Sex": row.sex,
             "Email": row.email_address,

@@ -1,6 +1,13 @@
 const express = require('express');
 const { db3 } = require('../database/database');
 const { insertAuditLogEnrollment, resolveAuditActor } = require('../../utils/auditLogger');
+const { applyPaymentWaterfall } = require('../../utils/matriculationPayment');
+const {
+    applyMatriculationPayment,
+} = require('../../utils/matriculationPaymentLines');
+const {
+    applyFeeLinePaymentAllocations,
+} = require('../../utils/matriculationFeeLines');
 
 const router = express.Router();
 
@@ -101,7 +108,7 @@ const formatSchoolYear = (row = {}) => {
 const getTransactionAuditDetails = async (connection, transactionId) => {
     const [[row]] = await connection.query(
         `SELECT
-            tt.id,
+            tt.transaction_no,
             tt.student_number,
             tt.payment,
             tt.employee_id,
@@ -113,7 +120,8 @@ const getTransactionAuditDetails = async (connection, transactionId) => {
             m.last_name,
             m.given_name,
             m.middle_initial,
-            m.balance,
+            COALESCE(m.balance, 0) AS balance_status,
+            COALESCE(mpl.balance, 0) AS remaining_balance,
             yt.year_description AS current_year,
             yt.year_description + 1 AS next_year,
             st.semester_description
@@ -121,11 +129,13 @@ const getTransactionAuditDetails = async (connection, transactionId) => {
          LEFT JOIN matriculation AS m
             ON m.student_number = tt.student_number
            AND m.active_school_year_id = tt.active_school_year_id
-         LEFT JOIN active_school_year_table AS sy ON tt.active_school_year_id = sy.id
-         LEFT JOIN year_table AS yt ON sy.year_id = yt.year_id
-         LEFT JOIN semester_table AS st ON sy.semester_id = st.semester_id
-         WHERE tt.id = ?
-         LIMIT 1`,
+         LEFT JOIN matriculation_payment_lines AS mpl
+            ON mpl.matriculation_id = m.id
+          LEFT JOIN active_school_year_table AS sy ON tt.active_school_year_id = sy.id
+          LEFT JOIN year_table AS yt ON sy.year_id = yt.year_id
+          LEFT JOIN semester_table AS st ON sy.semester_id = st.semester_id
+          WHERE tt.transaction_no = ?
+          LIMIT 1`,
         [transactionId]
     );
 
@@ -137,7 +147,7 @@ router.get('/payment_matriculation/transactions', async (req, res) => {
         await ensureReceiptStatusColumns();
         const [rows] = await db3.query(
             `SELECT
-                tt.id,
+                tt.transaction_no,
                 tt.student_number,
                 tt.payment,
                 tt.employee_id,
@@ -157,7 +167,7 @@ router.get('/payment_matriculation/transactions', async (req, res) => {
              LEFT JOIN active_school_year_table AS sy ON tt.active_school_year_id = sy.id
              LEFT JOIN year_table AS yt ON sy.year_id = yt.year_id
              LEFT JOIN semester_table AS st ON sy.semester_id = st.semester_id
-             ORDER BY tt.created_at DESC, tt.id DESC`
+             ORDER BY tt.created_at DESC, tt.transaction_no DESC`
         );
 
         return res.json(rows);
@@ -195,10 +205,10 @@ router.put('/payment_matriculation/void/:transaction_id', async (req, res) => {
         const [result] = await db3.query(
             `UPDATE transaction_table
              SET remark = ?,
-                 payment_status = ?,
-                 receipt_status = ?,
-                 voided_at = CURRENT_TIMESTAMP
-             WHERE id = ?`,
+                  payment_status = ?,
+                  receipt_status = ?,
+                  voided_at = CURRENT_TIMESTAMP
+             WHERE transaction_no = ?`,
             [voidRemark, PAYMENT_STATUS.VOID, RECEIPT_STATUS.VOID, transaction_id]
         );
 
@@ -214,8 +224,8 @@ router.put('/payment_matriculation/void/:transaction_id', async (req, res) => {
                 ON tt.student_number = m.student_number
                AND tt.active_school_year_id = m.active_school_year_id
              SET m.receipt_status = ?,
-                 m.latest_transaction_id = tt.id
-             WHERE tt.id = ?`,
+                 m.latest_transaction_id = tt.transaction_no
+             WHERE tt.transaction_no = ?`,
             [RECEIPT_STATUS.VOID, transaction_id]
         );
 
@@ -262,9 +272,9 @@ router.put('/payment_matriculation/remark/:transaction_id', async (req, res) => 
         const [result] = await db3.query(
             `UPDATE transaction_table
              SET remark = ?,
-                 receipt_status = COALESCE(?, receipt_status),
-                 cancelled_print_at = CASE WHEN ? = ? THEN CURRENT_TIMESTAMP ELSE cancelled_print_at END
-             WHERE id = ?`,
+                  receipt_status = COALESCE(?, receipt_status),
+                  cancelled_print_at = CASE WHEN ? = ? THEN CURRENT_TIMESTAMP ELSE cancelled_print_at END
+             WHERE transaction_no = ?`,
             [
                 normalizedRemark,
                 nextReceiptStatus,
@@ -287,8 +297,8 @@ router.put('/payment_matriculation/remark/:transaction_id', async (req, res) => 
                     ON tt.student_number = m.student_number
                    AND tt.active_school_year_id = m.active_school_year_id
                  SET m.receipt_status = ?,
-                     m.latest_transaction_id = tt.id
-                 WHERE tt.id = ?`,
+                     m.latest_transaction_id = tt.transaction_no
+                 WHERE tt.transaction_no = ?`,
                 [nextReceiptStatus, transaction_id]
             );
         }
@@ -323,7 +333,7 @@ router.put('/payment_matriculation/print/:transaction_id', async (req, res) => {
         const [[transactionBefore]] = await db3.query(
             `SELECT receipt_status, print_count
              FROM transaction_table
-             WHERE id = ?
+             WHERE transaction_no = ?
              LIMIT 1`,
             [transaction_id]
         );
@@ -345,10 +355,10 @@ router.put('/payment_matriculation/print/:transaction_id', async (req, res) => {
         await db3.query(
             `UPDATE transaction_table
              SET receipt_status = ?,
-                 print_count = print_count + 1,
-                 printed_at = CURRENT_TIMESTAMP,
-                 remark = ?
-             WHERE id = ?`,
+                  print_count = print_count + 1,
+                  printed_at = CURRENT_TIMESTAMP,
+                  remark = ?
+              WHERE transaction_no = ?`,
             [nextReceiptStatus, nextReceiptStatus === RECEIPT_STATUS.REPRINTED ? "Reprinted" : "Printed", transaction_id]
         );
 
@@ -358,8 +368,8 @@ router.put('/payment_matriculation/print/:transaction_id', async (req, res) => {
                 ON tt.student_number = m.student_number
                AND tt.active_school_year_id = m.active_school_year_id
              SET m.receipt_status = ?,
-                 m.latest_transaction_id = tt.id
-             WHERE tt.id = ?`,
+                 m.latest_transaction_id = tt.transaction_no
+             WHERE tt.transaction_no = ?`,
             [nextReceiptStatus, transaction_id]
         );
 
@@ -399,10 +409,10 @@ router.put('/payment_matriculation/cancel-print/:transaction_id', async (req, re
         const [result] = await db3.query(
             `UPDATE transaction_table
              SET receipt_status = ?,
-                 cancelled_print_at = CURRENT_TIMESTAMP,
-                 remark = ?
-             WHERE id = ?
-               AND receipt_status <> ?`,
+                  cancelled_print_at = CURRENT_TIMESTAMP,
+                  remark = ?
+              WHERE transaction_no = ?
+                AND receipt_status <> ?`,
             [RECEIPT_STATUS.CANCELLED_PRINT, "Cancelled Print", transaction_id, RECEIPT_STATUS.VOID]
         );
 
@@ -416,8 +426,8 @@ router.put('/payment_matriculation/cancel-print/:transaction_id', async (req, re
                 ON tt.student_number = m.student_number
                AND tt.active_school_year_id = m.active_school_year_id
              SET m.receipt_status = ?,
-                 m.latest_transaction_id = tt.id
-             WHERE tt.id = ?`,
+                 m.latest_transaction_id = tt.transaction_no
+             WHERE tt.transaction_no = ?`,
             [RECEIPT_STATUS.CANCELLED_PRINT, transaction_id]
         );
 
@@ -466,21 +476,6 @@ router.put('/payment_matriculation/:id', async (req, res) => {
 
         await connection.beginTransaction();
 
-        const [result] = await connection.query(
-            `UPDATE matriculation
-             SET payment = ?,
-                 balance = ?,
-                 payment_status = ?,
-                 receipt_status = ?
-             WHERE id = ?`,
-            [parsedPayment, parsedBalance, resolvedPaymentStatus, RECEIPT_STATUS.PAID_NOT_PRINTED, id]
-        );
-
-        if (result.affectedRows === 0) {
-            await connection.rollback();
-            return res.status(404).json({ message: "Matriculation record not found." });
-        }
-
         const [matriculationRows] = await connection.query(
             `SELECT student_number, last_name, given_name, middle_initial, total_tosf
              FROM matriculation
@@ -496,6 +491,29 @@ router.put('/payment_matriculation/:id', async (req, res) => {
 
         const matriculationRow = matriculationRows[0];
         const { student_number } = matriculationRow;
+
+        const [feeLines] = await connection.query(
+            `SELECT
+                mfl.id,
+                mfl.matriculation_id,
+                mfl.fee_rate_id,
+                mfl.amount,
+                mfl.is_paid,
+                COALESCE(mfl.paid_amount, 0) AS paid_amount,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 'TUITION' ELSE fc.fee_code END AS fee_code,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END AS fee_name,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE fc.sort_order END AS sort_order,
+                CASE WHEN mfl.fee_rate_id = 0 THEN NULL ELSE fc.account_type END AS account_type,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 1 ELSE 0 END AS is_tuition
+             FROM matriculation_fee_lines mfl
+             LEFT JOIN fee_rate fr ON fr.fee_rate_id = mfl.fee_rate_id
+             LEFT JOIN fee_catalog fc ON fc.fee_id = fr.fee_id
+             WHERE mfl.matriculation_id = ?
+             ORDER BY
+                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE COALESCE(fc.sort_order, 999999) END ASC,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END ASC`,
+            [id]
+        );
 
         const [activeSchoolYearRows] = await connection.query(
             `SELECT
@@ -520,7 +538,7 @@ router.put('/payment_matriculation/:id', async (req, res) => {
         const active_school_year_id = activeSchoolYearRows[0].school_year_id;
 
         const [counterRows] = await connection.query(
-            `SELECT counter
+            `SELECT counter, account_type_id
              FROM receipt_counter
              WHERE employee_id = ? AND active_school_year_id = ?`,
             [employee_id, active_school_year_id]
@@ -540,9 +558,9 @@ router.put('/payment_matriculation/:id', async (req, res) => {
         }
 
         const [maxIdRows] = await connection.query(
-            `SELECT MAX(CAST(id AS UNSIGNED)) AS max_id
+            `SELECT MAX(CAST(transaction_no AS UNSIGNED)) AS max_id
              FROM transaction_table
-             WHERE CAST(id AS CHAR) LIKE CONCAT(?, '%')`,
+             WHERE CAST(transaction_no AS CHAR) LIKE CONCAT(?, '%')`,
             [counterPrefix]
         );
 
@@ -550,9 +568,26 @@ router.put('/payment_matriculation/:id', async (req, res) => {
         // Use the assigned counter as source of truth, but self-heal if table already has a higher id.
         const nextTransactionId = latestId > 0 ? Math.max(assignedCounter, latestId + 1) : assignedCounter;
 
+        const cashierAccountTypeId = counterRows[0]?.account_type_id ?? null;
+        const paymentSummary = applyPaymentWaterfall(
+            feeLines,
+            parsedPayment,
+            cashierAccountTypeId
+        );
+
+        if (paymentSummary.error) {
+            await connection.rollback();
+            return res.status(400).json({ message: paymentSummary.error });
+        }
+
+        if (paymentSummary.totalPayment <= 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Payment must be a valid non-negative number." });
+        }
+
         await connection.query(
             `INSERT INTO transaction_table (
-                id, student_number, payment, employee_id, active_school_year_id,
+                transaction_no, student_number, payment, employee_id, active_school_year_id,
                 remark, payment_status, receipt_status, print_count
              )
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -569,6 +604,38 @@ router.put('/payment_matriculation/:id', async (req, res) => {
             ]
         );
 
+        await applyFeeLinePaymentAllocations(connection, paymentSummary.allocations);
+
+        const [updatedFeeLines] = await connection.query(
+            `SELECT
+                mfl.id,
+                mfl.matriculation_id,
+                mfl.fee_rate_id,
+                mfl.amount,
+                mfl.is_paid,
+                COALESCE(mfl.paid_amount, 0) AS paid_amount,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 'TUITION' ELSE fc.fee_code END AS fee_code,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END AS fee_name,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE fc.sort_order END AS sort_order,
+                CASE WHEN mfl.fee_rate_id = 0 THEN NULL ELSE fc.account_type END AS account_type,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 1 ELSE 0 END AS is_tuition
+             FROM matriculation_fee_lines mfl
+             LEFT JOIN fee_rate fr ON fr.fee_rate_id = mfl.fee_rate_id
+             LEFT JOIN fee_catalog fc ON fc.fee_id = fr.fee_id
+             WHERE mfl.matriculation_id = ?
+             ORDER BY
+                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE COALESCE(fc.sort_order, 999999) END ASC,
+                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END ASC`,
+            [id]
+        );
+
+        await applyMatriculationPayment(connection, {
+            matriculationId: Number(id),
+            transactionId: nextTransactionId,
+            allocations: paymentSummary.allocations,
+            feeLines: updatedFeeLines,
+        });
+
         await connection.query(
             `UPDATE receipt_counter
              SET counter = ?,
@@ -580,9 +647,19 @@ router.put('/payment_matriculation/:id', async (req, res) => {
         await connection.query(
             `UPDATE matriculation
              SET latest_transaction_id = ?,
+                 payment = ?,
+                 balance = ?,
+                 payment_status = ?,
                  receipt_status = ?
              WHERE id = ?`,
-            [nextTransactionId, RECEIPT_STATUS.PAID_NOT_PRINTED, id]
+            [
+                nextTransactionId,
+                paymentSummary.totalPayment,
+                paymentSummary.balance > 0 ? 1 : 0,
+                resolvedPaymentStatus,
+                RECEIPT_STATUS.PAID_NOT_PRINTED,
+                id,
+            ]
         );
 
         await connection.commit();
@@ -591,15 +668,18 @@ router.put('/payment_matriculation/:id', async (req, res) => {
         await insertMatriculationAuditLog({
             req,
             action: "MATRICULATION_PAYMENT_SAVE",
-            message: `${roleLabel} (${actorId}) saved matriculation payment for ${formatStudentName(matriculationRow)} (${student_number}). Receipt No: ${nextTransactionId}. Payment: ${formatMoney(parsedPayment)}. Balance: ${formatMoney(parsedBalance)}. Total amount to pay: ${formatMoney(matriculationRow.total_tosf)}. Academic term: ${formatSchoolYear(activeSchoolYearRows[0])}. Receipt status: ${RECEIPT_STATUS.PAID_NOT_PRINTED}.`,
+            message: `${roleLabel} (${actorId}) saved matriculation payment for ${formatStudentName(matriculationRow)} (${student_number}). Receipt No: ${nextTransactionId}. Payment: ${formatMoney(paymentSummary.totalPayment)}. Balance: ${formatMoney(paymentSummary.balance)}. Total amount to pay: ${formatMoney(matriculationRow.total_tosf)}. Academic term: ${formatSchoolYear(activeSchoolYearRows[0])}. Receipt status: ${RECEIPT_STATUS.PAID_NOT_PRINTED}.`,
         });
         return res.json({
             message: "Matriculation payment updated successfully.",
+            transaction_no: nextTransactionId,
             transaction_id: nextTransactionId,
             active_school_year_id,
-            balance: parsedBalance,
+            balance: paymentSummary.balance,
             payment_status: resolvedPaymentStatus,
             receipt_status: RECEIPT_STATUS.PAID_NOT_PRINTED,
+            payment_applied: paymentSummary.appliedPayment,
+            payment_breakdown: paymentSummary.allocations,
         });
     } catch (error) {
         await connection.rollback();

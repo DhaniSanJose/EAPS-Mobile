@@ -1194,6 +1194,12 @@ const SideBar = ({
           page_id: 153,
         },
         {
+          title: "Student Grade File",
+          link: "/registrar_student_grade_file",
+          icon: Grading,
+          page_id: 174,
+        },
+        {
           title: "Report of Grades",
           link: "/report_of_grades",
           icon: Assessment,

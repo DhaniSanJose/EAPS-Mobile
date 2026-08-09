@@ -338,17 +338,17 @@ const ExaminationPermitChangeCourse = () => {
 
   useEffect(() => {
     if (selectedPerson?.applicant_number) {
-        axios
-            .get(`${API_BASE_URL}/api/applicant-schedule/${selectedPerson.applicant_number}`)
-            .then((res) => setExamSchedule(res.data))
-            .catch((err) => {
-                console.error("Error fetching exam schedule:", err);
-                setExamSchedule(null);
-            });
+      axios
+        .get(`${API_BASE_URL}/api/applicant-schedule/${selectedPerson.applicant_number}`)
+        .then((res) => setExamSchedule(res.data))
+        .catch((err) => {
+          console.error("Error fetching exam schedule:", err);
+          setExamSchedule(null);
+        });
     } else {
-        setExamSchedule(null);
+      setExamSchedule(null);
     }
-}, [selectedPerson]);
+  }, [selectedPerson]);
 
 
   useEffect(() => {
@@ -560,60 +560,79 @@ const ExaminationPermitChangeCourse = () => {
   const getSignatureImageSrc = (signature) =>
     signature?.signature_image ? `${API_BASE_URL}/uploads/${signature.signature_image}` : "";
 
-  // document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  // document.addEventListener("keydown", (e) => {
-  //   const isBlockedKey =
-  //     e.key === "F12" ||
-  //     e.key === "F11" ||
-  //     (e.ctrlKey &&
-  //       e.shiftKey &&
-  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
-  //     (e.ctrlKey && e.key.toLowerCase() === "p");
-
-  //   if (isBlockedKey) {
-  //     e.preventDefault();
-  //     e.stopPropagation();
-  //   }
-  // });
-
   if (loading || hasAccess === null) return <LoadingOverlay open={loading} message="Loading..." />;
   if (!hasAccess) return <Unauthorized />;
 
 
 
   // ─── Shared header block ──────────────────────────────────────────────────
+  // ✅ UPDATED — logo + Document No. are now centered as a single column
+  // (flex column, alignItems: center) instead of being left-shifted by a
+  // negative margin, and the Document No. line is kept to one row with
+  // whiteSpace: "nowrap" at 13px.
   const SchoolHeader = ({ showProfile = false }) => (
     <table style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", textAlign: "center", tableLayout: "fixed" }}>
       <tbody>
         <tr>
           <td colSpan={40} style={{ height: "0.5in", textAlign: "center" }}>
-            <table width="100%" style={{ borderCollapse: "collapse", marginTop: "15px", fontFamily: "Arial" }}>
+            <table width="100%" style={{ borderCollapse: "collapse", marginTop: "-10px", fontFamily: "Arial" }}>
               <tbody>
                 <tr>
                   <td style={{ width: "20%", textAlign: "center" }}>
-                    <img src={fetchedLogo} alt="School Logo" style={{ marginLeft: "-10px", width: "120px", height: "120px", borderRadius: "50%", objectFit: "cover" }} />
-                    {controlNumbers.permit && (
-                      <div style={{ fontSize: "11.5px", fontWeight: "bold", color: "#8B0000", marginTop: "4px" }}>
-                        Document No.: {controlNumbers.permit}
-                      </div>
-                    )}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      <img
+                        src={fetchedLogo}
+                        alt="School Logo"
+                        style={{
+                          width: "120px",
+                          height: "120px",
+                          marginTop: "10px",
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                        }}
+                      />
+                      {controlNumbers.permit && (
+                        <div style={{ fontSize: "13px", fontWeight: "bold", color: "#8B0000", marginTop: "4px", whiteSpace: "nowrap" }}>
+                          Document No.: {controlNumbers.permit}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td style={{ width: "60%", textAlign: "center", lineHeight: "1" }}>
                     <div style={{ fontSize: "13px", fontFamily: "Arial" }}>Republic of the Philippines</div>
-                    <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "16px", textTransform: "Uppercase" }}>{firstLine}</div>
-                    <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "16px", textTransform: "Uppercase" }}>{secondLine}</div>
+                    <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "20px" }}>{firstLine}</div>
+                    {secondLine && (
+                      <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "20px" }}>{secondLine}</div>
+                    )}
                     {campusAddress && <div style={{ fontSize: "13px", fontFamily: "Arial" }}>{campusAddress}</div>}
                     {showProfile && (
-                      <div style={{ marginTop: "30px" }}>
-                        <b style={{ fontSize: "24px", letterSpacing: "1px", fontWeight: "bold" }}>EXAMINATION PERMIT</b>
-                      </div>
+                      <>
+                        <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "15px", letterSpacing: "1px", marginTop: "6px" }}>
+                          OFFICE OF THE ADMISSION SERVICES
+                        </div>
+                        <div style={{ marginTop: "30px" }}>
+                          <b style={{ fontSize: "24px", letterSpacing: "1px", fontWeight: "bold" }}>EXAMINATION PERMIT</b>
+                        </div>
+                      </>
                     )}
                   </td>
                   {showProfile && (
                     <td colSpan={4} rowSpan={6} style={{ textAlign: "center", position: "relative", width: "4.5cm", height: "4.5cm" }}>
-                      <div style={{ width: "4.70cm", height: "4.70cm", marginRight: "10px", display: "flex", justifyContent: "center", alignItems: "center", position: "relative", border: "2px solid black", overflow: "hidden", borderRadius: "4px" }}>
+                      <div
+                        style={{
+                          width: "3.80cm",
+                          height: "3.80cm",
+                          marginRight: "10px",
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          position: "relative",
+                          border: "1px solid black",
+                          overflow: "hidden",
+                          borderRadius: "4px",
+                          marginTop: "10px",
+                        }}
+                      >
                         {person.profile_img
                           ? <img src={`${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                           : <span style={{ fontSize: "12px", color: "#888" }}>No Image</span>}
@@ -630,13 +649,15 @@ const ExaminationPermitChangeCourse = () => {
   );
 
   // ─── Change Course header (with profile photo on right) ───────────────────
+  // ✅ UPDATED — same centering fix as SchoolHeader: logo + Document No.
+  // stacked in a centered flex column, 13px, single-line (nowrap).
   const ChangeCourseHeader = () => (
     <div className="student-table" style={{ width: "8in", maxWidth: "100%", margin: "0 auto", marginTop: "10px", boxSizing: "border-box", padding: "10px 0" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "nowrap" }}>
-        <div style={{ flexShrink: 0 }}>
-          <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginTop: "-25px", borderRadius: "50%" }} />
           {controlNumbers[selectedForm] && (
-            <div style={{ fontSize: "11.5px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+            <div style={{ fontSize: "13px", fontWeight: "bold", color: "#8B0000", textAlign: "center", whiteSpace: "nowrap" }}>
               Document No.: {controlNumbers[selectedForm]}
             </div>
           )}
@@ -661,13 +682,15 @@ const ExaminationPermitChangeCourse = () => {
     </div>
   );
 
+  // ✅ UPDATED — same centering fix: logo + Document No. stacked centered,
+  // 13px, single-line (nowrap).
   const EmptyFormHeader = () => (
     <div className="student-table" style={{ width: "8in", maxWidth: "100%", margin: "0 auto", marginTop: "10px", boxSizing: "border-box", padding: "10px 0" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <div style={{ position: "absolute", left: 0 }}>
-          <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+        <div style={{ position: "absolute", left: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginTop: "-25px", borderRadius: "50%" }} />
           {controlNumbers[selectedForm] && (
-            <div style={{ fontSize: "11.5px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+            <div style={{ fontSize: "13px", fontWeight: "bold", color: "#8B0000", textAlign: "center", whiteSpace: "nowrap" }}>
               Document No.: {controlNumbers[selectedForm]}
             </div>
           )}
@@ -1017,105 +1040,110 @@ const ExaminationPermitChangeCourse = () => {
       <Watermark top="23%" />
       <div className="section">
         <SchoolHeader showProfile />
-        <div style={{ height: "30px" }}></div>
-        <table className="student-table" style={{ borderCollapse: "collapse", fontFamily: "Arial", width: "8in", margin: "0 auto", textAlign: "center", tableLayout: "fixed" }}>
+        <div style={{ height: "20px" }} />
+        <table
+          className="student-table"
+          style={{
+            borderCollapse: "collapse",
+            fontFamily: "Arial",
+            fontSize: "15px",
+            width: "8in",
+            margin: "0 auto",
+            tableLayout: "fixed",
+          }}
+        >
           <tbody>
+            {/* Applicant Number */}
             <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
               <td colSpan={40}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", width: "100%", gap: "10px" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Applicant No.:</label>
-                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", minWidth: "278px", height: "1.2em", display: "flex", alignItems: "center" }}>{selectedPerson?.applicant_number}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", width: "100%", gap: "3px" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+                    Applicant No.:
+                  </label>
+                  <div style={{
+                    borderBottom: "1px solid black",
+                    fontFamily: "Arial",
+                    fontWeight: "normal",
+                    fontSize: "15px",
+                    minWidth: "278px",
+                    height: "1.2em",
+                    display: "flex",
+                    alignItems: "center",
+                  }}>
+                    {selectedPerson?.applicant_number}
+                  </div>
                 </div>
               </td>
             </tr>
-            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+
+            {/* Name + Permit No. */}
+            <tr>
               <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", width: "100%", gap: "10px" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Name:</label>
-                  <div style={{ borderBottom: "1px solid black", fontFamily: "Arial", fontWeight: "normal", fontSize: "15px", minWidth: "328px", height: "1.2em", display: "flex", alignItems: "center" }}>
-                    {selectedPerson?.last_name?.toUpperCase()}, {selectedPerson?.first_name?.toUpperCase()} {selectedPerson?.middle_name?.toUpperCase() || ""} {selectedPerson?.extension?.toUpperCase() || ""}
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  <label style={{ fontWeight: "bold", marginRight: "10px" }}>Name:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", fontFamily: "Arial", minWidth: "250px" }}>
+                    {selectedPerson?.last_name?.toUpperCase()}, {selectedPerson?.first_name?.toUpperCase()}{" "}
+                    {selectedPerson?.middle_name?.toUpperCase() || ""}{" "}
+                    {selectedPerson?.extension?.toUpperCase() || ""}
+                  </span>
                 </div>
               </td>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Permit No.:</label>
-                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", textAlign: "left" }}>
+                  <label style={{ fontWeight: "bold", marginRight: "10px" }}>Permit No.:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", minWidth: "200px", fontFamily: "Arial" }}>
                     {permitNumber || ""}
                   </span>
                 </div>
               </td>
             </tr>
-            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
-              <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%", gap: "10px" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Course Applied:</label>
-                  <div
-                    style={{
-                      borderBottom: "1px solid black",
-                      fontFamily: "Arial",
-                      fontWeight: "normal",
-                      fontSize: "15px",
-                      minWidth: "265px",
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      paddingRight: "5px",
-                      overflowWrap: "break-word",
 
-                    }}
-                  >
-                    {curriculumOptions.length > 0
-                      ? curriculumOptions.find(
-                        (i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString()
-                      )?.program_description || (person?.program ?? "")
-                      : "Loading..."}
-                  </div>
-                </div>
-              </td>
-              <td colSpan={20}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%", gap: "10px" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Major:</label>
-                  <div
-                    style={{
-                      borderBottom: "1px solid black",
-                      fontFamily: "Arial",
-                      fontWeight: "normal",
-                      fontSize: "15px",
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      paddingRight: "5px",
-
-                    }}
-                  >
-                    {curriculumOptions.length > 0
-                      ? curriculumOptions.find(
-                        (i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString()
-                      )?.major || ""
-                      : "Loading..."}
-                  </div>
-                </div>
-              </td>
-            </tr>
-            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+            {/* Course + Major */}
+            <tr>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Date of Exam:</label>
-                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
-                    {examSchedule?.schedule_created_at ? new Date(examSchedule.schedule_created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : ""}
+                  <label style={{ fontWeight: "bold", marginRight: "10px" }}>Course Applied:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", minWidth: "220px", fontFamily: "Arial" }}>
+                    {curriculumOptions.length > 0
+                      ? curriculumOptions.find(
+                        (c) => c.curriculum_id?.toString() === (person?.program ?? "").toString()
+                      )?.program_description || ""
+                      : "Loading..."}
                   </span>
                 </div>
               </td>
               <td colSpan={20}>
                 <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Time :</label>
+                  <label style={{ fontWeight: "bold", marginRight: "10px" }}>Major:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", minWidth: "200px", height: "12px", fontFamily: "Arial" }}>
+                    {curriculumOptions.length > 0
+                      ? curriculumOptions.find(
+                        (c) => c.curriculum_id?.toString() === (person?.program ?? "").toString()
+                      )?.major || ""
+                      : "Loading..."}
+                  </span>
+                </div>
+              </td>
+            </tr>
+
+            {/* Date of Exam + Time */}
+            <tr style={{ fontFamily: "Arial", fontSize: "15px" }}>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Date of Exam:</label>
+                  <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
+                    {examSchedule?.schedule_created_at
+                      ? new Date(examSchedule.schedule_created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                      : ""}
+                  </span>
+                </div>
+              </td>
+              <td colSpan={20}>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  <label style={{ fontWeight: "bold", whiteSpace: "nowrap", marginRight: "10px" }}>Time:</label>
                   <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "left" }}>
                     {examSchedule
-                      ? new Date(`1970-01-01T${examSchedule.start_time}`).toLocaleTimeString(
-                        "en-US",
-                        { hour: "numeric", minute: "2-digit", hour12: true }
-                      )
+                      ? new Date(`1970-01-01T${examSchedule.start_time}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
                       : ""}
                   </span>
                 </div>
@@ -1136,7 +1164,7 @@ const ExaminationPermitChangeCourse = () => {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <label style={{ fontWeight: "bold", whiteSpace: "nowrap" }}>Floor :</label>
                   <span style={{ flexGrow: 1, borderBottom: "1px solid black", height: "1.2em", fontFamily: "Arial", textAlign: "center" }}>
-                    {examSchedule?.floor ? getOrdinal(Number(examSchedule.floor)) : ""}
+                    {examSchedule?.floor !== undefined && examSchedule?.floor !== null ? getOrdinal(Number(examSchedule.floor)) : ""}
                   </span>
                 </div>
               </td>
@@ -1172,52 +1200,159 @@ const ExaminationPermitChangeCourse = () => {
               </td>
             </tr>
 
-            {/* Centered QR code — 200x200, applicant number centered inside */}
+            {/* Signature line (left) + Centered QR code (right), aligned to same height */}
             <tr>
-              <td colSpan={40} style={{ paddingTop: "18px", paddingBottom: "10px" }}>
-                <div style={{ display: "flex", justifyContent: "center" }}>
+              {/* Signature */}
+              <td
+                colSpan={20}
+                style={{
+                  paddingTop: "24px",
+                  paddingBottom: "16px",
+                  verticalAlign: "middle",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "200px",
+                  }}
+                >
                   <div
                     style={{
-                      width: "200px",
-                      height: "200px",
-                      border: "2px solid black",
-                      borderRadius: "6px",
-                      background: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative",
-                      overflow: "hidden",
+                      width: "360px",
+                      textAlign: "center",
                     }}
                   >
-                    {attendanceToken ? (
-                      <QRCodeSVG value={attendanceToken} size={150} level="H" />
-                    ) : (
-                      <span style={{ fontSize: "11px", color: "#888", textAlign: "center", padding: "0 10px" }}>
-                        No attendance QR yet
-                      </span>
-                    )}
+                    {/* Space to sign */}
+                    <div style={{ height: "30px" }} />
 
-                    {selectedPerson?.applicant_number && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "50%",
-                          left: "50%",
-                          transform: "translate(-50%, -50%)",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          color: "maroon",
-                          background: "white",
-                          padding: "2px 6px",
-                          borderRadius: "3px",
-                          textAlign: "center",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {selectedPerson.applicant_number}
-                      </div>
-                    )}
+                    <div
+                      style={{
+                        borderTop: "1px solid black",
+                        width: "100%",
+                        marginBottom: "8px",
+                      }}
+                    />
+
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        letterSpacing: "0.3px",
+                        color: "black",
+                      }}
+                    >
+                      Signature over Printed Name
+                    </span>
+                  </div>
+                </div>
+              </td>
+
+              {/* QR Code */}
+              <td
+                colSpan={20}
+                style={{
+                  paddingTop: "24px",
+                  paddingBottom: "16px",
+                  verticalAlign: "middle",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    alignItems: "center",
+                    height: "200px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "190px",
+                        height: "190px",
+                        borderRadius: "10px",
+                        border: "1px solid black",
+                        background: "#fff",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {attendanceToken ? (
+                        <>
+                          <QRCodeSVG
+                            value={attendanceToken}
+                            size={150}
+                            level="H"
+                          />
+
+                          {selectedPerson?.applicant_number && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "50%",
+                                left: "50%",
+                                transform: "translate(-50%, -50%)",
+                                fontSize: "12px",
+                                fontWeight: "700",
+                                color: "maroon",
+                                background: "rgba(255,255,255,0.92)",
+                                padding: "3px 7px",
+                                borderRadius: "4px",
+                                textAlign: "center",
+                                whiteSpace: "nowrap",
+                                boxShadow:
+                                  "0 0 0 1px rgba(128,0,0,0.15)",
+                              }}
+                            >
+                              {selectedPerson.applicant_number}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "22px",
+                              color: "#ccc",
+                            }}
+                          >
+                            ⬚
+                          </span>
+
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              color: "#999",
+                              textAlign: "center",
+                              padding: "0 14px",
+                              lineHeight: "1.4",
+                            }}
+                          >
+                            No attendance QR yet
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </td>
@@ -1404,7 +1539,7 @@ const ExaminationPermitChangeCourse = () => {
 
       <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}` }}>
+          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: "1px solid black" }}>
             <TableRow>
               <TableCell sx={{ color: "white", fontSize: "20px", fontFamily: "Arial", border: "none" }}>
                 Applicant ID:&nbsp;<span style={{ fontFamily: "Arial", fontWeight: "normal", textDecoration: "underline" }}>{selectedPerson?.applicant_number || "N/A"}</span>
@@ -1457,17 +1592,17 @@ const ExaminationPermitChangeCourse = () => {
               <TableHead>
                 <TableRow>
                   {["#", "Full Name", "Designation", "Prepared By"].map((header) => (
-                    <TableCell key={header} sx={{ border: `1px solid ${borderColor}`, fontWeight: 600, color: titleColor, textAlign: "center", fontSize: "13px", padding: "6px 10px" }}>{header}</TableCell>
+                    <TableCell key={header} sx={{ border: "1px solid black", fontWeight: 600, color: titleColor, textAlign: "center", fontSize: "13px", padding: "6px 10px" }}>{header}</TableCell>
                   ))}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginatedSignatures.map((signature, index) => (
                   <TableRow key={signature.id}>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px", color: titleColor, padding: "4px 8px" }}>{signaturePage * SIGNATURES_PER_PAGE + index + 1}</TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px", color: titleColor, padding: "4px 8px" }}>{signature.full_name}</TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", color: titleColor, fontSize: "12px", padding: "4px 8px" }}>{signature.designation}</TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", color: titleColor, padding: "2px 6px" }}>
+                    <TableCell sx={{ border: "1px solid black", textAlign: "center", fontSize: "12px", color: titleColor, padding: "4px 8px" }}>{signaturePage * SIGNATURES_PER_PAGE + index + 1}</TableCell>
+                    <TableCell sx={{ border: "1px solid black", textAlign: "center", fontSize: "12px", color: titleColor, padding: "4px 8px" }}>{signature.full_name}</TableCell>
+                    <TableCell sx={{ border: "1px solid black", textAlign: "center", color: titleColor, fontSize: "12px", padding: "4px 8px" }}>{signature.designation}</TableCell>
+                    <TableCell sx={{ border: "1px solid black", textAlign: "center", color: titleColor, padding: "2px 6px" }}>
                       <Box display="flex" justifyContent="center" alignItems="center">
                         <Checkbox size="small" color="primary" checked={selectedPreparedBy?.id === signature.id} onChange={() => handlePreparedByChange(signature)} />
                         <Typography fontSize="12px">Prepared By</Typography>
@@ -1477,7 +1612,7 @@ const ExaminationPermitChangeCourse = () => {
                 ))}
                 {paginatedSignatures.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ border: `1px solid ${borderColor}`, color: titleColor, padding: "8px", fontSize: "12px" }}>No signatures found.</TableCell>
+                    <TableCell colSpan={4} align="center" sx={{ border: "1px solid black", color: titleColor, padding: "8px", fontSize: "12px" }}>No signatures found.</TableCell>
                   </TableRow>
                 )}
               </TableBody>

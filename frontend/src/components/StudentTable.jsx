@@ -354,7 +354,7 @@ const StudentTable = ({ data, paymentType, onRemove }) => {
               <TableCell>{row.last_name}</TableCell>
               <TableCell>{row.given_name}</TableCell>
               <TableCell>{row.middle_initial}</TableCell>
-              <TableCell>{row.degree_program}</TableCell>
+              <TableCell>{row.program_description || row.degree_program}</TableCell>
               <TableCell>{row.year_level}</TableCell>
               <TableCell>{row.sex}</TableCell>
               <TableCell>{row.email_address}</TableCell>

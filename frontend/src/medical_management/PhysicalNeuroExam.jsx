@@ -35,6 +35,19 @@ import SearchIcon from "@mui/icons-material/Search";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
+const cleanSuggestionValue = (value) => {
+    if (value === null || value === undefined) return "";
+    const text = String(value).trim();
+    return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatSuggestionName = (student) =>
+    [
+        cleanSuggestionValue(student?.first_name),
+        cleanSuggestionValue(student?.middle_name),
+        cleanSuggestionValue(student?.last_name),
+    ].filter(Boolean).join(" ");
+
 const PhysicalNeuroExam = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
@@ -79,6 +92,9 @@ const PhysicalNeuroExam = () => {
 
 
     const [studentNumber, setStudentNumber] = useState("");
+    const [studentSuggestions, setStudentSuggestions] = useState([]);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+    const [suggestionsOpen, setSuggestionsOpen] = useState(false);
     const [person, setPerson] = useState(null);
 
     const [persons, setPersons] = useState([]);
@@ -405,6 +421,117 @@ const PhysicalNeuroExam = () => {
         }
     }, [studentNumber]);
 
+    useEffect(() => {
+        const query = studentNumber.trim();
+
+        if (!suggestionsOpen || query.length < 2) {
+            setStudentSuggestions([]);
+            setSuggestionsLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        setSuggestionsLoading(true);
+
+        const delayDebounce = setTimeout(async () => {
+            try {
+                const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
+                    params: { query, limit: 10 },
+                });
+
+                if (!cancelled) {
+                    setStudentSuggestions(res.data || []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch student suggestions:", err);
+                if (!cancelled) setStudentSuggestions([]);
+            } finally {
+                if (!cancelled) setSuggestionsLoading(false);
+            }
+        }, 250);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(delayDebounce);
+        };
+    }, [studentNumber, suggestionsOpen]);
+
+    const handleSuggestionSelect = (suggestion) => {
+        const nextStudentNumber = String(suggestion?.student_number || "");
+        if (!nextStudentNumber) return;
+
+        setStudentNumber(nextStudentNumber);
+        setSuggestionsOpen(false);
+        setStudentSuggestions([]);
+    };
+  const renderStudentSuggestions = () => {
+    if (!suggestionsOpen) return null;
+
+    const currentQuery = studentNumber;
+    if (String(currentQuery || "").trim().length < 2) return null;
+
+    return (
+      <Box
+        sx={{
+          position: "absolute",
+          top: "calc(100% + 4px)",
+          left: 0,
+          right: 0,
+          zIndex: 20,
+          backgroundColor: "#fff",
+          border: "1px solid #d0d0d0",
+          borderRadius: "8px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+          overflow: "hidden",
+          maxHeight: 320,
+        }}
+      >
+        {suggestionsLoading ? (
+          <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+            Searching...
+          </Box>
+        ) : studentSuggestions.length > 0 ? (
+          studentSuggestions.map((suggestion) => {
+            const name = formatSuggestionName(suggestion);
+            return (
+              <Box
+                key={`${suggestion.student_number}-${suggestion.person_id}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSuggestionSelect(suggestion);
+                }}
+                sx={{
+                  px: 2,
+                  py: 1,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  fontSize: 14,
+                  borderBottom: "1px solid #f0f0f0",
+                  "&:hover": {
+                    backgroundColor: "#f5f7fb",
+                  },
+                }}
+              >
+                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                  {suggestion.student_number}
+                </Typography>
+                <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                <Typography sx={{ fontSize: 14 }} noWrap>
+                  {name || "Unnamed Student"}
+                </Typography>
+              </Box>
+            );
+          })
+        ) : (
+          <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+            No matching students found
+          </Box>
+        )}
+      </Box>
+    );
+  };
     const fetchRecord = async (number) => {
         if (!number) return;
         try {
@@ -746,24 +873,36 @@ const PhysicalNeuroExam = () => {
                 </Typography>
 
 
-                <TextField
-                    variant="outlined"
-                    placeholder="Search Student Name / Email / Applicant ID "
-                    size="small"
-                    value={studentNumber}
-                    onChange={(e) => setStudentNumber(e.target.value)}
-                    sx={{
-                        width: 450,
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": {
-                            borderRadius: "10px",
-                        },
-                    }}
-                    InputProps={{
-                        startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-                    }}
-                />
+                <Box sx={{ position: "relative", width: 450 }}>
+                    <TextField
+                        variant="outlined"
+                        placeholder="Search Student Name / Email / Applicant ID "
+                        size="small"
+                        value={studentNumber}
+                        onChange={(e) => {
+                            setStudentNumber(e.target.value);
+                            setSuggestionsOpen(true);
+                        }}
+                        onFocus={() => {
+                            if (studentNumber.trim().length >= 2) setSuggestionsOpen(true);
+                        }}
+                        onBlur={() => {
+                            setTimeout(() => setSuggestionsOpen(false), 150);
+                        }}
+                        sx={{
+                            width: "100%",
+                            backgroundColor: "#fff",
+                            borderRadius: 1,
+                            "& .MuiOutlinedInput-root": {
+                                borderRadius: "10px",
+                            },
+                        }}
+                        InputProps={{
+                            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+                        }}
+                    />
+                    {renderStudentSuggestions()}
+                </Box>
 
             </Box>
 
@@ -1012,3 +1151,7 @@ const PhysicalNeuroExam = () => {
 };
 
 export default PhysicalNeuroExam;
+
+
+
+

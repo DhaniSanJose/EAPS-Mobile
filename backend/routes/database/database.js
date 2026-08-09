@@ -39,6 +39,9 @@ const db3 = mysql.createPool({
 // ✅ EXPORT BOTH
 let pageAccessPermissionColumnsReady;
 let programSlotsEStatusColumnReady;
+let scholarshipTypeCodeColumnReady;
+let unifastUnitColumnsReady;
+let matriculationUnitColumnsReady;
 
 const ensurePageAccessPermissionColumns = async () => {
   if (!pageAccessPermissionColumnsReady) {
@@ -83,9 +86,77 @@ const ensureProgramSlotsEStatusColumn = async () => {
   return programSlotsEStatusColumnReady;
 };
 
+const ensureScholarshipTypeCodeColumn = async () => {
+  if (!scholarshipTypeCodeColumnReady) {
+    scholarshipTypeCodeColumnReady = (async () => {
+      const [columns] = await db3.query("SHOW COLUMNS FROM scholarship_type");
+      const existingColumns = new Set(columns.map((column) => column.Field));
+
+      if (!existingColumns.has("scholarship_code")) {
+        await db3.query(
+          "ALTER TABLE scholarship_type ADD COLUMN scholarship_code VARCHAR(255) NOT NULL DEFAULT '' AFTER id",
+        );
+      }
+    })().catch((error) => {
+      scholarshipTypeCodeColumnReady = null;
+      throw error;
+    });
+  }
+
+  return scholarshipTypeCodeColumnReady;
+};
+
+const ensureUnitColumns = async (tableName) => {
+  const [columns] = await db3.query(`SHOW COLUMNS FROM ${tableName}`);
+  const existingColumns = new Set(columns.map((column) => column.Field));
+  const requiredColumns = [
+    "laboratory_units",
+    "computer_units",
+    "academic_units_enrolled",
+    "academic_units_nstp_enrolled",
+  ];
+
+  for (const column of requiredColumns) {
+    if (!existingColumns.has(column)) {
+      await db3.query(
+        `ALTER TABLE ${tableName} ADD COLUMN ${column} DECIMAL(10,2) NOT NULL DEFAULT 0.00`,
+      );
+    }
+  }
+};
+
+const ensureUnifastUnitColumns = async () => {
+  if (!unifastUnitColumnsReady) {
+    unifastUnitColumnsReady = (async () => {
+      await ensureUnitColumns("unifast");
+    })().catch((error) => {
+      unifastUnitColumnsReady = null;
+      throw error;
+    });
+  }
+
+  return unifastUnitColumnsReady;
+};
+
+const ensureMatriculationUnitColumns = async () => {
+  if (!matriculationUnitColumnsReady) {
+    matriculationUnitColumnsReady = (async () => {
+      await ensureUnitColumns("matriculation");
+    })().catch((error) => {
+      matriculationUnitColumnsReady = null;
+      throw error;
+    });
+  }
+
+  return matriculationUnitColumnsReady;
+};
+
 module.exports = {
   db,
   db3,
   ensurePageAccessPermissionColumns,
   ensureProgramSlotsEStatusColumn,
+  ensureScholarshipTypeCodeColumn,
+  ensureUnifastUnitColumns,
+  ensureMatriculationUnitColumns,
 };

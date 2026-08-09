@@ -8,6 +8,7 @@ import GradeIcon from "@mui/icons-material/Grade";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SettingsContext } from "../App";
+import GradingIcon from "@mui/icons-material/Grading";
 
 export const REGISTRAR_ENROLLMENT_TABS = [
   {
@@ -31,6 +32,11 @@ export const REGISTRAR_ENROLLMENT_TABS = [
     iconKey: "listAlt",
   },
   {
+    label: "Student Grade File",
+    to: "/registrar_student_grade_file",
+    iconKey: "grading",
+  },
+  {
     label: "Report of Grades",
     to: "/report_of_grades",
     iconKey: "grade",
@@ -43,7 +49,9 @@ export const REGISTRAR_ENROLLMENT_TABS = [
 ];
 
 export const getRegistrarEnrollmentActiveStep = (pathname) => {
-  const exact = REGISTRAR_ENROLLMENT_TABS.findIndex((tab) => tab.to === pathname);
+  const exact = REGISTRAR_ENROLLMENT_TABS.findIndex(
+    (tab) => tab.to === pathname,
+  );
   if (exact !== -1) return exact;
 
   if (
@@ -66,6 +74,7 @@ const TAB_ICONS = {
   person: <PersonIcon fontSize="large" />,
   assignment: <AssignmentIcon fontSize="large" />,
   listAlt: <ListAltIcon fontSize="large" />,
+  grading: <GradingIcon fontSize="large" />,
   grade: <GradeIcon fontSize="large" />,
   receipt: <ReceiptLongIcon fontSize="large" />,
 };

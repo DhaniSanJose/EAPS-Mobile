@@ -496,14 +496,14 @@ const StudentPersonalDataForm = forwardRef((props, ref) => {
 
                   <div
                     style={{
-                      textAlign: "center",
-                      fontSize: "12px",
                       fontWeight: "bold",
                       fontFamily: "Arial",
-                      marginTop: "15px",
+                      fontSize: "15px",
+                      letterSpacing: "1px",
+                      marginTop: "6px",
                     }}
                   >
-                    ADMISSION SERVICES
+                    OFFICE OF THE ADMISSION SERVICES
                   </div>
                 </div>
 

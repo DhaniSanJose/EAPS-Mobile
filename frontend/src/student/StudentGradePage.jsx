@@ -25,6 +25,8 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import ClassIcon from "@mui/icons-material/Class";
 import FilterNoneIcon from "@mui/icons-material/FilterNone";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import { FcPrint } from "react-icons/fc";
+import { downloadStudentGradesPdf } from "../utils/studentGradePrintLayout";
 
 // ─── Remark Badge ─────────────────────────────────────────────────
 const REMARK_MAP = {
@@ -176,152 +178,44 @@ const applyGradeVisibility = (subject, visibility) => {
   };
 };
 
-// ─── Mobile / Tablet Grade Card ────────────────────────────────────
-const MobileGradeCard = ({
-  row,
-  index,
-  borderColor,
-  subtitleColor,
-  titleColor,
-}) => (
-  <Box
-    sx={{
-      border: `1px solid ${borderColor}`,
-      borderRadius: "8px",
-      p: { xs: 1.25, sm: 1.5 },
-      mb: 1.5,
-      backgroundColor: index % 2 === 0 ? "#ffffff" : "lightgray",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+// ─── Shared "Download" button — styled/behaves like the Class Schedule
+//    page's Download Schedule button (StudentSchedule.jsx) ───────────
+const DownloadButton = ({ onClick, disabled, label, size = "normal" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      padding: size === "small" ? "4px 14px" : "5px 20px",
+      border: "2px solid black",
+      backgroundColor: "#f0f0f0",
+      color: "black",
+      borderRadius: "5px",
+      cursor: disabled ? "not-allowed" : "pointer",
+      fontSize: size === "small" ? "12px" : "14px",
+      fontWeight: "bold",
+      transition: "background-color 0.3s, transform 0.2s",
+      height: size === "small" ? "32px" : "40px",
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      userSelect: "none",
+      opacity: disabled ? 0.65 : 1,
+      whiteSpace: "nowrap",
+      flexShrink: 0,
     }}
+    onMouseEnter={(e) => {
+      if (!disabled) e.currentTarget.style.backgroundColor = "#d3d3d3";
+    }}
+    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+    onMouseDown={(e) => {
+      if (!disabled) e.currentTarget.style.transform = "scale(0.95)";
+    }}
+    onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
   >
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        mb: 0.5,
-        gap: 1,
-      }}
-    >
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          sx={{
-            fontWeight: 700,
-            fontSize: { xs: 12.5, sm: 13 },
-            color: titleColor,
-            mb: 0.2,
-          }}
-        >
-          {row.course_code}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: { xs: 11, sm: 11.5 },
-            color: subtitleColor,
-            lineHeight: 1.3,
-          }}
-        >
-          {row.course_description}
-        </Typography>
-      </Box>
-      <Box sx={{ ml: 1, flexShrink: 0 }}>
-        {row.grade_display ? (
-          <Typography
-            sx={{
-              fontWeight: 700,
-              fontSize: { xs: 12, sm: 13 },
-              color: "#E65100",
-            }}
-          >
-            {row.grade_display}
-          </Typography>
-        ) : row.numeric_grade ? (
-          <Typography
-            sx={{
-              fontWeight: 700,
-              fontSize: { xs: 15, sm: 16 },
-              color: titleColor,
-            }}
-          >
-            {row.numeric_grade}
-          </Typography>
-        ) : (
-          <Typography sx={{ color: "#9CA3AF", fontSize: 14 }}>—</Typography>
-        )}
-      </Box>
-    </Box>
-
-    <Box
-      sx={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "6px 12px",
-        mt: 0.8,
-        alignItems: "center",
-      }}
-    >
-      {/* Professor */}
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}
-      >
-        <PersonOutlineIcon
-          sx={{ fontSize: 13, color: "#000", flexShrink: 0 }}
-        />
-        <Typography
-          sx={{ fontSize: 11, color: "#000", wordBreak: "break-word" }}
-        >
-          {row.fname === "TBA" && row.lname === "TBA"
-            ? "TBA"
-            : `Prof. ${row.fname} ${row.lname}`}
-        </Typography>
-      </Box>
-
-      {/* Section */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <ClassIcon sx={{ fontSize: 13, color: "#000", flexShrink: 0 }} />
-        <Typography sx={{ fontSize: 11, color: "#000" }}>
-          {row.program_code}-{row.section_description}
-        </Typography>
-      </Box>
-
-      {/* Units */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <FilterNoneIcon sx={{ fontSize: 13, color: "#000", flexShrink: 0 }} />
-        <Typography sx={{ fontSize: 11, color: "#000" }}>
-          {getUnitDisplay(row)} unit{getUnitDisplay(row) !== 1 ? "s" : ""}
-        </Typography>
-      </Box>
-
-      {/* Schedule */}
-      {row.schedule && (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 0.5,
-            width: "100%",
-          }}
-        >
-          <AccessTimeIcon
-            sx={{ fontSize: 13, color: "#000", mt: "1px", flexShrink: 0 }}
-          />
-          <Typography
-            sx={{
-              fontSize: 11,
-              color: "#000",
-              whiteSpace: "pre-line",
-              lineHeight: 1.5,
-              wordBreak: "break-word",
-            }}
-          >
-            {row.schedule}
-          </Typography>
-        </Box>
-      )}
-
-      <RemarkBadge value={row.en_remarks} />
-    </Box>
-  </Box>
+    <FcPrint size={size === "small" ? 16 : 20} />
+    {label}
+  </button>
 );
 
 // ─── Main Component ───────────────────────────────────────────────
@@ -356,8 +250,30 @@ const StudentGradePage = () => {
     else setFetchedLogo(EaristLogo);
     if (settings.company_name) setCompanyName(settings.company_name);
     if (settings.short_term) setShortTerm(settings.short_term);
+
+    // Same fallback chain AdmissionApplicantList.jsx uses: prefer
+    // campus_address, but fall back to a plain "address" key so this
+    // doesn't end up blank if Settings only ever populated the latter.
     if (settings.campus_address) setCampusAddress(settings.campus_address);
+    else if (settings.address) setCampusAddress(settings.address);
   }, [settings]);
+
+  // ── Active School Year — same shape/endpoint the dashboard already uses
+  // ({ current_year, next_year, semester_description }). Fetched once here
+  // too so the PDF letterhead can show "School Year 2026-2027" instead of
+  // repeating the report title a second time. ─────────────────────────
+  const [activeSY, setActiveSY] = useState({
+    current_year: "",
+    next_year: "",
+    semester_description: "",
+  });
+
+  useEffect(() => {
+    axios
+      .get(`${API_BASE_URL}/api/active_school_year`)
+      .then((res) => setActiveSY(res.data[0] || {}))
+      .catch((err) => console.error(err));
+  }, []);
 
   const [userID, setUserID] = useState("");
   const [userRole, setUserRole] = useState("");
@@ -369,6 +285,11 @@ const StudentGradePage = () => {
     hasBalance: false,
     balance: 0,
   });
+
+  // ── Download-PDF state: one flag for "download everything", one for
+  //    tracking which single term card is currently being downloaded ──
+  const [isDownloadingAllGrades, setIsDownloadingAllGrades] = useState(false);
+  const [downloadingTermKey, setDownloadingTermKey] = useState(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -545,6 +466,33 @@ const StudentGradePage = () => {
     fetchSemesters();
   }, []);
 
+  const [gwaPrintStatus, setGwaPrintStatus] = useState({
+    overall: false,
+    per_semester: false,
+    loading: true,
+  });
+
+  useEffect(() => {
+    axios
+      .get(`${API_BASE_URL}/api/honors/gwa_printing_status`)
+      .then((res) =>
+        setGwaPrintStatus({
+          overall: Boolean(res.data?.overall),
+          per_semester: Boolean(res.data?.per_semester),
+          loading: false,
+        }),
+      )
+      .catch((err) => {
+        console.error("Failed to fetch GWA printing status:", err);
+        // fail-closed: if we can't confirm it's open, don't show/print it
+        setGwaPrintStatus({
+          overall: false,
+          per_semester: false,
+          loading: false,
+        });
+      });
+  }, []);
+
   const fetchYearLevels = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/year-levels`);
@@ -580,6 +528,19 @@ const StudentGradePage = () => {
         : yl.year_level_description;
     return acc;
   }, {});
+
+  const formatSchoolYearRange = (subject) => {
+    if (subject?.school_year) return String(subject.school_year);
+    if (subject?.sy_label) return String(subject.sy_label);
+    if (subject?.school_year_description)
+      return String(subject.school_year_description);
+
+    const startYear = parseInt(subject?.year_description, 10);
+    if (Number.isFinite(startYear) && startYear > 0) {
+      return `${startYear}-${startYear + 1}`;
+    }
+    return "";
+  };
 
   const formatYearLabel = (year) => yearLabelMap[year] || year;
 
@@ -617,6 +578,115 @@ const StudentGradePage = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+
+  // ── PDF download helpers ────────────────────────────────────────────
+  const resolveLogoUrl = () =>
+    settings?.logo_url
+      ? `${API_BASE_URL}${settings.logo_url}`
+      : `${window.location.origin}${EaristLogo}`;
+
+  const buildStudentInfoForPdf = () => {
+    if (!programInfo) return null;
+    return {
+      fullName:
+        `${programInfo.last_name || ""}, ${programInfo.first_name || ""} ${programInfo.middle_name || ""}`
+          .replace(/\s+/g, " ")
+          .trim(),
+      firstName: programInfo.first_name || "",
+      lastName: programInfo.last_name || "",
+      studentNumber: programInfo.student_number || "",
+      department: department || "",
+      programCode: programInfo.program_code || "",
+      programDescription:
+        `${programInfo.program_description || ""} ${programInfo.major || ""}`.trim(),
+      sectionDescription: programInfo.section_description || "",
+    };
+  };
+
+  const getTermsPayload = (termsToInclude) =>
+    termsToInclude.map((term) => {
+      const subjects = studentGrade
+        .filter(
+          (row) =>
+            `${row.year_level_description} ${row.semester_description}` ===
+            term,
+        )
+        .sort((a, b) =>
+          (a.course_code || "").localeCompare(b.course_code || ""),
+        );
+      return { term, subjects };
+    });
+
+  // The on-screen list (sortedTerms) is ordered latest-first, which is
+  // what students want to see when scrolling the page. The "all
+  // semesters" PDF should read like a transcript instead — 1st Year up
+  // through 4th Year, oldest to newest — so just reverse it: sortedTerms
+  // is already a complete, consistent ordering (year desc, then semester
+  // desc), so flipping it gives a complete chronological (year asc,
+  // semester asc) ordering for free.
+  const chronologicalTerms = [...sortedTerms].reverse();
+
+  const handleDownloadAllGrades = async () => {
+    const info = buildStudentInfoForPdf();
+    if (!info || !chronologicalTerms.length) return;
+    if (!gwaPrintStatus.overall) {
+      setMessage("Overall GWA printing is currently closed by the Registrar.");
+      return;
+    }
+    setIsDownloadingAllGrades(true);
+    try {
+      const resolvedCampusAddress =
+        campusAddress || "No address set in Settings";
+
+      await downloadStudentGradesPdf({
+        apiBaseUrl: API_BASE_URL,
+        studentInfo: info,
+        terms: getTermsPayload(chronologicalTerms),
+        companyName,
+        campusAddress: resolvedCampusAddress,
+        logoUrl: resolveLogoUrl(),
+        activeSchoolYear: activeSY,
+        formatYearLabel,
+        scope: "all",
+      });
+    } catch (error) {
+      console.error("Failed to download grades PDF:", error);
+    } finally {
+      setIsDownloadingAllGrades(false);
+    }
+  };
+
+  const handleDownloadTermGrades = async (term) => {
+    const info = buildStudentInfoForPdf();
+    if (!info) return;
+    if (!gwaPrintStatus.per_semester) {
+      setMessage(
+        "Per-semester GWA printing is currently closed by the Registrar.",
+      );
+      return;
+    }
+    setDownloadingTermKey(term);
+    try {
+      const resolvedCampusAddress =
+        campusAddress || "No address set in Settings";
+
+      await downloadStudentGradesPdf({
+        apiBaseUrl: API_BASE_URL,
+        studentInfo: info,
+        terms: getTermsPayload([term]),
+        companyName,
+        campusAddress: resolvedCampusAddress,
+        logoUrl: resolveLogoUrl(),
+        activeSchoolYear: activeSY,
+        formatYearLabel,
+        scope: "term",
+      });
+    } catch (error) {
+      console.error("Failed to download term grades PDF:", error);
+    } finally {
+      setDownloadingTermKey(null);
+    }
+  };
 
   const headCell = {
     backgroundColor: headerBg,
@@ -705,36 +775,61 @@ const StudentGradePage = () => {
           )}
         </Box>
 
-        {/* Grading Status Pill */}
+        {/* Right side: Grading Status Pill (top) + Download All Grades button (below) */}
         <Box
           sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            px: { xs: "10px", sm: "14px" },
-            py: "6px",
-            borderRadius: "20px",
-            fontSize: { xs: 11, sm: 12 },
-            fontWeight: 600,
-            letterSpacing: "0.03em",
-            backgroundColor: gradingActive ? "#E8F5E9" : "#FFF3E0",
-            color: gradingActive ? "#2E7D32" : "#E65100",
-            border: `1px solid ${gradingActive ? "#A5D6A7" : "#FFCC80"}`,
-            flexShrink: 0,
-            alignSelf: "flex-start",
-            whiteSpace: "nowrap",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 1,
           }}
         >
           <Box
             sx={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              backgroundColor: gradingActive ? "#43A047" : "#FB8C00",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              px: { xs: "10px", sm: "14px" },
+              py: "6px",
+              borderRadius: "20px",
+              fontSize: { xs: 11, sm: 12 },
+              fontWeight: 600,
+              letterSpacing: "0.03em",
+              backgroundColor: gradingActive ? "#E8F5E9" : "#FFF3E0",
+              color: gradingActive ? "#2E7D32" : "#E65100",
+              border: `1px solid ${gradingActive ? "#A5D6A7" : "#FFCC80"}`,
               flexShrink: 0,
+              alignSelf: "flex-end",
+              whiteSpace: "nowrap",
             }}
-          />
-          {gradingActive ? "Grades Available" : "Not Yet Available"}
+          >
+            <Box
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                backgroundColor: gradingActive ? "#43A047" : "#FB8C00",
+                flexShrink: 0,
+              }}
+            />
+            {gradingActive ? "Grades Available" : "Not Yet Available"}
+          </Box>
+
+          {!gwaPrintStatus.loading && gwaPrintStatus.overall && (
+            <DownloadButton
+              onClick={handleDownloadAllGrades}
+              disabled={
+                isDownloadingAllGrades ||
+                !studentGrade.length ||
+                matriculationBalanceInfo.hasBalance
+              }
+              label={
+                isDownloadingAllGrades
+                  ? "Preparing PDF..."
+                  : "Download All Grades"
+              }
+            />
+          )}
         </Box>
       </Box>
 
@@ -815,107 +910,90 @@ const StudentGradePage = () => {
           const semesterLabel = termSubjects[0]?.semester_description;
           const gwaValue = termSubjects[0]?.gwa;
           const sectionDescription = termSubjects[0]?.section_description;
+          const schoolYearRange = formatSchoolYearRange(termSubjects[0]);
 
           return (
             <Box key={idx} sx={{ mb: 5 }}>
-              {/* ── Student Info Card ── */}
+              {/* ── Student Info Card + per-term Download button ── */}
               <Box
                 sx={{
                   display: "flex",
                   alignItems: "flex-start",
                   mb: 2,
-                  p: { xs: 1.25, sm: 1.75, md: 2 },
-                  borderRadius: "10px",
-                  backgroundColor: "#fff",
-                  border: `1px solid ${borderColor}`,
-                  boxShadow: 2,
                   gap: { xs: 1, sm: 1.5 },
                 }}
               >
-                {/* Person icon */}
                 <Box
                   sx={{
-                    width: { xs: 34, sm: 40 },
-                    height: { xs: 34, sm: 40 },
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    backgroundColor: headerBg,
+                    flex: 1,
+                    minWidth: 0,
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
+                    alignItems: "flex-start",
+                    p: { xs: 1.25, sm: 1.75, md: 2 },
+                    borderRadius: "10px",
+                    backgroundColor: "#fff",
+                    border: `1px solid ${borderColor}`,
+                    boxShadow: 2,
+                    gap: { xs: 1, sm: 1.5 },
                   }}
                 >
-                  <PersonIcon fontSize="small" />
-                </Box>
+                  {/* Person icon */}
+                  <Box
+                    sx={{
+                      width: { xs: 34, sm: 40 },
+                      height: { xs: 34, sm: 40 },
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      backgroundColor: headerBg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                    }}
+                  >
+                    <PersonIcon fontSize="small" />
+                  </Box>
 
-                {/* Accent bar */}
-                <Box
-                  sx={{
-                    width: 4,
-                    borderRadius: 2,
-                    backgroundColor: headerBg,
-                    flexShrink: 0,
-                    alignSelf: "stretch",
-                  }}
-                />
+                  {/* Accent bar */}
+                  <Box
+                    sx={{
+                      width: 4,
+                      borderRadius: 2,
+                      backgroundColor: headerBg,
+                      flexShrink: 0,
+                      alignSelf: "stretch",
+                    }}
+                  />
 
-                {/* Info — stacks vertically on mobile/tablet, side-by-side on larger screens */}
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  {programInfo && (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: { xs: "column", lg: "row" },
-                        justifyContent: "space-between",
-                        gap: { xs: 0.5, lg: 0 },
-                      }}
-                    >
-                      {/* LEFT */}
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography
-                          sx={{
-                            fontSize: { xs: 11.5, sm: 13, md: 14 },
-                            fontWeight: 700,
-                            color: titleColor,
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          STUDENT NUMBER:{" "}
-                          <Box
-                            component="span"
-                            sx={{ fontWeight: "normal", ml: "8px" }}
+                  {/* Info — stacks vertically on mobile/tablet, side-by-side on larger screens */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    {programInfo && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: { xs: "column", lg: "row" },
+                          justifyContent: "space-between",
+                          gap: { xs: 0.5, lg: 0 },
+                        }}
+                      >
+                        {/* LEFT */}
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            sx={{
+                              fontSize: { xs: 11.5, sm: 13, md: 14 },
+                              fontWeight: 700,
+                              color: titleColor,
+                              wordBreak: "break-word",
+                            }}
                           >
-                            {programInfo.student_number}
-                          </Box>
-                        </Typography>
-                        <Typography
-                          sx={{
-                            fontSize: { xs: 11.5, sm: 13, md: 14 },
-                            fontWeight: 700,
-                            color: titleColor,
-                          }}
-                        >
-                          NAME:{" "}
-                          <Box component="span" sx={{ fontWeight: 400, ml: 1 }}>
-                            {programInfo.last_name}, {programInfo.first_name}{" "}
-                            {programInfo.middle_name}
-                          </Box>
-                        </Typography>
-                        {/* ADD THIS */}
-                        <Typography
-                          sx={{
-                            fontSize: { xs: 11.5, sm: 13, md: 14 },
-                            fontWeight: 700,
-                            color: titleColor,
-                          }}
-                        >
-                          DEPARTMENT:{" "}
-                          <Box component="span" sx={{ fontWeight: 400, ml: 1 }}>
-                            {department || "—"}
-                          </Box>
-                        </Typography>
-                        {gwaValue && (
+                            STUDENT NUMBER:{" "}
+                            <Box
+                              component="span"
+                              sx={{ fontWeight: "normal", ml: "8px" }}
+                            >
+                              {programInfo.student_number}
+                            </Box>
+                          </Typography>
                           <Typography
                             sx={{
                               fontSize: { xs: 11.5, sm: 13, md: 14 },
@@ -923,80 +1001,133 @@ const StudentGradePage = () => {
                               color: titleColor,
                             }}
                           >
-                            Weighted GWA:{" "}
+                            NAME:{" "}
                             <Box
                               component="span"
-                              sx={{
-                                fontWeight: "normal",
-                                ml: "8px",
-                                color: headerBg,
-                              }}
+                              sx={{ fontWeight: 400, ml: 1 }}
                             >
-                              {Number(gwaValue).toFixed(3)}
+                              {programInfo.last_name}, {programInfo.first_name}{" "}
+                              {programInfo.middle_name}
                             </Box>
                           </Typography>
-                        )}
-                      </Box>
+                          {/* ADD THIS */}
+                          <Typography
+                            sx={{
+                              fontSize: { xs: 11.5, sm: 13, md: 14 },
+                              fontWeight: 700,
+                              color: titleColor,
+                            }}
+                          >
+                            DEPARTMENT:{" "}
+                            <Box
+                              component="span"
+                              sx={{ fontWeight: 400, ml: 1 }}
+                            >
+                              {department || "—"}
+                            </Box>
+                          </Typography>
+                          {gwaValue && gwaPrintStatus.per_semester && (
+                            <Typography
+                              sx={{
+                                fontSize: { xs: 11.5, sm: 13, md: 14 },
+                                fontWeight: 700,
+                                color: titleColor,
+                              }}
+                            >
+                              Weighted GWA:{" "}
+                              <Box
+                                component="span"
+                                sx={{
+                                  fontWeight: "normal",
+                                  ml: "8px",
+                                  color: headerBg,
+                                }}
+                              >
+                                {Number(gwaValue).toFixed(3)}
+                              </Box>
+                            </Typography>
+                          )}
+                        </Box>
 
-                      {/* RIGHT */}
-                      <Box
-                        sx={{
-                          textAlign: { xs: "left", lg: "right" },
-                          minWidth: 0,
-                        }}
-                      >
-                        <Typography
+                        {/* RIGHT */}
+                        <Box
                           sx={{
-                            fontSize: { xs: 11.5, sm: 13, md: 14 },
-                            fontWeight: 700,
-                            color: titleColor,
-                            wordBreak: "break-word",
+                            textAlign: { xs: "left", lg: "right" },
+                            minWidth: 0,
                           }}
                         >
-                          PROGRAM:{" "}
-                          <Box
-                            component="span"
-                            sx={{ fontWeight: "normal", ml: "8px" }}
+                          <Typography
+                            sx={{
+                              fontSize: { xs: 11.5, sm: 13, md: 14 },
+                              fontWeight: 700,
+                              color: titleColor,
+                              wordBreak: "break-word",
+                            }}
                           >
-                            ({programInfo.program_code}){" "}
-                            {programInfo.program_description}{" "}
-                            {programInfo.major}
-                          </Box>
-                        </Typography>
-                        <Typography
-                          sx={{
-                            fontSize: { xs: 11.5, sm: 13, md: 14 },
-                            fontWeight: 700,
-                            color: titleColor,
-                          }}
-                        >
-                          YEAR / SEMESTER:{" "}
-                          <Box
-                            component="span"
-                            sx={{ fontWeight: "normal", ml: "8px" }}
+                            PROGRAM:{" "}
+                            <Box
+                              component="span"
+                              sx={{ fontWeight: "normal", ml: "8px" }}
+                            >
+                              ({programInfo.program_code}){" "}
+                              {programInfo.program_description}{" "}
+                              {programInfo.major}
+                            </Box>
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: { xs: 11.5, sm: 13, md: 14 },
+                              fontWeight: 700,
+                              color: titleColor,
+                            }}
                           >
-                            {formatYearLabel(yearLevel)} - {semesterLabel}
-                          </Box>
-                        </Typography>
-                        <Typography
-                          sx={{
-                            fontSize: { xs: 11.5, sm: 13, md: 14 },
-                            fontWeight: 700,
-                            color: titleColor,
-                          }}
-                        >
-                          SECTION:{" "}
-                          <Box
-                            component="span"
-                            sx={{ fontWeight: "normal", ml: "8px" }}
+                            AY / YEAR / SEMESTER:{" "}
+                            <Box
+                              component="span"
+                              sx={{ fontWeight: "normal", ml: "8px" }}
+                            >
+                              {[
+                                schoolYearRange,
+                                formatYearLabel(yearLevel),
+                                semesterLabel,
+                              ]
+                                .filter(Boolean)
+                                .join(" - ")
+                                .toUpperCase()}
+                            </Box>
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: { xs: 11.5, sm: 13, md: 14 },
+                              fontWeight: 700,
+                              color: titleColor,
+                            }}
                           >
-                            {sectionDescription || "—"}
-                          </Box>
-                        </Typography>
+                            SECTION:{" "}
+                            <Box
+                              component="span"
+                              sx={{ fontWeight: "normal", ml: "8px" }}
+                            >
+                              {sectionDescription || "—"}
+                            </Box>
+                          </Typography>
+                        </Box>
                       </Box>
-                    </Box>
-                  )}
+                    )}
+                  </Box>
                 </Box>
+
+                {!gwaPrintStatus.loading && gwaPrintStatus.per_semester && (
+                  <DownloadButton
+                    onClick={() => handleDownloadTermGrades(term)}
+                    disabled={
+                      downloadingTermKey === term ||
+                      matriculationBalanceInfo.hasBalance
+                    }
+                    label={downloadingTermKey === term ? "..." : "Download"}
+                    size="small"
+                  />
+                )}
               </Box>
 
               {isCardLayout ? (
@@ -1116,7 +1247,7 @@ const StudentGradePage = () => {
                             sx={{ fontSize: 13, color: "#000", flexShrink: 0 }}
                           />
                           <Typography sx={{ fontSize: 11, color: "#000" }}>
-                            {row.program_code}-{row.section_description}
+                            {row.section_description}
                           </Typography>
                         </Box>
 

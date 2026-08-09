@@ -69,6 +69,39 @@ const getHonorChip = (title) => {
   );
 };
 
+// ─── Rank badge ─────────────────────────────────────────────────────────────
+// Two ranking "modes" depending on which filters are active:
+//
+//   "overall"  → no College/Program filter selected. Rank is computed across
+//                the WHOLE filtered batch (Campus + School Year only), so
+//                #1/#2/#3 really mean Valedictorian / Salutatorian / 3rd Honor.
+//                Backed by `row.overall_rank` from the API.
+//
+//   "narrowed" → a College and/or Program filter is active. Rank is now
+//                scoped to that group, so it's just "1st/2nd/3rd in Group",
+//                not a school-wide honor. Backed by `row.college_rank`
+//                (which, since a Program always belongs to exactly one
+//                College, is already correctly scoped for both cases).
+//
+// This function is pure — it takes the context in as a parameter instead of
+// reading component state directly, so it's safe to keep at module scope.
+const getRankLabel = (rank, context) => {
+  if (!rank) return "—";
+
+  if (context === "overall") {
+    if (rank === 1) return "🏅 Valedictorian";
+    if (rank === 2) return "🥈 Salutatorian";
+    if (rank === 3) return "🥉 3rd Honor";
+    return `#${rank}`;
+  }
+
+  // "narrowed" — College and/or Program filter active
+  if (rank === 1) return "🏅 1st in Group";
+  if (rank === 2) return "🥈 2nd in Group";
+  if (rank === 3) return "🥉 3rd in Group";
+  return `#${rank}`;
+};
+
 const TABS = [
   {
     key: "academic",
@@ -82,7 +115,10 @@ const TABS = [
   },
 ];
 
-const rowsPerPage = 100;
+const rowsPerPage = 100; // keeps every page fetch small — the ranking below
+// is computed server-side (SQL window functions), so the browser never has
+// to pull or sort the full student list to know who's #1/#2 overall or
+// within a college/program.
 
 export default function HonorsReport() {
   const settings = useContext(SettingsContext);
@@ -168,12 +204,14 @@ export default function HonorsReport() {
   const [activeTab, setActiveTab] = useState("academic");
   const [searchQuery, setSearchQuery] = useState("");
   const [programId, setProgramId] = useState("");
+  const [departmentId, setDepartmentId] = useState(""); // College filter
   const [schoolYearId, setSchoolYearId] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   // ── dropdown options ───────────────────────────────────────────────────────
   const [programs, setPrograms] = useState([]);
+  const [departments, setDepartments] = useState([]); // list of colleges
   const [schoolYears, setSchoolYears] = useState([]);
   const [semesters, setSemesters] = useState([]); // fetched from API
 
@@ -187,6 +225,20 @@ export default function HonorsReport() {
     message: "",
     severity: "success",
   });
+
+  // ── Rank context — this is THE fix. It must live inside the component,
+  //    since it depends on programId/departmentId state, and it drives both
+  //    which rank column we read (overall_rank vs college_rank) and which
+  //    label set getRankLabel uses. ──────────────────────────────────────────
+  const rankContext = useMemo(
+    () => (programId || departmentId ? "narrowed" : "overall"),
+    [programId, departmentId],
+  );
+
+  const getRowRank = useCallback(
+    (row) => (rankContext === "overall" ? row.overall_rank : row.college_rank),
+    [rankContext],
+  );
 
   // ── auth ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -226,14 +278,20 @@ export default function HonorsReport() {
       .get(`${API_BASE_URL}/api/honors/semesters`)
       .then((r) => setSemesters(r.data))
       .catch(console.error);
+    // Colleges from DB (dprtmnt_table) — powers the College filter
+    axios
+      .get(`${API_BASE_URL}/api/honors/departments`)
+      .then((r) => setDepartments(r.data))
+      .catch(console.error);
     axios
       .get(`${API_BASE_URL}/api/active_school_year`)
       .then((r) => {
         const activeTerm = Array.isArray(r.data) ? r.data[0] : r.data;
-
-        if (activeTerm && activeTab === "academic") {
+        if (activeTerm) {
           setSchoolYearId(activeTerm.year_id ?? "");
-          setSemesterId(activeTerm.semester_id ?? "");
+          if (activeTab === "academic") {
+            setSemesterId(activeTerm.semester_id ?? "");
+          }
         }
       })
       .catch(console.error);
@@ -260,6 +318,15 @@ export default function HonorsReport() {
     }
   }, [programs, programId]);
 
+  useEffect(() => {
+    if (
+      departmentId &&
+      !departments.some((d) => String(d.dprtmnt_id) === String(departmentId))
+    ) {
+      setDepartmentId("");
+    }
+  }, [departments, departmentId]);
+
   // ── Fetch list ─────────────────────────────────────────────────────────────
   const endpoint =
     activeTab === "academic"
@@ -273,11 +340,13 @@ export default function HonorsReport() {
         const res = await axios.get(`${API_BASE_URL}${endpoint}`, {
           params: {
             page: currentPage,
-            limit: rowsPerPage,
+            limit: rowsPerPage, // top 100 per page — keeps the initial load fast
             search: searchQuery,
             program_id: programId || undefined,
-            school_year_id: activeTab === "academic" ? schoolYearId || undefined : undefined,
-            semester_id: activeTab === "academic" ? semesterId || undefined : undefined,
+            department_id: departmentId || undefined, // College filter
+            school_year_id: schoolYearId || undefined,
+            semester_id:
+              activeTab === "academic" ? semesterId || undefined : undefined,
             campus_id: campusId || undefined,
           },
           signal,
@@ -297,12 +366,19 @@ export default function HonorsReport() {
       currentPage,
       searchQuery,
       programId,
+      departmentId,
       schoolYearId,
       semesterId,
       campusId,
       activeTab,
     ],
   );
+
+  useEffect(() => {
+    if (activeTab !== "academic") {
+      setSemesterId(""); // only clear semester now, not school year
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -317,7 +393,15 @@ export default function HonorsReport() {
   // Reset to page 1 when filters/tab change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchQuery, programId, schoolYearId, semesterId, campusId]);
+  }, [
+    activeTab,
+    searchQuery,
+    programId,
+    departmentId,
+    schoolYearId,
+    semesterId,
+    campusId,
+  ]);
 
   useEffect(() => {
     if (activeTab !== "academic") {
@@ -384,9 +468,15 @@ export default function HonorsReport() {
       (p) => String(p.program_id) === String(programId),
     );
 
+    const selectedDepartment = departments.find(
+      (d) => String(d.dprtmnt_id) === String(departmentId),
+    );
+
     const selectedSchoolYear =
       activeTab === "academic"
-        ? schoolYears.find((s) => String(s.school_year_id) === String(schoolYearId))
+        ? schoolYears.find(
+            (s) => String(s.school_year_id) === String(schoolYearId),
+          )
         : null;
 
     const selectedSemester =
@@ -400,6 +490,7 @@ export default function HonorsReport() {
 
     const filterMeta = [
       selectedCampus && selectedCampus.branch,
+      selectedDepartment && selectedDepartment.dprtmnt_name,
       selectedProgram &&
         `${selectedProgram.program_code}${
           selectedProgram.major ? ` (${selectedProgram.major})` : ""
@@ -575,13 +666,14 @@ export default function HonorsReport() {
             <thead>
               <tr>
                 <th style="width:5%">#</th>
-                <th style="width:12%">Student No.</th>
-                <th style="width:25%">Student Name</th>
-                <th style="width:15%">Department</th>
-                <th style="width:15%">Program</th>
-                <th style="width:13%">Honor</th>
+                <th style="width:11%">Student No.</th>
+                <th style="width:22%">Student Name</th>
+                <th style="width:13%">Department</th>
+                <th style="width:13%">Program</th>
+                <th style="width:11%">Honor</th>
                 <th style="width:7%">Weighted GWA</th>
-                <th style="width:8%">Subjects</th>
+                <th style="width:7%">Subjects</th>
+                <th style="width:8%">Rank</th>
               </tr>
             </thead>
 
@@ -629,13 +721,17 @@ export default function HonorsReport() {
                               ${row.subject_count || ""}
                             </td>
 
+                            <td>
+                              ${getRankLabel(getRowRank(row), rankContext)}
+                            </td>
+
                           </tr>
                         `,
                       )
                       .join("")
                   : `
                     <tr>
-                      <td colspan="8" style="text-align:center;">
+                      <td colspan="9" style="text-align:center;">
                         No data found
                       </td>
                     </tr>
@@ -662,25 +758,25 @@ export default function HonorsReport() {
   const gwaCol = activeTab === "academic" ? "gwa" : "cumulative_gwa";
   const honorCol = activeTab === "academic" ? "honor_title" : "latin_honor";
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
     <Box
@@ -806,7 +902,7 @@ export default function HonorsReport() {
         {/* ── Filters ── */}
         <Grid container spacing={2} alignItems="center">
           {/* Campus */}
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={2.5}>
             <FormControl fullWidth size="small">
               <InputLabel>Campus</InputLabel>
               <Select
@@ -831,8 +927,40 @@ export default function HonorsReport() {
             </FormControl>
           </Grid>
 
+          {/* College — reuses curriculum_table → dprtmnt_curriculum_table →
+              dprtmnt_table, the same chain already used to resolve
+              dt.dprtmnt_name on every row. Selecting a College (and/or
+              Program) switches ranking into "narrowed" mode — see
+              rankContext above — so the badge stops claiming
+              Valedictorian/Salutatorian once it's no longer ranking the
+              whole batch. */}
+          <Grid item xs={12} sm={2.5}>
+            <FormControl fullWidth size="small">
+              <InputLabel>College</InputLabel>
+              <Select
+                value={departmentId}
+                label="College"
+                onChange={(e) => setDepartmentId(e.target.value)}
+                sx={{
+                  borderRadius: "12px",
+                  backgroundColor: "#fff",
+                }}
+              >
+                <MenuItem value="">
+                  <em>All Colleges</em>
+                </MenuItem>
+
+                {departments.map((d) => (
+                  <MenuItem key={d.dprtmnt_id} value={d.dprtmnt_id}>
+                    {d.dprtmnt_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
           {/* Program */}
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <FormControl fullWidth size="small">
               <InputLabel>Program</InputLabel>
               <Select
@@ -861,7 +989,7 @@ export default function HonorsReport() {
           {activeTab === "academic" && (
             <>
               {/* School Year */}
-              <Grid item xs={12} sm={2.5}>
+              <Grid item xs={12} sm={2}>
                 <FormControl fullWidth size="small">
                   <InputLabel>School Year</InputLabel>
                   <Select
@@ -878,7 +1006,10 @@ export default function HonorsReport() {
                     </MenuItem>
 
                     {schoolYears.map((sy) => (
-                      <MenuItem key={sy.school_year_id} value={sy.school_year_id}>
+                      <MenuItem
+                        key={sy.school_year_id}
+                        value={sy.school_year_id}
+                      >
                         {sy.school_year_description}
                       </MenuItem>
                     ))}
@@ -887,7 +1018,7 @@ export default function HonorsReport() {
               </Grid>
 
               {/* Semester */}
-              <Grid item xs={12} sm={2.5}>
+              <Grid item xs={12} sm={2}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Semester</InputLabel>
 
@@ -913,6 +1044,29 @@ export default function HonorsReport() {
                 </FormControl>
               </Grid>
             </>
+          )}
+
+          {activeTab !== "academic" && (
+            <Grid item xs={12} sm={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>School Year</InputLabel>
+                <Select
+                  value={schoolYearId}
+                  label="School Year"
+                  onChange={(e) => setSchoolYearId(e.target.value)}
+                  sx={{ borderRadius: "12px", backgroundColor: "#fff" }}
+                >
+                  <MenuItem value="">
+                    <em>All Years</em>
+                  </MenuItem>
+                  {schoolYears.map((sy) => (
+                    <MenuItem key={sy.school_year_id} value={sy.school_year_id}>
+                      {sy.school_year_description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
           )}
 
           {/* Print Button */}
@@ -962,7 +1116,7 @@ export default function HonorsReport() {
           <TableHead>
             <TableRow>
               <TableCell
-                colSpan={8}
+                colSpan={9}
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
@@ -977,7 +1131,7 @@ export default function HonorsReport() {
                   gap={1}
                 >
                   <Typography fontSize="14px" fontWeight="bold" color="white">
-                 Total Student's Records:
+                    Total Student's Records: {total}
                   </Typography>
                   <Box display="flex" alignItems="center" gap={1}>
                     <Button
@@ -1058,6 +1212,7 @@ export default function HonorsReport() {
                   "Honor",
                   "Weighted GWA",
                   "Subjects",
+                  "Rank",
                 ].map((h, i) => (
                   <TableCell
                     key={i}
@@ -1077,7 +1232,7 @@ export default function HonorsReport() {
               {listLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     sx={{
                       border: `1px solid ${borderColor}`,
                       textAlign: "center",
@@ -1090,7 +1245,7 @@ export default function HonorsReport() {
               ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     sx={{
                       border: `1px solid ${borderColor}`,
                       textAlign: "center",
@@ -1159,6 +1314,15 @@ export default function HonorsReport() {
                     >
                       {row.subject_count}
                     </TableCell>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {getRankLabel(getRowRank(row), rankContext)}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -1173,7 +1337,7 @@ export default function HonorsReport() {
           <TableHead>
             <TableRow>
               <TableCell
-                colSpan={8}
+                colSpan={9}
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
@@ -1188,7 +1352,7 @@ export default function HonorsReport() {
                   gap={1}
                 >
                   <Typography fontSize="14px" fontWeight="bold" color="white">
-                    Total Student's Records:
+                    Total Student's Records: {total}
                   </Typography>
                   <Box display="flex" alignItems="center" gap={1}>
                     <Button

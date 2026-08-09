@@ -102,9 +102,16 @@ router.get('/receipt-counter/active/:active_school_year_id', async (req, res) =>
         }
 
         const [rows] = await db3.query(
-            `SELECT id, counter, employee_id, active_school_year_id
-             FROM receipt_counter
-             WHERE active_school_year_id = ?`,
+            `SELECT
+                rc.id,
+                rc.counter,
+                rc.employee_id,
+                rc.account_type_id,
+                at.description AS account_type_description,
+                rc.active_school_year_id
+             FROM receipt_counter rc
+             LEFT JOIN account_type at ON at.id = rc.account_type_id
+             WHERE rc.active_school_year_id = ?`,
             [active_school_year_id]
         );
 
@@ -118,8 +125,10 @@ router.get('/receipt-counter/active/:active_school_year_id', async (req, res) =>
 router.post('/receipt-counter/assign', async (req, res) => {
     try {
         await ensureReceiptCounterAuditColumns();
-        const { counter, employee_id, year_id, semester_id } = req.body;
+        const { counter, employee_id, year_id, semester_id, account_type_id } = req.body;
         const normalizedCounter = normalizeCounter(counter);
+        const normalizedAccountTypeId =
+            account_type_id === "" || account_type_id == null ? null : Number(account_type_id);
 
         if (!normalizedCounter || !employee_id || !year_id || !semester_id) {
             return res.status(400).json({ message: "All fields are required." });
@@ -187,9 +196,9 @@ router.post('/receipt-counter/assign', async (req, res) => {
         }
 
         const [insertResult] = await db3.query(
-            `INSERT INTO receipt_counter(counter, employee_id, active_school_year_id)
-             VALUES (?, ?, ?)`,
-            [normalizedCounter, employee_id, activeSchoolYearId]
+            `INSERT INTO receipt_counter(counter, employee_id, account_type_id, active_school_year_id)
+             VALUES (?, ?, ?, ?)`,
+            [normalizedCounter, employee_id, normalizedAccountTypeId, activeSchoolYearId]
         );
 
         const { actorId, actorRole } = getAuditActor(req);
@@ -212,8 +221,10 @@ router.put('/receipt-counter/:id', async (req, res) => {
     try {
         await ensureReceiptCounterAuditColumns();
         const { id } = req.params;
-        const { counter } = req.body;
+        const { counter, account_type_id } = req.body;
         const normalizedCounter = normalizeCounter(counter);
+        const normalizedAccountTypeId =
+            account_type_id === "" || account_type_id == null ? null : Number(account_type_id);
 
         if (!id || !normalizedCounter) {
             return res.status(400).json({ message: "Assignment id and counter are required." });
@@ -266,9 +277,9 @@ router.put('/receipt-counter/:id', async (req, res) => {
 
         const [result] = await db3.query(
             `UPDATE receipt_counter
-             SET counter = ?
+             SET counter = ?, account_type_id = ?
              WHERE id = ?`,
-            [normalizedCounter, id]
+            [normalizedCounter, normalizedAccountTypeId, id]
         );
 
         if (result.affectedRows === 0) {

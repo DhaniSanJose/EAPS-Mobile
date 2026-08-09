@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { SettingsContext } from "../App";
 import {
     Box,
@@ -22,10 +22,14 @@ import {
     DialogActions,
     Snackbar,
     Alert,
+    IconButton,
 } from "@mui/material";
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
 import HistoryToggleOffIcon from '@mui/icons-material/HistoryToggleOff';
+import CloseIcon from "@mui/icons-material/Close";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import html2canvas from "html2canvas";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -39,6 +43,7 @@ import {
     Tooltip,
     Cell,
 } from "recharts";
+import { TableVirtuoso } from "react-virtuoso";
 
 const RECEIPT_STATUS = {
     PAID_NOT_PRINTED: "PAID_NOT_PRINTED",
@@ -68,6 +73,36 @@ const VOID_REASON_OPTIONS = [
     "Others",
 ];
 
+const HISTORY_INITIAL_BATCH = 50;
+const HISTORY_BATCH_STEP = 50;
+
+const VirtuosoTableComponents = {
+    Scroller: React.forwardRef((props, ref) => (
+        <Box
+            {...props}
+            ref={ref}
+            sx={{
+                ...props.sx,
+                overflowY: "auto",
+            }}
+        />
+    )),
+    Table: (props) => (
+        <Table
+            {...props}
+            sx={{
+                borderCollapse: "separate",
+                tableLayout: "fixed",
+                minWidth: 1060,
+                ...props.sx,
+            }}
+        />
+    ),
+    TableHead: React.forwardRef((props, ref) => <TableHead {...props} ref={ref} />),
+    TableRow: (props) => <TableRow {...props} />,
+    TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
+};
+
 import {
     computePriorityPayment,
     computeScopedBalance,
@@ -88,6 +123,36 @@ const formatAcademicSchoolYear = (row) => {
     }
 
     return row?.active_school_year_id || "";
+};
+
+const formatReceiptStatusLabel = (status) => {
+    const normalized = String(status || "").trim().toUpperCase();
+    switch (normalized) {
+        case RECEIPT_STATUS.PAID_NOT_PRINTED:
+            return "Not Printed";
+        case RECEIPT_STATUS.PRINTED:
+            return "Printed";
+        case RECEIPT_STATUS.VOID:
+            return "Voided";
+        case RECEIPT_STATUS.REPRINTED:
+            return "Reprinted";
+        case RECEIPT_STATUS.CANCELLED_PRINT:
+            return "Print Cancelled";
+        default:
+            return normalized ? normalized.replace(/_/g, " ") : "-";
+    }
+};
+
+const historyColumnWidth = {
+    id: 118,
+    student: 122,
+    payment: 92,
+    employee: 112,
+    sy: 180,
+    remark: 162,
+    receipt: 118,
+    count: 92,
+    created: 152,
 };
 
 const formatTransactionDateTime = (value) => {
@@ -131,6 +196,69 @@ const MatriculationPaymentModule = () => {
             toAmount(row?.tuition_paid_amount)
         );
 
+    const getFeeLineAssessmentTotal = (row) => {
+        const feeLines = Array.isArray(row?.fee_lines) ? row.fee_lines : [];
+        if (!feeLines.length) return 0;
+
+        const feeLineTotal = feeLines.reduce((sum, line) => sum + toAmount(line?.amount), 0);
+        const hasTuitionLine = feeLines.some(
+            (line) =>
+                Boolean(line?.is_tuition) ||
+                Number(line?.fee_rate_id) === 0 ||
+                String(line?.fee_code || "").toUpperCase() === "TUITION"
+        );
+
+        return feeLineTotal + (hasTuitionLine ? 0 : toAmount(row?.tuition_fees));
+    };
+
+    const getOverallAssessment = (row) => {
+        const feeLineAssessment = getFeeLineAssessmentTotal(row);
+        if (feeLineAssessment > 0) return feeLineAssessment;
+
+        return toAmount(row?.total_tosf ?? row?.fees?.grandTotal ?? 0);
+    };
+
+    const getDisplayedBalance = (row) => {
+        const scopedBalance = getScopedRowTotal(row);
+        if (scopedBalance <= 0) {
+            return 0;
+        }
+
+        if (row?.balance !== null && row?.balance !== undefined && row?.balance !== "") {
+            return Math.max(toAmount(row.balance), 0);
+        }
+
+        const totalAssessment = getOverallAssessment(row);
+        const paymentTotal = toAmount(row?.payment_total ?? row?.payment ?? 0);
+        return Math.max(totalAssessment - paymentTotal, 0);
+    };
+
+    const accountTypeColumns = Array.from(
+        (data || []).reduce((map, row) => {
+            (row?.fee_lines || []).forEach((line) => {
+                const accountTypeId = line?.account_type;
+                if (accountTypeId === null || accountTypeId === undefined || accountTypeId === "") {
+                    return;
+                }
+
+                const key = String(accountTypeId);
+                const description = String(line?.account_type_description || "").trim();
+                if (!map.has(key)) {
+                    map.set(key, {
+                        id: key,
+                        label: description || key,
+                    });
+                } else if (description && !map.get(key)?.label) {
+                    map.set(key, {
+                        ...map.get(key),
+                        label: description,
+                    });
+                }
+            });
+            return map;
+        }, new Map()).values()
+    ).sort((a, b) => Number(a.id) - Number(b.id));
+
     const visibleData = data.filter((row) => {
         const scopedBalance = getScopedRowTotal(row);
         const keepVisible = String(row?.id) === String(keepVisiblePaidMatriculationId);
@@ -151,6 +279,7 @@ const MatriculationPaymentModule = () => {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [transactionData, setTransactionData] = useState([]);
+    const [historyRenderLimit, setHistoryRenderLimit] = useState(HISTORY_INITIAL_BATCH);
     const [voidingReceipt, setVoidingReceipt] = useState(false);
     const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
     const [voidReason, setVoidReason] = useState("");
@@ -307,7 +436,8 @@ const MatriculationPaymentModule = () => {
             setKeepVisiblePaidMatriculationId(row?.id ?? null);
             await fetchStudentData();
             setReceiptData({
-                transaction_id: saveRes?.data?.transaction_id || "",
+                transaction_no: saveRes?.data?.transaction_no || saveRes?.data?.transaction_id || "",
+                transaction_id: saveRes?.data?.transaction_no || saveRes?.data?.transaction_id || "",
                 student_number: row?.student_number || "",
                 student_name: `${row?.last_name || ""}, ${row?.given_name || ""} ${row?.middle_initial || ""}`.trim(),
                 total_tosf: saveRes?.data?.total_tosf ?? paymentSummary.totalTosf,
@@ -328,7 +458,7 @@ const MatriculationPaymentModule = () => {
                 payment_applied: saveRes?.data?.payment_applied ?? paymentSummary.appliedPayment,
                 balance: saveRes?.data?.balance ?? paymentSummary.balance,
                 unpaid_total: paymentSummary.unpaidTotal,
-                payment_breakdown: saveRes?.data?.payment_breakdown || paymentSummary.deductions,
+                payment_breakdown: saveRes?.data?.payment_breakdown || paymentSummary.allocations,
                 employee_id: employeeId,
                 active_school_year_id: saveRes?.data?.active_school_year_id || row?.active_school_year_id || "",
                 remark: "Matriculation payment",
@@ -349,9 +479,8 @@ const MatriculationPaymentModule = () => {
     };
 
     const openConfirm = (row) => {
-        const scopedTotal = getScopedRowTotal(row);
         setConfirmRow(row);
-        setPaymentValue(scopedTotal > 0 ? String(scopedTotal) : "");
+        setPaymentValue("0");
         setConfirmOpen(true);
     };
 
@@ -391,7 +520,9 @@ const MatriculationPaymentModule = () => {
         setHistoryLoading(true);
         try {
             const res = await axios.get(`${API_BASE_URL}/api/payment_matriculation/transactions`);
-            setTransactionData(res.data || []);
+            const rows = res.data || [];
+            setTransactionData(rows);
+            setHistoryRenderLimit(Math.min(HISTORY_INITIAL_BATCH, rows.length || HISTORY_INITIAL_BATCH));
             showSnackbar("Transaction history loaded.", "success");
         } catch (error) {
             console.error(error);
@@ -400,13 +531,14 @@ const MatriculationPaymentModule = () => {
                 "error"
             );
             setTransactionData([]);
+            setHistoryRenderLimit(HISTORY_INITIAL_BATCH);
         } finally {
             setHistoryLoading(false);
         }
     };
 
     const markReceiptPrinted = async () => {
-        const transactionId = receiptData?.transaction_id;
+        const transactionId = receiptData?.transaction_no || receiptData?.transaction_id;
         if (!transactionId) return null;
 
         const res = await axios.put(
@@ -500,7 +632,7 @@ const MatriculationPaymentModule = () => {
 
     const markCancelledPrintIfUnprinted = async () => {
         if (receiptPrintedRef.current) return;
-        const transactionId = receiptData?.transaction_id;
+        const transactionId = receiptData?.transaction_no || receiptData?.transaction_id;
         if (
             !transactionId ||
             receiptData?.receipt_status === RECEIPT_STATUS.CANCELLED_PRINT ||
@@ -536,7 +668,7 @@ const MatriculationPaymentModule = () => {
     };
 
     const handleVoidReceipt = async () => {
-        const transactionId = receiptData?.transaction_id;
+        const transactionId = receiptData?.transaction_no || receiptData?.transaction_id;
         if (!transactionId) {
             showSnackbar("No transaction id found for this receipt.", "warning");
             return;
@@ -710,6 +842,17 @@ const MatriculationPaymentModule = () => {
         0
     );
     const formatReceiptAmount = (value) => toAmount(value).toLocaleString();
+    const historyRows = useMemo(
+        () => transactionData.slice(0, historyRenderLimit),
+        [transactionData, historyRenderLimit]
+    );
+    const historyHasMore = historyRenderLimit < transactionData.length;
+    const loadMoreHistoryRows = () => {
+        if (!historyHasMore) return;
+        setHistoryRenderLimit((prev) =>
+            Math.min(prev + HISTORY_BATCH_STEP, transactionData.length)
+        );
+    };
 
 
 
@@ -825,7 +968,6 @@ const MatriculationPaymentModule = () => {
                                         Total Students: {visibleData.length}
                                     </Typography>
                                     <Box display="flex" alignItems="center" gap={1}>
-                                        {/* First & Prev */}
                                         <Button
                                             onClick={() => setCurrentPage(1)}
                                             disabled={currentPage === 1}
@@ -876,8 +1018,6 @@ const MatriculationPaymentModule = () => {
                                             Prev
                                         </Button>
 
-
-                                        {/* Page Dropdown */}
                                         <FormControl size="small" sx={{ minWidth: 80 }}>
                                             <Select
                                                 value={currentPage}
@@ -899,14 +1039,14 @@ const MatriculationPaymentModule = () => {
                                                         borderColor: 'white',
                                                     },
                                                     '& svg': {
-                                                        color: 'white', // dropdown arrow icon color
+                                                        color: 'white',
                                                     }
                                                 }}
                                                 MenuProps={{
                                                     PaperProps: {
                                                         sx: {
                                                             maxHeight: 200,
-                                                            backgroundColor: '#fff', // dropdown background
+                                                            backgroundColor: '#fff',
                                                         }
                                                     }
                                                 }}
@@ -923,8 +1063,6 @@ const MatriculationPaymentModule = () => {
                                             of {totalPages} page{totalPages > 1 ? 's' : ''}
                                         </Typography>
 
-
-                                        {/* Next & Last */}
                                         <Button
                                             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                             disabled={currentPage === totalPages}
@@ -980,7 +1118,6 @@ const MatriculationPaymentModule = () => {
                             </TableCell>
                         </TableRow>
 
-                        {/* COLUMN HEADERS */}
                         <TableRow>
                             <TableCell>No.</TableCell>
                             <TableCell>Campus</TableCell>
@@ -996,14 +1133,13 @@ const MatriculationPaymentModule = () => {
                             <TableCell>Comp Units</TableCell>
                             <TableCell>Acad Units</TableCell>
                             <TableCell>NSTP Units</TableCell>
-                            <TableCell>Reg Fees</TableCell>
                             <TableCell>Tuition</TableCell>
                             <TableCell>Total Misc</TableCell>
-                            <TableCell>Payable Amount</TableCell>
+                            <TableCell>Overall Total</TableCell>
+                            <TableCell>Balance</TableCell>
                             <TableCell>Action</TableCell>
                         </TableRow>
                     </TableHead>
-
 
                     <TableBody
                         sx={{
@@ -1031,7 +1167,7 @@ const MatriculationPaymentModule = () => {
                                     <TableCell>{row.last_name}</TableCell>
                                     <TableCell>{row.given_name}</TableCell>
                                     <TableCell>{row.middle_initial}</TableCell>
-                                    <TableCell>{row.degree_program}</TableCell>
+                                    <TableCell>{row.program_description || row.degree_program}</TableCell>
                                     <TableCell>{row.year_level}</TableCell>
                                     <TableCell>{row.sex}</TableCell>
                                     <TableCell>{row.email_address}</TableCell>
@@ -1039,14 +1175,13 @@ const MatriculationPaymentModule = () => {
                                     <TableCell align="right">{row.computer_units}</TableCell>
                                     <TableCell align="right">{row.academic_units_enrolled}</TableCell>
                                     <TableCell align="right">{row.academic_units_nstp_enrolled}</TableCell>
-                                    <TableCell align="right">{row.registration_fees}</TableCell>
                                     <TableCell align="right">{row.tuition_fees}</TableCell>
                                     <TableCell align="right">{row.total_misc}</TableCell>
-                                    <TableCell align="right">{getScopedRowTotal(row).toLocaleString()}</TableCell>
+                                    <TableCell align="right">{getOverallAssessment(row).toLocaleString()}</TableCell>
+                                    <TableCell align="right">{getDisplayedBalance(row).toLocaleString()}</TableCell>
                                     <TableCell>
                                         <Button
                                             variant="contained"
-
                                             onClick={() => openConfirm(row)}
                                         >
                                             Transact to Matriculation
@@ -1060,14 +1195,79 @@ const MatriculationPaymentModule = () => {
             </TableContainer >
 
             {/* CONFIRM DIALOG */}
-            <Dialog open={confirmOpen} onClose={closeConfirm} fullWidth maxWidth="lg">
-                <DialogTitle>Confirm Payment</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
+            <Dialog
+                open={confirmOpen}
+                onClose={closeConfirm}
+                fullWidth
+                maxWidth="lg"
+                PaperProps={{
+                    sx: {
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        minWidth: { xs: "94vw", md: 1210 },
+                        boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                    },
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        bgcolor: settings?.header_color || "#1976d2",
+                        color: "white",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontWeight: "bold",
+                        px: 3,
+                        py: 2,
+                    }}
+                >
+                    <Box display="flex" alignItems="center" gap={1.5}>
+                        <Box
+                            sx={{
+                                backgroundColor: "rgba(255,255,255,0.2)",
+                                borderRadius: "50%",
+                                width: 40,
+                                height: 40,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <ReceiptLongOutlinedIcon fontSize="small" />
+                        </Box>
+                        <Box>
+                            <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                                Confirm Matriculation Payment
+                            </Typography>
+                            <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                                Review the payment breakdown before saving
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <IconButton
+                        onClick={closeConfirm}
+                        sx={{
+                            color: "white",
+                            border: "2px solid rgba(255,255,255,0.6)",
+                            borderRadius: "50%",
+                            width: 38,
+                            height: 38,
+                            padding: 0,
+                            "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.2)",
+                                border: "2px solid white",
+                            },
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ px: 3, pt: 2.5, pb: 1.5, background: "linear-gradient(180deg, #fff 0%, #fafafa 100%)" }}>
+                    <DialogContentText sx = {{ pt: 2.5}}>
                         Are you sure you want to save the payment to Matriculation for student{" "}
                         {confirmRow?.student_number || ""}?
                     </DialogContentText>
-                    <DialogContentText sx={{ mt: "20px", display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <Box sx={{ mt: "20px", display: "flex", alignItems: "center", gap: "1rem" }}>
                         <Box sx={{ mt: 1 }}>
                             <Box>
                                 <Box sx={{ mb: 1, display: "flex", gap: 1 }}>
@@ -1144,7 +1344,7 @@ const MatriculationPaymentModule = () => {
                                     "& .MuiInputBase-input": { fontSize: "20px" },
                                 }}
                             />
-                            <Box sx={{ mt: 2, width: "406px", display: "flex", alignItems: "center", justifyContent: "end" }}>
+                            <Box sx={{ mt: 2, width: "406px", display: "none", alignItems: "center", justifyContent: "end" }}>
                                 <Button onClick={closeConfirm}
                                     color="error"
                                     variant="outlined"
@@ -1219,129 +1419,306 @@ const MatriculationPaymentModule = () => {
                                 </TableContainer>
                             </Box>
                         </Box>
-                    </DialogContentText>
+                    </Box>
                 </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
+                    <Button onClick={closeConfirm} color="error" variant="outlined">
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleConfirmTransfer}
+                        variant="contained"
+                        disabled={isOverPayment}
+                        sx={{
+                            borderRadius: "10px",
+                            textTransform: "none",
+                            px: 3,
+                            fontWeight: "bold",
+                            backgroundColor: settings?.header_color || "#1976d2",
+                        }}
+                    >
+                        Confirm
+                    </Button>
+                </DialogActions>
             </Dialog>
 
-            <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} fullWidth maxWidth="lg">
-                <DialogTitle>Transaction History</DialogTitle>
-                <DialogContent>
-                    {historyLoading ? (
-                        <Typography sx={{ py: 2 }}>Loading transaction history...</Typography>
-                    ) : (
-                        <TableContainer component={Paper} sx={{ mt: 1, maxHeight: 500 }}>
-                            <Table stickyHeader size="small">
-                                <TableHead
+            <Dialog
+                open={historyOpen}
+                onClose={() => setHistoryOpen(false)}
+                fullWidth
+                maxWidth="lg"
+                PaperProps={{
+                    sx: {
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        minWidth: { xs: "92vw", md: 1100 },
+                        boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                    },
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        bgcolor: settings?.header_color || "#1976d2",
+                        color: "white",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontWeight: "bold",
+                        px: 3,
+                        py: 2,
+                    }}
+                >
+                    <Box display="flex" alignItems="center" gap={1.5}>
+                        <Box
+                            sx={{
+                                backgroundColor: "rgba(255,255,255,0.2)",
+                                borderRadius: "50%",
+                                width: 40,
+                                height: 40,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <HistoryToggleOffIcon fontSize="small" />
+                        </Box>
+                        <Box>
+                            <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                                Transaction History
+                            </Typography>
+                            <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                                Virtualized transaction records with scroll loading
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <IconButton
+                        onClick={() => setHistoryOpen(false)}
+                        sx={{
+                            color: "white",
+                            border: "2px solid rgba(255,255,255,0.6)",
+                            borderRadius: "50%",
+                            width: 38,
+                            height: 38,
+                            padding: 0,
+                            "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.2)",
+                                border: "2px solid white",
+                            },
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
 
-                                >
-                                    <TableRow>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>ID</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Student Number</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Payment</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Employee ID</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Academic School Year</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Remark</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Receipt Status</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Print Count</strong></TableCell>
-                                        <TableCell sx={{
-                                            backgroundColor: settings?.header_color || "#1976d2",
-                                            color: "white",
-                                            width: "1rem",
-                                            textAlign: "center",
-                                            border: `1px solid ${borderColor}`,
-                                        }}><strong>Created At</strong></TableCell>
-                                    </TableRow>
-                                </TableHead>
-
-                                <TableBody
-                                    sx={{
-                                        border: `1px solid ${borderColor}`,
-                                        "& .MuiTableRow-root:nth-of-type(odd)": {
-                                            backgroundColor: "#ffffff",
-                                        },
-                                        "& .MuiTableRow-root:nth-of-type(even)": {
-                                            backgroundColor: "lightgray",
-                                        },
-                                    }}
-                                >
-                                    {transactionData.length === 0 ? (
+                <DialogContent sx={{ px: 3, pt: 2.5, pb: 1.5, background: "linear-gradient(180deg, #fff 0%, #fafafa 100%)" }}>
+                    <Box
+                        sx={{
+                            border: "1px solid rgba(0,0,0,0.08)",
+                            borderRadius: 2,
+                            background: "linear-gradient(180deg, #ffffff 0%, #fafafa 100%)",
+                            boxShadow: "0 10px 24px rgba(0,0,0,0.06)",
+                            overflow: "hidden",
+                            mt: 2
+                        }}
+                    >
+                        {historyLoading ? (
+                            <Typography sx={{ py: 4, px: 2 }}>Loading transaction history...</Typography>
+                        ) : historyRows.length === 0 ? (
+                            <Box sx={{ py: 6, textAlign: "center" }}>
+                                <Typography fontSize={14} color="#555" fontWeight="bold">
+                                    No transactions found.
+                                </Typography>
+                            </Box>
+                        ) : (
+                            <Box sx={{ height: 380 }}>
+                                <TableVirtuoso
+                                    data={historyRows}
+                                    endReached={loadMoreHistoryRows}
+                                    style={{ height: "100%" }}
+                                    components={VirtuosoTableComponents}
+                                    fixedHeaderContent={() => (
                                         <TableRow>
-                                            <TableCell colSpan={9} align="center">
-                                                No transactions found.
-                                            </TableCell>
+                                            {[
+                                                "Transaction No.",
+                                                "Student Number",
+                                                "Payment",
+                                                "Employee ID",
+                                                "Academic School Year",
+                                                "Receipt Status",
+                                                "Created At",
+                                            ].map((label) => (
+                                                <TableCell
+                                                    key={label}
+                                                    sx={{
+                                                        backgroundColor: settings?.header_color || "#1976d2",
+                                                        color: "white",
+                                                        fontWeight: "bold",
+                                                        fontSize: 11,
+                                                        textAlign: "center",
+                                                        borderBottom: "1px solid rgba(255,255,255,0.18)",
+                                                        borderRight: "1px solid rgba(255,255,255,0.12)",
+                                                        py: 0.8,
+                                                        px: 0.7,
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }}
+                                                >
+                                                    {label}
+                                                </TableCell>
+                                            ))}
                                         </TableRow>
-                                    ) : (
-                                        transactionData.map((tx, idx) => (
-                                            <TableRow key={`${tx.id}-${idx}`}>
-                                                <TableCell>{tx.id}</TableCell>
-                                                <TableCell>{tx.student_number}</TableCell>
-                                                <TableCell>{tx.payment}</TableCell>
-                                                <TableCell>{tx.employee_id}</TableCell>
-                                                <TableCell>{formatAcademicSchoolYear(tx)}</TableCell>
-                                                <TableCell>{tx.remark}</TableCell>
-                                                <TableCell>{tx.receipt_status || "-"}</TableCell>
-                                                <TableCell>{tx.print_count ?? 0}</TableCell>
-                                                <TableCell>{formatTransactionDateTime(tx.created_at)}</TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
+                                    )} 
+                                    itemContent={(index, tx) => [
+                                        <TableCell
+                                            key="id"
+                                            sx={{
+                                                width: historyColumnWidth.id,
+                                                maxWidth: historyColumnWidth.id,
+                                                textAlign: "center",
+                                                fontSize: 11,
+                                                borderBottom: `1px solid ${borderColor}`,
+                                                borderRight: `1px solid ${borderColor}`,
+                                                py: 0.65,
+                                                px: 0.7,
+                                                backgroundColor: index % 2 === 0 ? "#fff" : "#f8f8f8",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {tx.transaction_no}
+                                        </TableCell>,
+                                        <TableCell
+                                            key="student"
+                                            sx={{
+                                                width: historyColumnWidth.student,
+                                                maxWidth: historyColumnWidth.student,
+                                                textAlign: "center",
+                                                fontSize: 11,
+                                                borderBottom: `1px solid ${borderColor}`,
+                                                borderRight: `1px solid ${borderColor}`,
+                                                py: 0.65,
+                                                px: 0.7,
+                                                backgroundColor: index % 2 === 0 ? "#fff" : "#f8f8f8",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {tx.student_number}
+                                        </TableCell>,
+                                        <TableCell
+                                            key="payment"
+                                            sx={{
+                                                width: historyColumnWidth.payment,
+                                                maxWidth: historyColumnWidth.payment,
+                                                textAlign: "center",
+                                                fontSize: 11,
+                                                borderBottom: `1px solid ${borderColor}`,
+                                                borderRight: `1px solid ${borderColor}`,
+                                                py: 0.65,
+                                                px: 0.7,
+                                                backgroundColor: index % 2 === 0 ? "#fff" : "#f8f8f8",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {tx.payment}
+                                        </TableCell>,
+                                        <TableCell
+                                            key="employee"
+                                            sx={{
+                                                width: historyColumnWidth.employee,
+                                                maxWidth: historyColumnWidth.employee,
+                                                textAlign: "center",
+                                                fontSize: 11,
+                                                borderBottom: `1px solid ${borderColor}`,
+                                                borderRight: `1px solid ${borderColor}`,
+                                                py: 0.65,
+                                                px: 0.7,
+                                                backgroundColor: index % 2 === 0 ? "#fff" : "#f8f8f8",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {tx.employee_id}
+                                        </TableCell>,
+                                        <TableCell
+                                            key="sy"
+                                            sx={{
+                                                width: historyColumnWidth.sy,
+                                                maxWidth: historyColumnWidth.sy,
+                                                textAlign: "center",
+                                                fontSize: 11,
+                                                borderBottom: `1px solid ${borderColor}`,
+                                                borderRight: `1px solid ${borderColor}`,
+                                                py: 0.65,
+                                                px: 0.7,
+                                                backgroundColor: index % 2 === 0 ? "#fff" : "#f8f8f8",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {formatAcademicSchoolYear(tx)}
+                                        </TableCell>,
+                                        <TableCell
+                                            key="receipt"
+                                            sx={{
+                                                width: historyColumnWidth.receipt,
+                                                maxWidth: historyColumnWidth.receipt,
+                                                textAlign: "center",
+                                                borderBottom: `1px solid ${borderColor}`,
+                                                borderRight: `1px solid ${borderColor}`,
+                                                py: 0.65,
+                                                px: 0.7,
+                                                backgroundColor: index % 2 === 0 ? "#fff" : "#f8f8f8",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {formatReceiptStatusLabel(tx.receipt_status)}
+                                        </TableCell>,
+                                        <TableCell
+                                            key="created"
+                                            sx={{
+                                                width: historyColumnWidth.created,
+                                                maxWidth: historyColumnWidth.created,
+                                                textAlign: "center",
+                                                fontSize: 11,
+                                                borderBottom: `1px solid ${borderColor}`,
+                                                py: 0.65,
+                                                px: 0.7,
+                                                backgroundColor: index % 2 === 0 ? "#fff" : "#f8f8f8",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {formatTransactionDateTime(tx.created_at)}
+                                        </TableCell>,
+                                    ]}
+                                />
+                                {historyHasMore && (
+                                    <Box sx={{ px: 2, py: 1.2, textAlign: "center", borderTop: `1px solid ${borderColor}`, backgroundColor: "#fafafa" }}>
+                                        <Typography fontSize={12} color="#666">
+                                            Scroll to load more transaction records.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+                    </Box>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setHistoryOpen(false)} color="error"
-                        variant="outlined">Close</Button>
+
+                <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
+                    <Button onClick={() => setHistoryOpen(false)} color="error" variant="outlined">
+                        Close
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -1368,31 +1745,72 @@ const MatriculationPaymentModule = () => {
             <Dialog
                 open={receiptOpen}
                 onClose={handleCloseReceipt}
+                fullWidth
+                maxWidth="lg"
                 PaperProps={{
                     sx: {
-                        width: "168mm",
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        width: "min(96vw, 168mm)",
                         maxWidth: "168mm",
-                        height: "210mm",
-                        maxHeight: "210mm",
+                        boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
                     },
                 }}
             >
-                <DialogTitle>RECEIPT</DialogTitle>
-                <DialogContent>
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1, gap: 1 }}>
-                        <Button variant="contained" onClick={handlePrintA5}>
-                            Print
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="error"
-                            onClick={openVoidConfirm}
-                            disabled={voidingReceipt}
+                <DialogTitle
+                    sx={{
+                        bgcolor: settings?.header_color || "#1976d2",
+                        color: "white",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontWeight: "bold",
+                        px: 3,
+                        py: 2,
+                    }}
+                >
+                    <Box display="flex" alignItems="center" gap={1.5}>
+                        <Box
+                            sx={{
+                                backgroundColor: "rgba(255,255,255,0.2)",
+                                borderRadius: "50%",
+                                width: 40,
+                                height: 40,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
                         >
-                            {voidingReceipt ? "Voiding..." : "Void"}
-                        </Button>
+                            <ReceiptLongOutlinedIcon fontSize="small" />
+                        </Box>
+                        <Box>
+                            <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+                                RECEIPT
+                            </Typography>
+                            <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                                Review and print the generated receipt
+                            </Typography>
+                        </Box>
                     </Box>
-
+                    <IconButton
+                        onClick={handleCloseReceipt}
+                        sx={{
+                            color: "white",
+                            border: "2px solid rgba(255,255,255,0.6)",
+                            borderRadius: "50%",
+                            width: 38,
+                            height: 38,
+                            padding: 0,
+                            "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.2)",
+                                border: "2px solid white",
+                            },
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ px: 3, pt: 2.5, pb: 1.5, background: "linear-gradient(180deg, #fff 0%, #fafafa 100%)" }}>
                     <Box
                         ref={a5PrintRef}
                         id="student-receipt-a5-print"
@@ -1417,7 +1835,7 @@ const MatriculationPaymentModule = () => {
                                 <Typography variant="body2" sx={{ mt: '4cm', ml: '6.5cm' }}>
                                 </Typography>
                                 <Typography variant="body2" sx={{ mt: '4cm', width: '3.1cm' }}>
-                                    {receiptData?.transaction_id || "-"}
+                                    {receiptData?.transaction_no || receiptData?.transaction_id || "-"}
                                 </Typography>
                                 <Typography variant="body2" sx={{ mt: '4cm', width: '2cm', ml: '2cm' }}>
                                     {new Date().toLocaleDateString()}
@@ -1513,7 +1931,20 @@ const MatriculationPaymentModule = () => {
                         </Box>
                     </Box>
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, justifyContent: "space-between" }}>
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                        <Button variant="contained" onClick={handlePrintA5}>
+                            Print
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={openVoidConfirm}
+                            disabled={voidingReceipt}
+                        >
+                            {voidingReceipt ? "Voiding..." : "Void"}
+                        </Button>
+                    </Box>
                     <Button onClick={handleCloseReceipt} color="error"
                         variant="outlined">Close</Button>
                 </DialogActions>
@@ -1528,7 +1959,7 @@ const MatriculationPaymentModule = () => {
                 <DialogTitle>Void Receipt</DialogTitle>
                 <DialogContent>
                     <DialogContentText sx={{ mb: 2 }}>
-                        Select the reason for voiding receipt {receiptData?.transaction_id || ""}.
+                        Select the reason for voiding receipt {receiptData?.transaction_no || receiptData?.transaction_id || ""}.
                     </DialogContentText>
                     <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                         <Select

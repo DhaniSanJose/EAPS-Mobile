@@ -503,16 +503,8 @@ const AdminPersonalDataForm = forwardRef(({ personId }, ref) => {
                     </div>
                   )}
 
-                  <div
-                    style={{
-                      textAlign: "center",
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      fontFamily: "Arial",
-                      marginTop: "15px",
-                    }}
-                  >
-                    ADMISSION SERVICES
+                  <div style={{ fontWeight: "bold", fontFamily: "Arial", fontSize: "15px", letterSpacing: "1px", marginTop: "6px" }}>
+                    OFFICE OF THE ADMISSION SERVICES
                   </div>
                 </div>
 
@@ -720,13 +712,13 @@ const AdminPersonalDataForm = forwardRef(({ personId }, ref) => {
                       >
                         {person.created_at
                           ? new Date(person.created_at).toLocaleDateString(
-                              "en-US",
-                              {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              },
-                            )
+                            "en-US",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            },
+                          )
                           : ""}
                       </div>
                       <div style={{ fontWeight: "bold", textAlign: "center" }}>
@@ -912,13 +904,13 @@ const AdminPersonalDataForm = forwardRef(({ personId }, ref) => {
                     >
                       {curriculumOptions.length > 0
                         ? curriculumOptions
-                            .find(
-                              (item) =>
-                                item?.curriculum_id?.toString() ===
-                                (person?.program ?? "").toString(),
-                            )
-                            ?.program_description?.toUpperCase() ||
-                          (person?.program?.toString()?.toUpperCase() ?? "")
+                          .find(
+                            (item) =>
+                              item?.curriculum_id?.toString() ===
+                              (person?.program ?? "").toString(),
+                          )
+                          ?.program_description?.toUpperCase() ||
+                        (person?.program?.toString()?.toUpperCase() ?? "")
                         : "LOADING..."}
                     </div>
                   </td>
@@ -973,13 +965,13 @@ const AdminPersonalDataForm = forwardRef(({ personId }, ref) => {
                     >
                       {person.birthOfDate
                         ? new Date(person.birthOfDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            },
-                          )
+                          "en-US",
+                          {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          },
+                        )
                         : ""}
                     </div>
                   </td>
@@ -1420,8 +1412,8 @@ const AdminPersonalDataForm = forwardRef(({ personId }, ref) => {
                       }}
                     >
                       {person.presentStreet ||
-                      person.presentBarangay ||
-                      person.presentMunicipality
+                        person.presentBarangay ||
+                        person.presentMunicipality
                         ? `${person.presentStreet || ""} ${person.presentBarangay || ""}, ${person.presentMunicipality || ""}`
                         : ""}
                     </div>

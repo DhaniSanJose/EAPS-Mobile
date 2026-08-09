@@ -1,33 +1,17 @@
-const express = require('express');
+const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { db, db3 } = require('../database/database');
+const { db, db3 } = require("../database/database");
 
 const router = express.Router();
 
-const GWA_UNIT_SQL =
-  "COALESCE(NULLIF(CAST(ct.course_unit AS DECIMAL(10,4)), 0), NULLIF(COALESCE(CAST(ct.lec_unit AS DECIMAL(10,4)), 0) + COALESCE(CAST(ct.lab_unit AS DECIMAL(10,4)), 0), 0), 0)";
+const {
+  GWA_UNIT_SQL,
+  GWA_EXCLUSION_SQL,
+  gwaGradeJoinSql,
+} = require("../../utils/gwaSql");
 
-const GWA_EXCLUSION_SQL = `
-  (
-    ct.is_gwa_included = 0
-    OR EXISTS (
-      SELECT 1
-      FROM program_tagging_table ptt_ex
-      LEFT JOIN year_level_table ylt_ex
-        ON ylt_ex.year_level_id = ptt_ex.year_level_id
-      WHERE ptt_ex.curriculum_id = es.curriculum_id
-        AND ptt_ex.course_id = es.course_id
-        AND (
-          COALESCE(ptt_ex.is_nstp, 0) = 1
-          OR LOWER(COALESCE(CAST(ptt_ex.category AS CHAR), '')) IN ('bridging', 'bridge', 'special')
-          OR LOWER(COALESCE(ylt_ex.year_level_description, '')) LIKE '%bridg%'
-          OR COALESCE(LOWER(ylt_ex.level_type), 'year') = 'special'
-        )
-    )
-  )
-`;
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ==========================================
@@ -62,7 +46,6 @@ const STUDENT_CURRENT_PROGRAM_SQL = `
   ) ranked
   WHERE ranked.rn = 1
 `;
-
 
 async function getRegistrarScope(employee_id) {
   const [rows] = await db3.query(
@@ -111,12 +94,20 @@ async function isStudentInRegistrarScope(student_number, employee_id) {
 async function checkRegistrarAccess(student_number, employee_id) {
   const scope = await getRegistrarScope(employee_id);
   if (scope.length === 0) {
-    return { ok: false, status: 403, error: "No program/department access has been assigned to this account." };
+    return {
+      ok: false,
+      status: 403,
+      error: "No program/department access has been assigned to this account.",
+    };
   }
 
   const inScope = await isStudentInRegistrarScope(student_number, employee_id);
   if (!inScope) {
-    return { ok: false, status: 403, error: "You do not have access to this student's records." };
+    return {
+      ok: false,
+      status: 403,
+      error: "You do not have access to this student's records.",
+    };
   }
 
   return { ok: true };
@@ -236,7 +227,6 @@ router.get("/student-info", async (req, res) => {
   }
 });
 
-
 router.get("/student-info/:student_number", async (req, res) => {
   const { student_number } = req.params;
   const { employee_id } = req.query;
@@ -310,7 +300,7 @@ router.put("/update_student_year_level", async (req, res) => {
 
     await db3.query(
       `UPDATE student_status_table SET year_level_id = ? WHERE id = ?`,
-      [new_year_level_id, id]
+      [new_year_level_id, id],
     );
 
     res
@@ -321,7 +311,6 @@ router.put("/update_student_year_level", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 router.get("/student_schedule/:id", async (req, res) => {
   const { id } = req.params;
@@ -527,9 +516,13 @@ router.get("/student_grade/:id", async (req, res) => {
       JOIN course_table AS ct
         ON es.course_id = ct.course_id
 
+      -- FIXED: use the canonical grade_conversion match — must have real
+      -- numeric bounds and a positive raw score, same condition Honors uses.
+      -- Previously this joined on min_score/max_score alone, which could
+      -- silently mismatch against text-coded grade_conversion rows and
+      -- produced a numeric_grade the Honors GWA would never have produced.
       LEFT JOIN grade_conversion gc_main
-        ON gc_main.is_disqualified = 0
-        AND es.final_grade BETWEEN gc_main.min_score AND gc_main.max_score
+        ON ${gwaGradeJoinSql("es", "gc_main")}
 
       LEFT JOIN program_tagging_table AS ptg
         ON ptg.curriculum_id = es.curriculum_id
@@ -596,7 +589,8 @@ router.get("/student_grade/:id", async (req, res) => {
         grade <= 0 ||
         !Number.isFinite(units) ||
         units <= 0
-      ) return acc;
+      )
+        return acc;
 
       const key = `${row.year_description}-${row.semester_id}`;
       if (!acc[key]) acc[key] = { total: 0, units: 0 };
@@ -613,7 +607,6 @@ router.get("/student_grade/:id", async (req, res) => {
     });
 
     res.json(rows);
-
   } catch (error) {
     console.error("Error fetching person:", error);
     res.status(500).json({
@@ -739,7 +732,6 @@ router.get("/student/latin-honor-standing/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch Latin honor standing" });
   }
 });
-
 
 router.get("/student/view_latest_grades/:id", async (req, res) => {
   const { id } = req.params;
@@ -1127,10 +1119,12 @@ router.put("/student/update_person/:person_id", async (req, res) => {
       }
     }
 
-    const nextEmailRaw =
-      Object.prototype.hasOwnProperty.call(cleanPayload, "emailAddress")
-        ? cleanPayload.emailAddress
-        : undefined;
+    const nextEmailRaw = Object.prototype.hasOwnProperty.call(
+      cleanPayload,
+      "emailAddress",
+    )
+      ? cleanPayload.emailAddress
+      : undefined;
     const nextEmail =
       nextEmailRaw === undefined || nextEmailRaw === null
         ? null
@@ -1149,7 +1143,9 @@ router.put("/student/update_person/:person_id", async (req, res) => {
 
     if (nextEmailRaw !== undefined) {
       if (!nextEmail) {
-        return res.status(400).json({ message: "emailAddress cannot be empty." });
+        return res
+          .status(400)
+          .json({ message: "emailAddress cannot be empty." });
       }
 
       const [conflicts] = await db3.query(
@@ -1161,7 +1157,9 @@ router.put("/student/update_person/:person_id", async (req, res) => {
         [nextEmail, person_id],
       );
       if (conflicts.length > 0) {
-        return res.status(409).json({ message: "Email is already used by another account." });
+        return res
+          .status(409)
+          .json({ message: "Email is already used by another account." });
       }
 
       await db3.query(
@@ -1247,11 +1245,10 @@ router.get("/student/:id", async (req, res) => {
         AND COALESCE(LOWER(ylt.level_type), 'year') <> 'special'
         AND ${regularCategoryClause}
     `;
-    const [expectedRegularSubjects] = await db3.query(expectedRegularSubjectsQuery, [
-      year_level_id,
-      semester_id,
-      curriculum_id,
-    ]);
+    const [expectedRegularSubjects] = await db3.query(
+      expectedRegularSubjectsQuery,
+      [year_level_id, semester_id, curriculum_id],
+    );
 
     const enrolledSubjectsQuery = `
       SELECT
@@ -1308,7 +1305,8 @@ router.get("/student/:id", async (req, res) => {
       enrolledSubjects
         .filter(
           (subject) =>
-            Number(subject.is_bridging) !== 1 && Number(subject.is_special) !== 1,
+            Number(subject.is_bridging) !== 1 &&
+            Number(subject.is_special) !== 1,
         )
         .map((subject) => Number(subject.course_id)),
     );
@@ -1553,10 +1551,7 @@ router.get("/student_enrollment", async (req, res) => {
     req.headers["x-employee-id"] ||
     req.headers["x-audit-actor-id"];
   const q = String(req.query.q || req.query.search || "").trim();
-  const limit = Math.min(
-    50,
-    Math.max(1, parseInt(req.query.limit, 10) || 10),
-  );
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
 
   try {
     if (!employee_id) {
@@ -1666,19 +1661,20 @@ router.get("/student-info-for-enrollment/:student_number", async (req, res) => {
           INNER JOIN semester_table smt ON sy.semester_id = smt.semester_id
           INNER JOIN course_table cst ON es.course_id = cst.course_id
           WHERE es.student_number = ? AND en_remarks = 0
-      `, [student_number]
-    )
+      `,
+      [student_number],
+    );
 
     if (rows.length === 0) {
       return res.status(400).json({ error: "student record is not found" });
     }
 
-    res.json(rows)
+    res.json(rows);
   } catch (err) {
     console.error("Failed to get student record:", err);
     res.status(500).send("Failed to get student record.");
   }
-})
+});
 
 router.get("/student_enrollment/:student_number", async (req, res) => {
   const { student_number } = req.params;
@@ -1738,7 +1734,7 @@ router.get("/student_enrollment/:student_number", async (req, res) => {
           es.id DESC
         LIMIT 1
       `,
-      [student_number]
+      [student_number],
     );
 
     res.json(rows);
@@ -1751,10 +1747,15 @@ router.get("/student_enrollment/:student_number", async (req, res) => {
 router.put("/student-enrollment/status", async (req, res) => {
   const { student_number, active_school_year_id, is_regular } = req.body;
 
-  if (!student_number || !active_school_year_id || ![0, 1].includes(Number(is_regular))) {
+  if (
+    !student_number ||
+    !active_school_year_id ||
+    ![0, 1].includes(Number(is_regular))
+  ) {
     return res.status(400).json({
       success: false,
-      message: "student_number, active_school_year_id, and is_regular are required",
+      message:
+        "student_number, active_school_year_id, and is_regular are required",
     });
   }
 
@@ -1787,12 +1788,12 @@ router.put("/student-enrollment/status", async (req, res) => {
   }
 });
 
-
 router.get("/student/:person_id/curriculum-subjects", async (req, res) => {
   try {
     const { person_id } = req.params;
 
-    const [rows] = await db3.query(`
+    const [rows] = await db3.query(
+      `
   SELECT DISTINCT
     pt.person_id,
     snt.student_number,
@@ -1873,17 +1874,17 @@ router.get("/student/:person_id/curriculum-subjects", async (req, res) => {
     prf.fname,
     prf.lname
   ORDER BY ptg.year_level_id, ptg.semester_id, co.course_code;
-`, [person_id]);
+`,
+      [person_id],
+    );
 
     res.json(rows);
-
   } catch (err) {
     console.error(err);
 
     res.status(500).json({ error: "Failed to fetch curriculum subjects" });
   }
 });
-
 
 router.get("/student-documents/:studentNumber", async (req, res) => {
   const { studentNumber } = req.params;
@@ -1937,16 +1938,15 @@ WHERE snt.person_id = ?
 
 ORDER BY rt.category, rt.description;
       `,
-      [studentNumber]
+      [studentNumber],
     );
 
-    console.log(rows)
+    console.log(rows);
 
     res.status(200).json({
       success: true,
       data: rows,
     });
-
   } catch (error) {
     console.error(error);
 
@@ -1972,14 +1972,14 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
       JOIN person_table pt ON snt.person_id = pt.person_id
       WHERE snt.person_id = ?
       `,
-      [person_id]
+      [person_id],
     );
 
     const student_number = studentInfo?.student_number || "Unknown";
 
     const [descRows] = await db3.query(
       "SELECT description, short_label FROM requirements_table WHERE id = ?",
-      [requirements_id]
+      [requirements_id],
     );
 
     if (!descRows.length) {
@@ -1998,7 +1998,7 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
       "..",
       "..",
       "uploads",
-      "StudentOnlineDocuments"
+      "StudentOnlineDocuments",
     );
 
     if (!fs.existsSync(uploadDir)) {
@@ -2010,7 +2010,7 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
     const [existingFiles] = await db3.query(
       `SELECT upload_id, file_path FROM requirement_uploads
        WHERE person_id = ? AND requirements_id = ?`,
-      [person_id, requirements_id]
+      [person_id, requirements_id],
     );
 
     for (const file of existingFiles) {
@@ -2020,7 +2020,7 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
         "..",
         "uploads",
         "StudentOnlineDocuments",
-        file.file_path
+        file.file_path,
       );
 
       try {
@@ -2031,10 +2031,9 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
         }
       }
 
-      await db3.query(
-        "DELETE FROM requirement_uploads WHERE upload_id = ?",
-        [file.upload_id]
-      );
+      await db3.query("DELETE FROM requirement_uploads WHERE upload_id = ?", [
+        file.upload_id,
+      ]);
     }
 
     await fs.promises.writeFile(finalPath, req.file.buffer);
@@ -2049,11 +2048,10 @@ router.post("/upload/enrollment", upload.single("file"), async (req, res) => {
         filename,
         req.file.originalname,
         remarks || null,
-      ]
+      ],
     );
 
     res.status(201).json({ message: "Enrollment upload successful" });
-
   } catch (err) {
     console.error("Enrollment upload error:", err);
     res.status(500).json({
@@ -2069,7 +2067,7 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
   try {
     const [rows] = await db3.query(
       "SELECT file_path, person_id FROM requirement_uploads WHERE upload_id = ?",
-      [uploadId]
+      [uploadId],
     );
 
     if (!rows.length) {
@@ -2084,7 +2082,7 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
       "..",
       "uploads",
       "StudentOnlineDocuments",
-      rows[0].file_path
+      rows[0].file_path,
     );
 
     try {
@@ -2095,21 +2093,19 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
       }
     }
 
-    await db3.query(
-      "DELETE FROM requirement_uploads WHERE upload_id = ?",
-      [uploadId]
-    );
+    await db3.query("DELETE FROM requirement_uploads WHERE upload_id = ?", [
+      uploadId,
+    ]);
 
     await db3.query(
       "UPDATE person_status_table SET requirements = 0 WHERE person_id = ?",
-      [rows[0].person_id]
+      [rows[0].person_id],
     );
 
     res.status(200).json({
       success: true,
       message: "Student file deleted successfully",
     });
-
   } catch (err) {
     console.error("Student delete error:", err);
     res.status(500).json({
@@ -2120,13 +2116,12 @@ router.delete("/student-upload/:uploadId", async (req, res) => {
   }
 });
 
-
 router.get("/student-status/:person_id", async (req, res) => {
   const { person_id } = req.params;
   try {
     const [[row]] = await db3.query(
       "SELECT requirements FROM person_status_table WHERE person_id = ?",
-      [person_id]
+      [person_id],
     );
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json({ requirements: row.requirements });
@@ -2141,17 +2136,19 @@ router.post("/student-submit-requirements", async (req, res) => {
   try {
     const [result] = await db3.query(
       "UPDATE person_status_table SET requirements = 1 WHERE person_id = ?",
-      [person_id]
+      [person_id],
     );
     if (result.affectedRows === 0)
-      return res.status(404).json({ error: "Applicant status record not found" });
+      return res
+        .status(404)
+        .json({ error: "Applicant status record not found" });
     res.json({ message: "Requirements submitted successfully" });
   } catch (err) {
     res.status(500).json({ error: "Failed to update requirements status" });
   }
 });
 
-router.get('/department_by_curriculum/:curriculum_id', async (req, res) => {
+router.get("/department_by_curriculum/:curriculum_id", async (req, res) => {
   const { curriculum_id } = req.params;
   try {
     const [[row]] = await db3.query(
@@ -2160,13 +2157,130 @@ router.get('/department_by_curriculum/:curriculum_id', async (req, res) => {
        JOIN dprtmnt_table dt ON dct.dprtmnt_id = dt.dprtmnt_id
        WHERE dct.curriculum_id = ?
        LIMIT 1`,
-      [curriculum_id]
+      [curriculum_id],
     );
-    if (!row) return res.status(404).json({ error: 'No department mapped to this curriculum_id' });
+    if (!row)
+      return res
+        .status(404)
+        .json({ error: "No department mapped to this curriculum_id" });
     res.json(row);
   } catch (err) {
-    console.error('[department_by_curriculum GET]', err);
+    console.error("[department_by_curriculum GET]", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/student/latin-honor-standing/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [[standing]] = await db3.query(
+      `
+      SELECT
+        overall_gwa.student_number,
+        overall_gwa.overall_gwa,
+        overall_gwa.max_grade,
+        overall_gwa.subject_count,
+        hr.title AS latin_honor,
+        gwa_rule.title AS gwa_rule_title
+      FROM (
+        SELECT
+          es.student_number,
+          ROUND(
+            SUM(CAST(gc.equivalent_grade AS DECIMAL(10,4)) * ${GWA_UNIT_SQL})
+            / NULLIF(SUM(${GWA_UNIT_SQL}), 0),
+            4
+          ) AS overall_gwa,
+          MAX(CAST(gc.equivalent_grade AS DECIMAL(10,4))) AS max_grade,
+          COUNT(es.id) AS subject_count
+        FROM enrolled_subject es
+        INNER JOIN student_numbering_table snt
+          ON snt.student_number = es.student_number
+          AND snt.person_id = ?
+        INNER JOIN student_status_table ss
+          ON ss.student_number = es.student_number
+          AND ss.active_school_year_id = es.active_school_year_id
+          AND ss.enrolled_status = '1'
+        INNER JOIN course_table ct
+          ON ct.course_id = es.course_id
+          AND ct.is_latin = 1
+        INNER JOIN grade_conversion gc
+          ON ${gwaGradeJoinSql("es", "gc")}
+        WHERE es.en_remarks = 1
+          AND ${GWA_UNIT_SQL} > 0
+          AND NOT ${GWA_EXCLUSION_SQL}
+        GROUP BY es.student_number
+      ) overall_gwa
+      LEFT JOIN honors_rules gwa_rule
+        ON gwa_rule.category = 1
+        AND overall_gwa.overall_gwa BETWEEN gwa_rule.min_gwa AND gwa_rule.max_gwa
+      LEFT JOIN honors_rules hr
+        ON hr.category = 1
+        AND overall_gwa.overall_gwa BETWEEN hr.min_gwa AND hr.max_gwa
+        AND overall_gwa.max_grade <= hr.max_subject_grade
+      ORDER BY hr.min_gwa ASC
+      LIMIT 1
+      `,
+      [id],
+    );
+
+    const [[disqualifiedGrade]] = await db3.query(
+      `
+      SELECT COUNT(es.id) AS count
+      FROM enrolled_subject es
+      INNER JOIN student_numbering_table snt
+        ON snt.student_number = es.student_number
+        AND snt.person_id = ?
+      INNER JOIN student_status_table ss
+        ON ss.student_number = es.student_number
+        AND ss.active_school_year_id = es.active_school_year_id
+        AND ss.enrolled_status = '1'
+      INNER JOIN course_table ct
+        ON ct.course_id = es.course_id
+        AND ct.is_latin = 1
+      INNER JOIN grade_conversion gc
+        ON gc.is_disqualified = 1
+        AND gc.min_score IS NOT NULL
+        AND gc.max_score IS NOT NULL
+        AND CAST(es.final_grade AS DECIMAL(8,2)) > 0
+        AND CAST(es.final_grade AS DECIMAL(8,2))
+            BETWEEN gc.min_score AND gc.max_score
+      WHERE es.en_remarks = 1
+        AND ${GWA_UNIT_SQL} > 0
+        AND NOT ${GWA_EXCLUSION_SQL}
+      `,
+      [id],
+    );
+
+    if (Number(disqualifiedGrade?.count || 0) > 0) {
+      return res.json({
+        ...standing,
+        standing: "disqualified",
+        latin_honor: null,
+      });
+    }
+
+    if (!standing) {
+      return res.json({
+        standing: "not_evaluated",
+        latin_honor: null,
+        overall_gwa: null,
+        max_grade: null,
+        subject_count: 0,
+      });
+    }
+
+    res.json({
+      ...standing,
+      standing: standing.latin_honor
+        ? "qualified"
+        : standing.gwa_rule_title
+          ? "disqualified"
+          : "not_in_standing",
+    });
+  } catch (error) {
+    console.error("Failed to fetch student Latin honor standing:", error);
+    res.status(500).json({ error: "Failed to fetch Latin honor standing" });
   }
 });
 

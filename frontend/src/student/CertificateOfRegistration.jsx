@@ -606,16 +606,6 @@ const CertificateOfRegistration = forwardRef(
       });
     };
 
-    const scholarshipDiscountValue = savedUnifast
-      ? "UNIFAST-FHE"
-      : selectedPaymentData?.matriculation_remark || "";
-    const officialReceiptValue = savedUnifast
-      ? "Scholar"
-      : selectedPaymentData?.matriculation_remark
-        ? "Scholar"
-        : "";
-    const showFreeTuitionStamp = Boolean(effectiveStudentNumber);
-
     useEffect(() => {
       const fetchDepartments = async () => {
         try {
@@ -632,6 +622,28 @@ const CertificateOfRegistration = forwardRef(
     const [tosf, setTosfData] = useState([]);
     const [scholarshipTypes, setScholarshipTypes] = useState([]);
     const [activeSchoolYear, setActiveSchoolYear] = useState([]);
+    const resolvedScholarshipCode =
+      data[0]?.scholarship_code ||
+      data[0]?.scholarship_name ||
+      scholarshipTypes.find(
+        (item) =>
+          Number(item.id) === Number(data[0]?.scholarship_id || selectedScholarshipId),
+      )?.scholarship_code ||
+      "";
+    const scholarshipDiscountValue = savedUnifast
+      ? (resolvedScholarshipCode || "UNIFAST-FHE")
+      : (
+          resolvedScholarshipCode ||
+          data[0]?.matriculation_remark ||
+          ""
+        );
+    const officialReceiptValue = savedUnifast
+      ? "Scholar"
+      : data[0]?.matriculation_remark
+        ? "Scholar"
+        : "";
+    const showFreeTuitionStamp =
+      savedUnifast && /UNIFAST/i.test(String(scholarshipDiscountValue || ""));
 
     const fetchTosf = async () => {
       try {
@@ -718,6 +730,16 @@ const CertificateOfRegistration = forwardRef(
       0,
     );
     const totalCombined = totalCourseUnits + totalLabUnits;
+    const totalNstpUnits = enrolled.reduce((sum, item) => {
+      const courseCode = String(item?.course_code || "").toUpperCase();
+      const courseDescription = String(item?.course_description || "").toUpperCase();
+      const isNstpSubject =
+        courseCode.includes("NSTP") || courseDescription.includes("NSTP");
+      return isNstpSubject
+        ? sum + toWholeUnit(item.course_unit || item.lab_unit)
+        : sum;
+    }, 0);
+    const computerUnits = Number(isHaveComputerFees || 0);
 
     const isFirstYear = Number(yearlevel) === 1;
     const isFirstSemester = Number(activeSchoolYear[0]?.semester_id) === 1;
@@ -826,9 +848,9 @@ const CertificateOfRegistration = forwardRef(
         email_address: data[0]?.email,
         phone_number: data[0]?.cellphoneNumber,
         laboratory_units: totalLabUnits,
-        computer_units: 3, // ONGOING
+        computer_units: computerUnits,
         academic_units_enrolled: totalCombined,
-        academic_units_nstp_enrolled: 3,
+        academic_units_nstp_enrolled: totalNstpUnits,
         tuition_fees: totalSum,
         nstp_fees: isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0,
         athletic_fees: tosf[0]?.athletic_fee || 0,
@@ -1768,7 +1790,7 @@ const CertificateOfRegistration = forwardRef(
                       >
                         {renderDetailField(
                           "Scholarship/Discount",
-                          savedUnifast ? "UNIFAST-FHE" : "",
+                          scholarshipDiscountValue,
                           RIGHT_LABEL_WIDTH,
                         )}
                       </td>
@@ -4151,16 +4173,18 @@ const CertificateOfRegistration = forwardRef(
                           paddingLeft: "50px", // ?? margin-left effect
                         }}
                       >
-                        <img
-                          src={FreeTuitionImage}
-                          alt="EARIST MIS FEE"
-                          style={{
-                            width: "420px",
-                            height: "236px",
-                            objectFit: "contain",
-                            display: "block",
-                          }}
-                        />
+                        {showFreeTuitionStamp && (
+                          <img
+                            src={FreeTuitionImage}
+                            alt="EARIST MIS FEE"
+                            style={{
+                              width: "420px",
+                              height: "236px",
+                              objectFit: "contain",
+                              display: "block",
+                            }}
+                          />
+                        )}
                       </td>
 
                       {/* RIGHT SIDE */}
