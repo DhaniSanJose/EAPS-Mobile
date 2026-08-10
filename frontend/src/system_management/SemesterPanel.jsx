@@ -37,6 +37,9 @@ const ROWS_PER_PAGE = 10;
 const SemesterPanel = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
 
   // ── Colors ──────────────────────────────────────────────────────────────────
   const [headerColor, setHeaderColor] = useState("#1976d2");
@@ -55,17 +58,17 @@ const SemesterPanel = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.header_color) setHeaderColor(settings.header_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url) setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.header) setHeaderColor(colors.header);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
+    if (assets.logoUrl) setFetchedLogo(assets.logoUrl);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   // ── Auth / access ────────────────────────────────────────────────────────────
@@ -315,7 +318,7 @@ const SemesterPanel = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -497,7 +500,7 @@ const SemesterPanel = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -602,7 +605,7 @@ const SemesterPanel = () => {
 
       {/* ── ADD / EDIT DIALOG ──────────────────────────────────────────────────── */}
       <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: "bold", backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+        <DialogTitle sx={{ fontWeight: "bold", backgroundColor: headerColor, color: "white" }}>
           {editingSemester ? "Edit Semester" : "Add Semester"}
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
@@ -648,7 +651,7 @@ const SemesterPanel = () => {
       <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)} maxWidth="xs" fullWidth>
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: colors.header || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

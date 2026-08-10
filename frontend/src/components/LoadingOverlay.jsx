@@ -2,10 +2,11 @@ import React, { useContext, useEffect, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import { SettingsContext } from "../App";
 import DefaultLogo from "../assets/EaristLogo.png";
-import API_BASE_URL from "../apiConfig";
 
 const LoadingOverlay = ({ open, message }) => {
   const settings = useContext(SettingsContext);
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
 
   const [fetchedLogo, setFetchedLogo] = useState(DefaultLogo);
   const [companyName, setCompanyName] = useState("Loading...");
@@ -15,10 +16,10 @@ const LoadingOverlay = ({ open, message }) => {
     if (!settings) return;
 
     setFetchedLogo(
-      settings.logo_url ? `${API_BASE_URL}${settings.logo_url}` : DefaultLogo
+      assets.logoUrl ? `${assets.logoUrl}` : DefaultLogo
     );
-    setBgImage(settings.bg_image ? `${API_BASE_URL}${settings.bg_image}` : null);
-    setCompanyName(settings.company_name || "Your Institution");
+    setBgImage(assets.backgroundImage ? `${assets.backgroundImage}` : null);
+    setCompanyName(branding.companyName || "Your Institution");
   }, [settings]);
 
   if (!open) return null;

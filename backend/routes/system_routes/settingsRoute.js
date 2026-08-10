@@ -83,47 +83,42 @@ const deleteOldFile = (fileUrl) => {
   });
 };
 
+const parseSettingsRow = (settings) => {
+  if (!settings) return null;
+
+  const normalized = { ...settings };
+  if (normalized.branches) {
+    try {
+      normalized.branches = JSON.parse(normalized.branches);
+    } catch (err) {
+      normalized.branches = [];
+    }
+  } else {
+    normalized.branches = [];
+  }
+
+  return normalized;
+};
+
+const getOrCreateSettingsRow = async () => {
+  const [rows] = await db.query("SELECT * FROM company_settings WHERE id = 1");
+  if (rows.length > 0) return parseSettingsRow(rows[0]);
+
+  await db.query("INSERT INTO company_settings (id, branches) VALUES (1, ?)", [
+    "[]",
+  ]);
+
+  const [createdRows] = await db.query(
+    "SELECT * FROM company_settings WHERE id = 1",
+  );
+  return parseSettingsRow(createdRows[0]);
+};
+
 /* ===================== GET SETTINGS ===================== */
 
 router.get("/settings", async (req, res) => {
   try {
-    const [rows] = await db.query(
-      "SELECT * FROM company_settings WHERE id = 1",
-    );
-
-    if (rows.length === 0) {
-      return res.json({
-        company_name: "",
-        short_term: "",
-        address: "",
-        header_color: "#ffffff",
-        footer_text: "",
-        footer_color: "#ffffff",
-        logo_url: null,
-        bg_image: null,
-        main_button_color: "#ffffff",
-        sub_button_color: "#ffffff",
-        border_color: "#000000",
-        stepper_color: "#000000",
-        sidebar_button_color: "#000000",
-        title_color: "#000000",
-        subtitle_color: "#555555",
-        branches: [],
-      });
-    }
-
-    const settings = rows[0];
-
-    if (settings.branches) {
-      try {
-        settings.branches = JSON.parse(settings.branches);
-      } catch (err) {
-        settings.branches = [];
-      }
-    } else {
-      settings.branches = [];
-    }
-
+    const settings = await getOrCreateSettingsRow();
     res.json(settings);
   } catch (err) {
     console.error("❌ Error fetching settings:", err);

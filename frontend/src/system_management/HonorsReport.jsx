@@ -122,6 +122,9 @@ const rowsPerPage = 100; // keeps every page fetch small — the ranking below
 
 export default function HonorsReport() {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
   const printRef = useRef(null);
 
   // ── access / auth ──────────────────────────────────────────────────────────
@@ -143,40 +146,29 @@ export default function HonorsReport() {
   const [campusAddress, setCampusAddress] = useState("");
   const [branches, setBranches] = useState([]);
 
-  const headerColor = settings?.header_color || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
 
   // ── Load settings ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     setFetchedLogo(
-      settings.logo_url ? `${API_BASE_URL}${settings.logo_url}` : EaristLogo,
+      assets.logoUrl ? assets.logoUrl : EaristLogo,
     );
 
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   // ── Resolve campus address based on selected campus filter ─────────────────
@@ -193,12 +185,12 @@ export default function HonorsReport() {
       setCampusAddress(matchedBranch.address);
       return;
     }
-    if (settings.campus_address) {
-      setCampusAddress(settings.campus_address);
+    if (branding.campusAddress) {
+      setCampusAddress(branding.campusAddress);
       return;
     }
-    setCampusAddress(settings.address || "");
-  }, [settings, branches, campusId]);
+    setCampusAddress(branding.campusAddress || "");
+  }, [settings, branches, campusId, branding.campusAddress]);
 
   // ── tabs / filters ─────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("academic");
@@ -838,7 +830,7 @@ export default function HonorsReport() {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>

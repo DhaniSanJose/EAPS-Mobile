@@ -38,6 +38,10 @@ import useAuditMac from "../utils/useAuditMac";
 const SectionSlotManagement = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
     const pageId = 167;
 
     const [borderColor, setBorderColor] = useState("#000000");
@@ -91,27 +95,17 @@ const SectionSlotManagement = () => {
 
     useEffect(() => {
         if (!settings) return;
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.logo_url) {
-            setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.title) setTitleColor(colors.title);
+        if (assets.logoUrl) {
+            setFetchedLogo(assets.logoUrl);
         } else {
             setFetchedLogo(EaristLogo);
         }
-        if (settings?.branches) {
-            try {
-                const parsed =
-                    typeof settings.branches === "string"
-                        ? JSON.parse(settings.branches)
-                        : settings.branches;
-                setBranches(Array.isArray(parsed) ? parsed : []);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setCampusFilter((prev) => prev || String(parsed[0].id));
-                }
-            } catch (err) {
-                console.error("Failed to parse branches:", err);
-                setBranches([]);
-            }
+        const branchList = settings.branches || [];
+        setBranches(branchList);
+        if (branchList.length > 0) {
+            setCampusFilter((prev) => prev || String(branchList[0].id));
         }
     }, [settings]);
 
@@ -949,7 +943,7 @@ const SectionSlotManagement = () => {
 
         doc.setFontSize(13);
         doc.setFont("helvetica", "bold");
-        const companyName = settings?.company_name || "Campus Name";
+        const companyName = branding.companyName || "Campus Name";
         const nameLines = doc.splitTextToSize(companyName, maxTextWidth);
         nameLines.forEach((line, i) => {
             drawSpacedText(line, textCenterX, 20 + i * 6);
@@ -1212,7 +1206,7 @@ const SectionSlotManagement = () => {
             <br />
             <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, }}>
                 <Table>
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                    <TableHead sx={{ backgroundColor: headerColor }}>
                         <TableRow>
                             <TableCell sx={{ color: 'white', textAlign: "Center" }}>FILTER OPTIONS</TableCell>
                         </TableRow>
@@ -1451,7 +1445,7 @@ const SectionSlotManagement = () => {
                             <TableCell sx={{ display: "flex", alignItems: "center", gap: "1rem", border: "none", justifyContent: "end" }}>
                                 <Button
                                     disabled={filteredSlotRows.filter((row) => row.course_id).length === 0}
-                                    sx={{ backgroundColor: settings?.main_button_color || settings?.header_color || "#1976d2", color: "white" }}
+                                    sx={{ backgroundColor: colors.mainButton || headerColor, color: "white" }}
                                     onClick={handleActualSizeReport}
                                 >
                                     Actual Size
@@ -1459,7 +1453,7 @@ const SectionSlotManagement = () => {
                                 {canCreate ? (
                                     <Button
                                         disabled={!selectedSectionFilter}
-                                        sx={{ backgroundColor: settings?.main_button_color || settings?.header_color || "#1976d2", color: "white" }}
+                                        sx={{ backgroundColor: colors.mainButton || headerColor, color: "white" }}
                                         onClick={() => {
                                             const section = sectionOptions.find(
                                                 (item) =>
@@ -1474,7 +1468,7 @@ const SectionSlotManagement = () => {
                                 ) : null}
                                 <Button
                                     disabled={!selectedSectionFilter || subjectRows.length === 0}
-                                    sx={{ backgroundColor: settings?.main_button_color || settings?.header_color || "#1976d2", color: "white" }}
+                                    sx={{ backgroundColor: colors.mainButton || headerColor, color: "white" }}
                                     onClick={() => setSubjectsModalOpen(true)}
                                 >
                                     List of Subjects
@@ -1494,7 +1488,7 @@ const SectionSlotManagement = () => {
                         },
                     }}
                 >
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                    <TableHead sx={{ backgroundColor: headerColor }}>
                         <TableRow>
                             <TableCell sx={{ color: "white", textAlign: "center", width: "70px" }}>#</TableCell>
                             <TableCell sx={{ color: "white", textAlign: "center" }}>Section</TableCell>
@@ -1594,7 +1588,7 @@ const SectionSlotManagement = () => {
                 <DialogContent>
                     <TableContainer component={Paper} sx={{ border: `1px solid ${borderColor}` }}>
                         <Table>
-                            <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                            <TableHead sx={{ backgroundColor: headerColor }}>
                                 <TableRow>
                                     <TableCell sx={{ color: "white", textAlign: "center" }}>Program Description</TableCell>
                                     <TableCell sx={{ color: "white", textAlign: "center" }}>Section</TableCell>
@@ -1635,7 +1629,7 @@ const SectionSlotManagement = () => {
                         variant="contained"
                         disabled={subjectRows.length === 0}
                         onClick={handleDownloadSubjectsPdf}
-                        sx={{ backgroundColor: settings?.main_button_color || settings?.header_color || "#1976d2" }}
+                        sx={{ backgroundColor: colors.mainButton || headerColor }}
                     >
                         Download PDF
                     </Button>
@@ -1817,7 +1811,7 @@ const SectionSlotManagement = () => {
                         variant="contained"
                         onClick={handleSaveEditSlots}
                         disabled={savingEditSlots}
-                        sx={{ backgroundColor: settings?.main_button_color || settings?.header_color || "#1976d2" }}
+                        sx={{ backgroundColor: colors.mainButton || headerColor }}
                     >
                         {savingEditSlots ? "Saving..." : "Save"}
                     </Button>

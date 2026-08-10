@@ -1,18 +1,3 @@
-/**
- * ENTRANCE EXAM — QR ATTENDANCE MODULE
- * ------------------------------------------------------------
- * Drop this file in your /routes folder (same folder as your
- * entrance-exam-schedule routes) and mount it in server.js:
- *
- *   const examAttendanceRoutes = require("./routes/exam_attendance_routes")(io);
- *   app.use("/api", examAttendanceRoutes);
- *
- * It needs `io` so a scan can push a live "attendance_updated"
- * event to the registrar dashboard (optional, safe to ignore).
- *
- * DB TABLE REQUIRED: exam_attendance  (see exam_attendance_schema.sql)
- */
-
 const express = require("express");
 const crypto = require("crypto");
 const { db } = require("../database/database");
@@ -72,7 +57,10 @@ module.exports = (io) => {
         });
       }
 
-      const token = await ensureAttendanceToken(applicant_number, assigned.schedule_id);
+      const token = await ensureAttendanceToken(
+        applicant_number,
+        assigned.schedule_id,
+      );
 
       res.json({
         applicant_number,
@@ -97,9 +85,13 @@ module.exports = (io) => {
       return res.status(400).json({ error: "Missing QR payload." });
     }
 
-    const token = String(qr_payload).replace(/^EARIST-EXAM-ATTENDANCE:/, "").trim();
+    const token = String(qr_payload)
+      .replace(/^EARIST-EXAM-ATTENDANCE:/, "")
+      .trim();
     if (!/^[a-f0-9]{64}$/i.test(token)) {
-      return res.status(400).json({ error: "Not a valid exam attendance QR code." });
+      return res
+        .status(400)
+        .json({ error: "Not a valid exam attendance QR code." });
     }
 
     try {
@@ -142,7 +134,11 @@ module.exports = (io) => {
         `UPDATE exam_attendance
          SET status = 'PRESENT', scanned_at = NOW(), scanned_by = ?, scanned_by_role = ?
          WHERE attendance_id = ?`,
-        [scanned_by || "unknown", scanned_by_role || "proctor", record.attendance_id],
+        [
+          scanned_by || "unknown",
+          scanned_by_role || "proctor",
+          record.attendance_id,
+        ],
       );
 
       await insertAuditLogAdmission({
@@ -204,7 +200,9 @@ module.exports = (io) => {
       res.json({ schedule_id, summary, applicants: rows });
     } catch (err) {
       console.error("Error fetching attendance roster:", err);
-      res.status(500).json({ error: "Server error fetching attendance roster." });
+      res
+        .status(500)
+        .json({ error: "Server error fetching attendance roster." });
     }
   });
 
@@ -215,10 +213,19 @@ module.exports = (io) => {
   // Body: { applicant_id, schedule_id, status, actor_id, actor_role }
   // ------------------------------------------------------------------
   router.put("/exam/attendance/manual", async (req, res) => {
-    const { applicant_id, schedule_id, status, actor_id, actor_role } = req.body;
+    const { applicant_id, schedule_id, status, actor_id, actor_role } =
+      req.body;
 
-    if (!applicant_id || !schedule_id || !["PRESENT", "ABSENT", "PENDING"].includes(status)) {
-      return res.status(400).json({ error: "applicant_id, schedule_id, and a valid status are required." });
+    if (
+      !applicant_id ||
+      !schedule_id ||
+      !["PRESENT", "ABSENT", "PENDING"].includes(status)
+    ) {
+      return res
+        .status(400)
+        .json({
+          error: "applicant_id, schedule_id, and a valid status are required.",
+        });
     }
 
     try {
@@ -229,7 +236,14 @@ module.exports = (io) => {
          SET status = ?, scanned_at = IF(? = 'PRESENT', NOW(), scanned_at),
              scanned_by = ?, scanned_by_role = ?, scan_note = 'manual override'
          WHERE applicant_id = ? AND schedule_id = ?`,
-        [status, status, actor_id || "unknown", actor_role || "registrar", applicant_id, schedule_id],
+        [
+          status,
+          status,
+          actor_id || "unknown",
+          actor_role || "registrar",
+          applicant_id,
+          schedule_id,
+        ],
       );
 
       await insertAuditLogAdmission({
@@ -240,12 +254,15 @@ module.exports = (io) => {
         message: `${actor_role || "Registrar"} (${actor_id || "unknown"}) manually set Applicant (${applicant_id}) attendance to ${status} for entrance exam schedule ${schedule_id}.`,
       });
 
-      if (io) io.emit("attendance_updated", { schedule_id, applicant_id, status });
+      if (io)
+        io.emit("attendance_updated", { schedule_id, applicant_id, status });
 
       res.json({ success: true });
     } catch (err) {
       console.error("Error setting manual attendance:", err);
-      res.status(500).json({ error: "Server error setting manual attendance." });
+      res
+        .status(500)
+        .json({ error: "Server error setting manual attendance." });
     }
   });
 

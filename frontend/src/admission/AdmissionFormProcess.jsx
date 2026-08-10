@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useContext, useRef, forwardRef, useImperativeHandle } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 
 import { SettingsContext } from "../App";
 import { Box, Container, Typography } from "@mui/material";
@@ -6,7 +13,7 @@ import EaristLogo from "../assets/EaristLogo.png";
 import { FcPrint } from "react-icons/fc";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
-import ForwardIcon from '@mui/icons-material/Forward';
+import ForwardIcon from "@mui/icons-material/Forward";
 import API_BASE_URL from "../apiConfig";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
@@ -17,51 +24,17 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
   useAuditMac();
   const { personId: personIdProp, controlNumber: controlNumberProp } = props;
   const settings = useContext(SettingsContext);
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
   const [ownControlNumber, setOwnControlNumber] = useState(null);
   const controlNumber = controlNumberProp ?? ownControlNumber;
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [stepperColor, setStepperColor] = useState("#000000");
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [branches, setBranches] = useState([]);
-
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches
-      );
-    }
-
-  }, [settings]);
+  const fetchedLogo = assets.logoUrl || EaristLogo;
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
+  const campusAddressFallback = branding.campusAddress || "";
+  const branches = settings?.branches || [];
+  const [, setGeneratingPdf] = useState(false);
 
   const words = companyName.trim().split(" ");
   const middle = Math.ceil(words.length / 2);
@@ -119,37 +92,36 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
     permanentMunicipality: "",
     permanentDswdHouseholdNumber: "",
     father_deceased: "",
-    father_family_name: "", father_given_name: "", father_middle_name: "", father_ext: "", father_contact: "", father_occupation: "",
-    father_income: "", father_email: "", mother_deceased: "", mother_family_name: "", mother_given_name: "", mother_middle_name: "",
-    mother_contact: "", mother_occupation: "", mother_income: "", guardian: "", guardian_family_name: "", guardian_given_name: "",
-    guardian_middle_name: "", guardian_ext: "", guardian_nickname: "", guardian_address: "", guardian_contact: "", guardian_email: "",
+    father_family_name: "",
+    father_given_name: "",
+    father_middle_name: "",
+    father_ext: "",
+    father_contact: "",
+    father_occupation: "",
+    father_income: "",
+    father_email: "",
+    mother_deceased: "",
+    mother_family_name: "",
+    mother_given_name: "",
+    mother_middle_name: "",
+    mother_contact: "",
+    mother_occupation: "",
+    mother_income: "",
+    guardian: "",
+    guardian_family_name: "",
+    guardian_given_name: "",
+    guardian_middle_name: "",
+    guardian_ext: "",
+    guardian_nickname: "",
+    guardian_address: "",
+    guardian_contact: "",
+    guardian_email: "",
   });
 
-
-  const [campusAddress, setCampusAddress] = useState("");
-
-
-  useEffect(() => {
-    if (!settings) return;
-
-    const branchId = person?.campus;
-    const matchedBranch = branches.find(
-      (branch) => String(branch?.id) === String(branchId)
-    );
-
-    if (matchedBranch?.address) {
-      setCampusAddress(matchedBranch.address);
-      return;
-    }
-
-    if (settings.campus_address) {
-      setCampusAddress(settings.campus_address);
-      return;
-    }
-
-    setCampusAddress(settings.address || "");
-  }, [settings, branches, person?.campus]);
-
+  const matchedBranch = branches.find(
+    (branch) => String(branch?.id) === String(person?.campus),
+  );
+  const campusAddress = matchedBranch?.address || campusAddressFallback;
 
   const fetchPersonData = async (id) => {
     try {
@@ -196,11 +168,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
     }
   }, [queryPersonId, personIdProp]); // ⬅️ add personIdProp to deps
 
-
-
-
   const [shortDate, setShortDate] = useState("");
-
 
   useEffect(() => {
     const updateDates = () => {
@@ -300,12 +268,15 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
 
   const fetchOwnControlNumber = async (actionType) => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/generate-control-number`, {
-        form_type: "admissionFormProcess",
-        applicant_number: person?.applicant_number,
-        person_id: userID,
-        action_type: actionType,
-      });
+      const res = await axios.post(
+        `${API_BASE_URL}/api/generate-control-number`,
+        {
+          form_type: "admissionFormProcess",
+          applicant_number: person?.applicant_number,
+          person_id: userID,
+          action_type: actionType,
+        },
+      );
       setOwnControlNumber(res.data.control_number);
       return res.data.control_number;
     } catch (err) {
@@ -338,9 +309,13 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
       const blob = new Blob([response.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
 
-      const lastName = (person?.last_name || "Applicant").trim().replace(/\s+/g, "_");
+      const lastName = (person?.last_name || "Applicant")
+        .trim()
+        .replace(/\s+/g, "_");
       const firstName = (person?.first_name || "").trim().replace(/\s+/g, "_");
-      const applicantNo = person?.applicant_number ? `_${person.applicant_number}` : "";
+      const applicantNo = person?.applicant_number
+        ? `_${person.applicant_number}`
+        : "";
       const fileName = `Admission_Form_Process_${lastName}${firstName ? "_" + firstName : ""}${applicantNo}.pdf`;
 
       const link = document.createElement("a");
@@ -376,9 +351,9 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
   {
     curriculumOptions.find(
       (item) =>
-        item?.curriculum_id?.toString() === (person?.program ?? "").toString()
-    )?.program_description || (person?.program ?? "")
-
+        item?.curriculum_id?.toString() === (person?.program ?? "").toString(),
+    )?.program_description ||
+      (person?.program ?? "");
   }
 
   document.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -409,7 +384,6 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
         padding: 2,
       }}
     >
-
       <Container>
         <div ref={divToPrintRef} style={{ marginBottom: "10%" }}>
           <Container>
@@ -433,9 +407,27 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                 }}
               >
                 <div style={{ flexShrink: 0 }}>
-                  <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+                  <img
+                    src={fetchedLogo}
+                    alt="School Logo"
+                    style={{
+                      width: "120px",
+                      height: "120px",
+                      objectFit: "cover",
+                      marginLeft: "10px",
+                      marginTop: "-25px",
+                      borderRadius: "50%",
+                    }}
+                  />
                   {controlNumber && (
-                    <div style={{ fontSize: "13px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "bold",
+                        color: "#8B0000",
+                        textAlign: "center",
+                      }}
+                    >
                       Document No.: {controlNumber}
                     </div>
                   )}
@@ -461,7 +453,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                       fontWeight: "bold",
                       fontFamily: "Arial",
                       fontSize: "16px",
-                      textTransform: "Uppercase"
+                      textTransform: "Uppercase",
                     }}
                   >
                     {firstLine}
@@ -472,7 +464,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                         fontWeight: "bold",
                         fontFamily: "Arial",
                         fontSize: "16px",
-                        textTransform: "Uppercase"
+                        textTransform: "Uppercase",
                       }}
                     >
                       {secondLine}
@@ -489,8 +481,16 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                     </div>
                   )}
 
-                  <div style={{ fontFamily: "Arial", letterSpacing: "1px" }}>
-                    <b>OFFICE OF THE ADMISSION SERVICES</b>
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      fontFamily: "Arial",
+                      fontSize: "15px",
+                      letterSpacing: "1px",
+                      marginTop: "6px",
+                    }}
+                  >
+                    OFFICE OF THE ADMISSION SERVICES
                   </div>
 
                   <br />
@@ -950,9 +950,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                         wordBreak: "break-word",
                       }}
                     >
-                      <div className="dataField">
-                        {person.birthPlace}
-                      </div>
+                      <div className="dataField">{person.birthPlace}</div>
                     </span>
                   </div>
                 </td>
@@ -1014,8 +1012,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                         height: "1.3em",
                         display: "inline-block",
                       }}
-                    >
-                    </span>
+                    ></span>
                   </div>
                 </td>
 
@@ -1196,11 +1193,11 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                     >
                       {curriculumOptions.length > 0
                         ? curriculumOptions.find(
-                          (item) =>
-                            item?.curriculum_id?.toString() ===
-                            (person?.program ?? "").toString(),
-                        )?.program_description ||
-                        (person?.program ?? "")
+                            (item) =>
+                              item?.curriculum_id?.toString() ===
+                              (person?.program ?? "").toString(),
+                          )?.program_description ||
+                          (person?.program ?? "")
                         : "Loading..."}
                     </div>
                   </div>
@@ -1236,10 +1233,10 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                     >
                       {curriculumOptions.length > 0
                         ? curriculumOptions.find(
-                          (item) =>
-                            item?.curriculum_id?.toString() ===
-                            (person?.program ?? "").toString(),
-                        )?.major || ""
+                            (item) =>
+                              item?.curriculum_id?.toString() ===
+                              (person?.program ?? "").toString(),
+                          )?.major || ""
                         : "Loading..."}
                     </div>
                   </div>
@@ -1559,7 +1556,10 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                       fontWeight: "normal",
                     }}
                   >
-                    <span>{settings?.short_term || shortTerm}-QSF-AS-001 Rev. 00 (7.3.25)</span>
+                    <span>
+                      {shortTerm}-QSF-AS-001 Rev. 00
+                      (7.3.25)
+                    </span>
                     <span>College Dean's Copy</span>
                   </div>
                 </td>
@@ -1597,9 +1597,27 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                 }}
               >
                 <div style={{ flexShrink: 0 }}>
-                  <img src={fetchedLogo} alt="School Logo" style={{ width: "120px", height: "120px", objectFit: "cover", marginLeft: "10px", marginTop: "-25px", borderRadius: "50%" }} />
+                  <img
+                    src={fetchedLogo}
+                    alt="School Logo"
+                    style={{
+                      width: "120px",
+                      height: "120px",
+                      objectFit: "cover",
+                      marginLeft: "10px",
+                      marginTop: "-25px",
+                      borderRadius: "50%",
+                    }}
+                  />
                   {controlNumber && (
-                    <div style={{ fontSize: "12px", fontWeight: "bold", color: "#8B0000", textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        color: "#8B0000",
+                        textAlign: "center",
+                      }}
+                    >
                       Document No.: {controlNumber}
                     </div>
                   )}
@@ -1625,8 +1643,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                       fontWeight: "bold",
                       fontFamily: "Arial",
                       fontSize: "16px",
-                      textTransform: "Uppercase"
-
+                      textTransform: "Uppercase",
                     }}
                   >
                     {firstLine}
@@ -1637,8 +1654,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                         fontWeight: "bold",
                         fontFamily: "Arial",
                         fontSize: "16px",
-                        textTransform: "Uppercase"
-
+                        textTransform: "Uppercase",
                       }}
                     >
                       {secondLine}
@@ -1655,10 +1671,17 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                     </div>
                   )}
 
-                  <div style={{ fontFamily: "Arial", letterSpacing: "1px" }}>
-                    <b>OFFICE OF THE ADMISSION SERVICES</b>
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      fontFamily: "Arial",
+                      fontSize: "15px",
+                      letterSpacing: "1px",
+                      marginTop: "6px",
+                    }}
+                  >
+                    OFFICE OF THE ADMISSION SERVICES
                   </div>
-
                   <br />
 
                   <div
@@ -2116,9 +2139,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                         wordBreak: "break-word",
                       }}
                     >
-                      <div className="dataField">
-                        {person.birthPlace}
-                      </div>
+                      <div className="dataField">{person.birthPlace}</div>
                     </span>
                   </div>
                 </td>
@@ -2180,8 +2201,7 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                         height: "1.3em",
                         display: "inline-block",
                       }}
-                    >
-                    </span>
+                    ></span>
                   </div>
                 </td>
 
@@ -2362,11 +2382,11 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                     >
                       {curriculumOptions.length > 0
                         ? curriculumOptions.find(
-                          (item) =>
-                            item?.curriculum_id?.toString() ===
-                            (person?.program ?? "").toString(),
-                        )?.program_description ||
-                        (person?.program ?? "")
+                            (item) =>
+                              item?.curriculum_id?.toString() ===
+                              (person?.program ?? "").toString(),
+                          )?.program_description ||
+                          (person?.program ?? "")
                         : "Loading..."}
                     </div>
                   </div>
@@ -2402,10 +2422,10 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                     >
                       {curriculumOptions.length > 0
                         ? curriculumOptions.find(
-                          (item) =>
-                            item?.curriculum_id?.toString() ===
-                            (person?.program ?? "").toString(),
-                        )?.major || ""
+                            (item) =>
+                              item?.curriculum_id?.toString() ===
+                              (person?.program ?? "").toString(),
+                          )?.major || ""
                         : "Loading..."}
                     </div>
                   </div>
@@ -2724,18 +2744,19 @@ const AdmissionFormProcess = forwardRef((props, ref) => {
                       fontWeight: "normal",
                     }}
                   >
-                    <span>{settings?.short_term || shortTerm}-QSF-AS-001 Rev. 00 (7.3.25)</span>
+                    <span>
+                      {shortTerm}-QSF-AS-001 Rev. 00
+                      (7.3.25)
+                    </span>
                     <span>Registrar's Copy</span>
                   </div>
                 </td>
               </tr>
-
-
             </tbody>
           </table>
         </div>
       </Container>
-    </Box >
+    </Box>
   );
 });
 

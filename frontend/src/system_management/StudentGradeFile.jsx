@@ -3,7 +3,6 @@ import React, {
   useEffect,
   useContext,
   useMemo,
-  useRef,
   memo,
 } from "react";
 import { SettingsContext } from "../App";
@@ -44,6 +43,21 @@ import {
 } from "../utils/gradeConversion";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatSuggestionName = (student) =>
+  [
+    cleanSuggestionValue(student?.first_name),
+    cleanSuggestionValue(student?.middle_name),
+    cleanSuggestionValue(student?.last_name),
+  ]
+    .filter(Boolean)
+    .join(" ");
 
 const bodyStyle = {
   fontSize: "15px",
@@ -152,6 +166,10 @@ const GradeSelect = memo(function GradeSelect({
 const StudentGradeFile = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   // Colors State
   const [titleColor, setTitleColor] = useState("#000000");
@@ -171,13 +189,12 @@ const StudentGradeFile = () => {
   // Filters
   const [selectedSemester, setSelectedSemester] = useState("");
   const [filteredPrograms, setFilteredPrograms] = useState([]);
-  const [globalSearch, setGlobalSearch] = useState("");
+  const [studentNumber, setStudentNumber] = useState("");
+  const [studentSuggestions, setStudentSuggestions] = useState([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [campusFilter, setCampusFilter] = useState("");
-  const [allStudents, setAllStudents] = useState([]);
   const [selectedStudentNumber, setSelectedStudentNumber] = useState("");
-  const [searchStatus, setSearchStatus] = useState("");
-  const [isLoadingStudentDirectory, setIsLoadingStudentDirectory] =
-    useState(false);
   const [isLoadingStudentRecord, setIsLoadingStudentRecord] = useState(false);
 
   // Data State
@@ -188,7 +205,6 @@ const StudentGradeFile = () => {
 
   // Selected State
   const [selectedYearLevel, setSelectedYearLevel] = useState(null);
-  const studentSearchAbortRef = useRef(null);
 
   // 👤 Auth & Loading
   const [userID, setUserID] = useState("");
@@ -242,38 +258,28 @@ const StudentGradeFile = () => {
     if (!settings) return;
 
     // 🎨 Apply Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-        if (parsed?.length > 0) {
-          setCampusFilter((prev) => prev || String(parsed[0].id));
-        }
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
+    const normalizedBranches = settings?.branches || [];
+    setBranches(normalizedBranches);
+    if (normalizedBranches?.length > 0) {
+      setCampusFilter((prev) => prev || String(normalizedBranches[0].id));
     }
   }, [settings]);
 
@@ -506,55 +512,6 @@ const StudentGradeFile = () => {
   // API CALLS
   // ==========================================
 
-  const searchStudents = async (query) => {
-    const trimmedQuery = String(query || "").trim();
-    if (trimmedQuery.length < 2) {
-      setAllStudents([]);
-      return;
-    }
-
-    const empId = employeeID || localStorage.getItem("employee_id") || "";
-    if (!empId) {
-      setAllStudents([]);
-      setSearchStatus("Missing employee id for student search");
-      return;
-    }
-
-    if (studentSearchAbortRef.current) {
-      studentSearchAbortRef.current.abort();
-    }
-    const controller = new AbortController();
-    studentSearchAbortRef.current = controller;
-
-    try {
-      setIsLoadingStudentDirectory(true);
-      const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, {
-        params: {
-          employee_id: empId,
-          q: trimmedQuery,
-          limit: 10,
-        },
-        signal: controller.signal,
-      });
-      const rows = Array.isArray(res.data) ? res.data : [];
-      setAllStudents(rows);
-      setSearchStatus(
-        rows.length
-          ? `Showing ${rows.length} matching student${rows.length > 1 ? "s" : ""}`
-          : "No students found",
-      );
-    } catch (err) {
-      if (axios.isCancel?.(err) || err?.code === "ERR_CANCELED" || err?.name === "CanceledError") {
-        return;
-      }
-      console.error("Error searching students:", err);
-      setAllStudents([]);
-      setSearchStatus("Failed to search students");
-    } finally {
-      setIsLoadingStudentDirectory(false);
-    }
-  };
-
   const fetchStudentProfile = async (student_number) => {
     if (!student_number) {
       setStudentInfo(null);
@@ -624,7 +581,7 @@ const StudentGradeFile = () => {
   };
 
   useEffect(() => {
-    if (!selectedStudentNumber) {
+    if (!selectedStudentNumber || String(selectedStudentNumber).trim().length < 5) {
       setStudentInfo(null);
       setStudentGradeList([]);
       return;
@@ -642,43 +599,43 @@ const StudentGradeFile = () => {
     loadStudentRecord();
   }, [selectedStudentNumber]);
 
-  // Debounced server-side student search (no full directory preload).
   useEffect(() => {
-    const trimmedQuery = globalSearch.trim();
+    const query = studentNumber.trim();
 
-    if (trimmedQuery.length === 0) {
-      setAllStudents([]);
-      setSearchStatus("");
-      return undefined;
+    if (!suggestionsOpen || query.length < 2) {
+      setStudentSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
     }
 
-    if (trimmedQuery.length < 2) {
-      setAllStudents([]);
-      setSearchStatus("Type at least 2 characters to search");
-      return undefined;
-    }
+    let cancelled = false;
+    setSuggestionsLoading(true);
 
-    // Skip search while a student number is already selected and matches input.
-    if (
-      selectedStudentNumber &&
-      String(trimmedQuery) === String(selectedStudentNumber)
-    ) {
-      return undefined;
-    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/cor-student-suggestions`,
+          {
+            params: { query, limit: 10 },
+          },
+        );
 
-    const timer = setTimeout(() => {
-      searchStudents(trimmedQuery);
-    }, 350);
+        if (!cancelled) {
+          setStudentSuggestions(res.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch Student Grade File suggestions:", err);
+        if (!cancelled) setStudentSuggestions([]);
+      } finally {
+        if (!cancelled) setSuggestionsLoading(false);
+      }
+    }, 250);
 
     return () => {
-      clearTimeout(timer);
-      if (studentSearchAbortRef.current) {
-        studentSearchAbortRef.current.abort();
-      }
+      cancelled = true;
+      clearTimeout(delayDebounce);
     };
-  }, [globalSearch, selectedStudentNumber, employeeID]);
-
-  const filteredStudents = allStudents;
+  }, [studentNumber, suggestionsOpen]);
 
   // ==========================================
   // HANDLERS
@@ -689,12 +646,14 @@ const StudentGradeFile = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  const handleSelectStudent = (student) => {
-    if (!student?.student_number) return;
+  const handleSuggestionSelect = (suggestion) => {
+    const nextStudentNumber = String(suggestion?.student_number || "");
+    if (!nextStudentNumber) return;
 
-    setSelectedStudentNumber(student.student_number);
-    setGlobalSearch(student.student_number);
-    setSearchStatus(`Selected ${student.student_number}`);
+    setStudentNumber(nextStudentNumber);
+    setSelectedStudentNumber(nextStudentNumber);
+    setSuggestionsOpen(false);
+    setStudentSuggestions([]);
   };
 
   const confirmDelete = (id) => {
@@ -969,12 +928,6 @@ const StudentGradeFile = () => {
     await handleChangeYearLevel(yearLevelId);
   };
 
-  const selectedStudent =
-    allStudents.find(
-      (student) =>
-        String(student.student_number) === String(selectedStudentNumber),
-    ) || null;
-
   if (loading || hasAccess === null)
     return <LoadingOverlay open={loading} message="Loading..." />;
   
@@ -1032,86 +985,102 @@ const StudentGradeFile = () => {
           STUDENT GRADE FILE
         </Typography>
 
-        <Box sx={{ width: 450, maxWidth: "100%" }}>
-          <Autocomplete
-            options={filteredStudents}
-            filterOptions={(options) => options}
-            loading={isLoadingStudentDirectory}
-            value={selectedStudent}
-            inputValue={globalSearch}
-            onChange={(_, student) => handleSelectStudent(student)}
-            onInputChange={(_, value, reason) => {
-              setGlobalSearch(value);
-
-              if (reason === "clear" || value.trim().length === 0) {
-                setSelectedStudentNumber("");
-                setStudentInfo(null);
-                setStudentGradeList([]);
-                setAllStudents([]);
-              }
+        <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+          <TextField
+            variant="outlined"
+            placeholder="Search student number or name"
+            size="small"
+            value={studentNumber}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              const trimmedValue = nextValue.trim();
+              setStudentNumber(nextValue);
+              setSelectedStudentNumber(/^\d/.test(trimmedValue) ? nextValue : "");
+              setSuggestionsOpen(true);
             }}
-            getOptionLabel={(option) => {
-              if (typeof option === "string") return option;
-
-              const fullName =
-                `${option.first_name || ""} ${option.middle_name || ""} ${option.last_name || ""}`
-                  .replace(/\s+/g, " ")
-                  .trim();
-
-              return fullName
-                ? `${option.student_number} - ${fullName}`
-                : String(option.student_number || "");
+            onFocus={() => {
+              if (studentNumber.trim().length >= 2) setSuggestionsOpen(true);
             }}
-            isOptionEqualToValue={(option, value) =>
-              String(option?.student_number) === String(value?.student_number)
-            }
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                variant="outlined"
-                placeholder="Search by name or student number"
-                size="small"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && filteredStudents.length > 0) {
-                    e.preventDefault();
-                    handleSelectStudent(filteredStudents[0]);
-                  }
-                }}
-                sx={{
-                  backgroundColor: "#fff",
-                  borderRadius: 1,
-                  "& .MuiOutlinedInput-root": { borderRadius: "10px" },
-                }}
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-                }}
-              />
-            )}
-            renderOption={(props, option) => {
-              const fullName =
-                `${option.first_name || ""} ${option.middle_name || ""} ${option.last_name || ""}`
-                  .replace(/\s+/g, " ")
-                  .trim();
-
-              return (
-                <Box component="li" {...props} key={option.student_number}>
-                  <Box>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                      {option.student_number}
-                    </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      {fullName || "Unnamed student"}
-                    </Typography>
-                  </Box>
-                </Box>
-              );
+            onBlur={() => {
+              setTimeout(() => setSuggestionsOpen(false), 150);
+            }}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": { borderRadius: "10px" },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
             }}
           />
+          {suggestionsOpen && studentNumber.trim().length >= 2 && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                backgroundColor: "#fff",
+                border: "1px solid #d0d0d0",
+                borderRadius: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                overflow: "hidden",
+                maxHeight: 320,
+              }}
+            >
+              {suggestionsLoading ? (
+                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                  Searching...
+                </Box>
+              ) : studentSuggestions.length > 0 ? (
+                studentSuggestions.map((suggestion) => {
+                  const name = formatSuggestionName(suggestion);
+                  return (
+                    <Box
+                      key={`${suggestion.student_number}-${suggestion.person_id}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSuggestionSelect(suggestion);
+                      }}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": {
+                          backgroundColor: "#f5f7fb",
+                        },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {suggestion.student_number}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>
+                        |
+                      </Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        {name || "Unnamed Student"}
+                      </Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                  No matching students found
+                </Box>
+              )}
+            </Box>
+          )}
           <Typography sx={{ mt: 0.75, fontSize: 12, color: "text.secondary" }}>
             {isLoadingStudentRecord
               ? "Loading selected student record..."
-              : searchStatus}
+              : " "}
           </Typography>
         </Box>
       </Box>
@@ -1125,7 +1094,7 @@ const StudentGradeFile = () => {
         sx={{ width: "100%", border: `1px solid ${borderColor}` }}
       >
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead sx={{ backgroundColor: headerColor }}>
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
                 Student Personal Information
@@ -1288,7 +1257,7 @@ const StudentGradeFile = () => {
             {/* Term Header Info */}
             <Box
               sx={{
-                backgroundColor: settings?.header_color || "#1976d2",
+                backgroundColor: headerColor,
                 borderBottom: `1px solid ${borderColor}`,
                 display: "flex",
                 alignItems: "center",

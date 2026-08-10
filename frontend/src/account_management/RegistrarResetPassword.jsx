@@ -83,6 +83,10 @@ const RegistrarResetPassword = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -99,14 +103,14 @@ const RegistrarResetPassword = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.logo_url) setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (assets.logoUrl) setFetchedLogo(`${assets.logoUrl}`);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   const [userID, setUserID] = useState("");

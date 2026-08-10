@@ -36,6 +36,8 @@ import useAuditMac from "../utils/useAuditMac";
 const SectionPanel = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -95,9 +97,9 @@ const SectionPanel = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   useEffect(() => {
@@ -302,7 +304,7 @@ const SectionPanel = () => {
         <Table size="small">
           <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
             <TableRow>
-              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                   {/* Left: Total Count */}
                   <Typography fontSize="14px" fontWeight="bold" color="white">
@@ -507,7 +509,7 @@ const SectionPanel = () => {
 
       <TableContainer sx={{ overflowY: 'auto' }}>
         <Table>
-          <TableHead style={{ backgroundColor: settings?.header_color || "#1976d2", }}>
+          <TableHead style={{ backgroundColor: headerColor, }}>
             <TableRow>
               <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>ID</TableCell>
               <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>Section Description</TableCell>
@@ -605,7 +607,7 @@ const SectionPanel = () => {
         <Table size="small">
           <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
             <TableRow>
-              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                   {/* Left: Total Count */}
                   <Typography fontSize="14px" fontWeight="bold" color="white">
@@ -791,7 +793,7 @@ const SectionPanel = () => {
         {/* HEADER */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.1rem",
@@ -868,7 +870,7 @@ const SectionPanel = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: colors.header || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

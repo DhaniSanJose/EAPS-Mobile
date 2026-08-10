@@ -86,6 +86,8 @@ const normalizeColorForSave = (input) => {
 const WorkloadManagement = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
     // 🎨 Theme colors (from company_settings, same as Department Registration)
     const [titleColor, setTitleColor] = useState("#000000");
@@ -93,8 +95,8 @@ const WorkloadManagement = () => {
 
     useEffect(() => {
         if (!settings) return;
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
+        if (colors.title) setTitleColor(colors.title);
+        if (colors.border) setBorderColor(colors.border);
     }, [settings]);
 
     // 🔐 Page access control (same pattern as Department Registration)
@@ -439,13 +441,13 @@ const WorkloadManagement = () => {
 
             <TableContainer component={Paper} sx={{ width: "100%" }}>
                 <Table size="small">
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                    <TableHead sx={{ backgroundColor: headerColor, color: "white" }}>
                         <TableRow>
                             <TableCell
                                 sx={{
                                     border: `1px solid ${borderColor}`,
                                     py: 0.5,
-                                    backgroundColor: settings?.header_color || "#1976d2",
+                                    backgroundColor: headerColor,
                                     color: "white",
                                 }}
                             >
@@ -791,13 +793,13 @@ const WorkloadManagement = () => {
             </Box>
             <TableContainer component={Paper} sx={{ width: "100%" }}>
                 <Table size="small">
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                    <TableHead sx={{ backgroundColor: headerColor, color: "white" }}>
                         <TableRow>
                             <TableCell
                                 sx={{
                                     border: `1px solid ${borderColor}`,
                                     py: 0.5,
-                                    backgroundColor: settings?.header_color || "#1976d2",
+                                    backgroundColor: headerColor,
                                     color: "white",
                                 }}
                             >
@@ -982,7 +984,7 @@ const WorkloadManagement = () => {
             >
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#1976d2",
+                        background: headerColor,
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.1rem",
@@ -1148,7 +1150,7 @@ const WorkloadManagement = () => {
             >
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#1976d2",
+                        background: headerColor,
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.2rem",

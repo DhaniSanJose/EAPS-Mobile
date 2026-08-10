@@ -28,6 +28,8 @@ import DateField from "../components/DateField";
 const QualifyingInterviewRoomAssignment = () => {
   const navigate = useNavigate();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [borderColor, setBorderColor] = useState("#000000");
@@ -50,18 +52,14 @@ const QualifyingInterviewRoomAssignment = () => {
     toTime: "",
   });
 
-  const branches = Array.isArray(settings?.branches)
-    ? settings.branches
-    : typeof settings?.branches === "string"
-      ? JSON.parse(settings.branches)
-      : [];
+  const branches = settings?.branches || [];
 
   const [selectedBranch, setSelectedBranch] = useState("");
 
   useEffect(() => {
     if (!settings) return;
-    setTitleColor(settings.title_color || "#000000");
-    setBorderColor(settings.border_color || "#000000");
+    setTitleColor(colors.title || "#000000");
+    setBorderColor(colors.border || "#000000");
   }, [settings]);
 
   const getOfficialOccupancy = (schedule) =>
@@ -298,7 +296,7 @@ const QualifyingInterviewRoomAssignment = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
@@ -530,7 +528,7 @@ const QualifyingInterviewRoomAssignment = () => {
               >
                 <Box
                   sx={{
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "#fff",
                     p: 1.5,
                   }}

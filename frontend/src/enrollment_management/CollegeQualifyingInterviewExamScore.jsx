@@ -61,6 +61,10 @@ const CollegeQualifyingInterviewExamScore = () => {
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -79,40 +83,28 @@ const CollegeQualifyingInterviewExamScore = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
+    setBranches(settings.branches || []);
   }, [settings]);
 
   useEffect(() => {
@@ -958,7 +950,7 @@ const CollegeQualifyingInterviewExamScore = () => {
 
   const divToPrintRef = useRef();
 
-  const handleExportQualifyingInterviewScorePdf = async () => {
+const handleExportQualifyingInterviewScorePdf = async () => {
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
 
@@ -968,7 +960,7 @@ const CollegeQualifyingInterviewExamScore = () => {
     const secondLine = words.slice(middleIndex).join(" ");
 
     const resolvedCampusAddress =
-      campusAddress || settings?.campus_address || settings?.address || "No address set in Settings";
+      campusAddress || branding.campusAddress || "No address set in Settings";
 
     const selectedProgramLabel = selectedProgramFilter
       ? filteredCurriculumOptions.find(
@@ -981,6 +973,24 @@ const CollegeQualifyingInterviewExamScore = () => {
         (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
       )?.dprtmnt_name || "N/A"
       : "All Departments";
+
+    // ✅ NEW: totals for the summary row at the bottom of the table
+    // (based on the same College Status the "Status" column shows per row)
+    const totalPassed = filteredPersons.filter(
+      (person) =>
+        Number(getCurrentCollegeApprovalStatus(person)) ===
+        COLLEGE_APPROVAL_STATUS.ACCEPTED
+    ).length;
+    const totalFailed = filteredPersons.filter(
+      (person) =>
+        Number(getCurrentCollegeApprovalStatus(person)) ===
+        COLLEGE_APPROVAL_STATUS.REJECTED
+    ).length;
+
+    // Fixed 9 columns in this table (Applicant ID, Name, Program, Qualifying
+    // Exam Score, Qualifying Status, Interview Exam Score, Interview Status,
+    // Total Avg, Status)
+    const totalColumnCount = 9;
 
     // Only the .print-container's INNER markup — no <html>/<head>/<body>,
     // no onload print script. The server wraps this with matching CSS.
@@ -1119,6 +1129,16 @@ const CollegeQualifyingInterviewExamScore = () => {
               `;
         })
         .join("")}
+
+          <tr>
+            <td
+              colspan="${totalColumnCount}"
+              style="border: 1.5px solid black; background-color: lightgray; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 6px 10px; font-weight: bold; text-align: right;"
+            >
+              <span style="margin-right: 32px;">Total Passed: ${totalPassed}</span>
+              <span>Total Failed: ${totalFailed}</span>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -1994,7 +2014,7 @@ ${reqText}`.trim();
     const reqText = buildRequirementsText(applicant, requirements);
 
     // ✅ Use dynamic company name from settings
-    const companyName = settings?.company_name || "Student Information System";
+    const companyName = branding.companyName || "Student Information System";
 
     const defaultMessage = `
 Dear ${applicant?.last_name || ""}, ${applicant?.first_name || ""} ${applicant?.middle_name || ""}
@@ -2039,7 +2059,7 @@ Thank you, best regards
     const reqText = buildRequirementsText(applicant, requirements);
 
     // ✅ Use dynamic company name from settings
-    const companyName = settings?.company_name || "Student Information System";
+    const companyName = branding.companyName || "Student Information System";
 
     const defaultMessage = `
 Dear ${applicant?.last_name || ""}, ${applicant?.first_name || ""} ${applicant?.middle_name || ""}
@@ -2545,7 +2565,7 @@ Thank you, best regards
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
@@ -2820,7 +2840,7 @@ Thank you, best regards
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -3325,7 +3345,7 @@ Thank you, best regards
       <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table size="small">
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell
@@ -3964,7 +3984,7 @@ Thank you, best regards
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -4148,7 +4168,7 @@ Thank you, best regards
       >
         <DialogTitle
           sx={{
-            bgcolor: settings?.header_color || "#1976d2",
+            bgcolor: headerColor,
             color: "white",
             display: "flex",
             justifyContent: "space-between",
@@ -4556,7 +4576,7 @@ Thank you, best regards
       >
         <DialogTitle
           sx={{
-            bgcolor: settings?.header_color || "#1976d2",
+            bgcolor: headerColor,
             color: "white",
             display: "flex",
             justifyContent: "space-between",
@@ -4963,7 +4983,7 @@ Thank you, best regards
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: colors.header || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

@@ -1,8 +1,6 @@
 import React, { useMemo, useEffect, useState, useContext } from "react";
 import { SettingsContext } from "../App";
 import { Box, Typography, Select, MenuItem } from "@mui/material";
-import API_BASE_URL from "../apiConfig";
-import EaristLogo from "../assets/EaristLogo.png";
 
 const ProgramTaggingFilter = ({
   curriculumList,
@@ -22,29 +20,11 @@ const ProgramTaggingFilter = ({
 }) => {
   const settings = useContext(SettingsContext);
 
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [branches, setBranches] = useState([]);
+  const colors = settings?.colors || {};
+  const borderColor = colors.border || "#000000";
+  const branches = settings?.branches || [];
   const [selectedCampus, setSelectedCampus] = useState("");
   const [selectedAcademicProgram, setSelectedAcademicProgram] = useState("");
-
-  // Load settings and branches
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.border_color) setBorderColor(settings.border_color);
-
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
-  }, [settings]);
 
   /* ===== FILTERS ===== */
   const filteredCurriculumList = useMemo(() => {

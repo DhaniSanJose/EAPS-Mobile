@@ -20,6 +20,10 @@ import EaristLogo from "../assets/EaristLogo.png"; // change path if needed
 
 const ApplicantTable = ({ data }) => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const [borderColor, setBorderColor] = useState("#000000");
 
   // Pagination states
@@ -29,7 +33,7 @@ const ApplicantTable = ({ data }) => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   // Slice data for current page

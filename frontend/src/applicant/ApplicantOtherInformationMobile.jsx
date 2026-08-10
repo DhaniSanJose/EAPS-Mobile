@@ -57,6 +57,10 @@ import AdmissionServices from "./ApplicantServicesSurvey";
  */
 const ApplicantOtherInformationMobile = (props) => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -106,13 +110,13 @@ const ApplicantOtherInformationMobile = (props) => {
   // ── Apply settings ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
   }, [settings]);
 
   // ── Fetch active school year ────────────────────────────────────────────
@@ -692,7 +696,7 @@ const ApplicantOtherInformationMobile = (props) => {
                     pointerEvents: disabled ? "none" : "auto",
                     cursor: disabled ? "default" : "pointer",
                     "&:hover": !disabled && {
-                      backgroundColor: settings?.header_color || "#6D2323",
+                      backgroundColor: headerColor || "#6D2323",
                       transform: { md: "scale(1.05)" },
                       "& .chip-icon": { color: "#fff" },
                       "& .chip-text": { color: "#fff" },
@@ -800,7 +804,7 @@ const ApplicantOtherInformationMobile = (props) => {
                     border: `1px solid ${borderColor}`,
                     backgroundColor:
                       activeStep === index
-                        ? settings?.header_color || "#1976d2"
+                        ? headerColor || "#1976d2"
                         : "#E8C999",
                     color: activeStep === index ? "#fff" : "#000",
                     display: "flex",
@@ -845,7 +849,7 @@ const ApplicantOtherInformationMobile = (props) => {
           {/* ── Step Header Bar ─────────────────────────────────────────── */}
           <Box
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               border: `1px solid ${borderColor}`,
               color: "white",
               borderRadius: 2,
@@ -881,7 +885,7 @@ const ApplicantOtherInformationMobile = (props) => {
           >
             <Box
               sx={{
-                backgroundColor: { xs: settings?.header_color || "#1976d2", md: "transparent" },
+                backgroundColor: { xs: headerColor || "#1976d2", md: "transparent" },
                 color: { xs: "#fff", md: mainButtonColor },
                 px: { xs: "14px", md: 0 },
                 py: { xs: "10px", md: 0 },
@@ -1025,7 +1029,7 @@ const ApplicantOtherInformationMobile = (props) => {
             <Box
               sx={{
                 display: { xs: "block", md: "none" },
-                backgroundColor: settings?.header_color || "#1976d2",
+                backgroundColor: headerColor || "#1976d2",
                 color: "#fff",
                 px: "14px",
                 py: "10px",

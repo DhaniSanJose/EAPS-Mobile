@@ -155,6 +155,10 @@ const buildDefaultState = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const StudentEditPermissions = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   useAccountAuditMac();
 
   const [mainButtonColor, setMainButtonColor] = useState("#6D2323");
@@ -192,9 +196,9 @@ const StudentEditPermissions = () => {
   // ── Load settings ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!settings) return;
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.title_color) setTitleColor(settings.title_color);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.title) setTitleColor(colors.title);
   }, [settings]);
 
   // ── Auth + access check ────────────────────────────────────────────────────
@@ -457,7 +461,7 @@ const StudentEditPermissions = () => {
                 alignItems: "center",
                 justifyContent: "space-between",
                 p: "12px 18px",
-                backgroundColor: settings?.header_color || mainButtonColor,
+                backgroundColor: headerColor || mainButtonColor,
                 color: "#fff",
                 cursor: "pointer",
               }}

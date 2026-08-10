@@ -2765,47 +2765,19 @@ const RegistrationSuccessModal = ({
 ════════════════════════════════════════ */
 const Register = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
+  const companyName = branding.companyName || "Company Name";
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   // isCompact = "not enough width for the two-column desktop layout" —
   // covers both phones and tablets so neither breaks the container.
   const isCompact = isMobile || isTablet;
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [stepperColor, setStepperColor] = useState("#000000");
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
   const [openReminder, setOpenReminder] = useState(true);
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url)
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches,
-      );
-    }
-  }, [settings]);
 
   const getBranchLabel = (branchId) => {
     const branch = branches.find(
@@ -3451,9 +3423,7 @@ const Register = () => {
     }
   };
 
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "url(/default-bg.jpg)";
+  const backgroundImage = assets.backgroundImage || "url(/default-bg.jpg)";
 
   // 🔒 Right-click / DevTools-shortcut blocking — desktop (mouse + keyboard)
   // only. Previously this ran on every render with no cleanup (piling up
@@ -3532,7 +3502,7 @@ const Register = () => {
             <div
               className="Header"
               style={{
-                backgroundColor: settings?.header_color || "#1976d2",
+                backgroundColor: headerColor,
                 padding: isMobile ? "12px 10px" : "1rem 0",
                 borderBottom: "3px solid black",
               }}
@@ -3540,18 +3510,14 @@ const Register = () => {
               <div className="HeaderTitle">
                 <div className="CircleCon">
                   <img
-                    src={
-                      settings?.logo_url
-                        ? `${API_BASE_URL}${settings.logo_url}`
-                        : Logo
-                    }
+                    src={assets.logoUrl || Logo}
                     alt="Logo"
                   />
                 </div>
               </div>
               <div className="HeaderBody">
                 <strong style={{ color: "white" }}>
-                  {(settings?.company_name || "Company Name")
+                  {companyName
                     .split(" ")
                     .reduce((acc, word, i) => {
                       if (i % 4 === 0 && i !== 0)
@@ -4715,7 +4681,7 @@ const Register = () => {
 
             <div className="Footer">
               <div className="FooterText">
-                &copy; {currentYear} {settings?.company_name || ""} <br />
+                &copy; {currentYear} {companyName || ""} <br />
                 Academic Information System. <br />
                 All rights reserved.
               </div>
@@ -4755,7 +4721,7 @@ const Register = () => {
           lastName={lastName}
           birthday={birthday}
           age={age}
-          companyName={settings?.company_name}
+          companyName={companyName}
           mainButtonColor={mainButtonColor}
           isMobile={isCompact}
           onContinue={handleContinueToLogin}

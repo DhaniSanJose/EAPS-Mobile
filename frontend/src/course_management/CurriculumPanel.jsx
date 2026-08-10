@@ -42,59 +42,39 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import SaveIcon from "@mui/icons-material/Save";
 
+const cleanSearchValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getCurriculumSearchText = (item) =>
+  [
+    item?.year_description,
+    item?.program_code,
+    item?.program_description,
+    item?.major,
+    item?.branch,
+    item?.components,
+  ]
+    .map(cleanSearchValue)
+    .join(" ")
+    .toLowerCase();
+
+const getCurriculumSuggestionValue = (item) =>
+  cleanSearchValue(item?.program_code) ||
+  cleanSearchValue(item?.program_description) ||
+  cleanSearchValue(item?.year_description);
+
 const CurriculumPanel = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [stepperColor, setStepperColor] = useState("#000000");
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    }
-
-    // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    } else {
-      setBranches([]);
-    }
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const headerColor = colors.header || "#1976d2";
+  const branches = settings?.branches || [];
 
   const [curriculum, setCurriculum] = useState({ year_id: "", program_id: "" });
   const [yearList, setYearList] = useState([]);
@@ -493,6 +473,7 @@ const CurriculumPanel = () => {
   };
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
@@ -545,6 +526,14 @@ const CurriculumPanel = () => {
           .includes(word),
     );
   });
+  const curriculumSuggestions =
+    searchQuery.trim().length >= 2
+      ? curriculumList
+          .filter((item) =>
+            getCurriculumSearchText(item).includes(searchQuery.trim().toLowerCase()),
+          )
+          .slice(0, 10)
+      : [];
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -657,26 +646,91 @@ const CurriculumPanel = () => {
             justifyContent: "flex-end",
           }}
         >
-          <TextField
-            variant="outlined"
-            placeholder="Search Year / Program Code / Description / Major"
-            size="small"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-            }}
-            sx={{
-              width: 460,
-              backgroundColor: "#fff",
-              borderRadius: 1,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-              },
-            }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-            }}
-          />
+          <Box sx={{ position: "relative", width: 460, maxWidth: "100%" }}>
+            <TextField
+              variant="outlined"
+              placeholder="Search Year / Program Code / Description / Major"
+              size="small"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+              }}
+              onBlur={() => {
+                setTimeout(() => setSuggestionsOpen(false), 150);
+              }}
+              sx={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                },
+              }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+              }}
+            />
+            {suggestionsOpen && searchQuery.trim().length >= 2 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  backgroundColor: "#fff",
+                  border: "1px solid #d0d0d0",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}
+              >
+                {curriculumSuggestions.length > 0 ? (
+                  curriculumSuggestions.map((item) => (
+                    <Box
+                      key={item.curriculum_id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearchQuery(getCurriculumSuggestionValue(item));
+                        setCurrentPage(1);
+                        setSuggestionsOpen(false);
+                      }}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": { backgroundColor: "#f5f7fb" },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {formatAcademicYear(item.year_description) || "N/A"}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        ({cleanSearchValue(item.program_code) || "N/A"}){" "}
+                        {cleanSearchValue(item.program_description) || "Unnamed Program"}
+                        {item.major ? ` (${item.major})` : ""}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                    No matching curriculums found
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
           <input
             ref={importInputRef}
             type="file"
@@ -727,7 +781,7 @@ const CurriculumPanel = () => {
       <TableContainer component={Paper} sx={{ width: "100%", mt: 2 }}>
         <Table size="small">
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#6D2323" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell
@@ -735,7 +789,7 @@ const CurriculumPanel = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#6D2323",
+                  backgroundColor: headerColor,
                   color: "white",
                   height: "60px"
                 }}
@@ -1028,7 +1082,7 @@ const CurriculumPanel = () => {
       <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table size="small">
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#6D2323" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell
@@ -1036,7 +1090,7 @@ const CurriculumPanel = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#6D2323",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -1147,7 +1201,7 @@ const CurriculumPanel = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",
@@ -1242,7 +1296,7 @@ const CurriculumPanel = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

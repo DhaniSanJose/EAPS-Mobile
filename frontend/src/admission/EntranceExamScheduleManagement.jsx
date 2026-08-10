@@ -53,63 +53,50 @@ import CampaignIcon from "@mui/icons-material/Campaign";
 import { Toc } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close"; // or use the custom SVG below
 
+const cleanApplicantValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatApplicantSuggestionName = (applicant) =>
+  [
+    cleanApplicantValue(applicant?.last_name),
+    cleanApplicantValue(applicant?.first_name),
+    cleanApplicantValue(applicant?.middle_name),
+    cleanApplicantValue(applicant?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.extension,
+    applicant?.emailAddress,
+  ]
+    .map(cleanApplicantValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionValue = (applicant) =>
+  cleanApplicantValue(applicant?.applicant_number) ||
+  formatApplicantSuggestionName(applicant) ||
+  cleanApplicantValue(applicant?.emailAddress);
+
 const EntranceExamScheduleManagement = () => {
   useAuditMac();
   const socket = useRef(null);
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-
-    // ✅ Branches (JSON stored in DB)
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const headerColor = colors.header || "#1976d2";
+  const branches = settings?.branches || [];
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -939,6 +926,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
   const [itemsPerPage, setItemsPerPage] = useState(100);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
@@ -1129,6 +1117,16 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentPersons = sortedPersons.slice(indexOfFirstItem, indexOfLastItem);
+  const applicantSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+          .filter((applicant) =>
+            getApplicantSuggestionText(applicant).includes(
+              searchQuery.trim().toLowerCase(),
+            ),
+          )
+          .slice(0, 10)
+      : [];
 
   useEffect(() => {
     const departmentIds =
@@ -1265,27 +1263,102 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
           ENTRANCE EXAM SCHEDULE MANAGEMENT
         </Typography>
 
-        <TextField
-          variant="outlined"
-          placeholder="Search Applicant Name / Email / Applicant ID"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1); // Corrected
-          }}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+        <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+          <TextField
+            variant="outlined"
+            placeholder="Search Applicant Name / Email / Applicant ID"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => {
+              if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+            }}
+            onBlur={() => {
+              setTimeout(() => setSuggestionsOpen(false), 150);
+            }}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                backgroundColor: "#fff",
+                border: "1px solid #d0d0d0",
+                borderRadius: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                overflow: "hidden",
+                maxHeight: 320,
+              }}
+            >
+              {applicantSuggestions.length > 0 ? (
+                applicantSuggestions.map((applicant) => {
+                  const applicantNumber = cleanApplicantValue(
+                    applicant?.applicant_number,
+                  );
+                  const name = formatApplicantSuggestionName(applicant);
+                  return (
+                    <Box
+                      key={`${applicantNumber || applicant?.person_id}-${name}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearchQuery(getApplicantSuggestionValue(applicant));
+                        setCurrentPage(1);
+                        setSuggestionsOpen(false);
+                      }}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": {
+                          backgroundColor: "#f5f7fb",
+                        },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {applicantNumber || "N/A"}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>
+                        |
+                      </Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        {name ||
+                          cleanApplicantValue(applicant?.emailAddress) ||
+                          "Unnamed Applicant"}
+                      </Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                  No matching applicants found
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
@@ -1303,7 +1376,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
@@ -1731,7 +1804,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               color: "white",
             }}
           >
@@ -1741,7 +1814,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -2241,7 +2314,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               color: "white",
             }}
           >
@@ -2251,7 +2324,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -2449,7 +2522,7 @@ Step 5: Arrive at least 1 hour before your scheduled examination. Late applicant
       >
         <DialogTitle
           sx={{
-            bgcolor: settings?.header_color || "#1976d2",
+            bgcolor: headerColor,
             color: "white",
             display: "flex",
             justifyContent: "space-between",

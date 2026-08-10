@@ -37,9 +37,14 @@ import MuiTooltip from "@mui/material/Tooltip";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import API_BASE_URL from "../apiConfig";
 import EaristLogo from "../assets/EaristLogo.png";
+import AdmissionsReportPanel from "../components/AdmissionsReportPanel";
 
 const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const theme = useTheme();
 
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -56,21 +61,29 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const [companyName, setCompanyName] = useState("");
   const [shortTerm, setShortTerm] = useState("");
   const [campusAddress, setCampusAddress] = useState("");
+  const [campuses, setCampuses] = useState([]);
+  const [selectedCampus, setSelectedCampus] = useState("all");
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url)
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    // company_settings.branches -> [{ id, branch_name }, ...]
+    if (Array.isArray(settings.branches)) setCampuses(settings.branches);
+  }, [settings]);
+
+  useEffect(() => {
+    if (!settings) return;
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
+    if (assets.logoUrl)
+      setFetchedLogo(assets.logoUrl);
     else setFetchedLogo(EaristLogo);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   // ── Auth ────────────────────────────────────────────────────────
@@ -106,7 +119,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${empID}/${pageId}`,
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch {
@@ -119,7 +132,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const fetchUserAccessList = async (empID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${empID}`
+        `${API_BASE_URL}/api/page_access/${empID}`,
       );
       const accessMap = data.reduce((acc, item) => {
         acc[item.page_id] = item.page_privilege === 1;
@@ -163,14 +176,26 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const year = date.getFullYear();
   const month = date.getMonth();
 
+  const dedupeByProgramCode = (list) => {
+    const seen = new Map();
+    for (const item of list) {
+      if (!seen.has(item.program_code)) {
+        seen.set(item.program_code, item);
+      }
+    }
+    return [...seen.values()];
+  };
+
   // ── Reference data loads ────────────────────────────────────────
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/applied_program`)
       .then((res) => {
-        setAllCurriculums(res.data);
-        setCurriculumOptions(res.data);
+        const deduped = dedupeByProgramCode(res.data);
+        setAllCurriculums(deduped);
+        setCurriculumOptions(deduped);
       })
+
       .catch(console.error);
 
     axios
@@ -199,20 +224,10 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
 
     axios
-      .get(`${API_BASE_URL}/api/enrolled-count`)
-      .then((res) => setEnrolledCount(res.data.total))
-      .catch(console.error);
-
-    axios
       .get(`${API_BASE_URL}/api/professors`)
       .then((res) =>
-        setProfessorCount(Array.isArray(res.data) ? res.data.length : 0)
+        setProfessorCount(Array.isArray(res.data) ? res.data.length : 0),
       )
-      .catch(console.error);
-
-    axios
-      .get(`${API_BASE_URL}/api/accepted-students-count`)
-      .then((res) => setAcceptedCount(res.data.total))
       .catch(console.error);
 
     axios
@@ -225,9 +240,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/all-applicants`)
-      .then((res) =>
-        setAllApplicants(Array.isArray(res.data) ? res.data : [])
-      )
+      .then((res) => setAllApplicants(Array.isArray(res.data) ? res.data : []))
       .catch((err) => console.error("Failed to fetch applicants:", err));
   }, []);
 
@@ -258,7 +271,10 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
 
     window.addEventListener("profile-image-updated", handleProfileImageUpdated);
     return () => {
-      window.removeEventListener("profile-image-updated", handleProfileImageUpdated);
+      window.removeEventListener(
+        "profile-image-updated",
+        handleProfileImageUpdated,
+      );
     };
   }, [setProfileImage]);
 
@@ -286,30 +302,37 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     selectedSchoolSemester,
     selectedDepartmentFilter,
     selectedProgramFilter,
+    selectedCampus,
   ];
 
   const applyFilters = () => {
     let filtered = [...allApplicants];
 
+    if (selectedCampus !== "all" && selectedCampus !== "") {
+      filtered = filtered.filter(
+        (p) => String(p.campus) === String(selectedCampus),
+      );
+    }
+
     if (selectedSchoolYear) {
       const sy = schoolYears.find(
-        (s) => String(s.year_id) === String(selectedSchoolYear)
+        (s) => String(s.year_id) === String(selectedSchoolYear),
       );
       if (sy) {
         const yearNum = Number(sy.current_year);
         filtered = filtered.filter(
-          (p) => new Date(p.created_at).getFullYear() === yearNum
+          (p) => new Date(p.created_at).getFullYear() === yearNum,
         );
       }
     }
 
     if (selectedSchoolSemester) {
       const sem = semesters.find(
-        (s) => String(s.semester_id) === String(selectedSchoolSemester)
+        (s) => String(s.semester_id) === String(selectedSchoolSemester),
       );
       if (sem) {
         filtered = filtered.filter(
-          (p) => String(p.middle_code) === String(sem.semester_code)
+          (p) => String(p.middle_code) === String(sem.semester_code),
         );
       }
     }
@@ -351,7 +374,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       0,
       23,
       59,
-      59
+      59,
     );
 
     setTotalApplicants(filtered.length);
@@ -359,13 +382,13 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       filtered.filter((p) => {
         const d = new Date(p.created_at);
         return d >= weekStart && d <= weekEnd;
-      }).length
+      }).length,
     );
     setMonthApplicants(
       filtered.filter((p) => {
         const d = new Date(p.created_at);
         return d >= monthStart && d <= monthEnd;
-      }).length
+      }).length,
     );
   }, SHARED_DEPS); // eslint-disable-line
 
@@ -380,51 +403,57 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     }
     filtered.forEach((p) => {
       const d = new Date(p.created_at);
-      const key = `${d.getFullYear()}-${String(
-        d.getMonth() + 1
-      ).padStart(2, "0")}`;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}`;
       if (monthCounts[key] !== undefined) monthCounts[key]++;
     });
     setMonthlyApplicants(
       Object.entries(monthCounts).map(([month, total]) => ({
         month,
         total,
-      }))
+      })),
     );
   }, SHARED_DEPS); // eslint-disable-line
 
-  // ── Pie chart ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!allApplicants.length) return;
-    const filtered = applyFilters();
-    setPieData([
-      { name: "Applied", value: filtered.length },
-      {
-        name: "Scheduled",
-        value: filtered.filter(
-          (p) => p.schedule_id != null && p.exam_status === 0
-        ).length,
-      },
-      {
-        name: "Pending",
-        value: filtered.filter((p) => p.schedule_id == null).length,
-      },
-      {
-        name: "Finished",
-        value: filtered.filter(
-          (p) => p.schedule_id != null && p.exam_status === 1
-        ).length,
-      },
-    ]);
-  }, SHARED_DEPS); // eslint-disable-line
+    const params = selectedCampus !== "all" ? { campus: selectedCampus } : {};
 
+    axios
+      .get(`${API_BASE_URL}/api/enrolled-count`, { params })
+      .then((res) => setEnrolledCount(res.data.total))
+      .catch(console.error);
+
+    axios
+      .get(`${API_BASE_URL}/api/accepted-students-count`, { params })
+      .then((res) => setAcceptedCount(res.data.total))
+      .catch(console.error);
+  }, [selectedCampus]);
+
+  useEffect(() => {
+    const params = selectedCampus !== "all" ? { campus: selectedCampus } : {};
+
+    axios
+      .get(`${API_BASE_URL}/api/ecat-summary`, { params })
+      .then((res) => {
+        const s = res.data || {};
+        setPieData([
+          { name: "Applied", value: Number(s.total_applied) || 0 },
+          { name: "Scheduled", value: Number(s.total_scheduled) || 0 },
+          { name: "Pending", value: Number(s.total_pending) || 0 },
+          { name: "Finished", value: Number(s.total_finished) || 0 },
+        ]);
+      })
+      .catch(console.error);
+  }, [selectedCampus]);
   // ── Department change ───────────────────────────────────────────
   const handleDepartmentChange = (selectedDept) => {
     setSelectedDepartmentFilter(selectedDept);
     setCurriculumOptions(
       selectedDept
         ? allCurriculums.filter((opt) => opt.dprtmnt_name === selectedDept)
-        : allCurriculums
+        : allCurriculums,
     );
     setSelectedProgramFilter("");
   };
@@ -436,7 +465,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     try {
       const role = localStorage.getItem("role");
       const accountRes = await axios.get(
-        `${API_BASE_URL}/api/get_user_account_id/${personData.person_id}`
+        `${API_BASE_URL}/api/get_user_account_id/${personData.person_id}`,
       );
       const user_account_id = accountRes.data.user_account_id;
       const formData = new FormData();
@@ -444,14 +473,14 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
       await axios.post(
         `${API_BASE_URL}/api/update_registrar/${user_account_id}`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
       const refreshed = await axios.get(
-        `${API_BASE_URL}/api/person_data/${personData.person_id}/${role}`
+        `${API_BASE_URL}/api/person_data/${personData.person_id}/${role}`,
       );
       setPersonData(refreshed.data);
       setProfileImage(
-        `${API_BASE_URL}/uploads/Admin1by1/${refreshed.data.profile_image}?t=${Date.now()}`
+        `${API_BASE_URL}/uploads/Admin1by1/${refreshed.data.profile_image}?t=${Date.now()}`,
       );
     } catch (err) {
       console.error("Upload failed:", err);
@@ -461,7 +490,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   // ── Calendar helpers ────────────────────────────────────────────
   const now = new Date();
   const manilaDate = new Date(
-    now.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+    now.toLocaleString("en-US", { timeZone: "Asia/Manila" }),
   );
   const today = manilaDate.getDate();
   const thisMonth = manilaDate.getMonth();
@@ -473,9 +502,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   while (currentDay <= totalDays) {
     const week = [];
     for (let i = 0; i < 7; i++) {
-      week.push(
-        currentDay > 0 && currentDay <= totalDays ? currentDay : null
-      );
+      week.push(currentDay > 0 && currentDay <= totalDays ? currentDay : null);
       currentDay++;
     }
     weeks.push(week);
@@ -484,21 +511,20 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const handleNextMonth = () => setDate(new Date(year, month + 1, 1));
   const days = ["Sun", "Mon", "Tue", "Wed", "Thur", "Fri", "Sat"];
 
-  const formattedDate = new Date().toLocaleDateString("en-US", {
-    weekday: "short",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-
   const MONTH_SHORT = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
   ];
-
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "linear-gradient(to right, #e0e0e0, #bdbdbd)";
 
   if (loading || hasAccess === null)
     return <LoadingOverlay open={loading} message="Loading..." />;
@@ -527,28 +553,13 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   return (
     <Box
       sx={{
-        height: "calc(100vh - 100px)",
+        minHeight: "calc(100vh - 100px)",
         width: "100%",
-        backgroundImage,
-        backgroundRepeat: "no-repeat",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        position: "relative",
+        backgroundColor: "transparent",
+        overflowY: "auto",
+        fontFamily: "Poppins, sans-serif",
       }}
     >
-      {/* Overlay */}
-      <Box
-        sx={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "rgba(0,0,0,0.1)",
-          backdropFilter: "blur(0.5px)",
-          WebkitBackdropFilter: "blur(0.5px)",
-          zIndex: 0,
-          pointerEvents: "none",
-        }}
-      />
-
       {/* Scrollable content */}
       <Box
         sx={{
@@ -561,119 +572,153 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
           boxSizing: "border-box",
         }}
       >
-        {/* ── Welcome card ── */}
-        <Card
+        {/* ── Welcome Card ── */}
+        <Box
           sx={{
+            width: "100%",
+            mt: 2,
+            borderRadius: "12px",
+            overflow: "hidden",
+            backgroundColor: headerColor,
+            color: "#fff",
             border: `2px solid ${borderColor}`,
+            mb: 2,
             boxShadow: 3,
-            backgroundColor: "#fff9ec",
-            p: isMobile ? 1 : 2,
-            borderRadius: 3,
             transition: "transform 0.3s ease, box-shadow 0.3s ease",
-            "&:hover": { transform: "scale(1.02)", boxShadow: 6 },
+            "&:hover": {
+              transform: "scale(1.01)",
+              boxShadow: 6,
+            },
           }}
         >
-          <CardContent sx={{ p: "8px !important" }}>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-              flexWrap="wrap"
-              gap={1}
-            >
-              <Box display="flex" alignItems="center" gap={2}>
-                <Box
-                  position="relative"
-                  display="inline-block"
-                  onMouseEnter={() => setHovered(true)}
-                  onMouseLeave={() => setHovered(false)}
+          <Box
+            sx={{
+              px: { xs: 2, md: 4 },
+              py: { xs: 2, md: 3 },
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              flexWrap: "wrap",
+            }}
+          >
+            {/* LEFT SIDE */}
+            <Box display="flex" alignItems="center" gap={{ xs: 1.5, md: 2 }}>
+              {/* AVATAR */}
+              <Box
+                position="relative"
+                display="inline-flex"
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+              >
+                <Avatar
+                  src={
+                    profileImage ||
+                    (personData?.profile_image
+                      ? `${API_BASE_URL}/uploads/Admin1by1/${personData.profile_image}`
+                      : undefined)
+                  }
+                  alt={personData?.fname || "Admin"}
+                  onClick={() => fileInputRef.current?.click()}
+                  sx={{
+                    width: { xs: 60, sm: 70, md: 80 },
+                    height: { xs: 60, sm: 70, md: 80 },
+                    border: "2px solid white",
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    cursor: "pointer",
+                    color: "white",
+                    fontSize: { xs: 24, md: 30 },
+                  }}
                 >
-                  <Avatar
-                    src={
-                      profileImage ||
-                      (personData?.profile_image
-                        ? `${API_BASE_URL}/uploads/Admin1by1/${personData.profile_image}`
-                        : undefined)
-                    }
-                    alt={personData?.fname}
-                    sx={{
-                      width: isMobile ? 60 : 90,
-                      height: isMobile ? 60 : 90,
-                      border: `2px solid ${borderColor}`,
-                      cursor: "pointer",
-                    }}
-                    onClick={() => fileInputRef.current.click()}
-                  >
-                    {personData?.fname?.[0]}
-                  </Avatar>
-                  {hovered && (
-                    <label
-                      onClick={() => fileInputRef.current.click()}
-                      style={{
-                        position: "absolute",
-                        bottom: "-5px",
-                        right: 0,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: "50%",
-                        backgroundColor: "#ffffff",
-                        border: `2px solid ${borderColor}`,
-                        width: "36px",
-                        height: "36px",
-                      }}
-                    >
-                      <AddCircleIcon
-                        sx={{
-                          color: settings?.header_color || "#1976d2",
-                          fontSize: 32,
-                        }}
-                      />
-                    </label>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    ref={fileInputRef}
-                    style={{ display: "none" }}
-                    onChange={handleFileChange}
-                  />
-                </Box>
+                  {personData?.fname?.[0]}
+                </Avatar>
 
-                <Box sx={{ color: titleColor }}>
-                  <Typography
-                    variant={isMobile ? "h6" : "h5"}
-                    fontWeight="bold"
+                {hovered && (
+                  <IconButton
+                    size="small"
+                    onClick={() => fileInputRef.current?.click()}
+                    sx={{
+                      position: "absolute",
+                      bottom: -5,
+                      right: -2,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "50%",
+                      backgroundColor: "#ffffff",
+                      border: `2px solid ${borderColor}`,
+                      width: { xs: 28, md: 32 },
+                      height: { xs: 28, md: 32 },
+                      p: 0,
+                      "&:hover": {
+                        backgroundColor: "#f5f5f5",
+                      },
+                    }}
                   >
-                    Welcome back!{" "}
-                    {personData
-                      ? `${personData.lname}, ${personData.fname} ${personData.mname || ""
-                      }`
-                      : ""}
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    color="black"
-                    fontSize={isMobile ? 14 : 18}
-                  >
-                    <b>Employee ID:</b>{" "}
-                    {personData?.employee_id || "N/A"}
-                  </Typography>
-                </Box>
+                    <AddCircleIcon
+                      sx={{
+                        color: headerColor,
+                        fontSize: { xs: 23, md: 27 },
+                      }}
+                    />
+                  </IconButton>
+                )}
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleFileChange}
+                />
               </Box>
 
-              {!isMobile && (
-                <Box textAlign="right">
-                  <Typography variant="body1" fontSize="18px" color="black">
-                    {formattedDate}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </CardContent>
-        </Card>
+              {/* TEXT */}
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  sx={{
+                    fontSize: {
+                      xs: "21px",
+                      sm: "27px",
+                      md: "32px",
+                    },
+                    fontWeight: 800,
+                    lineHeight: 1.1,
+                    color: "white",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  Welcome Back!{" "}
+                  {personData
+                    ? `${personData.lname}, ${personData.fname} ${
+                        personData.mname || ""
+                      }`
+                    : ""}
+                </Typography>
 
+                <Typography
+                  sx={{
+                    fontSize: {
+                      xs: "14px",
+                      sm: "18px",
+                      md: "22px",
+                    },
+                    letterSpacing: 0,
+                    opacity: 0.9,
+                    color: "white",
+                    mt: 0.5,
+                  }}
+                >
+                  <Box component="span" sx={{ fontWeight: 700 }}>
+                    Employee ID:
+                  </Box>{" "}
+                  {personData?.employee_id || "N/A"}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
         {/* ── Main grid ── */}
         <Grid
           container
@@ -810,7 +855,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                       background: mainButtonColor,
                     }}
                     onClick={() => {
-                      window.location.href = "/applicant_list_admin";
+                      window.location.href = "/admission_applicant_list";
                     }}
                   >
                     Applicant List
@@ -826,10 +871,11 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                       border: `2px solid ${borderColor}`,
                     }}
                     onClick={() => {
-                      window.location.href = "/room_registration";
+                      window.location.href =
+                        "/entrance_exam_schedule_management";
                     }}
                   >
-                    Room Registration
+                    Entrance Exam Schedule Management
                   </Button>
                 </Box>
               </Card>
@@ -837,14 +883,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
           </Grid>
 
           {/* ── Centre: Applicant Overview ── */}
-          <Grid
-            item
-            xs={12}
-            sm={12}
-            md={8}
-            lg={6}
-            sx={{ display: "flex" }}
-          >
+          <Grid item xs={12} sm={12} md={8} lg={6} sx={{ display: "flex" }}>
             <Card
               sx={{
                 width: "100%",
@@ -878,20 +917,30 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                   Applicant Overview
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                  <FormControl
-                    size="small"
-                    sx={{ minWidth: 140, flex: 1 }}
-                  >
-                    <InputLabel id="school-year-label">
-                      School Year
-                    </InputLabel>
+                  <FormControl size="small" sx={{ minWidth: 140, flex: 1 }}>
+                    <InputLabel id="campus-label">Campus</InputLabel>
+                    <Select
+                      labelId="campus-label"
+                      value={selectedCampus}
+                      label="Campus"
+                      onChange={(e) => setSelectedCampus(e.target.value)}
+                    >
+                      <MenuItem value="all">All Campuses</MenuItem>
+                      {campuses.map((c) => (
+                        <MenuItem value={c.id} key={c.id}>
+                          {c.branch || c.branch_name || "Unnamed Branch"}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl size="small" sx={{ minWidth: 140, flex: 1 }}>
+                    <InputLabel id="school-year-label">School Year</InputLabel>
                     <Select
                       labelId="school-year-label"
                       value={selectedSchoolYear}
                       label="School Year"
-                      onChange={(e) =>
-                        setSelectedSchoolYear(e.target.value)
-                      }
+                      onChange={(e) => setSelectedSchoolYear(e.target.value)}
                     >
                       <MenuItem value="">All Years</MenuItem>
                       {schoolYears.map((sy) => (
@@ -901,10 +950,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                       ))}
                     </Select>
                   </FormControl>
-                  <FormControl
-                    size="small"
-                    sx={{ minWidth: 140, flex: 1 }}
-                  >
+                  <FormControl size="small" sx={{ minWidth: 140, flex: 1 }}>
                     <InputLabel>Semester</InputLabel>
                     <Select
                       label="Semester"
@@ -915,10 +961,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                     >
                       <MenuItem value="">All Semesters</MenuItem>
                       {semesters.map((sem) => (
-                        <MenuItem
-                          value={sem.semester_id}
-                          key={sem.semester_id}
-                        >
+                        <MenuItem value={sem.semester_id} key={sem.semester_id}>
                           {sem.semester_description}
                         </MenuItem>
                       ))}
@@ -998,10 +1041,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                     />
                     <Bar dataKey="total">
                       {monthlyApplicants.map((_, i) => (
-                        <Cell
-                          key={`cell-${i}`}
-                          fill={mainButtonColor}
-                        />
+                        <Cell key={`cell-${i}`} fill={mainButtonColor} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -1011,14 +1051,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
           </Grid>
 
           {/* ── Right column ── */}
-          <Grid
-            item
-            xs={12}
-            sm={6}
-            md={4}
-            lg={3}
-            sx={{ display: "flex" }}
-          >
+          <Grid item xs={12} sm={6} md={4} lg={3} sx={{ display: "flex" }}>
             <Box
               sx={{
                 display: "flex",
@@ -1045,7 +1078,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                     alignItems="center"
                     justifyContent="space-between"
                     sx={{
-                      backgroundColor: settings?.header_color || "#1976d2",
+                      backgroundColor: headerColor,
                       color: "white",
                       border: `2px solid ${borderColor}`,
                       borderBottom: "none",
@@ -1128,12 +1161,10 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                           day === today &&
                           month === thisMonth &&
                           year === thisYear;
-                        const dateKey = `${year}-${String(
-                          month + 1
-                        ).padStart(2, "0")}-${String(day).padStart(
+                        const dateKey = `${year}-${String(month + 1).padStart(
                           2,
-                          "0"
-                        )}`;
+                          "0",
+                        )}-${String(day).padStart(2, "0")}`;
                         const isHoliday = holidays[dateKey];
 
                         const dayCell = (
@@ -1146,7 +1177,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                               fontSize: isMobile ? 11 : 13,
                               borderRadius: "50%",
                               backgroundColor: isToday
-                                ? settings?.header_color || "#1976d2"
+                                ? headerColor
                                 : isHoliday
                                   ? "#E8C999"
                                   : "#fff",
@@ -1154,9 +1185,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                               fontWeight: isHoliday ? "bold" : "500",
                               cursor: isHoliday ? "pointer" : "default",
                               "&:hover": {
-                                backgroundColor: isHoliday
-                                  ? "#F5DFA6"
-                                  : "#000",
+                                backgroundColor: isHoliday ? "#F5DFA6" : "#000",
                                 color: isHoliday ? "black" : "white",
                               },
                             }}
@@ -1188,7 +1217,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                             {dayCell}
                           </React.Fragment>
                         );
-                      })
+                      }),
                     )}
                   </Box>
                 </CardContent>
@@ -1225,17 +1254,12 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                   <FormControl size="small" fullWidth>
                     <Select
                       value={selectedDepartmentFilter}
-                      onChange={(e) =>
-                        handleDepartmentChange(e.target.value)
-                      }
+                      onChange={(e) => handleDepartmentChange(e.target.value)}
                       displayEmpty
                     >
                       <MenuItem value="">Select College</MenuItem>
                       {department.map((dep) => (
-                        <MenuItem
-                          key={dep.dprtmnt_id}
-                          value={dep.dprtmnt_name}
-                        >
+                        <MenuItem key={dep.dprtmnt_id} value={dep.dprtmnt_name}>
                           {dep.dprtmnt_name} ({dep.dprtmnt_code})
                         </MenuItem>
                       ))}
@@ -1245,9 +1269,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                   <FormControl size="small" fullWidth>
                     <Select
                       value={selectedProgramFilter}
-                      onChange={(e) =>
-                        setSelectedProgramFilter(e.target.value)
-                      }
+                      onChange={(e) => setSelectedProgramFilter(e.target.value)}
                       displayEmpty
                     >
                       <MenuItem value="">All Programs</MenuItem>
@@ -1295,6 +1317,10 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
             </Box>
           </Grid>
         </Grid>
+        <AdmissionsReportPanel
+          campuses={campuses}
+          selectedCampus={selectedCampus}
+        />
       </Box>
     </Box>
   );

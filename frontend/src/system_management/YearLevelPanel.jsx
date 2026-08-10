@@ -29,6 +29,8 @@ import useAuditMac from "../utils/useAuditMac";
 const YearLevelPanel = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -67,9 +69,9 @@ const YearLevelPanel = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   useEffect(() => {
@@ -303,7 +305,7 @@ const YearLevelPanel = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
             }}
           >
             <TableRow>
@@ -312,7 +314,7 @@ const YearLevelPanel = () => {
                 sx={{
 
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -469,7 +471,7 @@ const YearLevelPanel = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
             }}
           >
             <TableRow>
@@ -478,7 +480,7 @@ const YearLevelPanel = () => {
                 sx={{
 
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -523,7 +525,7 @@ const YearLevelPanel = () => {
         {/* ===== HEADER ===== */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.1rem",
@@ -608,7 +610,7 @@ const YearLevelPanel = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: colors.header || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

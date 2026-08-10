@@ -48,6 +48,10 @@ const PROTECTED_PAGE_ID = 69;
 const UserPageAccess = () => {
   useAccountAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   // UI Colors
   const [titleColor, setTitleColor] = useState("#000000");
@@ -117,8 +121,8 @@ const UserPageAccess = () => {
   // Load settings
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   // Check page privilege
@@ -1209,7 +1213,7 @@ const UserPageAccess = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -1602,7 +1606,7 @@ const UserPageAccess = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -1786,7 +1790,7 @@ const UserPageAccess = () => {
       >
         <DialogTitle
           sx={{
-            bgcolor: settings?.header_color || "#1976d2",
+            bgcolor: headerColor || "#1976d2",
             color: "white",
             display: "flex",
             justifyContent: "space-between",
@@ -1881,7 +1885,7 @@ const UserPageAccess = () => {
           <Paper sx={{ border: `1px solid ${borderColor}` }}>
             <TableContainer>
               <Table>
-                <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
                   <TableRow>
                     {["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"].map((header) => (
                       <TableCell
@@ -1975,7 +1979,7 @@ const UserPageAccess = () => {
       >
         <DialogTitle
           sx={{
-            bgcolor: settings?.header_color || "#1976d2",
+            bgcolor: headerColor || "#1976d2",
             color: "white",
             display: "flex",
             justifyContent: "space-between",
@@ -2061,7 +2065,7 @@ const UserPageAccess = () => {
           <Paper sx={{ border: `1px solid ${borderColor}` }}>
             <TableContainer>
               <Table>
-                <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
                   <TableRow>
                     {["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"].map((header) => (
                       <TableCell
@@ -2150,7 +2154,7 @@ const UserPageAccess = () => {
       >
         <DialogTitle
           sx={{
-            bgcolor: settings?.header_color || "#1976d2",
+            bgcolor: headerColor || "#1976d2",
             color: "white",
             display: "flex",
             justifyContent: "space-between",
@@ -2275,7 +2279,7 @@ const UserPageAccess = () => {
           <Paper sx={{ border: `1px solid ${borderColor}` }}>
             <TableContainer>
               <Table>
-                <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
                   <TableRow>
                     {["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"].map((header) => (
                       <TableCell

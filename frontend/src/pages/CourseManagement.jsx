@@ -15,14 +15,13 @@ import API_BASE_URL from "../apiConfig";
 
 const CourseManagement = () => {
   const settings = useContext(SettingsContext);
-
-  // Theme Colors
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-
-  // School Info
-  const [fetchedLogo, setFetchedLogo] = useState(null);
+  const colors = settings?.colors || {};
+  const assets = settings?.assets || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const fetchedLogo = branding.logoUrl || null;
 
   // Access Control
   const [userID, setUserID] = useState("");
@@ -34,18 +33,6 @@ const CourseManagement = () => {
   const [userAccessList, setUserAccessList] = useState({});
 
   const pageId = 93;
-
-  useEffect(() => {
-    if (!settings) return;
-
-    setTitleColor(settings.title_color || "#000000");
-    setBorderColor(settings.border_color || "#000000");
-    setMainButtonColor(settings.main_button_color || "#1976d2");
-
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    }
-  }, [settings]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -121,9 +108,8 @@ const CourseManagement = () => {
     return <LoadingOverlay open={loading} message="Loading..." />;
   if (!hasAccess) return <Unauthorized />;
 
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "linear-gradient(to right, #e0e0e0, #bdbdbd)";
+  const backgroundImage =
+    assets.backgroundImage || "linear-gradient(to right, #e0e0e0, #bdbdbd)";
 
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());

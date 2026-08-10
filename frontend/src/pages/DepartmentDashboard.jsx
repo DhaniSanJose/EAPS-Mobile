@@ -15,11 +15,11 @@ import { Box, Typography } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
 const DepartmentManagement = () => {
   const settings = useContext(SettingsContext);
-
-  // Theme Colors
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
+  const colors = settings?.colors || {};
+  const assets = settings?.assets || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
 
   // Access Control
   const [userID, setUserID] = useState("");
@@ -32,14 +32,6 @@ const DepartmentManagement = () => {
   const [userAccessList, setUserAccessList] = useState({});
 
   const pageId = 94; // Department Management
-
-  // Load theme
-  useEffect(() => {
-    if (!settings) return;
-    setTitleColor(settings.title_color || "#000000");
-    setBorderColor(settings.border_color || "#000000");
-    setMainButtonColor(settings.main_button_color || "#1976d2");
-  }, [settings]);
 
   // Load user and access
   useEffect(() => {
@@ -139,9 +131,8 @@ const DepartmentManagement = () => {
 
   if (!hasAccess) return <Unauthorized />;
 
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "linear-gradient(to right, #e0e0e0, #bdbdbd)"
+  const backgroundImage =
+    assets.backgroundImage || "linear-gradient(to right, #e0e0e0, #bdbdbd)"
 
   return (
     <Box

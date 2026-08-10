@@ -51,62 +51,13 @@ import SaveIcon from "@mui/icons-material/Save";
 const VerifyDocumentRoomAssignment = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const headerColor = colors.header || "#1976d2";
+  const branches = settings?.branches || [];
   const [selectedBranch, setSelectedBranch] = useState("");
 
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    if (settings.branches) {
-      try {
-        const parsedBranches =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsedBranches);
-      } catch (err) {
-        console.error("Invalid branches JSON", err);
-      }
-    }
-  }, [settings]);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-  }, [settings]);
 
   const [pendingDelete, setPendingDelete] = useState(null);
 
@@ -608,7 +559,7 @@ const VerifyDocumentRoomAssignment = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", p: 1 }}>
@@ -763,7 +714,7 @@ const VerifyDocumentRoomAssignment = () => {
                   sx={{
                     border: `1px solid ${borderColor}`,
                     py: 0.5,
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "white",
                   }}
                 >
@@ -1099,7 +1050,7 @@ const VerifyDocumentRoomAssignment = () => {
                   sx={{
                     border: `1px solid ${borderColor}`,
                     py: 0.5,
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "white",
                   }}
                 >
@@ -1296,7 +1247,7 @@ const VerifyDocumentRoomAssignment = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",
@@ -1435,7 +1386,7 @@ const VerifyDocumentRoomAssignment = () => {
         {/* HEADER */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

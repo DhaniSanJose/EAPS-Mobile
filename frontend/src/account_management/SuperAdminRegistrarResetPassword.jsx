@@ -26,13 +26,38 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SuperAdminResetPasswordTabs from "../components/SuperAdminResetPasswordTabs";
 import API_BASE_URL from "../apiConfig";
+import EaristLogo from "../assets/EaristLogo.png";
 import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import { getLoginMacPayload } from "../utils/userMacAddress";
+
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getRegistrarSuggestionText = (registrar) =>
+  [
+    registrar?.employee_id,
+    registrar?.fullName,
+    registrar?.first_name,
+    registrar?.middle_name,
+    registrar?.last_name,
+    registrar?.email,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
 const SuperAdminRegistrarResetPassword = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -50,25 +75,25 @@ const SuperAdminRegistrarResetPassword = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   const [userID, setUserID] = useState("");
@@ -76,6 +101,7 @@ const SuperAdminRegistrarResetPassword = () => {
   const [userRole, setUserRole] = useState("");
   const [hasAccess, setHasAccess] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
@@ -172,6 +198,14 @@ const SuperAdminRegistrarResetPassword = () => {
   const indexOfLastRow = currentPage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = registrars.slice(indexOfFirstRow, indexOfLastRow);
+  const registrarSuggestions =
+    searchQuery.trim().length >= 2
+      ? registrars
+        .filter((registrar) =>
+          getRegistrarSuggestionText(registrar).includes(searchQuery.trim().toLowerCase()),
+        )
+        .slice(0, 8)
+      : [];
 
   const handleNameClick = (r) => {
     setSearchQuery(r.employee_id); // or r.email if backend supports
@@ -439,26 +473,47 @@ const SuperAdminRegistrarResetPassword = () => {
         </Typography>
 
 
-        <TextField
-          size="small"
-          placeholder="Search Employee ID / Name / Email Address"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+        <Box sx={{ position: "relative", width: 450 }}>
+          <TextField
+            size="small"
+            placeholder="Search Employee ID / Name / Email Address"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => setSuggestionsOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, mt: 0.5, maxHeight: 260, overflowY: "auto", backgroundColor: "#fff", border: "1px solid #d6d6d6", borderRadius: 1, boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+              {registrarSuggestions.length > 0 ? (
+                registrarSuggestions.map((registrar) => (
+                  <Box key={`${registrar?.employee_id}-${registrar?.email}`} onMouseDown={(e) => { e.preventDefault(); handleNameClick(registrar); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                    <Typography component="span" sx={{ fontWeight: 700, minWidth: 120 }}>{cleanSuggestionValue(registrar?.employee_id) || "No employee ID"}</Typography>
+                    <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[cleanSuggestionValue(registrar?.fullName), cleanSuggestionValue(registrar?.email)].filter(Boolean).join(" - ")}</Typography>
+                  </Box>
+                ))
+              ) : (
+                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching registrars</Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
-      {searchError && <Typography color="error">{searchError}</Typography>}
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
       <br />
@@ -472,7 +527,7 @@ const SuperAdminRegistrarResetPassword = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor || "#1976d2" }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
@@ -551,7 +606,7 @@ const SuperAdminRegistrarResetPassword = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -770,7 +825,7 @@ const SuperAdminRegistrarResetPassword = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >

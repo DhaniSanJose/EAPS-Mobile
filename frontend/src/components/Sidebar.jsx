@@ -498,10 +498,13 @@ const SideBar = ({
   onMobileClose,
 }) => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const headerColor = colors.header || "#1976d2";
   const navigate = useNavigate();
 
-  const accentColor = settings?.main_button_color || "#8b1a1a";
-  const shortTerm = settings?.short_term || "EARIST";
+  const accentColor = colors.mainButton || "#8b1a1a";
+  const shortTerm = branding.shortTerm || "EARIST";
 
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);

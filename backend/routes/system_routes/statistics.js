@@ -5,7 +5,7 @@ const router = express.Router();
 
 router.get("/applicant-stats", async (req, res) => {
   try {
-    const { gender, department_id, program_id, school_year, semester } =
+    const { gender, department_id, program_id, school_year, semester, campus } =
       req.query;
 
     // ---------------------------
@@ -45,6 +45,12 @@ router.get("/applicant-stats", async (req, res) => {
     if (semester) {
       where += " AND pt.middle_code = ?";
       params.push(semester);
+    }
+
+    // Campus filter — company_settings.branches[].id === person_table.campus
+    if (campus !== undefined && campus !== "" && campus !== "all") {
+      where += " AND pt.campus = ?";
+      params.push(campus);
     }
 
     // ---------------------------
@@ -104,16 +110,20 @@ router.get("/applicant-stats", async (req, res) => {
 
 router.get("/applicants-per-month", async (req, res) => {
   try {
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
     const sql = `
       SELECT
         DATE_FORMAT(created_at, '%Y-%m') AS month,
         COUNT(*) AS total
       FROM person_table
+      ${hasCampus ? "WHERE campus = ?" : ""}
       GROUP BY DATE_FORMAT(created_at, '%Y-%m')
       ORDER BY month ASC
     `;
 
-    const [rows] = await db.query(sql);
+    const [rows] = await db.query(sql, hasCampus ? [campus] : []);
     res.json(rows);
   } catch (error) {
     console.error("Error in /applicants-per-month:", error);
@@ -121,42 +131,20 @@ router.get("/applicants-per-month", async (req, res) => {
   }
 });
 
-// router.get("/applicants-per-month", async (req, res) => {
-//   try {
-//     const [rows] = await db.query(`
-//       WITH months AS (
-//         SELECT DATE_FORMAT(MAKEDATE(YEAR(CURDATE()), 1) + INTERVAL (n-1) MONTH, '%Y-%m') AS month
-//         FROM (
-//           SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
-//           UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8
-//           UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12
-//         ) numbers
-//       )
-//       SELECT
-//         m.month,
-//         COALESCE(COUNT(p.person_id), 0) AS total
-//       FROM months m
-//       LEFT JOIN admission.person_table p
-//         ON DATE_FORMAT(p.created_at, '%Y-%m') = m.month
-//         AND YEAR(p.created_at) = YEAR(CURDATE())
-//       GROUP BY m.month
-//       ORDER BY m.month ASC;
-//     `);
-
-//     res.json(rows);
-//   } catch (err) {
-//     console.error("âŒ Error fetching applicants per month:", err);
-//     res.status(500).json({ error: "Failed to fetch applicants per month" });
-//   }
-// });
-
 router.get("/applicants/total", async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
+    const [rows] = await db.query(
+      `
       SELECT COUNT(*) AS total
       FROM person_table
       WHERE termsOfAgreement = 1
-    `);
+      ${hasCampus ? "AND campus = ?" : ""}
+    `,
+      hasCampus ? [campus] : [],
+    );
 
     res.json(rows[0]);
   } catch (err) {
@@ -166,12 +154,19 @@ router.get("/applicants/total", async (req, res) => {
 
 router.get("/applicants/week", async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
+    const [rows] = await db.query(
+      `
       SELECT COUNT(*) AS total
       FROM person_table
       WHERE termsOfAgreement = 1
         AND YEARWEEK(created_at, 1) = YEARWEEK(NOW(), 1)
-    `);
+      ${hasCampus ? "AND campus = ?" : ""}
+    `,
+      hasCampus ? [campus] : [],
+    );
 
     res.json(rows[0]);
   } catch (err) {
@@ -181,13 +176,20 @@ router.get("/applicants/week", async (req, res) => {
 
 router.get("/applicants/month", async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
+    const [rows] = await db.query(
+      `
       SELECT COUNT(*) AS total
       FROM person_table
       WHERE termsOfAgreement = 1
         AND YEAR(created_at) = YEAR(NOW())
         AND MONTH(created_at) = MONTH(NOW())
-    `);
+      ${hasCampus ? "AND campus = ?" : ""}
+    `,
+      hasCampus ? [campus] : [],
+    );
 
     res.json(rows[0]);
   } catch (err) {
@@ -197,12 +199,19 @@ router.get("/applicants/month", async (req, res) => {
 
 router.get("/applicants/year", async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
+    const [rows] = await db.query(
+      `
       SELECT COUNT(*) AS total
       FROM person_table
       WHERE termsOfAgreement = 1
         AND YEAR(created_at) = YEAR(NOW())
-    `);
+      ${hasCampus ? "AND campus = ?" : ""}
+    `,
+      hasCampus ? [campus] : [],
+    );
 
     res.json(rows[0]);
   } catch (err) {
@@ -211,7 +220,8 @@ router.get("/applicants/year", async (req, res) => {
 });
 
 router.get("/applicants/department/total", async (req, res) => {
-  const { department_id } = req.query;
+  const { department_id, campus } = req.query;
+  const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
 
   try {
     const [rows] = await db.query(
@@ -224,8 +234,9 @@ router.get("/applicants/department/total", async (req, res) => {
         ON prog.curriculum_id = dct.curriculum_id
       WHERE pt.termsOfAgreement = 1
         AND dct.dprtmnt_id = ?
+        ${hasCampus ? "AND pt.campus = ?" : ""}
     `,
-      [department_id],
+      hasCampus ? [department_id, campus] : [department_id],
     );
 
     res.json(rows[0]);
@@ -235,7 +246,8 @@ router.get("/applicants/department/total", async (req, res) => {
 });
 
 router.get("/applicants/department/week", async (req, res) => {
-  const { department_id } = req.query;
+  const { department_id, campus } = req.query;
+  const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
 
   try {
     const [rows] = await db.query(
@@ -249,8 +261,9 @@ router.get("/applicants/department/week", async (req, res) => {
       WHERE pt.termsOfAgreement = 1
         AND dct.dprtmnt_id = ?
         AND YEARWEEK(pt.created_at, 1) = YEARWEEK(NOW(), 1)
+        ${hasCampus ? "AND pt.campus = ?" : ""}
     `,
-      [department_id],
+      hasCampus ? [department_id, campus] : [department_id],
     );
 
     res.json(rows[0]);
@@ -260,7 +273,8 @@ router.get("/applicants/department/week", async (req, res) => {
 });
 
 router.get("/applicants/department/month", async (req, res) => {
-  const { department_id } = req.query;
+  const { department_id, campus } = req.query;
+  const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
 
   try {
     const [rows] = await db.query(
@@ -275,8 +289,9 @@ router.get("/applicants/department/month", async (req, res) => {
         AND dct.dprtmnt_id = ?
         AND YEAR(pt.created_at) = YEAR(NOW())
         AND MONTH(pt.created_at) = MONTH(NOW())
+        ${hasCampus ? "AND pt.campus = ?" : ""}
     `,
-      [department_id],
+      hasCampus ? [department_id, campus] : [department_id],
     );
 
     res.json(rows[0]);
@@ -286,7 +301,8 @@ router.get("/applicants/department/month", async (req, res) => {
 });
 
 router.get("/applicants/department/year", async (req, res) => {
-  const { department_id } = req.query;
+  const { department_id, campus } = req.query;
+  const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
 
   try {
     const [rows] = await db.query(
@@ -300,8 +316,9 @@ router.get("/applicants/department/year", async (req, res) => {
       WHERE pt.termsOfAgreement = 1
         AND dct.dprtmnt_id = ?
         AND YEAR(pt.created_at) = YEAR(NOW())
+        ${hasCampus ? "AND pt.campus = ?" : ""}
     `,
-      [department_id],
+      hasCampus ? [department_id, campus] : [department_id],
     );
 
     res.json(rows[0]);
@@ -311,7 +328,8 @@ router.get("/applicants/department/year", async (req, res) => {
 });
 
 router.get("/applicants/program/stats", async (req, res) => {
-  const { program_id } = req.query;
+  const { program_id, campus } = req.query;
+  const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
 
   if (!program_id) {
     return res.status(400).json({ error: "Missing program_id" });
@@ -328,8 +346,9 @@ router.get("/applicants/program/stats", async (req, res) => {
       INNER JOIN admission.person_table pt ON pst.person_id = pt.person_id
       INNER JOIN enrollment.curriculum_table ct ON pt.program = ct.curriculum_id
       WHERE ct.program_id = ?
+        ${hasCampus ? "AND pt.campus = ?" : ""}
     `,
-      [program_id],
+      hasCampus ? [program_id, campus] : [program_id],
     );
 
     res.json(
@@ -346,11 +365,12 @@ router.get("/applicants/program/stats", async (req, res) => {
 });
 
 router.get("/applicants/filter", async (req, res) => {
-  let { department_id, program_code } = req.query;
+  let { department_id, program_code, campus } = req.query;
 
   // Normalize empty strings to null
   if (!department_id) department_id = null;
   if (!program_code) program_code = null;
+  if (!campus) campus = null;
 
   try {
     const [rows] = await db.query(
@@ -371,8 +391,9 @@ router.get("/applicants/filter", async (req, res) => {
       WHERE
         (${department_id} IS NULL OR dc.dprtmnt_id = ?)
         AND (${program_code} IS NULL OR pt.program_code = ?)
+        AND (${campus} IS NULL OR p.campus = ?)
     `,
-      [department_id, program_code],
+      [department_id, program_code, campus],
     );
 
     res.json(rows);
@@ -384,9 +405,7 @@ router.get("/applicants/filter", async (req, res) => {
 
 router.get("/exam/completed-count", async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT COUNT(*) AS total FROM exam_results`,
-    );
+    const [rows] = await db.query(`SELECT COUNT(*) AS total FROM exam_results`);
     console.log("Exam count from DB:", rows[0].total); // Debug
 
     res.json({ total: rows[0].total });
@@ -396,31 +415,109 @@ router.get("/exam/completed-count", async (req, res) => {
   }
 });
 
+// ====================================================================
+// ECAT SUMMARY (pie chart) — now campus-aware.
+// Pass ?campus=<company_settings.branches[].id> to scope every number
+// in the pie to applicants whose person_table.campus matches that id.
+// Omit campus (or pass "all") to see every campus combined.
+// ====================================================================
 router.get("/ecat-summary", async (req, res) => {
   try {
-    const [rows] = await db.execute(`
-      SELECT
-        SUM(CASE WHEN pt.termsOfAgreement = 1 THEN 1 ELSE 0 END) AS total_applied,
-        SUM(CASE WHEN ea.schedule_id IS NOT NULL THEN 1 ELSE 0 END) AS total_scheduled,
-        SUM(CASE WHEN ea.schedule_id IS NULL THEN 1 ELSE 0 END) AS total_pending,
-        SUM(CASE WHEN ae.status IN ('PASSED','FAILED') THEN 1 ELSE 0 END) AS total_finished
-      FROM exam_applicants AS ea
-      LEFT JOIN applicant_numbering_table AS ant ON ea.applicant_id = ant.applicant_number
-      LEFT JOIN person_table AS pt ON ant.person_id = pt.person_id
-      LEFT JOIN person_status_table AS pst ON pt.person_id = pst.person_id
-      LEFT JOIN exam_results AS ae ON pt.person_id = ae.person_id
-    `);
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+    const params = [];
 
-    res.json(rows);
+    let totalAppliedFilter = "WHERE termsOfAgreement = 1";
+    if (hasCampus) {
+      totalAppliedFilter += " AND campus = ?";
+      params.push(campus);
+    }
+
+    let pendingCampusFilter = "";
+    if (hasCampus) {
+      pendingCampusFilter = " AND p.campus = ?";
+      params.push(campus);
+    }
+
+    let scheduledCampusJoin = "";
+    let scheduledCampusFilter = "";
+    if (hasCampus) {
+      scheduledCampusJoin = `
+         INNER JOIN applicant_numbering_table ant3 ON ant3.applicant_number = ea3.applicant_id
+         INNER JOIN person_table pt3 ON pt3.person_id = ant3.person_id
+      `;
+      scheduledCampusFilter = " AND pt3.campus = ?";
+      params.push(campus);
+    }
+
+    let finishedCampusJoin = "";
+    let finishedCampusFilter = "";
+    if (hasCampus) {
+      finishedCampusJoin =
+        " INNER JOIN person_table pt4 ON pt4.person_id = er.person_id";
+      finishedCampusFilter = " AND pt4.campus = ?";
+      params.push(campus);
+    }
+
+    const [rows] = await db.execute(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM person_table ${totalAppliedFilter}) AS total_applied,
+
+        (SELECT COUNT(*)
+         FROM person_table p
+         LEFT JOIN applicant_numbering_table ant ON ant.person_id = p.person_id
+         LEFT JOIN exam_applicants ea ON ea.applicant_id = ant.applicant_number
+         LEFT JOIN (
+           SELECT ru.person_id, COUNT(DISTINCT ru.requirements_id) AS verified_count
+           FROM requirement_uploads ru
+           INNER JOIN requirements_table rt ON ru.requirements_id = rt.id
+           WHERE ru.document_status = 'Documents Verified & ECAT'
+             AND rt.category = 'Main'
+             AND rt.is_verifiable = 1
+           GROUP BY ru.person_id
+         ) AS vdocs ON vdocs.person_id = p.person_id
+         LEFT JOIN (
+           SELECT p3.person_id, COUNT(rt2.id) AS total_required
+           FROM person_table p3
+           LEFT JOIN requirements_table rt2
+             ON (rt2.applicant_type = p3.applyingAs OR rt2.applicant_type = 0)
+            AND rt2.category = 'Main'
+            AND rt2.is_verifiable = 1
+           GROUP BY p3.person_id
+         ) AS rtot ON rtot.person_id = p.person_id
+         WHERE COALESCE(rtot.total_required, 0) > 0
+           AND COALESCE(vdocs.verified_count, 0) >= rtot.total_required
+           AND (ea.email_sent IS NULL OR ea.email_sent = 0)
+           ${pendingCampusFilter}
+        ) AS total_pending,
+
+        (SELECT COUNT(DISTINCT ea3.applicant_id)
+         FROM exam_applicants ea3
+         ${scheduledCampusJoin}
+         WHERE ea3.email_sent = 1
+         ${scheduledCampusFilter}
+        ) AS total_scheduled,
+
+        (SELECT COUNT(DISTINCT er.person_id)
+         FROM exam_results er
+         ${finishedCampusJoin}
+         WHERE 1=1 ${finishedCampusFilter}
+        ) AS total_finished
+    `,
+      params,
+    );
+
+    res.json(rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching ECAT summary:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
 router.get("/get_enrollment_statistic", async (req, res) => {
   try {
-    const { year } = req.query; // Get year from query string
+    const { year, campus } = req.query; // Get year / campus from query string
 
     let query = `
       SELECT
@@ -435,10 +532,20 @@ router.get("/get_enrollment_statistic", async (req, res) => {
     `;
 
     const params = [];
+    const conditions = [];
 
     if (year) {
-      query += " WHERE YEAR(created_at) = ?";
+      conditions.push("YEAR(created_at) = ?");
       params.push(year);
+    }
+
+    if (campus !== undefined && campus !== "" && campus !== "all") {
+      conditions.push("campus = ?");
+      params.push(campus);
+    }
+
+    if (conditions.length) {
+      query += " WHERE " + conditions.join(" AND ");
     }
 
     const [rows] = await db3.execute(query, params);
@@ -468,43 +575,14 @@ router.get("/get-scheduled-applicants", async (req, res) => {
   }
 });
 
-router.get("/get_enrollment_statistic", async (req, res) => {
-  try {
-    const { year } = req.query; // Get year from query string
-
-    let query = `
-      SELECT
-        SUM(CASE WHEN academicProgram = 2 THEN 1 ELSE 0 END) AS Techvoc,
-        SUM(CASE WHEN academicProgram = 1 THEN 1 ELSE 0 END) AS Graduate,
-        SUM(CASE WHEN academicProgram = 0 THEN 1 ELSE 0 END) AS Undergraduate,
-        SUM(CASE WHEN classifiedAs = 'Returnee' THEN 1 ELSE 0 END) AS Returnee,
-        SUM(CASE WHEN classifiedAs = 'Shiftee' THEN 1 ELSE 0 END) AS Shiftee,
-        SUM(CASE WHEN classifiedAs = 'Foreign Student' THEN 1 ELSE 0 END) AS ForeignStudent,
-        SUM(CASE WHEN classifiedAs = 'Transferee' THEN 1 ELSE 0 END) AS Transferee
-      FROM person_table 
-    `;
-
-    const params = [];
-
-    if (year) {
-      query += " WHERE YEAR(created_at) = ?";
-      params.push(year);
-    }
-
-    const [rows] = await db3.execute(query, params);
-
-    res.json(rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
 router.get(
   "/get_enrollment_statistic/college/:yearDescription/:userDep",
   async (req, res) => {
     try {
       const { yearDescription, userDep } = req.params;
+      const { campus } = req.query;
+      const hasCampus =
+        campus !== undefined && campus !== "" && campus !== "all";
 
       if (!yearDescription || !userDep) {
         return res
@@ -525,9 +603,15 @@ router.get(
       INNER JOIN dprtmnt_curriculum_table 
         ON person_table.program = dprtmnt_curriculum_table.curriculum_id
       WHERE dprtmnt_curriculum_table.dprtmnt_id = ? AND YEAR(person_table.created_at) = ?
+      ${hasCampus ? "AND person_table.campus = ?" : ""}
     `;
 
-      const [rows] = await db3.query(query, [userDep, yearDescription]);
+      const [rows] = await db3.query(
+        query,
+        hasCampus
+          ? [userDep, yearDescription, campus]
+          : [userDep, yearDescription],
+      );
 
       res.json(rows[0]);
       console.log("DATA: ", rows[0]);
@@ -540,8 +624,14 @@ router.get(
 
 router.get("/enrolled-count", async (req, res) => {
   try {
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
     const [rows] = await db.execute(
-      "SELECT COUNT(*) AS total FROM person_table WHERE classifiedAs = 'Freshman (First Year)' OR classifiedAs = 'Transferee' OR classifiedAs = 'Returnee'",
+      `SELECT COUNT(*) AS total FROM person_table
+       WHERE (classifiedAs = 'Freshman (First Year)' OR classifiedAs = 'Transferee' OR classifiedAs = 'Returnee')
+       ${hasCampus ? "AND campus = ?" : ""}`,
+      hasCampus ? [campus] : [],
     );
     res.json({ total: rows[0].total });
   } catch (error) {
@@ -550,7 +640,7 @@ router.get("/enrolled-count", async (req, res) => {
   }
 });
 
-// âœ… Count how many registrar roles exist
+// ✅ Count how many registrar roles exist
 router.get("/registrar_count", async (req, res) => {
   try {
     const [rows] = await db3.query(
@@ -602,10 +692,18 @@ router.get("/course_count/:id", async (req, res) => {
 
 router.get("/accepted-students-count", async (req, res) => {
   try {
-    const [rows] = await db3.execute(`
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
+    const [rows] = await db3.execute(
+      `
       SELECT COUNT(*) AS total
-      FROM student_numbering_table;
-    `);
+      FROM student_numbering_table snt
+      ${hasCampus ? "INNER JOIN person_table pt ON pt.person_id = snt.person_id" : ""}
+      ${hasCampus ? "WHERE pt.campus = ?" : ""};
+    `,
+      hasCampus ? [campus] : [],
+    );
 
     res.json(rows[0]); // { total: 25 }
   } catch (err) {
@@ -616,7 +714,11 @@ router.get("/accepted-students-count", async (req, res) => {
 
 router.get("/current-enrolled-students-count", async (req, res) => {
   try {
-    const [rows] = await db3.execute(`
+    const { campus } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+
+    const [rows] = await db3.execute(
+      `
       SELECT COUNT(DISTINCT p.person_id) AS total
         FROM person_table p
         JOIN person_status_table ps 
@@ -629,8 +731,11 @@ router.get("/current-enrolled-students-count", async (req, res) => {
           ON sst.active_school_year_id = sy.id
         WHERE ps.student_registration_status = 1
           AND sst.enrolled_status = 1
-          AND sy.astatus = 1;
-    `);
+          AND sy.astatus = 1
+          ${hasCampus ? "AND p.campus = ?" : ""};
+    `,
+      hasCampus ? [campus] : [],
+    );
 
     res.json(rows[0]); // { total: 25 }
   } catch (err) {
@@ -639,4 +744,4 @@ router.get("/current-enrolled-students-count", async (req, res) => {
   }
 });
 
-module.exports = router
+module.exports = router;

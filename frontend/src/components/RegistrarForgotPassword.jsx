@@ -598,6 +598,10 @@ const ForgotPasswordTotpModal = ({
 const RegistrarForgotPassword = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const { device, isMobile, isTablet, isDesktop } = useResponsive();
   const navigate = useNavigate();
 
@@ -606,8 +610,8 @@ const RegistrarForgotPassword = () => {
 
   useEffect(() => {
     if (settings) {
-      if (settings.border_color) setBorderColor(settings.border_color);
-      if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+      if (colors.border) setBorderColor(colors.border);
+      if (colors.mainButton) setMainButtonColor(colors.mainButton);
     }
   }, [settings]);
 
@@ -660,9 +664,9 @@ const RegistrarForgotPassword = () => {
   };
 
   
-  const logoSrc = settings?.logo_url ? `${API_BASE_URL}${settings.logo_url}` : Logo;
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
+  const logoSrc = assets.logoUrl ? `${assets.logoUrl}` : Logo;
+  const backgroundImage = assets.backgroundImage
+    ? `url(${assets.backgroundImage})`
     : "linear-gradient(to right, #f5f5f5, #fafafa)";
 
   // ── STEP 1: identify — on success, pop up the modal instead of switching page content ──
@@ -743,7 +747,7 @@ const RegistrarForgotPassword = () => {
           <div
             className="Header"
             style={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               padding: isMobile ? "12px 10px" : isTablet ? "14px 12px" : "1rem 0",
               borderBottom: "3px solid black",
             }}
@@ -755,7 +759,7 @@ const RegistrarForgotPassword = () => {
             </div>
             <div className="HeaderBody">
               <strong style={{ color: "white" }}>
-                {(settings?.company_name || "Company Name").split(" ").reduce((acc, word, index) => {
+                {(branding.companyName || "Company Name").split(" ").reduce((acc, word, index) => {
                   if (index % 4 === 0 && index !== 0) acc.push(<br key={`br-${index}`} />);
                   acc.push(word + " ");
                   return acc;
@@ -836,7 +840,7 @@ const RegistrarForgotPassword = () => {
           {/* Footer */}
           <div className="Footer">
             <div className="FooterText">
-              &copy; {currentYear} {settings?.company_name || "EARIST"} <br />
+              &copy; {currentYear} {branding.companyName || "EARIST"} <br />
               Academic Information System. <br />
               All rights reserved.
             </div>

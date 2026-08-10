@@ -150,7 +150,8 @@ const PrintingHistoryDialog = ({
 }) => {
   useAuditMac();
   const settings = useContext(SettingsContext);
-  const headerColor = settings?.header_color || "#1976d2";
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);

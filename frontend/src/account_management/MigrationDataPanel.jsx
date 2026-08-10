@@ -25,6 +25,10 @@ import useAccountAuditMac from "./useAccountAuditMac";
 const MigrationDataPanel = () => {
     useAccountAuditMac();
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
     const [titleColor, setTitleColor] = useState("#000000");
     const [borderColor, setBorderColor] = useState("#000000");
@@ -67,20 +71,15 @@ const MigrationDataPanel = () => {
     /* ── settings ── */
     useEffect(() => {
         if (!settings) return;
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-        setFetchedLogo(settings.logo_url ? `${API_BASE_URL}${settings.logo_url}` : EaristLogo);
-        if (settings.company_name) setCompanyName(settings.company_name);
-        if (settings.campus_address) setCampusAddress(settings.campus_address);
-        if (settings?.branches) {
-            try {
-                const parsed = typeof settings.branches === "string"
-                    ? JSON.parse(settings.branches) : settings.branches;
-                setBranches(parsed);
-                setCampusFilter(prev => prev || parsed?.[0]?.id || "");
-            } catch (err) { console.error(err); setBranches([]); }
-        }
+        if (colors.title) setTitleColor(colors.title);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.mainButton) setMainButtonColor(colors.mainButton);
+        setFetchedLogo(assets.logoUrl ? `${assets.logoUrl}` : EaristLogo);
+        if (branding.companyName) setCompanyName(branding.companyName);
+        if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+        const normalizedBranches = settings?.branches || [];
+        setBranches(normalizedBranches);
+        setCampusFilter(prev => prev || normalizedBranches?.[0]?.id || "");
     }, [settings]);
 
     /* ── auth ── */
@@ -314,7 +313,7 @@ const MigrationDataPanel = () => {
                             sx={{ border: "1px solid #fecaca", overflow: "hidden" }}
                         >
                             <Table size="small">
-                                <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                                <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
                                     <TableRow>
                                         {["#", "Student Number", "Student Name"].map((h) => (
                                             <TableCell
@@ -362,7 +361,7 @@ const MigrationDataPanel = () => {
             >
                 <Table>
                     <TableHead
-                        sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+                        sx={{ backgroundColor: headerColor || "#1976d2" }}
                     >
                         <TableRow>
                             <TableCell sx={{ color: "white", textAlign: "Center" }}>
@@ -574,7 +573,7 @@ const MigrationDataPanel = () => {
             >
                 <Table>
                     <TableHead
-                        sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+                        sx={{ backgroundColor: headerColor || "#1976d2" }}
                     >
                         <TableRow>
                             <TableCell sx={{ color: "white", textAlign: "Center" }}>

@@ -174,6 +174,10 @@ const overlayStyle = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 const StudentPersonalInformationResponsive = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -202,18 +206,14 @@ const StudentPersonalInformationResponsive = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string" ? JSON.parse(settings.branches) : settings.branches
-      );
-    }
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const getBranchLabel = (branchId) => {
@@ -987,7 +987,7 @@ const StudentPersonalInformationResponsive = () => {
                     transition: "all 0.25s ease-in-out",
                     "&:hover": {
                       transform: { md: "scale(1.04)" },
-                      backgroundColor: settings?.header_color || "#6D2323",
+                      backgroundColor: headerColor || "#6D2323",
                       "& .chip-icon": { color: "#fff" },
                       "& .chip-text": { color: "#fff" },
                     },
@@ -1055,7 +1055,7 @@ const StudentPersonalInformationResponsive = () => {
                     height: { xs: 42, md: 52 },
                     borderRadius: "50%",
                     border: `2px solid ${borderColor}`,
-                    backgroundColor: activeStep === index ? (settings?.header_color || "#6D2323") : "#E8C999",
+                    backgroundColor: activeStep === index ? (headerColor || "#6D2323") : "#E8C999",
                     color: activeStep === index ? "#fff" : "#333",
                     display: "flex",
                     alignItems: "center",
@@ -1100,7 +1100,7 @@ const StudentPersonalInformationResponsive = () => {
 
         {/* ── SECTION: Personal Information ─────────────────────────────── */}
         <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
-          <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
+          <Box sx={{ backgroundColor: headerColor || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
             Personal Information
           </Box>
           <Box sx={{ p: { xs: "14px", md: "20px" } }}>
@@ -1181,7 +1181,7 @@ const StudentPersonalInformationResponsive = () => {
 
         {/* ── SECTION: Course Program ───────────────────────────────────── */}
         <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
-          <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
+          <Box sx={{ backgroundColor: headerColor || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
             Course Program
           </Box>
           <Box sx={{ p: { xs: "14px", md: "20px" } }}>
@@ -1278,7 +1278,7 @@ const StudentPersonalInformationResponsive = () => {
 
         {/* ── SECTION: Person Details ───────────────────────────────────── */}
         <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
-          <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
+          <Box sx={{ backgroundColor: headerColor || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
             Person Details
           </Box>
           <Box sx={{ p: { xs: "14px", md: "20px" } }}>
@@ -1625,7 +1625,7 @@ const StudentPersonalInformationResponsive = () => {
 
         {/* ── SECTION: Contact Information ─────────────────────────────── */}
         <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
-          <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
+          <Box sx={{ backgroundColor: headerColor || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
             Contact Information
           </Box>
           <Box sx={{ p: { xs: "14px", md: "20px" } }}>
@@ -1688,7 +1688,7 @@ const StudentPersonalInformationResponsive = () => {
 
         {/* ── SECTION: Present Address ─────────────────────────────────── */}
         <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
-          <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
+          <Box sx={{ backgroundColor: headerColor || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
             Present Address
           </Box>
           <Box sx={{ p: { xs: "14px", md: "20px" } }}>
@@ -1883,7 +1883,7 @@ const StudentPersonalInformationResponsive = () => {
 
         {/* ── SECTION: Permanent Address ───────────────────────────────── */}
         <Box sx={{ backgroundColor: "#fff", borderRadius: "10px", mx: { xs: "12px", md: 0 }, mt: "12px", mb: 3, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${borderColor}` }}>
-          <Box sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
+          <Box sx={{ backgroundColor: headerColor || "#1976d2", color: "#fff", p: { xs: "10px 14px", md: "12px 18px" }, fontSize: { xs: 13, md: 15 }, fontWeight: 700, letterSpacing: 0.3 }}>
             Permanent Address
           </Box>
           <Box sx={{ p: { xs: "14px", md: "20px" } }}>
@@ -2200,7 +2200,7 @@ const StudentPersonalInformationResponsive = () => {
             {/* Header */}
             <Box
               sx={{
-                bgcolor: settings?.header_color || "#1976d2",
+                bgcolor: headerColor || "#1976d2",
                 color: "white",
                 display: "flex",
                 justifyContent: "space-between",

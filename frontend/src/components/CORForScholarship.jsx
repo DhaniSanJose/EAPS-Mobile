@@ -46,6 +46,8 @@ const CertificateOfRegistration = forwardRef(
   ({ student_number, onSaved }, divToPrintRef) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
+    const branding = settings?.branding || {};
+    const assets = settings?.assets || {};
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
     const [branches, setBranches] = useState([]);
@@ -67,26 +69,15 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       if (settings) {
         // ? load dynamic logo
-        if (settings.logo_url) {
-          setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+        if (assets.logoUrl) {
+          setFetchedLogo(`${assets.logoUrl}`);
         } else {
           setFetchedLogo(EaristLogo);
         }
 
         // ? load dynamic name + branch metadata
-        if (settings.company_name) setCompanyName(settings.company_name);
-        if (settings?.branches) {
-          try {
-            const parsed =
-              typeof settings.branches === "string"
-                ? JSON.parse(settings.branches)
-                : settings.branches;
-            setBranches(parsed);
-          } catch (err) {
-            console.error("Failed to parse branches:", err);
-            setBranches([]);
-          }
-        }
+        if (branding.companyName) setCompanyName(branding.companyName);
+        setBranches(settings?.branches || []);
       }
     }, [settings]);
 
@@ -204,12 +195,12 @@ const CertificateOfRegistration = forwardRef(
         return;
       }
 
-      if (settings.campus_address) {
-        setCampusAddress(settings.campus_address);
+      if (branding.campusAddress) {
+        setCampusAddress(branding.campusAddress);
         return;
       }
 
-      setCampusAddress(settings.address || "");
+      setCampusAddress(branding.campusAddress || "");
     }, [settings, branches, person?.campus]);
 
     const [hasAccess, setHasAccess] = useState(null);

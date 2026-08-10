@@ -35,8 +35,10 @@ const EvaluatorScheduleTile = () => {
   const navigate = useNavigate();
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [borderColor, setBorderColor] = useState("#000000");
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const headerColor = colors.header || "#1976d2";
   const [schedules, setSchedules] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredSchedules, setFilteredSchedules] = useState([]);
@@ -54,12 +56,6 @@ const EvaluatorScheduleTile = () => {
   const [loading, setLoading] = useState(false);
 
   const pageId = 128;
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-  }, [settings]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -100,27 +96,9 @@ const EvaluatorScheduleTile = () => {
     }
   };
 
-  const branches = React.useMemo(() => {
-    try {
-      if (Array.isArray(settings?.branches)) return settings.branches;
-      if (typeof settings?.branches === "string") {
-        const parsed = JSON.parse(settings.branches);
-        return Array.isArray(parsed) ? parsed : [];
-      }
-    } catch (err) {
-      console.error("Failed to parse branches:", err);
-    }
-
-    return [];
-  }, [settings?.branches]);
+  const branches = React.useMemo(() => settings?.branches || [], [settings?.branches]);
 
   const [selectedBranch, setSelectedBranch] = useState("");
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-  }, [settings]);
 
   // Fetch school years, semesters, and active selection in order
   useEffect(() => {
@@ -357,7 +335,7 @@ const EvaluatorScheduleTile = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
@@ -587,7 +565,7 @@ const EvaluatorScheduleTile = () => {
             >
               <Box
                 sx={{
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "#fff",
                   p: 1.5,
                 }}

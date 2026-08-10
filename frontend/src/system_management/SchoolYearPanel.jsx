@@ -37,6 +37,8 @@ import useAuditMac from "../utils/useAuditMac";
 const SchoolYearPanel = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
   const navigate = useNavigate();
 
   const [titleColor, setTitleColor] = useState("#000000");
@@ -84,8 +86,8 @@ const SchoolYearPanel = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   useEffect(() => {
@@ -638,7 +640,7 @@ const SchoolYearPanel = () => {
       >
         <DialogTitle
           sx={{
-            bgcolor: isLocked ? "#7a0000" : settings?.header_color || "#1976d2",
+            bgcolor: isLocked ? "#7a0000" : headerColor,
             color: "white",
             display: "flex",
             justifyContent: "space-between",
@@ -809,7 +811,7 @@ const SchoolYearPanel = () => {
                     borderRadius: "10px",
                     fontSize: 14,
                     "&.Mui-focused fieldset": {
-                      borderColor: settings?.header_color || "#1976d2",
+                      borderColor: headerColor,
                       borderWidth: 2,
                     },
                   },
@@ -874,7 +876,7 @@ const SchoolYearPanel = () => {
                   textTransform: "none",
                   px: 3,
                   fontWeight: "bold",
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   "&:hover": { opacity: 0.9 },
                 }}
               >
@@ -925,7 +927,7 @@ const SchoolYearPanel = () => {
         <Table size="small">
           <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
             <TableRow>
-              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                   <Typography fontSize="14px" fontWeight="bold">
                     Total School Years Records: {filteredSchoolYears.length}
@@ -1222,7 +1224,7 @@ const SchoolYearPanel = () => {
         <Table size="small">
           <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
             <TableRow>
-              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+              <TableCell colSpan={10} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                   <Typography fontSize="14px" fontWeight="bold" color="white">
                     Total School Years Records:  {filteredSchoolYears.length}
@@ -1417,7 +1419,7 @@ const SchoolYearPanel = () => {
       >
         <DialogTitle
           sx={{
-            bgcolor: activateLocked ? "#7a0000" : settings?.header_color || "#1976d2",
+            bgcolor: activateLocked ? "#7a0000" : headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.1rem",
@@ -1532,7 +1534,7 @@ const SchoolYearPanel = () => {
                     borderRadius: "10px",
                     fontSize: 14,
                     "&.Mui-focused fieldset": {
-                      borderColor: settings?.header_color || "#1976d2",
+                      borderColor: headerColor,
                       borderWidth: 2,
                     },
                   },
@@ -1613,7 +1615,7 @@ const SchoolYearPanel = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: colors.header || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",
@@ -1691,7 +1693,7 @@ const SchoolYearPanel = () => {
         {/* ===== HEADER ===== */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.1rem",

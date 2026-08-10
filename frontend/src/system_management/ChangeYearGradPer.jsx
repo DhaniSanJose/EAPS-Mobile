@@ -15,6 +15,7 @@ import useAuditMac from "../utils/useAuditMac";
 const ChangeYearGradPer = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -54,9 +55,9 @@ const ChangeYearGradPer = () => {
 
   useEffect(() => {
     if (!settings) return;
-    setTitleColor(settings.title_color || "#000000");
-    setSubtitleColor(settings.subtitle_color || "#555555");
-    setBorderColor(settings.border_color || "#000000");
+    setTitleColor(colors.title || "#000000");
+    setSubtitleColor(colors.subtitle || "#555555");
+    setBorderColor(colors.border || "#000000");
   }, [settings]);
 
   useEffect(() => {
@@ -222,7 +223,7 @@ const ChangeYearGradPer = () => {
       <Dialog open={confirmDialog.open} onClose={handleCancelDialog} maxWidth="xs" fullWidth>
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: colors.header || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

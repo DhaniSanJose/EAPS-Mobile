@@ -46,10 +46,39 @@ import ImageIcon from "@mui/icons-material/Image";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import EditIcon from "@mui/icons-material/Edit";
 
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getStudentSuggestionText = (student) =>
+  [
+    student?.student_number,
+    student?.first_name,
+    student?.middle_name,
+    student?.last_name,
+    student?.emailAddress,
+    student?.program_code,
+    student?.program_description,
+    student?.dprtmnt_name,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
+const getStudentSuggestionValue = (student) =>
+  cleanSuggestionValue(student?.student_number) ||
+  cleanSuggestionValue(student?.emailAddress);
+
 const rowsPerPage = 100;
 
 export default function StudentAccounts() {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -68,40 +97,28 @@ export default function StudentAccounts() {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const [snackbar, setSnackbar] = useState({
@@ -221,6 +238,7 @@ export default function StudentAccounts() {
   const [email, setEmail] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   const fetchPersons = useCallback(
     async (signal) => {
@@ -739,6 +757,17 @@ export default function StudentAccounts() {
   const startIndex = (currentPage - 1) * rowsPerPage;
 
   const currentData = useMemo(() => persons || [], [persons]);
+  const studentSuggestions = useMemo(
+    () =>
+      searchQuery.trim().length >= 2
+        ? currentData
+          .filter((student) =>
+            getStudentSuggestionText(student).includes(searchQuery.trim().toLowerCase()),
+          )
+          .slice(0, 8)
+        : [],
+    [currentData, searchQuery],
+  );
   const pageOptions = useMemo(
     () => Array.from({ length: totalPages }, (_, i) => i + 1),
     [totalPages],
@@ -837,27 +866,55 @@ export default function StudentAccounts() {
           STUDENT ACCOUNTS
         </Typography>
 
-        <TextField
-          variant="outlined"
-          placeholder="Search Student Number / Name / Program / Department"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1); // reset to first page when searching
-          }}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+        <Box sx={{ position: "relative", width: 450 }}>
+          <TextField
+            variant="outlined"
+            placeholder="Search Student Number / Name / Program / Department"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1); // reset to first page when searching
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => setSuggestionsOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, mt: 0.5, maxHeight: 260, overflowY: "auto", backgroundColor: "#fff", border: "1px solid #d6d6d6", borderRadius: 1, boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+              {studentSuggestions.length > 0 ? (
+                studentSuggestions.map((student) => {
+                  const studentNumber = cleanSuggestionValue(student?.student_number);
+                  const name = [student?.last_name, student?.first_name, student?.middle_name]
+                    .map(cleanSuggestionValue)
+                    .filter(Boolean)
+                    .join(", ");
+                  const program = cleanSuggestionValue(student?.program_code || student?.program_description);
+
+                  return (
+                    <Box key={`${studentNumber}-${student?.emailAddress}`} onMouseDown={(e) => { e.preventDefault(); setSearchQuery(getStudentSuggestionValue(student)); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                      <Typography component="span" sx={{ fontWeight: 700, minWidth: 110 }}>{studentNumber || "No number"}</Typography>
+                      <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[name, program].filter(Boolean).join(" - ") || student?.emailAddress}</Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching students</Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
@@ -892,7 +949,7 @@ export default function StudentAccounts() {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -1251,7 +1308,7 @@ export default function StudentAccounts() {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -1358,7 +1415,7 @@ export default function StudentAccounts() {
         {/* HEADER */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor || "#1976d2",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.1rem",

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
+import EaristLogo from "../assets/EaristLogo.png";
 
 import axios from "axios";
 import {
@@ -75,6 +76,10 @@ import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 const StudentCollegePersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -93,34 +98,28 @@ const StudentCollegePersonalInformation = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches,
-      );
-    }
+    setBranches(settings.branches || []);
   }, [settings]);
 
   const getBranchLabel = (branchId) => {
@@ -1824,7 +1823,6 @@ const StudentCollegePersonalInformation = () => {
         </Box>
       </Box>
 
-      {searchError && <Typography color="error">{searchError}</Typography>}
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
       <br />
@@ -1837,7 +1835,7 @@ const StudentCollegePersonalInformation = () => {
         <Table>
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               border: `1px solid ${borderColor}`,
             }}
           >
@@ -2022,7 +2020,7 @@ const StudentCollegePersonalInformation = () => {
                       transform: disabled ? "none" : "scale(1.05)",
                       backgroundColor: disabled
                         ? "#fff"
-                        : settings?.header_color || "#1976d2",
+                        : headerColor,
 
                       "& .card-text": {
                         color: disabled ? mainButtonColor : "#fff",
@@ -2116,7 +2114,7 @@ const StudentCollegePersonalInformation = () => {
                       border: `1px solid ${borderColor}`,
                       backgroundColor:
                         activeStep === index
-                          ? settings?.header_color || "#1976d2"
+                          ? headerColor
                           : "#E8C999",
                       color: activeStep === index ? "#fff" : "#000",
                       display: "flex",
@@ -2163,7 +2161,7 @@ const StudentCollegePersonalInformation = () => {
           <Container
             maxWidth="100%"
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               border: `1px solid ${borderColor}`,
               maxHeight: "500px",
               overflowY: "auto",
@@ -4128,7 +4126,7 @@ const StudentCollegePersonalInformation = () => {
                   {/* Header — matches the DialogTitle style from your email modal */}
                   <Box
                     sx={{
-                      bgcolor: settings?.header_color || "#1976d2",
+                      bgcolor: headerColor,
                       color: "white",
                       display: "flex",
                       justifyContent: "space-between",

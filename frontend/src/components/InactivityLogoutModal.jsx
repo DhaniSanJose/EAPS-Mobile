@@ -18,7 +18,7 @@ import LoginIcon from "@mui/icons-material/Login";
  *
  * <InactivityLogoutModal
  *   isAuthenticatedPage={isAuthenticated}
- *   accentColor={settings?.header_color}   // optional, falls back to #1976d2
+ *   accentColor={settings?.colors?.header}   // optional, falls back to #1976d2
  *   onLogout={() => {
  *     clearAuthStorage();
  *     setIsAuthenticated(false);

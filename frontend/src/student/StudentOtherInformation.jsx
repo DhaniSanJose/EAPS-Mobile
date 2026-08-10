@@ -63,6 +63,10 @@ const canStudentEdit = (permissions, fieldId, userRole) => {
 
 const StudentDashboard5 = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -82,20 +86,20 @@ const StudentDashboard5 = () => {
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     }
 
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   // ── Fetch field permissions ──────────────────────────────────────────────
@@ -687,7 +691,7 @@ const StudentDashboard5 = () => {
                     transform: disabled ? "none" : "scale(1.05)",
                     backgroundColor: disabled
                       ? "#fff"
-                      : settings?.header_color || "#1976d2",
+                      : headerColor || "#1976d2",
 
                     "& .card-text": {
                       color: disabled ? mainButtonColor : "#fff",
@@ -762,7 +766,7 @@ const StudentDashboard5 = () => {
                   sx={{
                     width: 50, height: 50, borderRadius: "50%",
                     border: `1px solid ${borderColor}`,
-                    backgroundColor: activeStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
+                    backgroundColor: activeStep === index ? headerColor || "#1976d2" : "#E8C999",
                     color: activeStep === index ? "#fff" : "#000",
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}
@@ -791,7 +795,7 @@ const StudentDashboard5 = () => {
           <Container
             maxWidth="100%"
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               border: `1px solid ${borderColor}`,
               maxHeight: "500px",
               overflowY: "auto",

@@ -41,42 +41,16 @@ const AdmissionHealthMedicalRecords = () => {
 
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);   // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);           // ✅ NEW
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const subtitleColor = colors.subtitle || "#555555";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const subButtonColor = colors.subButton || "#ffffff";
+  const headerColor = colors.header || "#1976d2";
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
 
 
   const stepsData = [
@@ -914,7 +888,7 @@ const AdmissionHealthMedicalRecords = () => {
                 cursor: "pointer",
                 borderRadius: 2,
                 border: `1px solid ${borderColor}`,
-                backgroundColor: currentStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
+                backgroundColor: currentStep === index ? headerColor : "#E8C999",
                 color: currentStep === index ? "#fff" : "#000",
                 boxShadow:
                   currentStep === index
@@ -963,7 +937,7 @@ const AdmissionHealthMedicalRecords = () => {
 
       <TableContainer component={Paper} sx={{ width: '100%', mb: 1 }}>
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
+          <TableHead sx={{ backgroundColor: headerColor, border: `1px solid ${borderColor}`, }}>
             <TableRow>
               {/* Left cell: Applicant ID */}
               <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
@@ -1151,7 +1125,7 @@ const AdmissionHealthMedicalRecords = () => {
                     transform: disabled ? "none" : "scale(1.05)",
                     backgroundColor: disabled
                       ? "#fff"
-                      : settings?.header_color || "#1976d2",
+                      : headerColor,
 
                     "& .card-text": {
                       color: disabled ? mainButtonColor : "#fff",
@@ -1265,7 +1239,7 @@ const AdmissionHealthMedicalRecords = () => {
                         height: 50,
                         borderRadius: "50%",
                         border: `1px solid ${borderColor}`,
-                        backgroundColor: activeStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
+                        backgroundColor: activeStep === index ? headerColor : "#E8C999",
                         color: activeStep === index ? "#fff" : "#000",
                         display: "flex",
                         alignItems: "center",
@@ -1311,7 +1285,7 @@ const AdmissionHealthMedicalRecords = () => {
           <Container
             maxWidth="100%"
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               border: `1px solid ${borderColor}`,
               maxHeight: "500px",
               overflowY: "auto",

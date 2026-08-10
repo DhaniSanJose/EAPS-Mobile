@@ -27,6 +27,7 @@ import {
 } from "@mui/material";
 import { Delete, FileUpload, PersonAdd, Save, Search } from "@mui/icons-material";
 import API_BASE_URL from "../apiConfig";
+import EaristLogo from "../assets/EaristLogo.png";
 import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import { SettingsContext } from "../App";
@@ -36,6 +37,10 @@ import LoadingOverlay from "../components/LoadingOverlay";
 const UploadApplicants = () => {
   useAccountAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
@@ -51,22 +56,22 @@ const UploadApplicants = () => {
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   const [userID, setUserID] = useState("");
@@ -180,9 +185,9 @@ const UploadApplicants = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
   }, [settings]);
 
   useEffect(() => {
@@ -740,7 +745,7 @@ const UploadApplicants = () => {
 
       <TableContainer component={Paper} sx={{ border: `1px solid ${borderColor}` }}>
         <Table size="small">
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
             <TableRow>
               {[
                 "No.",

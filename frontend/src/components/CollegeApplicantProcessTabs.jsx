@@ -72,13 +72,17 @@ const TAB_ICONS = {
 
 const CollegeApplicantProcessTabs = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const location = useLocation();
   const navigate = useNavigate();
   const [borderColor, setBorderColor] = useState("#000000");
 
   useEffect(() => {
-    if (settings?.border_color) {
-      setBorderColor(settings.border_color);
+    if (colors.border) {
+      setBorderColor(colors.border);
     }
   }, [settings]);
 
@@ -146,7 +150,7 @@ const CollegeApplicantProcessTabs = () => {
             border: `1px solid ${borderColor}`,
             backgroundColor:
               activeStep === index
-                ? settings?.header_color || "#1976d2"
+                ? headerColor || "#1976d2"
                 : "#E8C999",
             color: activeStep === index ? "#fff" : "#000",
             boxShadow:

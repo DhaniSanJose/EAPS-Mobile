@@ -56,6 +56,8 @@ const CertificateOfRegistration = forwardRef(
   ) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
     const [branches, setBranches] = useState([]);
@@ -71,27 +73,16 @@ const CertificateOfRegistration = forwardRef(
     useEffect(() => {
       if (settings) {
         // ? load dynamic logo
-        if (settings.logo_url) {
-          setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+        if (assets.logoUrl) {
+          setFetchedLogo(assets.logoUrl);
         } else {
           setFetchedLogo(EaristLogo);
         }
 
         // ? load dynamic name + address
-        if (settings.company_name) setCompanyName(settings.company_name);
-        if (settings.campus_address) setCampusAddress(settings.campus_address);
-        if (settings?.branches) {
-          try {
-            const parsed =
-              typeof settings.branches === "string"
-                ? JSON.parse(settings.branches)
-                : settings.branches;
-            setBranches(Array.isArray(parsed) ? parsed : []);
-          } catch (err) {
-            console.error("Failed to parse branches:", err);
-            setBranches([]);
-          }
-        }
+        if (branding.companyName) setCompanyName(branding.companyName);
+        if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+        setBranches(settings?.branches || []);
       }
     }, [settings]);
 
@@ -197,10 +188,10 @@ const CertificateOfRegistration = forwardRef(
     };
 
     useEffect(() => {
-      if (settings && settings.address) {
-        setCampusAddress(settings.address);
+      if (branding.campusAddress) {
+        setCampusAddress(branding.campusAddress);
       }
-    }, [settings]);
+    }, [branding.campusAddress]);
 
     const [hasAccess, setHasAccess] = useState(null);
     const [approvedBy, setApprovedBy] = useState(null);

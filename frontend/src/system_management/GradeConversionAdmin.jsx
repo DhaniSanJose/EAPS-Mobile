@@ -50,6 +50,9 @@ const C = {
 const GradeConversionAdmin = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
 
     // ── Settings state ──
     const [titleColor, setTitleColor] = useState("#000000");
@@ -70,28 +73,20 @@ const GradeConversionAdmin = () => {
 
     useEffect(() => {
         if (!settings) return;
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-        if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-        if (settings.stepper_color) setStepperColor(settings.stepper_color);
-        if (settings.logo_url) setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+        if (colors.title) setTitleColor(colors.title);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.mainButton) setMainButtonColor(colors.mainButton);
+        if (colors.subButton) setSubButtonColor(colors.subButton);
+        if (colors.stepper) setStepperColor(colors.stepper);
+        if (assets.logoUrl) setFetchedLogo(assets.logoUrl);
         else setFetchedLogo(EaristLogo);
-        if (settings.company_name) setCompanyName(settings.company_name);
-        if (settings.short_term) setShortTerm(settings.short_term);
-        if (settings.campus_address) setCampusAddress(settings.campus_address);
-        if (settings?.branches) {
-            try {
-                const parsed = typeof settings.branches === "string" ? JSON.parse(settings.branches) : settings.branches;
-                setBranches(parsed);
-            } catch (err) {
-                console.error("Failed to parse branches:", err);
-                setBranches([]);
-            }
-        }
+        if (branding.companyName) setCompanyName(branding.companyName);
+        if (branding.shortTerm) setShortTerm(branding.shortTerm);
+        if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+        setBranches(settings?.branches || []);
     }, [settings]);
 
-    const resolvedHeader = settings?.header_color || mainButtonColor || "#1976d2";
+    const resolvedHeader = colors.header || mainButtonColor || "#1976d2";
     const resolvedBorder = borderColor || "#000000";
 
     // ── Auth / access ──
@@ -874,7 +869,7 @@ const GradeConversionAdmin = () => {
             >
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#9E0000",
+                        background: colors.header || "#9E0000",
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.2rem",
@@ -1050,7 +1045,7 @@ const GradeConversionAdmin = () => {
             >
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#9E0000",
+                        background: colors.header || "#9E0000",
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.2rem",

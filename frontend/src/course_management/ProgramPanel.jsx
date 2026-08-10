@@ -30,51 +30,35 @@ import SaveIcon from "@mui/icons-material/Save";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
+const cleanSearchValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getProgramSearchText = (program) =>
+  [
+    program?.program_code,
+    program?.program_description,
+    program?.major,
+    program?.dprtmnt_name,
+  ]
+    .map(cleanSearchValue)
+    .join(" ")
+    .toLowerCase();
+
+const getProgramSuggestionValue = (program) =>
+  cleanSearchValue(program?.program_code) ||
+  cleanSearchValue(program?.program_description);
+
 const ProgramPanel = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [stepperColor, setStepperColor] = useState("#000000");
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    }
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    } else {
-      setBranches([]);
-    }
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const headerColor = colors.header || "#1976d2";
+  const branches = settings?.branches || [];
 
   const [program, setProgram] = useState({
     name: "",
@@ -325,6 +309,7 @@ const ProgramPanel = () => {
   };
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   const getCampusName = (components) => {
     const branch = branches.find(
@@ -342,6 +327,14 @@ const ProgramPanel = () => {
       getCampusName(prog.components).toLowerCase().includes(q)
     );
   });
+  const programSuggestions =
+    searchQuery.trim().length >= 2
+      ? programs
+          .filter((prog) =>
+            getProgramSearchText(prog).includes(searchQuery.trim().toLowerCase()),
+          )
+          .slice(0, 10)
+      : [];
 
   const handleCloseSnackbar = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
@@ -555,26 +548,90 @@ const ProgramPanel = () => {
             justifyContent: "flex-end",
           }}
         >
-          <TextField
-            variant="outlined"
-            placeholder="Search Program Description / Code / Major"
-            size="small"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-            }}
-            sx={{
-              width: 450,
-              backgroundColor: "#fff",
-              borderRadius: 1,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-              },
-            }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-            }}
-          />
+          <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+            <TextField
+              variant="outlined"
+              placeholder="Search Program Description / Code / Major"
+              size="small"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+              }}
+              onBlur={() => {
+                setTimeout(() => setSuggestionsOpen(false), 150);
+              }}
+              sx={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                },
+              }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+              }}
+            />
+            {suggestionsOpen && searchQuery.trim().length >= 2 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  backgroundColor: "#fff",
+                  border: "1px solid #d0d0d0",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}
+              >
+                {programSuggestions.length > 0 ? (
+                  programSuggestions.map((prog) => (
+                    <Box
+                      key={prog.program_id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearchQuery(getProgramSuggestionValue(prog));
+                        setCurrentPage(1);
+                        setSuggestionsOpen(false);
+                      }}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": { backgroundColor: "#f5f7fb" },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {cleanSearchValue(prog.program_code) || "N/A"}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        {cleanSearchValue(prog.program_description) || "Unnamed Program"}
+                        {prog.major ? ` (${prog.major})` : ""}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                    No matching programs found
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
           <input
             ref={importInputRef}
             type="file"
@@ -622,14 +679,14 @@ const ProgramPanel = () => {
       <div style={styles.formSection}>
         <TableContainer component={Paper} sx={{ width: "100%" }}>
           <Table size="small">
-            <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+            <TableHead sx={{ backgroundColor: headerColor, color: "white" }}>
               <TableRow>
                 <TableCell
                   colSpan={20}
                   sx={{
                     border: `1px solid ${borderColor}`,
                     py: 0.5,
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "white",
                   }}
                 >
@@ -933,7 +990,7 @@ const ProgramPanel = () => {
                   sx={{
                     border: `1px solid ${borderColor}`,
                     py: 0.5,
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "white",
                   }}
                 >
@@ -1130,7 +1187,7 @@ const ProgramPanel = () => {
         {/* ===== HEADER ===== */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",
@@ -1262,7 +1319,7 @@ const ProgramPanel = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

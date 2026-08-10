@@ -55,6 +55,7 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
+import EaristLogo from "../assets/EaristLogo.png";
 import { postAuditEvent, getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import PrintingHistoryDialog, {
@@ -69,9 +70,30 @@ import StudentServicesSurvey from "../student/StudentServicesSurvey";
 import SaveIcon from '@mui/icons-material/Save';
 import { createFilterOptions } from "@mui/material/Autocomplete";
 
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getStudentSuggestionName = (student) =>
+  [
+    student?.last_name,
+    student?.first_name,
+    student?.middle_name,
+    student?.extension,
+  ]
+    .map(cleanSuggestionValue)
+    .filter(Boolean)
+    .join(", ");
+
 const StudentAdminPersonalInformation = () => {
   useAccountAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -90,34 +112,28 @@ const StudentAdminPersonalInformation = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches,
-      );
-    }
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const getBranchLabel = (branchId) => {
@@ -1003,6 +1019,9 @@ const StudentAdminPersonalInformation = () => {
   const [errors, setErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [searchError, setSearchError] = useState("");
+  const [studentSuggestions, setStudentSuggestions] = useState([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [persons, setPersons] = useState([]);
 
@@ -1064,6 +1083,55 @@ const StudentAdminPersonalInformation = () => {
 
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+
+    if (!suggestionsOpen || query.length < 2) {
+      setStudentSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSuggestionsLoading(true);
+
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
+          params: { query, limit: 10 },
+        });
+
+        if (!cancelled) setStudentSuggestions(res.data || []);
+      } catch (err) {
+        console.error("Failed to fetch student suggestions:", err);
+        if (!cancelled) setStudentSuggestions([]);
+      } finally {
+        if (!cancelled) setSuggestionsLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(delayDebounce);
+    };
+  }, [searchQuery, suggestionsOpen]);
+
+  const handleStudentSuggestionSelect = (student) => {
+    const nextStudentNumber = String(student?.student_number || "");
+    if (!nextStudentNumber) return;
+
+    setSearchQuery(nextStudentNumber);
+    setSelectedPerson(student);
+    setSuggestionsOpen(false);
+    setStudentSuggestions([]);
+
+    if (student?.person_id) {
+      sessionStorage.setItem("admin_edit_person_id", student.person_id);
+      sessionStorage.setItem("admin_edit_person_data", JSON.stringify(student));
+      setUserID(student.person_id);
+    }
+  };
 
   // ✅ For Excel Import
   const [excelFile, setExcelFile] = useState(null);
@@ -1410,23 +1478,52 @@ const StudentAdminPersonalInformation = () => {
 
         {/* ✅ Right side: Search + Excel Import side by side */}
         <Box display="flex" alignItems="center" gap={2}>
-          <TextField
-            size="small"
-            placeholder="Search Student Name / Email / Student Number"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              width: 450,
-              backgroundColor: "#fff",
-              borderRadius: 1,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-              },
-            }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-            }}
-          />
+          <Box sx={{ position: "relative", width: 450 }}>
+            <TextField
+              size="small"
+              placeholder="Search Student Name / Email / Student Number"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => setSuggestionsOpen(true)}
+              onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+              sx={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                },
+              }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+              }}
+            />
+            {suggestionsOpen && searchQuery.trim().length >= 2 && (
+              <Box sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, mt: 0.5, maxHeight: 260, overflowY: "auto", backgroundColor: "#fff", border: "1px solid #d6d6d6", borderRadius: 1, boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+                {suggestionsLoading ? (
+                  <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>Loading suggestions...</Box>
+                ) : studentSuggestions.length > 0 ? (
+                  studentSuggestions.map((student) => {
+                    const studentNumber = cleanSuggestionValue(student?.student_number);
+                    const name = getStudentSuggestionName(student);
+                    const email = cleanSuggestionValue(student?.emailAddress || student?.email);
+
+                    return (
+                      <Box key={`${student?.person_id}-${studentNumber}`} onMouseDown={(e) => { e.preventDefault(); handleStudentSuggestionSelect(student); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                        <Typography component="span" sx={{ fontWeight: 700, minWidth: 120 }}>{studentNumber || "No student no."}</Typography>
+                        <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[name, email].filter(Boolean).join(" - ")}</Typography>
+                      </Box>
+                    );
+                  })
+                ) : (
+                  <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching students</Box>
+                )}
+              </Box>
+            )}
+          </Box>
           <PrintingHistoryDialog
             employeeId={employeeID}
             action={PRINTING_STUDENT_ACTION}
@@ -1435,7 +1532,6 @@ const StudentAdminPersonalInformation = () => {
         </Box>
       </Box>
 
-      {searchError && <Typography color="error">{searchError}</Typography>}
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
@@ -1445,7 +1541,7 @@ const StudentAdminPersonalInformation = () => {
         <Table>
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               border: `1px solid ${borderColor}`,
             }}
           >
@@ -1659,7 +1755,7 @@ const StudentAdminPersonalInformation = () => {
                       transform: disabled ? "none" : "scale(1.05)",
                       backgroundColor: disabled
                         ? "#fff"
-                        : settings?.header_color || "#1976d2",
+                        : headerColor || "#1976d2",
 
                       "& .card-text": {
                         color: disabled ? mainButtonColor : "#fff",
@@ -1754,7 +1850,7 @@ const StudentAdminPersonalInformation = () => {
                       border: `1px solid ${borderColor}`,
                       backgroundColor:
                         activeStep === index
-                          ? settings?.header_color || "#1976d2"
+                          ? headerColor || "#1976d2"
                           : "#E8C999",
                       color: activeStep === index ? "#fff" : "#000",
                       display: "flex",
@@ -1800,7 +1896,7 @@ const StudentAdminPersonalInformation = () => {
           <Container
             maxWidth="100%"
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               border: `1px solid ${borderColor}`,
               maxHeight: "500px",
               overflowY: "auto",
@@ -3139,7 +3235,7 @@ const StudentAdminPersonalInformation = () => {
             >
               <DialogTitle
                 sx={{
-                  background: settings?.header_color || "#1976d2",
+                  background: headerColor || "#1976d2",
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: "1.2rem",
@@ -3215,7 +3311,7 @@ const StudentAdminPersonalInformation = () => {
             >
               <DialogTitle
                 sx={{
-                  background: settings?.header_color || "#1976d2",
+                  background: headerColor || "#1976d2",
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: "1.2rem",
@@ -3850,7 +3946,7 @@ const StudentAdminPersonalInformation = () => {
                   {/* Header — matches the DialogTitle style from your email modal */}
                   <Box
                     sx={{
-                      bgcolor: settings?.header_color || "#1976d2",
+                      bgcolor: headerColor || "#1976d2",
                       color: "white",
                       display: "flex",
                       justifyContent: "space-between",

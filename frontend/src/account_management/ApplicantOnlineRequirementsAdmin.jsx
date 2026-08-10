@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import Search from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
+import EaristLogo from "../assets/EaristLogo.png";
 import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import { Link, useLocation } from "react-router-dom";
@@ -46,6 +47,30 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import CloseIcon from "@mui/icons-material/Close";
 import FormalExample from "../assets/formalexample.png";
+
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.emailAddress,
+    applicant?.email,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionValue = (applicant) =>
+  cleanSuggestionValue(applicant?.applicant_number) ||
+  cleanSuggestionValue(applicant?.emailAddress) ||
+  cleanSuggestionValue(applicant?.email);
 
 const ApplicantOnlineRequirementsAdmin = () => {
   useAccountAuditMac();
@@ -120,6 +145,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
   const [uploads, setUploads] = useState([]);
   const [persons, setPersons] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState({});
 
   const [remarksMap, setRemarksMap] = useState({});
@@ -171,6 +197,10 @@ const ApplicantOnlineRequirementsAdmin = () => {
   const [documentStatus, setDocumentStatus] = useState("");
 
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -190,25 +220,25 @@ const ApplicantOnlineRequirementsAdmin = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   const [hasAccess, setHasAccess] = useState(null);
@@ -514,6 +544,15 @@ const ApplicantOnlineRequirementsAdmin = () => {
       });
     }
   }, [searchQuery, persons, explicitSelection]);
+
+  const applicantSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+        .filter((applicant) =>
+          getApplicantSuggestionText(applicant).includes(searchQuery.trim().toLowerCase()),
+        )
+        .slice(0, 8)
+      : [];
 
   const fetchPersons = async () => {
     try {
@@ -1142,24 +1181,54 @@ const ApplicantOnlineRequirementsAdmin = () => {
           APPLICANT ONLINE REQUIREMENTS
         </Typography>
 
-        <TextField
-          variant="outlined"
-          placeholder="Search Applicant Name / Email / Applicant ID"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+        <Box sx={{ position: "relative", width: 450 }}>
+          <TextField
+            variant="outlined"
+            placeholder="Search Applicant Name / Email / Applicant ID"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => setSuggestionsOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, mt: 0.5, maxHeight: 260, overflowY: "auto", backgroundColor: "#fff", border: "1px solid #d6d6d6", borderRadius: 1, boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+              {applicantSuggestions.length > 0 ? (
+                applicantSuggestions.map((applicant) => {
+                  const applicantNumber = cleanSuggestionValue(applicant?.applicant_number);
+                  const name = [applicant?.last_name, applicant?.first_name, applicant?.middle_name]
+                    .map(cleanSuggestionValue)
+                    .filter(Boolean)
+                    .join(", ");
+                  const email = cleanSuggestionValue(applicant?.emailAddress || applicant?.email);
+
+                  return (
+                    <Box key={`${applicant?.person_id}-${applicantNumber}`} onMouseDown={(e) => { e.preventDefault(); setExplicitSelection(true); setSelectedPerson(applicant); setSearchQuery(getApplicantSuggestionValue(applicant)); fetchUploadsByApplicantNumber(applicant.applicant_number); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                      <Typography component="span" sx={{ fontWeight: 700, minWidth: 120 }}>{applicantNumber || "No applicant ID"}</Typography>
+                      <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[name, email].filter(Boolean).join(" - ")}</Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching applicants</Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
@@ -1173,7 +1242,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor || "#1976d2" }}
           >
             <TableRow>
               {/* Left cell: Applicant ID */}
@@ -1702,7 +1771,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
         >
           <Table>
             <TableHead
-              sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+              sx={{ backgroundColor: headerColor || "#1976d2" }}
             >
               <TableRow>
                 <TableCell
@@ -1802,7 +1871,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
         <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} fullWidth maxWidth="sm">
           <DialogTitle
             sx={{
-              background: settings?.header_color || "#9E0000",
+              background: headerColor || "#9E0000",
               color: "#fff",
               fontWeight: 700,
               fontSize: "1.2rem",
@@ -1857,10 +1926,10 @@ const ApplicantOnlineRequirementsAdmin = () => {
               variant="contained"
               onClick={handleConfirmAction}
               sx={{
-                backgroundColor: settings?.header_color || "#9E0000",
+                backgroundColor: headerColor || "#9E0000",
                 "&:hover": {
-                  backgroundColor: settings?.header_color
-                    ? `${settings.header_color}cc`
+                  backgroundColor: headerColor
+                    ? `${headerColor}cc`
                     : "#7a0000",
                 },
               }}
@@ -1904,7 +1973,7 @@ const ApplicantOnlineRequirementsAdmin = () => {
               {/* Header */}
               <Box
                 sx={{
-                  bgcolor: settings?.header_color || "#1976d2",
+                  bgcolor: headerColor || "#1976d2",
                   color: "white",
                   display: "flex",
                   justifyContent: "space-between",

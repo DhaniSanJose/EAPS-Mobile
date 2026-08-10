@@ -36,6 +36,10 @@ import {
 
 const StudentOnlineRequirements = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const theme = useTheme();
   // Card layout for phones + small tablets, table layout from md (tablet-landscape) up
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -52,14 +56,14 @@ const StudentOnlineRequirements = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.logo_url) setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (assets.logoUrl) setFetchedLogo(`${assets.logoUrl}`);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   const [requirements, setRequirements] = useState([]);
@@ -485,7 +489,7 @@ const StudentOnlineRequirements = () => {
       <Dialog open={openConfirmModal} onClose={() => setOpenConfirmModal(false)} maxWidth="md" fullWidth fullScreen={isMobile}
         PaperProps={{ sx: { borderRadius: isMobile ? 0 : "16px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}
       >
-        <DialogTitle sx={{ bgcolor: settings?.header_color || "#1976d2", color: "white", display: "flex", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
+        <DialogTitle sx={{ bgcolor: headerColor || "#1976d2", color: "white", display: "flex", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
           <Box display="flex" alignItems="center" gap={1.5}>
             <Box sx={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
               <Typography fontSize={20}>📄</Typography>
@@ -549,7 +553,7 @@ const StudentOnlineRequirements = () => {
                 setSnack({ open: true, severity: "error", message: "Failed to submit. Please try again." });
               }
             }}
-            sx={{ minWidth: { xs: "100%", sm: 200 }, height: 42, backgroundColor: settings?.header_color || "#1976d2", color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: settings?.header_color || "#1976d2", opacity: 0.9, boxShadow: "none" } }}
+            sx={{ minWidth: { xs: "100%", sm: 200 }, height: 42, backgroundColor: headerColor || "#1976d2", color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: headerColor || "#1976d2", opacity: 0.9, boxShadow: "none" } }}
           >
             Submit Requirements
           </Button>
@@ -644,7 +648,7 @@ const StudentOnlineRequirements = () => {
                 }}
               >
                 <Table sx={{ minWidth: 720 }}>
-                  <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}` }}>
+                  <TableHead sx={{ backgroundColor: headerColor || "#1976d2", border: `1px solid ${borderColor}` }}>
                     <TableRow>
                       {["Document", "Upload", "Remarks", "Preview", "Delete"].map((h) => (
                         <TableCell key={h} sx={{ color: "white", border: `1px solid ${borderColor}`, fontSize: { md: 13, lg: 14 } }}>{h}</TableCell>

@@ -183,6 +183,10 @@ const MobileSubjectCard = ({
 // ─── Main Component ───────────────────────────────────────────────
 const StudentCurriculumSubjects = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const theme = useTheme();
   // Card layout for phones + small/medium tablets, table layout from
   // tablet-landscape / small-laptop (md) up. Driven by MUI's breakpoint
@@ -197,11 +201,11 @@ const StudentCurriculumSubjects = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
   }, [settings]);
 
   const [subjects, setSubjects] = useState([]);
@@ -338,7 +342,7 @@ const StudentCurriculumSubjects = () => {
     ),
   ];
   const sortedTerms = sortTerms(rawTerms, yearOrder, semesterOrder);
-  const headerBg = settings?.header_color || "#800000";
+  const headerBg = headerColor || "#800000";
   const programInfo = subjects[0];
 
   const headCell = {

@@ -35,6 +35,36 @@ const PAGE_ID = 171;
 // fit small screens while keeping the print output exactly the same size.
 const PERMIT_WIDTH_PX = 816; // 8.5in * 96dpi
 
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.emailAddress,
+    applicant?.email,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionName = (applicant) =>
+  [
+    applicant?.last_name,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.extension,
+  ]
+    .map(cleanSuggestionValue)
+    .filter(Boolean)
+    .join(", ");
+
 const ExamAttendanceScanner = () => {
   const settings = useContext(SettingsContext);
   const theme = useTheme();
@@ -43,47 +73,15 @@ const ExamAttendanceScanner = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px (phones)
   const isTablet = useMediaQuery(theme.breakpoints.down("md")); // <900px (phones + small tablets)
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [stepperColor, setStepperColor] = useState("#000000");
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const fetchedLogo = assets.logoUrl || EaristLogo;
+  const companyName = branding.companyName || "";
+  const campusAddressFallback = branding.campusAddress || "";
+  const branches = settings?.branches || [];
 
   const words = companyName.trim().split(" ");
   const middle = Math.ceil(words.length / 2);
@@ -105,7 +103,6 @@ const ExamAttendanceScanner = () => {
     applicant_number: "",
   });
 
-  const [campusAddress, setCampusAddress] = useState("");
   const [isVerified, setIsVerified] = useState(false);
   const [verifiedAt, setVerifiedAt] = useState(null);
   const [attendanceToken, setAttendanceToken] = useState(null);
@@ -158,6 +155,7 @@ const ExamAttendanceScanner = () => {
   const [persons, setPersons] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPerson, setSelectedPerson] = useState(null);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   useEffect(() => {
     const fetchPersons = async () => {
@@ -217,7 +215,6 @@ const ExamAttendanceScanner = () => {
       });
       setScanStatus({ type: "success", message: res.data.message });
 
-      // Refresh whatever applicant is currently loaded
       if (person?.applicant_number) {
         fetchAllForApplicant(person.applicant_number, person.person_id);
       }
@@ -231,8 +228,6 @@ const ExamAttendanceScanner = () => {
     }
   };
 
-  // ---------------- Data fetch for a selected applicant ----------------
-  // Reuses exactly the same set of endpoints ExamPermit.jsx uses.
   const fetchAllForApplicant = async (applicant_number, personIdFromSearch) => {
     try {
       const res = await axios.get(
@@ -322,23 +317,10 @@ const ExamAttendanceScanner = () => {
     }
   };
 
-  // Campus address resolution — unchanged from ExamPermit.jsx
-  useEffect(() => {
-    if (!settings) return;
-    const branchId = person?.campus;
-    const matchedBranch = branches.find(
-      (branch) => String(branch?.id) === String(branchId),
-    );
-    if (matchedBranch?.address) {
-      setCampusAddress(matchedBranch.address);
-      return;
-    }
-    if (settings.campus_address) {
-      setCampusAddress(settings.campus_address);
-      return;
-    }
-    setCampusAddress(settings.address || "");
-  }, [settings, branches, person?.campus]);
+  const matchedBranch = branches.find(
+    (branch) => String(branch?.id) === String(person?.campus),
+  );
+  const campusAddress = matchedBranch?.address || campusAddressFallback;
 
   // ---------------- Attendance state (PRESENT / ABSENT / NOT YET ARRIVED) ----------------
   const getAttendanceState = () => {
@@ -497,6 +479,9 @@ const ExamAttendanceScanner = () => {
             options={persons}
             value={selectedPerson}
             inputValue={searchQuery}
+            open={suggestionsOpen && searchQuery.trim().length >= 2}
+            onOpen={() => setSuggestionsOpen(true)}
+            onClose={() => setSuggestionsOpen(false)}
             isOptionEqualToValue={(option, value) =>
               option?.applicant_number === value?.applicant_number
             }
@@ -506,21 +491,66 @@ const ExamAttendanceScanner = () => {
                 : ""
             }
             onInputChange={(event, newInputValue, reason) => {
-              if (reason !== "reset") setSearchQuery(newInputValue);
+              if (reason !== "reset") {
+                setSearchQuery(newInputValue);
+                setSuggestionsOpen(true);
+              }
             }}
             filterOptions={(options, state) => {
-              const query = state.inputValue.toLowerCase();
-              return options.filter((p) => {
-                const fullString =
-                  `${p.first_name ?? ""} ${p.middle_name ?? ""} ${p.last_name ?? ""} ${p.emailAddress ?? ""}`.toLowerCase();
-                return (
-                  (p.applicant_number || "").toLowerCase().includes(query) ||
-                  fullString.includes(query)
-                );
-              });
+              const query = state.inputValue.trim().toLowerCase();
+              if (query.length < 2) return [];
+
+              return options
+                .filter((applicant) =>
+                  getApplicantSuggestionText(applicant).includes(query),
+                )
+                .slice(0, 8);
             }}
-            onChange={(event, newValue) => handleSelectPerson(newValue)}
+            onChange={(event, newValue) => {
+              handleSelectPerson(newValue);
+              setSuggestionsOpen(false);
+            }}
+            noOptionsText="No matching applicants"
             sx={{ width: isTablet ? "100%" : 420 }}
+            renderOption={(props, option) => {
+              const { key, ...optionProps } = props;
+              const applicantNumber = cleanSuggestionValue(option?.applicant_number);
+              const name = getApplicantSuggestionName(option);
+              const email = cleanSuggestionValue(option?.emailAddress || option?.email);
+
+              return (
+                <Box
+                  component="li"
+                  key={key}
+                  {...optionProps}
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    fontSize: 14,
+                    borderBottom: "1px solid #f0f0f0",
+                    "&:hover": { backgroundColor: "#f5f7fb" },
+                  }}
+                >
+                  <Typography component="span" sx={{ fontWeight: 700, minWidth: 120 }}>
+                    {applicantNumber || "No applicant ID"}
+                  </Typography>
+                  <Typography
+                    component="span"
+                    sx={{
+                      color: "#444",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {[name, email].filter(Boolean).join(" - ")}
+                  </Typography>
+                </Box>
+              );
+            }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -536,7 +566,13 @@ const ExamAttendanceScanner = () => {
                   },
                 }}
                 InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+                  ...params.InputProps,
+                  startAdornment: (
+                    <>
+                      <SearchIcon sx={{ mr: 1, color: "gray" }} />
+                      {params.InputProps.startAdornment}
+                    </>
+                  ),
                 }}
               />
             )}

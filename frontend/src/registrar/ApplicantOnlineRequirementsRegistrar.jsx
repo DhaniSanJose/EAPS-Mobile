@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
+import EaristLogo from "../assets/EaristLogo.png";
 import axios from "axios";
 import {
   Box,
@@ -43,6 +44,40 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
+
+const cleanApplicantValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatApplicantSuggestionName = (applicant) =>
+  [
+    cleanApplicantValue(applicant?.last_name),
+    cleanApplicantValue(applicant?.first_name),
+    cleanApplicantValue(applicant?.middle_name),
+    cleanApplicantValue(applicant?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.extension,
+    applicant?.emailAddress,
+  ]
+    .map(cleanApplicantValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionValue = (applicant) =>
+  cleanApplicantValue(applicant?.applicant_number) ||
+  formatApplicantSuggestionName(applicant) ||
+  cleanApplicantValue(applicant?.emailAddress);
 
 const ApplicantOnlineRequirementsRegistrar = () => {
   useAuditMac();
@@ -112,6 +147,7 @@ const ApplicantOnlineRequirementsRegistrar = () => {
   const [uploads, setUploads] = useState([]);
   const [persons, setPersons] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState({});
 
   const [remarksMap, setRemarksMap] = useState({});
@@ -191,6 +227,10 @@ const ApplicantOnlineRequirementsRegistrar = () => {
   const [documentStatus, setDocumentStatus] = useState("");
 
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -208,25 +248,25 @@ const ApplicantOnlineRequirementsRegistrar = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}/${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   const [hasAccess, setHasAccess] = useState(null);
@@ -573,6 +613,29 @@ const ApplicantOnlineRequirementsRegistrar = () => {
       });
     }
   }, [searchQuery, persons, explicitSelection]);
+
+  const applicantSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+          .filter((applicant) =>
+            getApplicantSuggestionText(applicant).includes(
+              searchQuery.trim().toLowerCase(),
+            ),
+          )
+          .slice(0, 10)
+      : [];
+
+  const handleApplicantSuggestionSelect = (applicant) => {
+    const nextValue = getApplicantSuggestionValue(applicant);
+    setSearchQuery(nextValue);
+    setSelectedPerson(applicant);
+    setExplicitSelection(true);
+    setSuggestionsOpen(false);
+
+    if (applicant?.applicant_number) {
+      fetchUploadsByApplicantNumber(applicant.applicant_number);
+    }
+  };
 
   const fetchPersons = async () => {
     try {
@@ -1038,25 +1101,91 @@ const ApplicantOnlineRequirementsRegistrar = () => {
           APPLICANT ONLINE REQUIREMENTS
         </Typography>
 
-
-        <TextField
-          variant="outlined"
-          placeholder="Search Applicant Name / Email / Applicant ID"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+        <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+          <TextField
+            variant="outlined"
+            placeholder="Search Applicant Name / Email / Applicant ID"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => {
+              if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+            }}
+            onBlur={() => {
+              setTimeout(() => setSuggestionsOpen(false), 150);
+            }}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                backgroundColor: "#fff",
+                border: "1px solid #d0d0d0",
+                borderRadius: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                overflow: "hidden",
+                maxHeight: 320,
+              }}
+            >
+              {applicantSuggestions.length > 0 ? (
+                applicantSuggestions.map((applicant) => {
+                  const applicantNumber = cleanApplicantValue(applicant?.applicant_number);
+                  const name = formatApplicantSuggestionName(applicant);
+                  return (
+                    <Box
+                      key={`${applicantNumber || applicant?.person_id}-${name}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleApplicantSuggestionSelect(applicant);
+                      }}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": { backgroundColor: "#f5f7fb" },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {applicantNumber || "N/A"}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        {name || cleanApplicantValue(applicant?.emailAddress) || "Unnamed Applicant"}
+                      </Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                  No matching applicants found
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
@@ -1077,7 +1206,7 @@ const ApplicantOnlineRequirementsRegistrar = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               {/* Left cell: Applicant ID */}
@@ -1637,7 +1766,7 @@ const ApplicantOnlineRequirementsRegistrar = () => {
         >
           <Table>
             <TableHead
-              sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+              sx={{ backgroundColor: headerColor }}
             >
               <TableRow>
                 <TableCell

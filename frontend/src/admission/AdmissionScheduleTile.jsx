@@ -36,6 +36,10 @@ const AdmissionScheduleTile = () => {
     useAuditMac();
     const navigate = useNavigate();
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
     const [titleColor, setTitleColor] = useState("#000000");
     const [borderColor, setBorderColor] = useState("#000000");
@@ -57,18 +61,7 @@ const AdmissionScheduleTile = () => {
     });
 
 
-    const branches = useMemo(() => {
-        if (Array.isArray(settings?.branches)) return settings.branches;
-        if (typeof settings?.branches !== "string") return [];
-
-        try {
-            const parsed = JSON.parse(settings.branches);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (err) {
-            console.error("Failed to parse branches:", err);
-            return [];
-        }
-    }, [settings?.branches]);
+    const branches = useMemo(() => settings?.branches || [], [settings?.branches]);
 
     const [selectedBranch, setSelectedBranch] = useState("");
 
@@ -91,8 +84,8 @@ const AdmissionScheduleTile = () => {
 
     useEffect(() => {
         if (!settings) return;
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
+        if (colors.title) setTitleColor(colors.title);
+        if (colors.border) setBorderColor(colors.border);
     }, [settings]);
 
     const getOfficialOccupancy = (schedule) =>
@@ -153,6 +146,22 @@ const AdmissionScheduleTile = () => {
         };
         fetchSchedules();
     }, [selectedSchoolYear, selectedSchoolSemester, selectedBranch]);
+
+
+    const formatDateLong = (dateString) => {
+        if (!dateString) return "N/A";
+        const datePart = String(dateString).split("T")[0];
+        const [y, m, d] = datePart.split("-").map(Number);
+        if (!y || !m || !d) return "N/A";
+        const date = new Date(y, m - 1, d);
+        if (isNaN(date.getTime())) return "N/A";
+        return date.toLocaleDateString("en-US", {
+            weekday: "short",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+    };
 
     useEffect(() => {
         const lowerQuery = searchQuery.toLowerCase();
@@ -324,7 +333,7 @@ const AdmissionScheduleTile = () => {
             >
                 <Table>
                     <TableHead
-                        sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+                        sx={{ backgroundColor: headerColor }}
                     >
                         <TableRow>
                             <TableCell sx={{ color: "white", textAlign: "Center" }}>
@@ -504,140 +513,124 @@ const AdmissionScheduleTile = () => {
             <br />
             <br />
 
-          <Grid container spacing={3}>
+            <Grid container spacing={3}>
                 {filteredSchedules.length === 0 && (
-                  <Grid item xs={12}>
-                    <Box
-                      sx={{
-                        border: `2px dashed ${borderColor}`,
-                        borderRadius: 2,
-                        p: 3,
-                        textAlign: "center",
-                        backgroundColor: "#fafafa",
-                      }}
-                    >
-                      <Typography sx={{ fontWeight: "bold" }}>
-                        There is no schedule in this {selectedYearLabel} and{" "}
-                        {selectedSemesterLabel}.
-                      </Typography>
-                    </Box>
-                  </Grid>
+                    <Grid item xs={12}>
+                        <Box
+                            sx={{
+                                border: `2px dashed ${borderColor}`,
+                                borderRadius: 2,
+                                p: 3,
+                                textAlign: "center",
+                                backgroundColor: "#fafafa",
+                            }}
+                        >
+                            <Typography sx={{ fontWeight: "bold" }}>
+                                There is no schedule in this {selectedYearLabel} and{" "}
+                                {selectedSemesterLabel}.
+                            </Typography>
+                        </Box>
+                    </Grid>
                 )}
                 {filteredSchedules.map((schedule) => (
-                  <Grid
-                    item
-                    xs={12}
-                    sm={6}
-                    md={2.4}
-                    lg={2.4}
-                    key={schedule.schedule_id}
-                  >
-                    <Card
-                      onClick={() =>
-                        navigate(
-                          `/proctor_applicant_list?proctor=${encodeURIComponent(
-                            schedule.proctor,
-                          )}&schedule=${schedule.schedule_id}`,
-                        )
-                      }
-                      sx={{
-                        cursor: "pointer",
-                        borderRadius: "16px",
-                        overflow: "hidden",
-                        boxShadow: 4,
-                        border: `1px solid ${borderColor}`,
-                        transition: "0.3s ease",
-                        "&:hover": {
-                          transform: "translateY(-4px) scale(1.03)",
-                          boxShadow: 6,
-                        },
-                      }}
+                    <Grid
+                        item
+                        xs={12}
+                        sm={6}
+                        md={2.4}
+                        lg={2.4}
+                        key={schedule.schedule_id}
                     >
-                      <Box
-                        sx={{
-                          backgroundColor: settings?.header_color || "#1976d2",
-                          color: "#fff",
-                          p: 1.5,
-                        }}
-                      >
-                        <Typography
-                          fontWeight="bold"
-                          fontSize="16px"
-                          sx={{ textAlign: "center" }}
+                        <Card
+                            onClick={() =>
+                                navigate(
+                                    `/proctor_applicant_list?proctor=${encodeURIComponent(
+                                        schedule.proctor,
+                                    )}&schedule=${schedule.schedule_id}`,
+                                )
+                            }
+                            sx={{
+                                cursor: "pointer",
+                                borderRadius: "16px",
+                                overflow: "hidden",
+                                boxShadow: 4,
+                                border: `1px solid ${borderColor}`,
+                                transition: "0.3s ease",
+                                "&:hover": {
+                                    transform: "translateY(-4px) scale(1.03)",
+                                    boxShadow: 6,
+                                },
+                            }}
                         >
-                          Schedule #{schedule.schedule_id}
-                        </Typography>
-                      </Box>
-        
-                      <CardContent>
-                        <Typography fontSize="14px" mb={0.5}>
-                          <strong>Proctor:</strong> {schedule.proctor}
-                        </Typography>
-                        <Typography fontSize="14px" mb={0.5}>
-                          <strong>Building:</strong> {schedule.building_description}
-                        </Typography>
-                        <Typography fontSize="14px" mb={0.5}>
-                          <strong>Room:</strong> {schedule.room_description}
-                        </Typography>
-                        <Typography fontSize="14px" mb={0.5}>
-                          <strong>Date:</strong>{" "}
-                          {new Date(schedule.schedule_date).toLocaleDateString(
-                            "en-US",
-                            {
-                              weekday: "short",
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            },
-                          )}
-                        </Typography>
-                        <Typography fontSize="14px" mb={1}>
-                          <strong>Time:</strong> {formatTime12(schedule.start_time)} -{" "}
-                          {formatTime12(schedule.end_time)}
-                        </Typography>
-        
-                        <Typography fontSize="14px" mb={0.5} fontWeight="bold">
-                          <strong>Applicants:</strong> {schedule.current_occupancy}/
-                          {schedule.room_quota}
-                        </Typography>
-        
-                        <LinearProgress
-                          variant="determinate"
-                          value={
-                            (schedule.current_occupancy / schedule.room_quota) * 100
-                          }
-                          sx={{
-                            height: 8,
-                            borderRadius: 4,
-                            backgroundColor: "#eee",
-                            "& .MuiLinearProgress-bar": {
-                              backgroundColor: getOccupancyColor(
-                                schedule.current_occupancy,
-                                schedule.room_quota,
-                              ),
-                            },
-                          }}
-                        />
-        
-                        <Box sx={{ mt: 1 }}>
-                          {schedule.current_occupancy >= schedule.room_quota ? (
-                            <Chip label="Occupied" color="error" size="small" />
-                          ) : schedule.current_occupancy / schedule.room_quota >=
-                            0.7 ? (
-                            <Chip
-                              label="Almost Occupied"
-                              color="warning"
-                              size="small"
-                            />
-                          ) : (
-                            <Chip label="Available" color="success" size="small" />
-                          )}
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
+                            <Box
+                                sx={{
+                                    backgroundColor: headerColor,
+                                    color: "#fff",
+                                    p: 1.5,
+                                }}
+                            >
+                                <Typography
+                                    fontWeight="bold"
+                                    fontSize="16px"
+                                    sx={{ textAlign: "center" }}
+                                >
+                                    Schedule #{schedule.schedule_id}
+                                </Typography>
+                            </Box>
+
+                            <CardContent>
+                                <Typography fontSize="14px" mb={0.5}>
+                                    <strong>Proctor:</strong> {schedule.proctor}
+                                </Typography>
+                                <Typography fontSize="14px" mb={0.5}>
+                                    <strong>Building:</strong> {schedule.building_description}
+                                </Typography>
+                                <Typography fontSize="14px" mb={0.5}>
+                                    <strong>Room:</strong> {schedule.room_description}
+                                </Typography>
+                                <Typography fontSize="14px" mb={0.5}>
+                                    <strong>Date:</strong> {formatDateLong(schedule.day_description)}
+                                </Typography>
+                                <Typography fontSize="14px" mb={1}>
+                                    <strong>Time:</strong> {formatTime12(schedule.start_time)} -{" "}
+                                    {formatTime12(schedule.end_time)}
+                                </Typography>
+
+                                <Typography fontSize="14px" mb={0.5} fontWeight="bold">
+                                    <strong>Applicants:</strong> {getOfficialOccupancy(schedule)}/
+                                    {schedule.room_quota}
+                                </Typography>
+
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={(getOfficialOccupancy(schedule) / schedule.room_quota) * 100}
+                                    sx={{
+                                        height: 8,
+                                        borderRadius: 4,
+                                        backgroundColor: "#eee",
+                                        "& .MuiLinearProgress-bar": {
+                                            backgroundColor: getOccupancyColor(
+                                                schedule.current_occupancy,
+                                                schedule.room_quota,
+                                            ),
+                                        },
+                                    }}
+                                />
+
+                                <Box sx={{ mt: 1 }}>
+                                    {getOfficialOccupancy(schedule) >= schedule.room_quota ? (
+                                        <Chip label="Occupied" color="error" size="small" />
+                                    ) : getOfficialOccupancy(schedule) / schedule.room_quota >= 0.7 ? (
+                                        <Chip label="Almost Occupied" color="warning" size="small" />
+                                    ) : (
+                                        <Chip label="Available" color="success" size="small" />
+                                    )}
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Grid>
                 ))}
-              </Grid>
+            </Grid>
         </Box>
     );
 };

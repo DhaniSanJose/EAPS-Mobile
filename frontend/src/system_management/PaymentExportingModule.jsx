@@ -60,7 +60,9 @@ const PaymentExportingModule = () => {
     const [viewClicked, setViewClicked] = useState(false);
     const [studentSearch, setStudentSearch] = useState("");
 
-    const settings = useContext(SettingsContext);
+  const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
     const [titleColor, setTitleColor] = useState("#000000");
     const [borderColor, setBorderColor] = useState("#000000");
@@ -91,35 +93,19 @@ const PaymentExportingModule = () => {
         if (!settings) return;
 
         // 🎨 Colors
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+        if (colors.title) setTitleColor(colors.title);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.mainButton) setMainButtonColor(colors.mainButton);
 
-        if (settings?.branches) {
-            try {
-                const parsed =
-                    typeof settings.branches === "string"
-                        ? JSON.parse(settings.branches)
-                        : settings.branches;
-                const safeBranches = Array.isArray(parsed) ? parsed : [];
-
-                setBranches(safeBranches);
-                setCampusFilter((currentBranch) => {
-                    if (!currentBranch) return "";
-                    const branchExists = safeBranches.some(
-                        (branch) => String(branch.id) === String(currentBranch)
-                    );
-                    return branchExists ? currentBranch : "";
-                });
-            } catch (err) {
-                console.error("Failed to parse branches:", err);
-                setBranches([]);
-                setCampusFilter("");
-            }
-        } else {
-            setBranches([]);
-            setCampusFilter("");
-        }
+        const safeBranches = settings?.branches || [];
+        setBranches(safeBranches);
+        setCampusFilter((currentBranch) => {
+            if (!currentBranch) return "";
+            const branchExists = safeBranches.some(
+                (branch) => String(branch.id) === String(currentBranch)
+            );
+            return branchExists ? currentBranch : "";
+        });
 
     }, [settings]);
 
@@ -521,7 +507,7 @@ const PaymentExportingModule = () => {
 
             <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, }}>
                 <Table>
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                    <TableHead sx={{ backgroundColor: headerColor }}>
                         <TableRow>
                             <TableCell sx={{ color: 'white', textAlign: "Center" }}>Payment Exporting Module</TableCell>
                         </TableRow>

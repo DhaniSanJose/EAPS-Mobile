@@ -27,6 +27,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import RestoreIcon from "@mui/icons-material/Restore";
 import DeleteIcon from "@mui/icons-material/Delete";
 import API_BASE_URL from "../apiConfig";
+import EaristLogo from "../assets/EaristLogo.png";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import { SettingsContext } from "../App";
@@ -62,10 +63,40 @@ const formatName = (account) => {
   return [name, suffix].filter(Boolean).join(" ");
 };
 
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getArchiveSuggestionText = (account) =>
+  [
+    account?.applicant_number,
+    account?.email,
+    account?.account_type,
+    account?.archive_type,
+    account?.archive_reason,
+    account?.reason,
+    account?.message,
+    formatName(account),
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
+const getArchiveSuggestionValue = (account) =>
+  cleanSuggestionValue(account?.applicant_number) ||
+  cleanSuggestionValue(account?.email) ||
+  cleanSuggestionValue(formatName(account));
+
 const ArchivedModule = () => {
   useAccountAuditMac();
 
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -83,33 +114,27 @@ const ArchivedModule = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches
-      );
-    }
+    setBranches(settings?.branches || []);
 
   }, [settings]);
 
@@ -119,6 +144,7 @@ const ArchivedModule = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [archivedAccounts, setArchivedAccounts] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [employeeID, setEmployeeID] = useState("");
   const [canDelete, setCanDelete] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
@@ -137,27 +163,15 @@ const ArchivedModule = () => {
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.border_color) {
-      setBorderColor(settings.border_color);
+    if (colors.border) {
+      setBorderColor(colors.border);
     }
 
-    if (settings.main_button_color) {
-      setMainButtonColor(settings.main_button_color);
+    if (colors.mainButton) {
+      setMainButtonColor(colors.mainButton);
     }
 
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(Array.isArray(parsed) ? parsed : []);
-      } catch (error) {
-        console.error("Failed to parse branches:", error);
-        setBranches([]);
-      }
-    }
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const showSnack = (message, severity = "info") => {
@@ -242,6 +256,17 @@ const ArchivedModule = () => {
 
     return filteredAccounts.slice(startIndex, endIndex);
   }, [filteredAccounts, currentPage]);
+  const archiveSuggestions = useMemo(
+    () =>
+      searchQuery.trim().length >= 2
+        ? archivedAccounts
+          .filter((account) =>
+            getArchiveSuggestionText(account).includes(searchQuery.trim().toLowerCase()),
+          )
+          .slice(0, 8)
+        : [],
+    [archivedAccounts, searchQuery],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -381,26 +406,51 @@ const ArchivedModule = () => {
 
 
         {/* Right: Search */}
-        <TextField
-          variant="outlined"
-          placeholder="Search by Applicant / Message / Type"
-          size="small"
+        <Box sx={{ position: "relative", width: 450 }}>
+          <TextField
+            variant="outlined"
+            placeholder="Search by Applicant / Message / Type"
+            size="small"
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => setSuggestionsOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, mt: 0.5, maxHeight: 260, overflowY: "auto", backgroundColor: "#fff", border: "1px solid #d6d6d6", borderRadius: 1, boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+              {archiveSuggestions.length > 0 ? (
+                archiveSuggestions.map((account) => {
+                  const accountId = cleanSuggestionValue(account?.applicant_number);
+                  const accountName = cleanSuggestionValue(formatName(account));
+                  const type = cleanSuggestionValue(account?.account_type || account?.archive_type);
 
-
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+                  return (
+                    <Box key={`${account?.person_id}-${accountId}-${account?.email}`} onMouseDown={(event) => { event.preventDefault(); setSearchQuery(getArchiveSuggestionValue(account)); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                      <Typography component="span" sx={{ fontWeight: 700, minWidth: 120 }}>{accountId || type || "Archived"}</Typography>
+                      <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[accountName, account?.email].filter(Boolean).join(" - ")}</Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching archived accounts</Box>
+              )}
+            </Box>
+          )}
+        </Box>
 
       </Box>
 
@@ -418,7 +468,7 @@ const ArchivedModule = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -722,7 +772,7 @@ const ArchivedModule = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -923,7 +973,7 @@ const ArchivedModule = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: headerColor || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

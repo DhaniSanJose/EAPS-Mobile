@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
+import EaristLogo from "../assets/EaristLogo.png";
 import axios from "axios";
 import { Button, Box, TextField, Container, Snackbar, Alert, Typography, Card, TableContainer, Paper, Table, TableHead, TableRow, TableCell, FormHelperText, FormControl, InputLabel, Select, MenuItem, Modal, FormControlLabel, Checkbox, IconButton, CircularProgress, } from "@mui/material";
 import { Link } from "react-router-dom";
@@ -43,6 +44,40 @@ import DateField from "../components/DateField";
 import FormalExample from "../assets/formalexample.png";
 import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
+
+const cleanApplicantValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatApplicantSuggestionName = (applicant) =>
+  [
+    cleanApplicantValue(applicant?.last_name),
+    cleanApplicantValue(applicant?.first_name),
+    cleanApplicantValue(applicant?.middle_name),
+    cleanApplicantValue(applicant?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.extension,
+    applicant?.emailAddress,
+  ]
+    .map(cleanApplicantValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionValue = (applicant) =>
+  cleanApplicantValue(applicant?.applicant_number) ||
+  formatApplicantSuggestionName(applicant) ||
+  cleanApplicantValue(applicant?.emailAddress);
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
@@ -50,6 +85,10 @@ import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProce
 const ApplicantRegistrarPersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -68,33 +107,27 @@ const ApplicantRegistrarPersonalInformation = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches
-      );
-    }
+    setBranches(settings?.branches || []);
 
   }, [settings]);
 
@@ -1102,6 +1135,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchError, setSearchError] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
 
 
@@ -1134,6 +1168,38 @@ const ApplicantRegistrarPersonalInformation = () => {
 
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
+
+  const applicantSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+          .filter((applicant) =>
+            getApplicantSuggestionText(applicant).includes(
+              searchQuery.trim().toLowerCase(),
+            ),
+          )
+          .slice(0, 10)
+      : [];
+
+  const handleApplicantSuggestionSelect = async (applicant) => {
+    const nextValue = getApplicantSuggestionValue(applicant);
+    setSearchQuery(nextValue);
+    setSuggestionsOpen(false);
+
+    if (!applicant?.person_id) return;
+
+    try {
+      const details = await axios.get(
+        `${API_BASE_URL}/api/person_with_applicant/${applicant.person_id}`,
+      );
+      setPerson(details.data);
+      sessionStorage.setItem("admin_edit_person_id", details.data.person_id);
+      setUserID(details.data.person_id);
+      setSearchError("");
+    } catch (err) {
+      console.error("Search failed:", err);
+      setSearchError("Applicant not found");
+    }
+  };
 
 
   const divToPrintRef = useRef();
@@ -1507,28 +1573,93 @@ const ApplicantRegistrarPersonalInformation = () => {
         </Typography>
 
         <Box display="flex" alignItems="center" gap={2}>
-          <TextField
-            size="small"
-
-            placeholder="Search Applicant Name / Email / Applicant ID"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              width: 450,
-              backgroundColor: "#fff",
-              borderRadius: 1,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-              },
-            }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-            }}
-          />
+          <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+            <TextField
+              size="small"
+              placeholder="Search Applicant Name / Email / Applicant ID"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+              }}
+              onBlur={() => {
+                setTimeout(() => setSuggestionsOpen(false), 150);
+              }}
+              sx={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                },
+              }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+              }}
+            />
+            {suggestionsOpen && searchQuery.trim().length >= 2 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  backgroundColor: "#fff",
+                  border: "1px solid #d0d0d0",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}
+              >
+                {applicantSuggestions.length > 0 ? (
+                  applicantSuggestions.map((applicant) => {
+                    const applicantNumber = cleanApplicantValue(applicant?.applicant_number);
+                    const name = formatApplicantSuggestionName(applicant);
+                    return (
+                      <Box
+                        key={`${applicantNumber || applicant?.person_id}-${name}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleApplicantSuggestionSelect(applicant);
+                        }}
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          fontSize: 14,
+                          borderBottom: "1px solid #f0f0f0",
+                          "&:hover": { backgroundColor: "#f5f7fb" },
+                        }}
+                      >
+                        <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                          {applicantNumber || "N/A"}
+                        </Typography>
+                        <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                        <Typography sx={{ fontSize: 14 }} noWrap>
+                          {name || cleanApplicantValue(applicant?.emailAddress) || "Unnamed Applicant"}
+                        </Typography>
+                      </Box>
+                    );
+                  })
+                ) : (
+                  <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                    No matching applicants found
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
           <PrintingHistoryDialog employeeId={employeeID} />
         </Box>
       </Box>
-      {searchError && <Typography color="error">{searchError}</Typography>}
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
 
@@ -1543,7 +1674,7 @@ const ApplicantRegistrarPersonalInformation = () => {
 
       <TableContainer component={Paper} sx={{ width: '100%', mb: 1 }}>
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
+          <TableHead sx={{ backgroundColor: headerColor, border: `1px solid ${borderColor}`, }}>
             <TableRow>
               {/* Left cell: Applicant ID */}
               <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
@@ -1701,7 +1832,7 @@ const ApplicantRegistrarPersonalInformation = () => {
                     transform: disabled ? "none" : "scale(1.05)",
                     backgroundColor: disabled
                       ? "#fff"
-                      : settings?.header_color || "#1976d2",
+                      : headerColor,
 
                     "& .card-text": {
                       color: disabled ? mainButtonColor : "#fff",
@@ -1818,7 +1949,7 @@ const ApplicantRegistrarPersonalInformation = () => {
                         height: 50,
                         borderRadius: "50%",
                         border: `1px solid ${borderColor}`,
-                        backgroundColor: activeStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
+                        backgroundColor: activeStep === index ? headerColor : "#E8C999",
                         color: activeStep === index ? "#fff" : "#000",
                         display: "flex",
                         alignItems: "center",
@@ -1865,7 +1996,7 @@ const ApplicantRegistrarPersonalInformation = () => {
           <Container
             maxWidth="100%"
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               border: `1px solid ${borderColor}`,
               maxHeight: "500px",
               overflowY: "auto",
@@ -3620,7 +3751,7 @@ const ApplicantRegistrarPersonalInformation = () => {
                   {/* Header — matches the DialogTitle style from your email modal */}
                   <Box
                     sx={{
-                      bgcolor: settings?.header_color || "#1976d2",
+                      bgcolor: headerColor,
                       color: "white",
                       display: "flex",
                       justifyContent: "space-between",

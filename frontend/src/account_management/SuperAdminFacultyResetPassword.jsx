@@ -29,10 +29,33 @@ import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getFacultySuggestionText = (facultyMember) =>
+  [
+    facultyMember?.employee_id,
+    facultyMember?.fullName,
+    facultyMember?.first_name,
+    facultyMember?.middle_name,
+    facultyMember?.last_name,
+    facultyMember?.email,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
 const SuperAdminFacultyResetPassword = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -43,15 +66,16 @@ const SuperAdminFacultyResetPassword = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
   }, [settings]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [faculty, setFaculty] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -226,6 +250,14 @@ const SuperAdminFacultyResetPassword = () => {
   const indexOfLastRow = currentPage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = faculty.slice(indexOfFirstRow, indexOfLastRow);
+  const facultySuggestions =
+    searchQuery.trim().length >= 2
+      ? faculty
+        .filter((facultyMember) =>
+          getFacultySuggestionText(facultyMember).includes(searchQuery.trim().toLowerCase()),
+        )
+        .slice(0, 8)
+      : [];
 
   const handleNameClick = (f) => {
     setSearchQuery(f.email);
@@ -308,7 +340,7 @@ const SuperAdminFacultyResetPassword = () => {
 
   const PaginationBar = () => (
     <TableRow>
-      <TableCell colSpan={6} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+      <TableCell colSpan={6} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor || "#1976d2", color: "white" }}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Typography fontSize="14px" fontWeight="bold" color="white">Total Faculty's Records: {faculty.length}</Typography>
           <PaginationControls />
@@ -324,14 +356,36 @@ const SuperAdminFacultyResetPassword = () => {
         <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}>
           FACULTY RESET PASSWORD
         </Typography>
-        <TextField
-          size="small"
-          placeholder="Search Employee ID / Name / Email"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ width: 450, backgroundColor: "#fff", borderRadius: 1, "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
-          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
-        />
+        <Box sx={{ position: "relative", width: 450 }}>
+          <TextField
+            size="small"
+            placeholder="Search Employee ID / Name / Email"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => setSuggestionsOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+            sx={{ width: "100%", backgroundColor: "#fff", borderRadius: 1, "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+            InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, mt: 0.5, maxHeight: 260, overflowY: "auto", backgroundColor: "#fff", border: "1px solid #d6d6d6", borderRadius: 1, boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+              {facultySuggestions.length > 0 ? (
+                facultySuggestions.map((facultyMember) => (
+                  <Box key={`${facultyMember?.employee_id}-${facultyMember?.email}`} onMouseDown={(e) => { e.preventDefault(); handleNameClick(facultyMember); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                    <Typography component="span" sx={{ fontWeight: 700, minWidth: 120 }}>{cleanSuggestionValue(facultyMember?.employee_id) || "No employee ID"}</Typography>
+                    <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[cleanSuggestionValue(facultyMember?.fullName), cleanSuggestionValue(facultyMember?.email)].filter(Boolean).join(" - ")}</Typography>
+                  </Box>
+                ))
+              ) : (
+                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching faculty</Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br /><br />
@@ -342,7 +396,7 @@ const SuperAdminFacultyResetPassword = () => {
       {/* Section Label */}
       <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}` }}>
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "center" }}>Faculty Information</TableCell>
             </TableRow>

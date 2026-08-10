@@ -37,6 +37,10 @@ import API_BASE_URL from "../apiConfig";
 
 const StudentFacultyEvaluation = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -51,10 +55,10 @@ const StudentFacultyEvaluation = () => {
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
   }, [settings]);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -610,7 +614,7 @@ const StudentFacultyEvaluation = () => {
                           label={r.scale}
                           size="small"
                           sx={{
-                            backgroundColor: settings?.header_color || "#1976d2",
+                            backgroundColor: headerColor || "#1976d2",
                             color: "white",
                             fontWeight: 700,
                             minWidth: 32,
@@ -630,7 +634,7 @@ const StudentFacultyEvaluation = () => {
                       <TableHead>
                         <TableRow
                           sx={{
-                            backgroundColor: settings?.header_color || "#1976d2",
+                            backgroundColor: headerColor || "#1976d2",
                             color: "white",
                             border: `1px solid ${borderColor}`,
                           }}

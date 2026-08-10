@@ -48,12 +48,15 @@ const filterOptions = createFilterOptions({
 
 const SuperAdminProfessorEducation = () => {
   useAccountAuditMac();
-  const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
+    const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
     const settings = useContext(SettingsContext);
+    const colors = settings?.colors || {};
+    const branding = settings?.branding || {};
+    const assets = settings?.assets || {};
+    const headerColor = colors.header || "#1976d2";
     const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
     const [borderColor, setBorderColor] = useState("#000000");
     const [titleColor, setTitleColor] = useState("#000000");
-    const headerColor = settings?.header_color || "#1976d2";
 
     const [profList, setProfList] = useState([]);
     const [list, setList] = useState([]);
@@ -100,9 +103,9 @@ const SuperAdminProfessorEducation = () => {
 
     useEffect(() => {
         if (!settings) return;
-        if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.title_color) setTitleColor(settings.title_color);
+        if (colors.mainButton) setMainButtonColor(colors.mainButton);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.title) setTitleColor(colors.title);
     }, [settings]);
 
     useEffect(() => {
@@ -673,7 +676,7 @@ const SuperAdminProfessorEducation = () => {
             >
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#9E0000",
+                        background: headerColor || "#9E0000",
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.2rem",

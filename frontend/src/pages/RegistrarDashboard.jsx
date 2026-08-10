@@ -48,30 +48,17 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
   // ── Theme colors ────────────────────────────────────────────────
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [stepperColor, setStepperColor] = useState("#000000");
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url)
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    else setFetchedLogo(EaristLogo);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const subtitleColor = colors.subtitle || "#555555";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
+  const fetchedLogo = branding.logoUrl || EaristLogo;
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
+  const campusAddress = branding.campusAddress || "";
 
   // ── Auth ────────────────────────────────────────────────────────
   const [userID, setUserID] = useState("");
@@ -479,8 +466,6 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
   ];
 
 
-  const headerColor = settings?.header_color || "#1976d2";
-
   const cardSx = {
     border: `2px solid ${borderColor}`,
     borderRadius: 3,
@@ -567,7 +552,7 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
             mt: 2,
             borderRadius: "12px",
             overflow: "hidden",
-            backgroundColor: settings?.header_color || "#1976d2",
+            backgroundColor: headerColor,
             color: "#fff",
             border: `2px solid ${borderColor}`,
             mb: 2,

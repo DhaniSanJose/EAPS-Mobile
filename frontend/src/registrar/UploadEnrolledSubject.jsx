@@ -10,6 +10,7 @@ import useAuditMac from "../utils/useAuditMac";
 const UploadEnrolledSubject = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [branches, setBranches] = useState([]);
@@ -26,23 +27,12 @@ const UploadEnrolledSubject = () => {
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.title_color) setTitleColor(settings.title_color);
+    if (colors.title) setTitleColor(colors.title);
 
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(Array.isArray(parsed) ? parsed : []);
-        setCampus((prev) => prev || String(parsed?.[0]?.id ?? ""));
-      } catch (err) {
-        setBranches([]);
-      }
-    } else {
-      setBranches([]);
-    }
-  }, [settings]);
+    const normalizedBranches = settings?.branches || [];
+    setBranches(normalizedBranches);
+    setCampus((prev) => prev || String(normalizedBranches?.[0]?.id ?? ""));
+  }, [settings, colors.title]);
 
   const handleEnrolledSubjectImport = async (event) => {
     const file = event.target.files?.[0];

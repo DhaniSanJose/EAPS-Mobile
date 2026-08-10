@@ -74,14 +74,10 @@ const AdmissionContactManagement = () => {
     useAuditMac();
     const settings = useContext(SettingsContext);
 
-    const [titleColor, setTitleColor] = useState("#000000");
-    const [borderColor, setBorderColor] = useState("#000000");
-
-    useEffect(() => {
-        if (!settings) return;
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-    }, [settings]);
+    const colors = settings?.colors || {};
+    const titleColor = colors.title || "#000000";
+    const borderColor = colors.border || "#000000";
+    const headerColor = colors.header || "#1976d2";
 
     // 🔐 Page access control
     // NOTE: replace with the actual page_id assigned to Admission Contact
@@ -184,17 +180,7 @@ const AdmissionContactManagement = () => {
         }
     };
 
-    const [branches, setBranches] = useState([]);
-
-    useEffect(() => {
-        if (!settings?.branches) return;
-        try {
-            const parsed = typeof settings.branches === "string" ? JSON.parse(settings.branches) : settings.branches;
-            setBranches(parsed || []);
-        } catch {
-            setBranches([]);
-        }
-    }, [settings]);
+    const branches = settings?.branches || [];
 
 
 
@@ -377,9 +363,9 @@ const AdmissionContactManagement = () => {
 
             <TableContainer component={Paper} sx={{ width: "100%" }}>
                 <Table size="small">
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                    <TableHead sx={{ backgroundColor: headerColor, color: "white" }}>
                         <TableRow>
-                            <TableCell sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                            <TableCell sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" sx={{ padding: "6px" }}>
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
                                         Total Admission Contact Records: {filteredContacts.length}
@@ -616,9 +602,9 @@ const AdmissionContactManagement = () => {
 
             <TableContainer component={Paper} sx={{ width: "100%" }}>
                 <Table size="small">
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                    <TableHead sx={{ backgroundColor: headerColor, color: "white" }}>
                         <TableRow>
-                            <TableCell sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                            <TableCell sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" sx={{ padding: "6px" }}>
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
                                         Total Admission Contact Records: {filteredContacts.length}
@@ -711,7 +697,7 @@ const AdmissionContactManagement = () => {
             >
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#1976d2",
+                        background: headerColor,
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.1rem",
@@ -864,7 +850,7 @@ const AdmissionContactManagement = () => {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
             >
-                <DialogTitle sx={{ background: settings?.header_color || "#1976d2", color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+                <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
                     Delete Admission Contact
                 </DialogTitle>
 

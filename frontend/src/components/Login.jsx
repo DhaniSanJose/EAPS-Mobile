@@ -786,20 +786,12 @@ const CompactAnnouncementBanner = ({ slides }) => {
 const Login = ({ setIsAuthenticated }) => {
   const settings = useContext(SettingsContext);
   const { device, isMobile, isTablet, isDesktop, isCompact } = useResponsive();
-
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-
-  useEffect(() => {
-    if (settings) {
-      if (settings.title_color) setTitleColor(settings.title_color);
-      if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-      if (settings.border_color) setBorderColor(settings.border_color);
-      if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    }
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
+  const companyName = branding.companyName || "Company Name";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -1042,10 +1034,9 @@ const Login = ({ setIsAuthenticated }) => {
     return "/student_dashboard";
   }
 
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "linear-gradient(to right, #f5f5f5, #fafafa)";
-  const logoSrc = settings?.logo_url ? `${API_BASE_URL}${settings.logo_url}` : Logo;
+  const backgroundImage =
+    assets.backgroundImage || "linear-gradient(to right, #f5f5f5, #fafafa)";
+  const logoSrc = assets.logoUrl || Logo;
 
   // 🔒 Disable right-click + block DevTools shortcuts.
   // Registered ONCE (not on every render) to avoid stacking listeners,
@@ -1121,7 +1112,7 @@ const Login = ({ setIsAuthenticated }) => {
           <div
             className="Header"
             style={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               padding: isMobile ? "12px 10px" : isTablet ? "14px 12px" : "1rem 0",
               borderBottom: "3px solid black",
             }}
@@ -1133,7 +1124,7 @@ const Login = ({ setIsAuthenticated }) => {
             </div>
             <div className="HeaderBody">
               <strong style={{ color: "white" }}>
-                {(settings?.company_name || "Company Name").split(" ").reduce((acc, word, i) => {
+                {companyName.split(" ").reduce((acc, word, i) => {
                   if (i % 4 === 0 && i !== 0) acc.push(<br key={`br-${i}`} />);
                   acc.push(word + " ");
                   return acc;
@@ -1327,7 +1318,7 @@ const Login = ({ setIsAuthenticated }) => {
           {/* ── Footer ── */}
           <div className="Footer">
             <div className="FooterText">
-              &copy; {currentYear} {settings?.company_name || "EARIST"} <br />
+              &copy; {currentYear} {companyName || "EARIST"} <br />
               Academic Information System. <br />
               All rights reserved.
             </div>

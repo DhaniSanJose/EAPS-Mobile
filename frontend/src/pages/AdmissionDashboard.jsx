@@ -43,30 +43,16 @@ import API_BASE_URL from "../apiConfig";
 
 const AdmissionDashboardPanel = () => {
   const settings = useContext(SettingsContext);
-
-  // Theme Colors
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-
-  // School Info
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-
-  useEffect(() => {
-    if (!settings) return;
-
-    setTitleColor(settings.title_color || "#000000");
-    setBorderColor(settings.border_color || "#000000");
-    setMainButtonColor(settings.main_button_color || "#1976d2");
-
-    setFetchedLogo(settings.logo_url ? `${API_BASE_URL}${settings.logo_url}` : null);
-    setCompanyName(settings.company_name || "");
-    setShortTerm(settings.short_term || "");
-    setCampusAddress(settings.campus_address || "");
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const assets = settings?.assets || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const fetchedLogo = branding.logoUrl || null;
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
+  const campusAddress = branding.campusAddress || "";
 
   // User & Access Control
   const [userID, setUserID] = useState("");
@@ -216,9 +202,8 @@ const AdmissionDashboardPanel = () => {
     return <LoadingOverlay open={loading} message="Loading..." />;
   if (!hasAccess) return <Unauthorized />;
 
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "linear-gradient(to right, #e0e0e0, #bdbdbd)";
+  const backgroundImage =
+    assets.backgroundImage || "linear-gradient(to right, #e0e0e0, #bdbdbd)";
 
   // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());

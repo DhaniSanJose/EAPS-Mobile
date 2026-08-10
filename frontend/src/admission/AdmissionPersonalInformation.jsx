@@ -29,7 +29,6 @@ import FactCheckIcon from "@mui/icons-material/FactCheck";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
-import SearchIcon from "@mui/icons-material/Search";
 import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from '@mui/icons-material/Campaign';
 import API_BASE_URL from "../apiConfig";
@@ -43,6 +42,40 @@ import DateField from "../components/DateField";
 import FormalExample from "../assets/formalexample.png";
 import AdminECATApplicationForm from "./AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
+
+const cleanApplicantValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatApplicantSuggestionName = (applicant) =>
+  [
+    cleanApplicantValue(applicant?.last_name),
+    cleanApplicantValue(applicant?.first_name),
+    cleanApplicantValue(applicant?.middle_name),
+    cleanApplicantValue(applicant?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.extension,
+    applicant?.emailAddress,
+  ]
+    .map(cleanApplicantValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionValue = (applicant) =>
+  cleanApplicantValue(applicant?.applicant_number) ||
+  formatApplicantSuggestionName(applicant) ||
+  cleanApplicantValue(applicant?.emailAddress);
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 import SaveIcon from '@mui/icons-material/Save';
@@ -51,52 +84,16 @@ const AdmissionPersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-
-    // ✅ Branches (JSON stored in DB)
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches
-      );
-    }
-
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const subtitleColor = colors.subtitle || "#555555";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
+  const branches = settings?.branches || [];
 
   const getBranchLabel = (branchId) => {
     const branch = branches.find((item) => String(item.id) === String(branchId));
@@ -1333,17 +1330,43 @@ const AdmissionPersonalInformation = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchError, setSearchError] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
+  const handleApplicantSuggestionSelect = async (applicant, nextValue) => {
+    setSearchQuery(nextValue || applicant?.applicant_number || "");
+    setSuggestionsOpen(false);
+    if (applicant?.person_id) {
+      await fetchByPersonId(applicant.person_id);
+      sessionStorage.setItem("admin_edit_person_id", applicant.person_id);
+      setUserID(applicant.person_id);
+      setSearchError("");
+    }
+  };
+
+  const applicantSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+          .filter((applicant) =>
+            getApplicantSuggestionText(applicant).includes(
+              searchQuery.trim().toLowerCase(),
+            ),
+          )
+          .slice(0, 10)
+      : [];
 
 
 
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
-      if (searchQuery.trim() === "") return; // Don't search empty
+      const query = searchQuery.trim();
+      if (query === "" || query.length < 2) {
+        setSearchError("");
+        return;
+      }
 
       try {
         const res = await axios.get(`${API_BASE_URL}/api/search-person`, {
-          params: { query: searchQuery }
+          params: { query }
         });
 
         if (res.data && res.data.person_id) {
@@ -1744,28 +1767,105 @@ const AdmissionPersonalInformation = () => {
         </Typography>
 
         <Box display="flex" alignItems="center" gap={2}>
-          <TextField
-            size="small"
-
-            placeholder="Search Applicant Name / Email / Applicant ID"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              width: 450,
-              backgroundColor: "#fff",
-              borderRadius: 1,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-              },
-            }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-            }}
-          />
+          <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+            <TextField
+              variant="outlined"
+              placeholder="Search Applicant Name / Email / Applicant ID"
+              size="small"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+              }}
+              onBlur={() => {
+                setTimeout(() => setSuggestionsOpen(false), 150);
+              }}
+              sx={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                },
+              }}
+              InputProps={{
+                startAdornment: <Search sx={{ mr: 1, color: "gray" }} />,
+              }}
+            />
+            {suggestionsOpen && searchQuery.trim().length >= 2 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  backgroundColor: "#fff",
+                  border: "1px solid #d0d0d0",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}
+              >
+                {applicantSuggestions.length > 0 ? (
+                  applicantSuggestions.map((applicant) => {
+                    const applicantNumber = cleanApplicantValue(
+                      applicant?.applicant_number,
+                    );
+                    const name = formatApplicantSuggestionName(applicant);
+                    return (
+                      <Box
+                        key={`${applicantNumber || applicant?.person_id}-${name}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleApplicantSuggestionSelect(
+                            applicant,
+                            getApplicantSuggestionValue(applicant),
+                          );
+                        }}
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          fontSize: 14,
+                          borderBottom: "1px solid #f0f0f0",
+                          "&:hover": {
+                            backgroundColor: "#f5f7fb",
+                          },
+                        }}
+                      >
+                        <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                          {applicantNumber || "N/A"}
+                        </Typography>
+                        <Typography sx={{ fontSize: 14, color: "#555" }}>
+                          |
+                        </Typography>
+                        <Typography sx={{ fontSize: 14 }} noWrap>
+                          {name ||
+                            cleanApplicantValue(applicant?.emailAddress) ||
+                            "Unnamed Applicant"}
+                        </Typography>
+                      </Box>
+                    );
+                  })
+                ) : (
+                  <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                    No matching applicants found
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
           <PrintingHistoryDialog employeeId={employeeID} />
         </Box>
       </Box>
-      {searchError && <Typography color="error">{searchError}</Typography>}
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
       <br />
@@ -1777,7 +1877,7 @@ const AdmissionPersonalInformation = () => {
 
       <TableContainer component={Paper} sx={{ width: '100%', mb: 1 }}>
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}`, }}>
+          <TableHead sx={{ backgroundColor: headerColor, border: `1px solid ${borderColor}`, }}>
             <TableRow>
               {/* Left cell: Applicant ID */}
               <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
@@ -1962,7 +2062,7 @@ const AdmissionPersonalInformation = () => {
                     transform: disabled ? "none" : "scale(1.05)",
                     backgroundColor: disabled
                       ? "#fff"
-                      : settings?.header_color || "#1976d2",
+                      : headerColor,
 
                     "& .card-text": {
                       color: disabled ? mainButtonColor : "#fff",
@@ -2077,7 +2177,7 @@ const AdmissionPersonalInformation = () => {
                         height: 50,
                         borderRadius: "50%",
                         border: `1px solid ${borderColor}`,
-                        backgroundColor: activeStep === index ? settings?.header_color || "#1976d2" : "#E8C999",
+                        backgroundColor: activeStep === index ? headerColor : "#E8C999",
                         color: activeStep === index ? "#fff" : "#000",
                         display: "flex",
                         alignItems: "center",
@@ -2124,7 +2224,7 @@ const AdmissionPersonalInformation = () => {
           <Container
             maxWidth="100%"
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               border: `1px solid ${borderColor}`,
               maxHeight: "500px",
               overflowY: "auto",
@@ -3848,7 +3948,7 @@ const AdmissionPersonalInformation = () => {
             >
               <DialogTitle
                 sx={{
-                  background: settings?.header_color || mainButtonColor || "#1976d2",
+                  background: headerColor || mainButtonColor || "#1976d2",
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: "1.2rem",
@@ -3920,7 +4020,7 @@ const AdmissionPersonalInformation = () => {
                   {/* Header — matches the DialogTitle style from your email modal */}
                   <Box
                     sx={{
-                      bgcolor: settings?.header_color || "#1976d2",
+                      bgcolor: headerColor,
                       color: "white",
                       display: "flex",
                       justifyContent: "space-between",

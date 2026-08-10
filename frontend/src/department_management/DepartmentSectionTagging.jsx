@@ -43,6 +43,7 @@ import useAuditMac from "../utils/useAuditMac";
 const DepartmentSectionTagging = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
 
   // ── Theme ─────────────────────────────────────────────────────────────────
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
@@ -52,10 +53,10 @@ const DepartmentSectionTagging = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.header_color) setHeaderColor(settings.header_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.title_color) setTitleColor(settings.title_color);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.header) setHeaderColor(colors.header);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.title) setTitleColor(colors.title);
   }, [settings]);
 
   // ── Auth / access ─────────────────────────────────────────────────────────
@@ -903,7 +904,7 @@ const DepartmentSectionTagging = () => {
         sx={{ width: "100%", border: `1px solid ${borderColor}` }}
       >
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead sx={{ backgroundColor: headerColor }}>
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>Student Tagged Section</TableCell>
             </TableRow>

@@ -35,6 +35,10 @@ const FeeRow = ({ label, amount, bold, red, large, borderColor }) => (
 
 const StudentBalanceInfo = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -48,9 +52,8 @@ const StudentBalanceInfo = () => {
   const [assessmentRow, setAssessmentRow] = useState(location.state?.assessmentRow || null);
   const [loading, setLoading] = useState(!location.state?.assessmentRow);
 
-  const titleColor = settings?.title_color || "#000";
-  const borderColor = settings?.border_color || "#000";
-  const headerColor = settings?.header_color || "#990000";
+  const titleColor = colors.title || "#000";
+  const borderColor = colors.border || "#000";
 
   useEffect(() => {
     if (assessmentRow) return;

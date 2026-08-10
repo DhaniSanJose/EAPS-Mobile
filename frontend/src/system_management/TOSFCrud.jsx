@@ -195,6 +195,9 @@ const RowActions = ({ canEdit, canDelete, onEdit, onDelete }) => (
 
 const TOSF = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
 
   const feeCategoryOptions = [
     { value: 2, label: "Tuition" },
@@ -221,34 +224,25 @@ const TOSF = () => {
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EARISTLogo);
     }
 
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings.branches) {
-      try {
-        const parsedBranches =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        if (Array.isArray(parsedBranches) && parsedBranches.length > 0) {
-          setBranches(parsedBranches);
-        }
-      } catch (error) {
-        console.error("Failed to parse branches:", error);
-      }
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+    const normalizedBranches = settings?.branches || [];
+    if (normalizedBranches.length > 0) {
+      setBranches(normalizedBranches);
     }
   }, [settings]);
 
@@ -1491,7 +1485,7 @@ const TOSF = () => {
     return `${startYear} - ${startYear + 1}`;
   };
 
-  const headerColor = settings?.header_color || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
   const verificationDialogPaperSx = {
     borderRadius: "16px",
     overflow: "hidden",

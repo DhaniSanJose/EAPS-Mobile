@@ -170,24 +170,27 @@ function UploadButton({
 function Settings({ onUpdate }) {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
 
   // School info
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
+  const [companyName, setCompanyName] = useState(branding.companyName || "");
+  const [shortTerm, setShortTerm] = useState(branding.shortTerm || "");
   const [logo, setLogo] = useState(null);
-  const [previewLogo, setPreviewLogo] = useState(null);
+  const [previewLogo, setPreviewLogo] = useState(assets.logoUrl || null);
   const [bgImage, setBgImage] = useState(null);
-  const [previewBg, setPreviewBg] = useState(null);
-  const [footerText, setFooterText] = useState("");
+  const [previewBg, setPreviewBg] = useState(assets.backgroundImage || null);
+  const [footerText, setFooterText] = useState(branding.footerText || "");
 
   // Colors
-  const [headerColor, setHeaderColor] = useState("#1976d2");
-  const [footerColor, setFooterColor] = useState("#ffffff");
-  const [mainButtonColor, setMainButtonColor] = useState("#ffffff");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
+  const [headerColor, setHeaderColor] = useState(colors.header || "");
+  const [footerColor, setFooterColor] = useState(colors.footer || "");
+  const [mainButtonColor, setMainButtonColor] = useState(colors.mainButton || "");
+  const [subButtonColor, setSubButtonColor] = useState(colors.subButton || "");
+  const [borderColor, setBorderColor] = useState(colors.border || "");
+  const [titleColor, setTitleColor] = useState(colors.title || "");
+  const [subtitleColor, setSubtitleColor] = useState(colors.subtitle || "");
 
   const [snack, setSnack] = useState({
     open: false,
@@ -202,20 +205,10 @@ function Settings({ onUpdate }) {
   const loading = false;
   const pageId = 74;
 
-  // Resolved dynamic colors (fall back to context/defaults)
-  const resolvedHeader = settings?.header_color || headerColor || "#1976d2";
-  const resolvedBorder = borderColor || "#000000";
-  const branches = (() => {
-    try {
-      if (Array.isArray(settings?.branches)) return settings.branches;
-      if (typeof settings?.branches === "string") {
-        return JSON.parse(settings.branches || "[]");
-      }
-    } catch (error) {
-      console.error("Failed to parse branches:", error);
-    }
-    return [];
-  })();
+  // Resolved dynamic colors from database-backed settings/context.
+  const resolvedHeader = colors.header || headerColor;
+  const resolvedBorder = colors.border || borderColor;
+  const branches = settings?.branches || [];
 
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
@@ -248,14 +241,14 @@ function Settings({ onUpdate }) {
           data.logo_url ? `${API_BASE_URL}${data.logo_url}` : null,
         );
         setPreviewBg(data.bg_image ? `${API_BASE_URL}${data.bg_image}` : null);
-        setHeaderColor(data.header_color || "#1976d2");
-        setFooterText(data.footer_text || "");
-        setFooterColor(data.footer_color || "#ffffff");
-        setMainButtonColor(data.main_button_color || "#ffffff");
-        setSubButtonColor(data.sub_button_color || "#ffffff");
-        setBorderColor(data.border_color || "#000000");
-        setTitleColor(data.title_color || "#000000");
-        setSubtitleColor(data.subtitle_color || "#555555");
+        setHeaderColor(data.header_color || colors.header || "");
+        setFooterText(data.footer_text || branding.footerText || "");
+        setFooterColor(data.footer_color || colors.footer || "");
+        setMainButtonColor(data.main_button_color || colors.mainButton || "");
+        setSubButtonColor(data.sub_button_color || colors.subButton || "");
+        setBorderColor(data.border_color || colors.border || "");
+        setTitleColor(data.title_color || colors.title || "");
+        setSubtitleColor(data.subtitle_color || colors.subtitle || "");
       })
       .catch(() =>
         setSnack({
@@ -821,9 +814,7 @@ function Settings({ onUpdate }) {
       {/* ── Hidden legacy TableContainer (preserved for compatibility) ─── */}
       <TableContainer component={Paper} sx={{ display: "none" }}>
         <Table>
-          <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
-          >
+          <TableHead sx={{ backgroundColor: resolvedHeader }}>
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
                 Settings

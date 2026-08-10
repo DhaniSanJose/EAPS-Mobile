@@ -55,57 +55,17 @@ const ApplicationProcessAdmin = () => {
 
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-
-    // ✅ Branches (JSON stored in DB)
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
+  const fetchedLogo = assets.logoUrl || EaristLogo;
+  const companyName = branding.companyName || "";
+  const campusAddressFallback = branding.campusAddress || "";
+  const branches = settings?.branches || [];
 
   useEffect(() => {
     socket.current = io(API_BASE_URL, {
@@ -462,26 +422,10 @@ const ApplicationProcessAdmin = () => {
     middle_code: "",
   });
 
-  useEffect(() => {
-    if (!settings) return;
-
-    const branchId = person?.campus;
-    const matchedBranch = branches.find(
-      (branch) => String(branch?.id) === String(branchId),
-    );
-
-    if (matchedBranch?.address) {
-      setCampusAddress(matchedBranch.address);
-      return;
-    }
-
-    if (settings.campus_address) {
-      setCampusAddress(settings.campus_address);
-      return;
-    }
-
-    setCampusAddress(settings.address || "");
-  }, [settings, branches, person?.campus]);
+  const matchedBranch = branches.find(
+    (branch) => String(branch?.id) === String(person?.campus),
+  );
+  const campusAddress = matchedBranch?.address || campusAddressFallback;
 
   // ⬇️ Add this inside ApplicantList component, before useEffect
   const fetchApplicants = async () => {
@@ -1346,7 +1290,7 @@ const ApplicationProcessAdmin = () => {
         <Table>
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
             }}
           >
             <TableRow>
@@ -1476,7 +1420,7 @@ const ApplicationProcessAdmin = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               color: "white",
             }}
           >
@@ -1486,7 +1430,7 @@ const ApplicationProcessAdmin = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -1891,7 +1835,7 @@ const ApplicationProcessAdmin = () => {
       <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table size="small">
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell
@@ -2505,7 +2449,7 @@ const ApplicationProcessAdmin = () => {
           >
             <DialogTitle
               sx={{
-                background: settings?.header_color || "#9E0000",
+                background: headerColor,
                 color: "#fff",
                 fontWeight: 700,
                 fontSize: "1.2rem",
@@ -2619,7 +2563,7 @@ const ApplicationProcessAdmin = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               color: "white",
             }}
           >
@@ -2629,7 +2573,7 @@ const ApplicationProcessAdmin = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -2826,7 +2770,7 @@ const ApplicationProcessAdmin = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

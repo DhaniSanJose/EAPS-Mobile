@@ -161,43 +161,20 @@ const ApplicantDashboard = (props) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));   // < 600px
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [stepperColor, setStepperColor] = useState("#000000");
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-  // branches list (needed to label a curriculum's campus, same as
-  // ApplicantPersonalInformation's getBranchLabel).
-  const [branches, setBranches] = useState([]);
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings.branches) {
-      setBranches(
-        typeof settings.branches === "string"
-          ? JSON.parse(settings.branches)
-          : settings.branches,
-      );
-    }
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const academic = settings?.academic || {};
+  const titleColor = colors.title || "#000000";
+  const subtitleColor = colors.subtitle || "#555555";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const stepperColor = colors.stepper || "#000000";
+  const headerColor = colors.header || "#1976d2";
+  const fetchedLogo = branding.logoUrl || EaristLogo;
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
+  const campusAddress = branding.campusAddress || "";
+  const branches = settings?.branches || [];
 
   const { profileImage, setProfileImage } = props;
   const [hovered, setHovered] = useState(false);
@@ -1134,7 +1111,7 @@ const ApplicantDashboard = (props) => {
   // person/settings fallback fields.
   const academicYearValue = activeSchoolYear
     ? `${activeSchoolYear.current_year}-${activeSchoolYear.next_year}`
-    : person?.academic_year || settings?.academic_year || "N/A";
+    : person?.academic_year || academic.academicYear || "N/A";
 
   const semesterValue =
     activeSchoolYear?.semester_description ||
@@ -1326,7 +1303,7 @@ const ApplicantDashboard = (props) => {
                   width: "100%",
                   borderRadius: "12px",
                   overflow: "hidden",
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "#fff",
                   border: `2px solid ${borderColor}`,
                   mb: 2,
@@ -1364,7 +1341,7 @@ const ApplicantDashboard = (props) => {
                           onClick={() => fileInputRef.current?.click()}
                           sx={{ position: "absolute", bottom: -4, right: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: "#ffffff", border: `2px solid ${borderColor}`, width: 30, height: 30, "&:hover": { backgroundColor: "#f5f5f5" } }}
                         >
-                          <AddCircleIcon sx={{ color: settings?.header_color || "#1976d2", fontSize: 24 }} />
+                          <AddCircleIcon sx={{ color: headerColor, fontSize: 24 }} />
                         </IconButton>
                       )}
                       <input type="file" accept="image/*" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
@@ -1437,7 +1414,7 @@ const ApplicantDashboard = (props) => {
                   width: "100%",
                   borderRadius: "12px",
                   overflow: "hidden",
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "#fff",
                   border: `2px solid ${borderColor}`,
                   mb: 2,
@@ -1512,7 +1489,7 @@ const ApplicantDashboard = (props) => {
                           >
                             <AddCircleIcon
                               sx={{
-                                color: settings?.header_color || "#1976d2",
+                                color: headerColor,
                                 fontSize: 22,
                               }}
                             />
@@ -1729,7 +1706,7 @@ const ApplicantDashboard = (props) => {
                       sx={{
                         px: 2,
                         py: 1.5,
-                        backgroundColor: settings?.header_color || "#1976d2",
+                        backgroundColor: headerColor,
                         color: "#fff",
                         borderBottom: `2px solid ${borderColor}`,
                       }}
@@ -1936,7 +1913,7 @@ const ApplicantDashboard = (props) => {
               <Grid item xs="auto">
                 <Card sx={{ marginLeft: "10px", boxShadow: 3, p: 2, border: `2px solid ${borderColor}`, borderRadius: "10px", width: "425px", height: "406px", transition: "transform 0.2s ease", "&:hover": { transform: "scale(1.03)" }, display: "flex", flexDirection: "column", justifyContent: "flex-start", alignItems: "center" }}>
                   <CardContent sx={{ p: 0, width: "100%" }}>
-                    <Grid container alignItems="center" justifyContent="space-between" sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white", border: `2px solid ${borderColor}`, borderBottom: "none", borderRadius: "8px 8px 0 0", padding: "10px 8px" }}>
+                    <Grid container alignItems="center" justifyContent="space-between" sx={{ backgroundColor: headerColor, color: "white", border: `2px solid ${borderColor}`, borderBottom: "none", borderRadius: "8px 8px 0 0", padding: "10px 8px" }}>
                       <Grid item><IconButton size="small" onClick={handlePrevMonth} sx={{ color: "white" }}><ArrowBackIos fontSize="small" /></IconButton></Grid>
                       <Grid item><Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>{date.toLocaleString("default", { month: "long" })} {year}</Typography></Grid>
                       <Grid item><IconButton size="small" onClick={handleNextMonth} sx={{ color: "white" }}><ArrowForwardIos fontSize="small" /></IconButton></Grid>
@@ -1952,7 +1929,7 @@ const ApplicantDashboard = (props) => {
                           const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                           const isHoliday = holidays[dateKey];
                           const dayCell = (
-                            <Box sx={{ height: 45, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isToday ? settings?.header_color || "#1976d2" : isHoliday ? "#E8C999" : "#fff", color: isToday ? "white" : "black", fontWeight: isHoliday ? "bold" : "500", cursor: isHoliday ? "pointer" : "default", "&:hover": { backgroundColor: isHoliday ? "#F5DFA6" : "#000", color: isHoliday ? "black" : "white" } }}>
+                            <Box sx={{ height: 45, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isToday ? headerColor : isHoliday ? "#E8C999" : "#fff", color: isToday ? "white" : "black", fontWeight: isHoliday ? "bold" : "500", cursor: isHoliday ? "pointer" : "default", "&:hover": { backgroundColor: isHoliday ? "#F5DFA6" : "#000", color: isHoliday ? "black" : "white" } }}>
                               {day}
                             </Box>
                           );
@@ -2064,7 +2041,7 @@ const ApplicantDashboard = (props) => {
                         sx={{
                           px: 2,
                           py: 1.5,
-                          backgroundColor: settings?.header_color || "#1976d2",
+                          backgroundColor: headerColor,
                           color: "#fff",
                           borderBottom: `2px solid ${borderColor}`,
                         }}
@@ -2183,7 +2160,7 @@ const ApplicantDashboard = (props) => {
                                     borderRadius: "50%",
                                     bgcolor:
                                       index === 0
-                                        ? settings?.header_color || "#1976d2"
+                                        ? headerColor
                                         : "#d1d1d1",
                                     transition: "all 0.2s ease",
                                   }}
@@ -2271,7 +2248,7 @@ const ApplicantDashboard = (props) => {
                         alignItems="center"
                         justifyContent="space-between"
                         sx={{
-                          backgroundColor: settings?.header_color || "#1976d2",
+                          backgroundColor: headerColor,
                           color: "white",
                           border: `2px solid ${borderColor}`,
                           borderBottom: "none",
@@ -2339,7 +2316,7 @@ const ApplicantDashboard = (props) => {
                                   alignItems: "center",
                                   justifyContent: "center",
                                   borderRadius: "50%",
-                                  backgroundColor: isToday ? settings?.header_color || "#1976d2" : isHoliday ? "#E8C999" : "#fff",
+                                  backgroundColor: isToday ? headerColor : isHoliday ? "#E8C999" : "#fff",
                                   color: isToday ? "white" : "black",
                                   fontWeight: isHoliday ? "bold" : "500",
                                   cursor: isHoliday ? "pointer" : "default",
@@ -2410,9 +2387,24 @@ const ApplicantDashboard = (props) => {
                     </Stack>
                     <Button
                       fullWidth
-                      variant="outlined"
-                      onClick={() => (window.location.href = "/applicant_profile")}
-                      sx={{ mt: 2, borderColor: mainButtonColor, color: mainButtonColor, textTransform: "none", fontWeight: 700, borderRadius: "8px" }}
+                      variant="contained"
+                      color="primary"
+                      onClick={() => {
+                        let keys = JSON.parse(localStorage.getItem("dashboardKeys"));
+                        if (!keys) {
+                          const g = () => Math.random().toString(36).substring(2, 10);
+                          keys = {
+                            step1: g(),
+                            step2: g(),
+                            step3: g(),
+                            step4: g(),
+                            step5: g(),
+                          };
+                          localStorage.setItem("dashboardKeys", JSON.stringify(keys));
+                        }
+                        window.location.href = `/applicant_personal_information/${keys.step1}`;
+                      }}
+                      sx={{ mt: 2, textTransform: "none", fontWeight: 700, borderRadius: "8px" }}
                     >
                       View / Edit Profile
                     </Button>

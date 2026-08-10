@@ -4,12 +4,16 @@ import axios from "axios";
 import { FcPrint } from "react-icons/fc";
 import { useLocation } from "react-router-dom";
 import { SettingsContext } from "../App";
+import EaristLogo from "../assets/EaristLogo.png";
 import SearchIcon from "@mui/icons-material/Search";
 import API_BASE_URL from "../apiConfig";
 
 const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
 
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
 
     const [titleColor, setTitleColor] = useState("#000000");
     const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -26,36 +30,28 @@ const HealthRecord = ({ studentNumber: studentNumberProp } = {}) => {
         if (!settings) return;
 
         // 🎨 Colors
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-        if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);   // ✅ NEW
-        if (settings.stepper_color) setStepperColor(settings.stepper_color);           // ✅ NEW
+        if (colors.title) setTitleColor(colors.title);
+        if (colors.subtitle) setSubtitleColor(colors.subtitle);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.mainButton) setMainButtonColor(colors.mainButton);
+        if (colors.subButton) setSubButtonColor(colors.subButton);   // ✅ NEW
+        if (colors.stepper) setStepperColor(colors.stepper);           // ✅ NEW
 
         // 🏫 Logo
-        if (settings.logo_url) {
-            setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+        if (assets.logoUrl) {
+            setFetchedLogo(assets.logoUrl);
         } else {
             setFetchedLogo(EaristLogo);
         }
 
         // 🏷️ School Information
-        if (settings.company_name) setCompanyName(settings.company_name);
-        if (settings.short_term) setShortTerm(settings.short_term);
-        if (settings.campus_address) setCampusAddress(settings.campus_address);
+        if (branding.companyName) setCompanyName(branding.companyName);
+        if (branding.shortTerm) setShortTerm(branding.shortTerm);
+        if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     }, [settings]);
 
     const [campusAddress, setCampusAddress] = useState("");
-
-
-    useEffect(() => {
-        if (settings && settings.address) {
-            setCampusAddress(settings.address);
-        }
-    }, [settings]);
-
 
 
     const words = companyName.trim().split(" ");

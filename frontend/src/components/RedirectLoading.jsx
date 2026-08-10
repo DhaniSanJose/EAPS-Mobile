@@ -1,13 +1,13 @@
 import React, { useContext } from "react";
 import { SettingsContext } from "../App";
-import API_BASE_URL from "../apiConfig";
 
 const RedirectLoading = ({ message = "Loading..." }) => {
   const settings = useContext(SettingsContext);
+  const assets = settings?.assets || {};
 
   const logo =
-    settings?.logo_url
-      ? `${API_BASE_URL}${settings.logo_url}`
+    assets.logoUrl
+      ? `${assets.logoUrl}`
       : "/EaristLogo.png";
 
   return (

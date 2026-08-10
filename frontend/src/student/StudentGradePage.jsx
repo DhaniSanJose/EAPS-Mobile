@@ -221,6 +221,10 @@ const DownloadButton = ({ onClick, disabled, label, size = "normal" }) => (
 // ─── Main Component ───────────────────────────────────────────────
 const StudentGradePage = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const theme = useTheme();
 
   // Breakpoints:
@@ -240,22 +244,22 @@ const StudentGradePage = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.logo_url)
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (assets.logoUrl)
+      setFetchedLogo(`${assets.logoUrl}`);
     else setFetchedLogo(EaristLogo);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
 
     // Same fallback chain AdmissionApplicantList.jsx uses: prefer
     // campus_address, but fall back to a plain "address" key so this
     // doesn't end up blank if Settings only ever populated the latter.
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    else if (settings.address) setCampusAddress(settings.address);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+    else if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   // ── Active School Year — same shape/endpoint the dashboard already uses
@@ -571,7 +575,7 @@ const StudentGradePage = () => {
     ),
   ];
   const sortedTerms = sortTerms(rawTerms, yearOrder, semesterOrder);
-  const headerBg = settings?.header_color || "#1976d2";
+  const headerBg = headerColor || "#1976d2";
   const programInfo = studentGrade[0] || null;
   const formattedMatriculationBalance =
     matriculationBalanceInfo.balance.toLocaleString(undefined, {
@@ -581,8 +585,8 @@ const StudentGradePage = () => {
 
   // ── PDF download helpers ────────────────────────────────────────────
   const resolveLogoUrl = () =>
-    settings?.logo_url
-      ? `${API_BASE_URL}${settings.logo_url}`
+    assets.logoUrl
+      ? `${assets.logoUrl}`
       : `${window.location.origin}${EaristLogo}`;
 
   const buildStudentInfoForPdf = () => {

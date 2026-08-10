@@ -343,6 +343,193 @@ router.post("/generate-admission-form-pdf", async (req, res) => {
   }
 });
 
+router.post("/generate-empty-admission-form-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Same A4 @96dpi proportions as the filled Admission Form route —
+    // EmptyAdmissionFormProcess.jsx uses the identical .student-table /
+    // logo -25px offset structure, so the same print CSS lines up.
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Reuses the SAME print CSS as /generate-admission-form-pdf (scale,
+    // .student-table offset, .dataField, svg.MuiSvgIcon-root, etc) since
+    // EmptyAdmissionFormProcess.jsx mirrors that component's header/table
+    // structure exactly — just with blank ruled fields instead of
+    // person.* data. These two rules were previously MISSING here, which
+    // is what caused the layout to drift from the filled PDF:
+    //   .dataField { margin-top: 2px !important; }
+    //   svg.MuiSvgIcon-root { margin-top: -53px; width: 70px !important; height: 70px !important; }
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      margin: 0;
+      padding: 0;
+    }
+ 
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 210mm;
+      height: 297mm;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+ 
+    @page {
+      size: A4;
+      margin: 0;
+    }
+ 
+    @media print {
+      button { display: none !important; }
+    }
+ 
+    .print-container {
+      width: 100%;
+      height: auto;
+      padding: 10px 20px;
+      transform: scale(0.836);
+    }
+ 
+    .student-table {
+      margin-top: -90px !important;
+    }
+ 
+    button {
+      display: none;
+    }
+ 
+    /* ── ADDED: matches /generate-admission-form-pdf exactly ── */
+    .dataField {
+      margin-top: 2px !important;
+    }
+ 
+    svg.MuiSvgIcon-root {
+      margin-top: -53px;
+      width: 70px !important;
+      height: 70px !important;
+    }
+    /* ── end additions ── */
+ 
+    table {
+      border-collapse: collapse;
+    }
+ 
+    img {
+      max-width: 100%;
+    }
+ 
+    [style*="background-color"],
+    [style*="backgroundColor"] {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: {
+        top: "0.25in",
+        bottom: "0.25in",
+        left: "0.25in",
+        right: "0.25in",
+      },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    // No applicant is tied to a blank form, so date-stamp the filename
+    // instead of naming it after a person (same convention as the
+    // Admission Services CSM / Exam Scores routes above).
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const fileName = `Empty_Admission_Form_Process_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Empty Admission Form (Process)",
+      legacyAction: "EMPTY_ADMISSION_FORM_PROCESS_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the blank Admission Form (Process) PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Empty Admission Form PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 // ─── 2. Office of the Registrar ─────────────────────────────────────────────
 router.post("/generate-registrar-form-pdf", async (req, res) => {
   let browser;
@@ -2992,13 +3179,11 @@ router.post("/generate-health-record-pdf", async (req, res) => {
     return res.end(pdfBuffer);
   } catch (err) {
     console.error("Health Record PDF ERROR:", err);
-    return res
-      .status(500)
-      .json({
-        message: "PDF generation failed",
-        error: err.message,
-        stack: err.stack,
-      });
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
   } finally {
     if (browser) await browser.close();
   }
@@ -4413,6 +4598,201 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
     return res.end(pdfBuffer);
   } catch (err) {
     console.error("Student Grades PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
+// ─── Entrance Exam Attendance Report ────────────────────────────────────────
+router.post("/generate-attendance-report-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, title, fileNamePrefix } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${title || "Attendance Report"}</title>
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial;
+      background: #ffffff;
+    }
+
+    .print-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .print-header {
+      position: relative;
+      width: 100%;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .header-content img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .header-text {
+      text-align: center;
+    }
+
+    .info-row {
+      margin-top: 16px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .info-row-line {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 12px;
+    }
+
+    .table-wrapper {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1.5px solid black;
+      table-layout: fixed;
+    }
+
+    th, td {
+      border: 1.5px solid black;
+      padding: 4px 3px;
+      font-size: 9px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    th {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    td.applicant-name {
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    ${html}
+  </div>
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      landscape: false,
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const prefix =
+      fileNamePrefix ||
+      (title || "Attendance_Report").replace(/[^a-z0-9]+/gi, "_");
+    const fileName = `${prefix}_${timestamp}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: title || "Attendance Report",
+      legacyAction: "EXAM_ATTENDANCE_REPORT_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported the ${title || "Attendance Report"} PDF.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Attendance Report PDF ERROR:", err);
     return res.status(500).json({
       message: "PDF generation failed",
       error: err.message,

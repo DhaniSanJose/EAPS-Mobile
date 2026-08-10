@@ -40,6 +40,10 @@ import SendIcon from "@mui/icons-material/Send";
 
 const ApplicantOnlineRequirements = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const theme = useTheme();
   // Card layout for phones + small tablets, table layout from md (tablet-landscape) up
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -59,19 +63,17 @@ const ApplicantOnlineRequirements = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url) setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings.branches) {
-      setBranches(typeof settings.branches === "string" ? JSON.parse(settings.branches) : settings.branches);
-    }
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
+    if (assets.logoUrl) setFetchedLogo(`${assets.logoUrl}`);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const getBranchLabel = (branchId) => {
@@ -581,7 +583,7 @@ const ApplicantOnlineRequirements = () => {
       <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth fullScreen={isMobile}
         PaperProps={{ sx: { borderRadius: isMobile ? 0 : "16px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}
       >
-        <DialogTitle sx={{ bgcolor: settings?.header_color || "#1976d2", color: "white", display: "flex", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
+        <DialogTitle sx={{ bgcolor: headerColor || "#1976d2", color: "white", display: "flex", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
           <Box display="flex" alignItems="center" gap={1.5}>
             <Box sx={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Typography fontSize={20}>🎉</Typography>
@@ -595,24 +597,24 @@ const ApplicantOnlineRequirements = () => {
 
         <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1 }}>
           <Box sx={{ display: "flex", justifyContent: "center", mb: 2.5, mt: 1 }}>
-            <Box sx={{ width: 76, height: 76, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.9)", border: `3px solid ${settings?.header_color || "#1976d2"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34 }}>
+            <Box sx={{ width: 76, height: 76, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.9)", border: `3px solid ${headerColor || "#1976d2"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34 }}>
               🎓
             </Box>
           </Box>
           <Box sx={{ textAlign: "center", mb: 2 }}>
             <Typography sx={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", mb: 1 }}>Congratulations, Applicant!</Typography>
             <Typography sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.65, mb: 1 }}>
-              Your application to <strong style={{ color: settings?.header_color || "#1976d2" }}>{companyName}</strong> has been successfully received.
+              Your application to <strong style={{ color: headerColor || "#1976d2" }}>{companyName}</strong> has been successfully received.
             </Typography>
             <Typography sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.65 }}>
-              The <strong style={{ color: settings?.header_color || "#1976d2" }}>Admission Office</strong> will contact you regarding the evaluation of your submitted documents.
+              The <strong style={{ color: headerColor || "#1976d2" }}>Admission Office</strong> will contact you regarding the evaluation of your submitted documents.
             </Typography>
           </Box>
 
           {/* Applicant summary card */}
           <Box
             sx={{
-              border: `1.5px solid ${settings?.header_color || "#1976d2"}`,
+              border: `1.5px solid ${headerColor || "#1976d2"}`,
               borderRadius: "12px",
               overflow: "hidden",
               mb: 1,
@@ -620,7 +622,7 @@ const ApplicantOnlineRequirements = () => {
           >
             <Box
               sx={{
-                backgroundColor: settings?.header_color || "#1976d2",
+                backgroundColor: headerColor || "#1976d2",
                 px: 2,
                 py: 1,
               }}
@@ -738,10 +740,10 @@ const ApplicantOnlineRequirements = () => {
           <Box sx={{ borderTop: "1px solid #e0e0e0", my: 2 }} />
           <Box sx={{ display: "flex", gap: 1.5, mb: 1, flexDirection: { xs: "column", sm: "row" } }}>
             {[
-              { icon: <EmailOutlinedIcon sx={{ fontSize: 18, color: settings?.header_color || "#1976d2", flexShrink: 0 }} />, label: "Check your Gmail for email updates from the Admission Office." },
-              { icon: <DashboardOutlinedIcon sx={{ fontSize: 18, color: settings?.header_color || "#1976d2", flexShrink: 0 }} />, label: "Monitor your Applicant Dashboard for real-time status updates." },
+              { icon: <EmailOutlinedIcon sx={{ fontSize: 18, color: headerColor || "#1976d2", flexShrink: 0 }} />, label: "Check your Gmail for email updates from the Admission Office." },
+              { icon: <DashboardOutlinedIcon sx={{ fontSize: 18, color: headerColor || "#1976d2", flexShrink: 0 }} />, label: "Monitor your Applicant Dashboard for real-time status updates." },
             ].map((item, i) => (
-              <Box key={i} sx={{ flex: 1, backgroundColor: "#f0f7ff", borderLeft: `3px solid ${settings?.header_color || "#1976d2"}`, borderRadius: "0 9px 9px 0", p: 1.5, display: "flex", gap: 1, alignItems: "flex-start" }}>
+              <Box key={i} sx={{ flex: 1, backgroundColor: "#f0f7ff", borderLeft: `3px solid ${headerColor || "#1976d2"}`, borderRadius: "0 9px 9px 0", p: 1.5, display: "flex", gap: 1, alignItems: "flex-start" }}>
                 {item.icon}
                 <Typography sx={{ fontSize: 12.5, color: "#333", lineHeight: 1.5 }}>{item.label}</Typography>
               </Box>
@@ -755,7 +757,7 @@ const ApplicantOnlineRequirements = () => {
             variant="contained"
             endIcon={<ArrowForwardIcon />}
             onClick={() => { setOpenModal(false); window.location.href = "/applicant_dashboard"; }}
-            sx={{ height: 44, borderRadius: "10px", backgroundColor: settings?.header_color || "#1976d2", color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: settings?.header_color || "#1976d2", opacity: 0.9, boxShadow: "none" } }}
+            sx={{ height: 44, borderRadius: "10px", backgroundColor: headerColor || "#1976d2", color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: headerColor || "#1976d2", opacity: 0.9, boxShadow: "none" } }}
           >
             Go to Applicant Dashboard
           </Button>
@@ -766,7 +768,7 @@ const ApplicantOnlineRequirements = () => {
       <Dialog open={openConfirmModal} onClose={() => setOpenConfirmModal(false)} maxWidth="md" fullWidth fullScreen={isMobile}
         PaperProps={{ sx: { borderRadius: isMobile ? 0 : "16px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" } }}
       >
-        <DialogTitle sx={{ bgcolor: settings?.header_color || "#1976d2", color: "white", display: "flex", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
+        <DialogTitle sx={{ bgcolor: headerColor || "#1976d2", color: "white", display: "flex", alignItems: "center", fontWeight: "bold", px: 3, py: 2 }}>
           <Box display="flex" alignItems="center" gap={1.5}>
             <Box sx={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
               <Typography fontSize={20}>📄</Typography>
@@ -834,7 +836,7 @@ const ApplicantOnlineRequirements = () => {
                 });
               }
             }}
-            sx={{ minWidth: { xs: "100%", sm: 200 }, height: 42, backgroundColor: settings?.header_color || "#1976d2", color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: settings?.header_color || "#1976d2", opacity: 0.9, boxShadow: "none" } }}
+            sx={{ minWidth: { xs: "100%", sm: 200 }, height: 42, backgroundColor: headerColor || "#1976d2", color: "#fff", fontWeight: 700, fontSize: 14, textTransform: "none", boxShadow: "none", "&:hover": { backgroundColor: headerColor || "#1976d2", opacity: 0.9, boxShadow: "none" } }}
           >
             Submit Requirements
           </Button>
@@ -910,7 +912,7 @@ const ApplicantOnlineRequirements = () => {
                 }}
               >
                 <Table sx={{ minWidth: 720 }}>
-                  <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", border: `1px solid ${borderColor}` }}>
+                  <TableHead sx={{ backgroundColor: headerColor || "#1976d2", border: `1px solid ${borderColor}` }}>
                     <TableRow>
                       {["Document", "Upload", "Remarks", "Preview", "Delete"].map((h) => (
                         <TableCell key={h} sx={{ color: "white", border: `1px solid ${borderColor}`, fontSize: { md: 13, lg: 14 } }}>{h}</TableCell>

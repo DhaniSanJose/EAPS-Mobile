@@ -35,7 +35,7 @@ import {
   getDepartmentIdsFromAdminData,
   resolveStudentRegistrarScope,
   syncRegistrarScopeFromAdminData,
-  getScopedDepartmentIds 
+  getScopedDepartmentIds
 } from "../utils/registrarCurriculumRestriction";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -219,6 +219,10 @@ const getStudentSearchErrorMessage = (error) =>
 const CollegeCourseTagging = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   // ── settings state (unchanged) ──
   const [titleColor, setTitleColor] = useState("#000000");
@@ -234,21 +238,21 @@ const CollegeCourseTagging = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url)
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
+    if (assets.logoUrl)
+      setFetchedLogo(assets.logoUrl);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
-  const headerColor = settings?.header_color || "#1976d2";
+
 
   // ── all original state (unchanged) ──
   const [data, setdata] = useState([]);
@@ -552,7 +556,7 @@ const CollegeCourseTagging = () => {
     if (departmentLoading) return;
     const ownIds = departments.length
       ? departments.map((d) => d.dprtmnt_id)
-      : getScopedDepartmentIds(); 
+      : getScopedDepartmentIds();
     fetchAllAccessibleDepartments(ownIds);
   }, [departmentLoading, departments]);
 
@@ -2751,7 +2755,7 @@ const CollegeCourseTagging = () => {
               Requested Department: <strong>{selectedOtherDepartment?.dprtmnt_name}</strong>
             </Typography>
             <Typography sx={{ mb: 1.5, fontSize: "13px" }}>
-              Select the department requesting access            
+              Select the department requesting access
             </Typography>
             <Select
               value={selectedRequestorDepartment}
@@ -2771,7 +2775,7 @@ const CollegeCourseTagging = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             variant="outlined"
             sx={{
               borderColor: TOKEN.red,
@@ -2783,7 +2787,7 @@ const CollegeCourseTagging = () => {
           onClick={() => setOpenOtherDeptDialog(false)}>
             Cancel
           </Button>
-          <Button 
+          <Button
             variant="contained"
             onClick={() => handleGrantAccessDialogOpen(selectedRequestorDepartment)}
             sx={{
@@ -2836,7 +2840,7 @@ const CollegeCourseTagging = () => {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             variant="outlined"
             sx={{
               borderColor: TOKEN.red,
@@ -2848,7 +2852,7 @@ const CollegeCourseTagging = () => {
           onClick={() => setGrantAccessDialogOpen(false)}>
             Cancel
           </Button>
-          <Button 
+          <Button
             variant="contained"
             onClick={() => handleGrantAccess(selectedRequestorDepartment.dprtmnt_id)}
             sx={{
@@ -2900,7 +2904,7 @@ const CollegeCourseTagging = () => {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             variant="outlined"
             sx={{
               borderColor: TOKEN.red,
@@ -2912,7 +2916,7 @@ const CollegeCourseTagging = () => {
           onClick={() => setOtherDeptDataConfirmation(false)}>
             Cancel
           </Button>
-          <Button 
+          <Button
             variant="contained"
             disabled={otherDeptCurriculumLoading || !selectedGrantedDept?.dprtmnt_id}
             onClick={() => handleViewDeptData(selectedGrantedDept?.dprtmnt_id)}

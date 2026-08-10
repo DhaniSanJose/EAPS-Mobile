@@ -173,7 +173,9 @@ const formatTransactionDateTime = (value) => {
 };
 
 const MatriculationPaymentModule = () => {
-    const settings = useContext(SettingsContext);
+  const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
     const [borderColor, setBorderColor] = useState("#000000");
     const [titleColor, setTitleColor] = useState("#6D2323");
@@ -309,8 +311,8 @@ const MatriculationPaymentModule = () => {
 
     useEffect(() => {
         if (!settings) return;
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.title_color) setTitleColor(settings.title_color);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.title) setTitleColor(colors.title);
     }, [settings]);
 
     useEffect(() => {
@@ -932,7 +934,7 @@ const MatriculationPaymentModule = () => {
                 <Button
                     startIcon={<HistoryToggleOffIcon />}
                     sx={{
-                        backgroundColor: settings?.header_color || "maroon",
+                        backgroundColor: colors.header || "maroon",
                         color: "white",
                         width: "230px",
                     }}
@@ -959,7 +961,7 @@ const MatriculationPaymentModule = () => {
                                 colSpan={19}
                                 sx={{
                                     py: 0.5,
-                                    backgroundColor: settings?.header_color || "#6D2323",
+                                    backgroundColor: colors.header || "#6D2323",
                                     color: "white",
                                 }}
                             >
@@ -1211,7 +1213,7 @@ const MatriculationPaymentModule = () => {
             >
                 <DialogTitle
                     sx={{
-                        bgcolor: settings?.header_color || "#1976d2",
+                        bgcolor: headerColor,
                         color: "white",
                         display: "flex",
                         justifyContent: "space-between",
@@ -1434,7 +1436,7 @@ const MatriculationPaymentModule = () => {
                             textTransform: "none",
                             px: 3,
                             fontWeight: "bold",
-                            backgroundColor: settings?.header_color || "#1976d2",
+                            backgroundColor: headerColor,
                         }}
                     >
                         Confirm
@@ -1458,7 +1460,7 @@ const MatriculationPaymentModule = () => {
             >
                 <DialogTitle
                     sx={{
-                        bgcolor: settings?.header_color || "#1976d2",
+                        bgcolor: headerColor,
                         color: "white",
                         display: "flex",
                         justifyContent: "space-between",
@@ -1550,7 +1552,7 @@ const MatriculationPaymentModule = () => {
                                                 <TableCell
                                                     key={label}
                                                     sx={{
-                                                        backgroundColor: settings?.header_color || "#1976d2",
+                                                        backgroundColor: headerColor,
                                                         color: "white",
                                                         fontWeight: "bold",
                                                         fontSize: 11,
@@ -1759,7 +1761,7 @@ const MatriculationPaymentModule = () => {
             >
                 <DialogTitle
                     sx={{
-                        bgcolor: settings?.header_color || "#1976d2",
+                        bgcolor: headerColor,
                         color: "white",
                         display: "flex",
                         justifyContent: "space-between",

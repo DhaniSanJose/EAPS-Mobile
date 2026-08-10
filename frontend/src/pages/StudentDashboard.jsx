@@ -64,46 +64,21 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const navigate = useNavigate();
   const settings = useContext(SettingsContext);
 
-  // 📱 Responsive breakpoint helpers (reactive to viewport, unlike raw window.innerWidth reads)
+  // ðŸ“± Responsive breakpoint helpers (reactive to viewport, unlike raw window.innerWidth reads)
   const isMobile = useMediaQuery("(max-width:600px)");
   const isTablet = useMediaQuery("(max-width:960px)");
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const subtitleColor = colors.subtitle || "#555555";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const fetchedLogo = branding.logoUrl || EaristLogo;
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
+  const campusAddress = branding.campusAddress || "";
+  const headerColor = colors.header || "#1976d2";
 
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
@@ -311,7 +286,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const total = courseCount?.initial_course || 0;
   const displayedStatusTotal = passed + failed + incomplete + dropped;
 
-  // percentages (normalize values to 0–100)
+  // percentages (normalize values to 0â€“100)
   const statusRingBase = displayedStatusTotal || total;
   const statusSlices = [
     { value: passed, color: "#75a843" },
@@ -530,7 +505,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         groupedByTerm[key].units += units;
       });
 
-      // Only show regular "year" levels 1st–4th Year — bridging, 5th year,
+      // Only show regular "year" levels 1stâ€“4th Year â€” bridging, 5th year,
       // masteral/doctoral terms are excluded here to keep the strip readable.
       // (Adjust the "<= 4" below if a program legitimately needs 5th year shown.)
       const MAX_YEAR_LEVEL_TO_SHOW = 4;
@@ -547,7 +522,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           semOrder: Number(t.semester_id) || 0,
           gwa: t.units > 0 ? t.total / t.units : null,
         }))
-        // Ascending now: 1st Yr Sem 1 → ... → 4th Yr Sem 2, reads like a timeline
+        // Ascending now: 1st Yr Sem 1 â†’ ... â†’ 4th Yr Sem 2, reads like a timeline
         .sort((a, b) => a.yearOrder - b.yearOrder || a.semOrder - b.semOrder);
 
       setTermGwaList(list);
@@ -571,7 +546,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         });
         setHolidays(lookup);
       } catch (err) {
-        console.error("❌ Failed to fetch PH holidays:", err);
+        console.error("âŒ Failed to fetch PH holidays:", err);
         setHolidays({});
       }
     };
@@ -600,7 +575,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     fetchAnnouncements();
   }, []);
 
-  // Lightbox state — add near your other useState declarations
+  // Lightbox state â€” add near your other useState declarations
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -652,10 +627,10 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       formData.append("profile_picture", file);
       formData.append("person_id", person_id);
 
-      // ✅ Upload image using same backend API
+      // âœ… Upload image using same backend API
       await axios.post(`${API_BASE_URL}/api/update_student`, formData);
 
-      // ✅ Refresh profile info to display the new image
+      // âœ… Refresh profile info to display the new image
       const updated = await axios.get(
         `${API_BASE_URL}/api/person_data/${person_id}/${role}`,
       );
@@ -667,7 +642,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       const baseUrl = `${API_BASE_URL}/uploads/Student1by1/${updated.data.profile_image}`;
       setProfileImage(`${baseUrl}?t=${Date.now()}`);
     } catch (error) {
-      console.error("❌ Upload failed:", error);
+      console.error("âŒ Upload failed:", error);
     }
   };
 
@@ -680,7 +655,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           const trimmed = line.trim();
           if (!trimmed) return <div key={i} style={{ height: "6px" }} />;
 
-          const bulletMatch = trimmed.match(/^([•\*\-–])\s+(.*)/);
+          const bulletMatch = trimmed.match(/^([â€¢\*\-â€“])\s+(.*)/);
           if (bulletMatch) {
             return (
               <div
@@ -699,7 +674,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     fontSize: "14px",
                   }}
                 >
-                  •
+                  â€¢
                 </span>
                 <span
                   style={{
@@ -714,7 +689,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
             );
           }
 
-          const subBulletMatch = line.match(/^[\s\t]+([•\*\-–])\s+(.*)/);
+          const subBulletMatch = line.match(/^[\s\t]+([â€¢\*\-â€“])\s+(.*)/);
           if (subBulletMatch) {
             return (
               <div
@@ -734,7 +709,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     fontSize: "12px",
                   }}
                 >
-                  ◦
+                  â—¦
                 </span>
                 <span
                   style={{
@@ -790,7 +765,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     );
   };
 
-  const maroon = settings?.header_color || "#9b2f35";
+  const maroon = headerColor || "#9b2f35";
   const darkMaroon = "#7d252b";
   const softBorder = "#e6ded9";
   const cardSx = {
@@ -874,10 +849,10 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     },
   ];
 
-  // 🔒 Disable right-click and block DevTools shortcuts.
+  // ðŸ”’ Disable right-click and block DevTools shortcuts.
   // Moved into a useEffect with cleanup so listeners aren't re-added on every render
   // (the original code attached a brand-new listener on every single render, which
-  // leaks memory and gets worse the longer a session runs — especially costly on
+  // leaks memory and gets worse the longer a session runs â€” especially costly on
   // memory-constrained mobile/tablet browsers).
   useEffect(() => {
     const handleContextMenu = (e) => e.preventDefault();
@@ -923,7 +898,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           mt: { xs: 1.5, md: 2.5 },
           borderRadius: "12px",
           overflow: "hidden",
-          backgroundColor: settings?.header_color || "#1976d2",
+          backgroundColor: headerColor,
           color: "#fff",
           border: `2px solid ${borderColor}`,
         }}
@@ -1685,7 +1660,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                             lineHeight: 1,
                           }}
                         >
-                          {t.gwa !== null ? t.gwa.toFixed(3) : "—"}
+                          {t.gwa !== null ? t.gwa.toFixed(3) : "â€”"}
                         </Typography>
                       </Box>
                     ))}
@@ -1946,7 +1921,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   sx={{
                     px: 2,
                     py: 1.5,
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "#fff",
                     borderBottom: `2px solid ${borderColor}`,
                   }}
@@ -2144,7 +2119,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                             borderRadius: "999px",
                             bgcolor:
                               index === 0
-                                ? settings?.header_color || maroon
+                                ? headerColor || maroon
                                 : "#d1d1d1",
                             transition: "all 0.3s ease",
                           }}
@@ -2240,7 +2215,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                 background: "#111",
               }}
             >
-              {/* LEFT — image */}
+              {/* LEFT â€” image */}
               {announcements[lightboxIndex].file_path && (
                 <div
                   style={{
@@ -2276,7 +2251,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                 </div>
               )}
 
-              {/* RIGHT — details */}
+              {/* RIGHT â€” details */}
               <div
                 style={{
                   flex: 1,
@@ -2294,7 +2269,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   scrollbarColor: "rgba(255,255,255,0.2) transparent",
                 }}
               >
-                {/* Close button — top of details panel */}
+                {/* Close button â€” top of details panel */}
                 <IconButton
                   onClick={(e) => {
                     e.stopPropagation();

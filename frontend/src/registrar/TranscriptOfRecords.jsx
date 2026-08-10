@@ -47,6 +47,10 @@ const formatSuggestionName = (student) =>
 
 const TranscriptOfRecords = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -64,37 +68,25 @@ const TranscriptOfRecords = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    const settingsBranches = settings?.branches || settings?.branch;
-    if (settingsBranches) {
-      try {
-        const parsed =
-          typeof settingsBranches === "string"
-            ? JSON.parse(settingsBranches)
-            : settingsBranches;
-        setBranches(Array.isArray(parsed) ? parsed : []);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const [person, setPerson] = useState({
@@ -267,12 +259,12 @@ const TranscriptOfRecords = () => {
       return;
     }
 
-    if (settings.campus_address) {
-      setCampusAddress(settings.campus_address);
+    if (branding.campusAddress) {
+      setCampusAddress(branding.campusAddress);
       return;
     }
 
-    setCampusAddress(settings.address || "");
+    setCampusAddress(branding.campusAddress || "");
   }, [
     settings,
     branches,
@@ -280,6 +272,7 @@ const TranscriptOfRecords = () => {
     studentData?.branch_id,
     person?.campus,
     person?.branch_id,
+    branding.campusAddress,
   ]);
 
   // Auto-fill/search from URL person_id or student_number (same pattern as Report of Grades / Search COR)
@@ -1419,7 +1412,7 @@ const TranscriptOfRecords = () => {
         <Table>
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               border: `1px solid ${borderColor}`,
             }}
           >
@@ -1500,7 +1493,7 @@ const TranscriptOfRecords = () => {
               gap: 1,
               px: 2,
               py: 1.5,
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               color: "white",
               borderTop: `1px solid ${borderColor}`,
             }}
@@ -1812,7 +1805,7 @@ const TranscriptOfRecords = () => {
               gap: 1,
               px: 2,
               py: 1.5,
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
               color: "white",
               borderTop: `1px solid ${borderColor}`,
             }}

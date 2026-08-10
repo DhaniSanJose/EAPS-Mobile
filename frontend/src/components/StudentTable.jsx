@@ -28,6 +28,8 @@ import useAuditMac from "../utils/useAuditMac";
 const StudentTable = ({ data, paymentType, onRemove }) => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [borderColor, setBorderColor] = useState("#000000");
 
@@ -42,7 +44,7 @@ const StudentTable = ({ data, paymentType, onRemove }) => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   const insertTransferAuditLog = async (row, target) => {
@@ -146,7 +148,7 @@ const StudentTable = ({ data, paymentType, onRemove }) => {
               colSpan={19}
               sx={{
                 py: 0.5,
-                backgroundColor: settings?.header_color || "#6D2323",
+                backgroundColor: headerColor || "#6D2323",
                 color: "white",
               }}
             >

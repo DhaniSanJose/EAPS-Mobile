@@ -1,12 +1,14 @@
 import React, { useContext } from "react";
 import { SettingsContext } from "../App"; // ✅ import your global context
-import API_BASE_URL from "../apiConfig";
 
 const Unauthorized = () => {
     const settings = useContext(SettingsContext);
+    const colors = settings?.colors || {};
+    const assets = settings?.assets || {};
+    const headerColor = colors.header || "#1976d2";
 
-    const backgroundImage = settings?.bg_image
-        ? `url(${API_BASE_URL}${settings.bg_image})`
+    const backgroundImage = assets.backgroundImage
+        ? `url(${assets.backgroundImage})`
         : "linear-gradient(to right, #fafafa, #f5f5f5)"; // fallback color
 
     return (

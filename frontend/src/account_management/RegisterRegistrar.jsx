@@ -38,6 +38,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import API_BASE_URL from "../apiConfig";
+import EaristLogo from "../assets/EaristLogo.png";
 import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import SaveIcon from "@mui/icons-material/Save";
@@ -56,11 +57,38 @@ import AddCircleIcon from "@mui/icons-material/AddCircle";
 import LockResetIcon from "@mui/icons-material/LockReset";
 import ImageIcon from "@mui/icons-material/Image";
 
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getRegistrarSuggestionText = (registrar) =>
+  [
+    registrar?.employee_id,
+    registrar?.first_name,
+    registrar?.middle_name,
+    registrar?.last_name,
+    registrar?.email,
+    registrar?.dprtmnt_name,
+    registrar?.scopes_summary,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
+const getRegistrarSuggestionValue = (registrar) =>
+  cleanSuggestionValue(registrar?.employee_id) ||
+  cleanSuggestionValue(registrar?.email);
 
 const RegisterRegistrar = () => {
   useAccountAuditMac();
   const getAuditRequestConfig = (overrides = {}) => getAuditConfig(overrides);
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -78,25 +106,25 @@ const RegisterRegistrar = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
   }, [settings]);
 
   // Also put it at the very top
@@ -279,6 +307,7 @@ const RegisterRegistrar = () => {
   const [sortOrder, setSortOrder] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const filteredRegistrar = registrars
     .filter((r) => {
       const matchesDepartment = selectedDepartmentFilter
@@ -311,6 +340,14 @@ const RegisterRegistrar = () => {
     indexOfFirstItem,
     indexOfLastItem,
   );
+  const registrarSuggestions =
+    searchTerm.trim().length >= 2
+      ? registrars
+          .filter((registrar) =>
+            getRegistrarSuggestionText(registrar).includes(searchTerm.trim().toLowerCase()),
+          )
+          .slice(0, 10)
+      : [];
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -903,23 +940,52 @@ const RegisterRegistrar = () => {
           REGISTRAR ACCOUNTS
         </Typography>
 
-        <TextField
-          size="small"
-          placeholder="Search registrar..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
-            },
-          }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-          }}
-        />
+        <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+          <TextField
+            size="small"
+            placeholder="Search registrar..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => {
+              if (searchTerm.trim().length >= 2) setSuggestionsOpen(true);
+            }}
+            onBlur={() => {
+              setTimeout(() => setSuggestionsOpen(false), 150);
+            }}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+              },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchTerm.trim().length >= 2 && (
+            <Box sx={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20, backgroundColor: "#fff", border: "1px solid #d0d0d0", borderRadius: "8px", boxShadow: "0 8px 24px rgba(0,0,0,0.14)", overflow: "hidden", maxHeight: 320 }}>
+              {registrarSuggestions.length > 0 ? registrarSuggestions.map((registrar) => {
+                const employeeId = cleanSuggestionValue(registrar.employee_id);
+                const name = [registrar.first_name, registrar.middle_name, registrar.last_name].map(cleanSuggestionValue).filter(Boolean).join(" ");
+                return (
+                  <Box key={`${employeeId}-${registrar.email}`} onMouseDown={(e) => { e.preventDefault(); setSearchTerm(getRegistrarSuggestionValue(registrar)); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{employeeId || "N/A"}</Typography>
+                    <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                    <Typography sx={{ fontSize: 14 }} noWrap>{name || cleanSuggestionValue(registrar.email) || "Unnamed Registrar"}</Typography>
+                  </Box>
+                );
+              }) : (
+                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>No matching registrars found</Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
@@ -930,7 +996,7 @@ const RegisterRegistrar = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               color: "white",
             }}
           >
@@ -940,7 +1006,7 @@ const RegisterRegistrar = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -1240,7 +1306,7 @@ const RegisterRegistrar = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor || "#1976d2" }}
           >
             <TableRow>
               {[
@@ -1435,7 +1501,7 @@ const RegisterRegistrar = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               color: "white",
             }}
           >
@@ -1445,7 +1511,7 @@ const RegisterRegistrar = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -1635,7 +1701,7 @@ const RegisterRegistrar = () => {
         {/* HEADER */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor || "#1976d2",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.1rem",
@@ -2212,7 +2278,7 @@ const RegisterRegistrar = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: headerColor || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

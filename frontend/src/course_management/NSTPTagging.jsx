@@ -86,19 +86,11 @@ const NSTPTagging = () => {
   const settings = useContext(SettingsContext);
 
   // ── Theme ─────────────────────────────────────────────────────────────────
-  const [mainButtonColor, setMainButtonColor] = useState("#1B5E20");
-  const [headerColor, setHeaderColor] = useState("#1B5E20");
-  const [borderColor, setBorderColor] = useState("#c8e6c9");
-  const [titleColor, setTitleColor] = useState("#1B5E20");
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.header_color) setHeaderColor(settings.header_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.title_color) setTitleColor(settings.title_color);
-  }, [settings]);
+  const colors = settings?.colors || {};
+  const mainButtonColor = colors.mainButton || "#1B5E20";
+  const headerColor = colors.header || "#1B5E20";
+  const borderColor = colors.border || "#c8e6c9";
+  const titleColor = colors.title || "#1B5E20";
 
   // ── Auth / access ─────────────────────────────────────────────────────────
   const [hasAccess, setHasAccess] = useState(null);
@@ -676,7 +668,7 @@ const NSTPTagging = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>

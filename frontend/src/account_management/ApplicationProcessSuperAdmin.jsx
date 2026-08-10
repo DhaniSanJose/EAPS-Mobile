@@ -51,11 +51,39 @@ import {
 import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
 import SaveIcon from "@mui/icons-material/Save";
 
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.emailAddress,
+    applicant?.email,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionValue = (applicant) =>
+  cleanSuggestionValue(applicant?.applicant_number) ||
+  cleanSuggestionValue(applicant?.emailAddress) ||
+  cleanSuggestionValue(applicant?.email);
+
 const ApplicantProcessSuperAdmin = () => {
   useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -74,39 +102,27 @@ const ApplicantProcessSuperAdmin = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   useEffect(() => {
@@ -442,6 +458,7 @@ const ApplicantProcessSuperAdmin = () => {
 
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [snack, setSnack] = useState({
     open: false,
@@ -477,12 +494,12 @@ const ApplicantProcessSuperAdmin = () => {
       return;
     }
 
-    if (settings.campus_address) {
-      setCampusAddress(settings.campus_address);
+    if (branding.campusAddress) {
+      setCampusAddress(branding.campusAddress);
       return;
     }
 
-    setCampusAddress(settings.address || "");
+    setCampusAddress(branding.campusAddress || "");
   }, [settings, branches, person?.campus]);
 
   // ⬇️ Add this inside ApplicantList component, before useEffect
@@ -913,6 +930,14 @@ const ApplicantProcessSuperAdmin = () => {
     indexOfFirstItem,
     indexOfLastItem,
   );
+  const applicantSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+        .filter((applicant) =>
+          getApplicantSuggestionText(applicant).includes(searchQuery.trim().toLowerCase()),
+        )
+        .slice(0, 8)
+      : [];
 
   const maxButtonsToShow = 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxButtonsToShow / 2));
@@ -1512,19 +1537,21 @@ const ApplicantProcessSuperAdmin = () => {
         <Typography variant="h4" fontWeight="bold" sx={{ color: titleColor }}>
           ADD APPLICANT ACCOUNT / REQUEST ACCOUNT DELETION
         </Typography>
-        <Box>
+        <Box sx={{ position: "relative", width: 450 }}>
           <TextField
             variant="outlined"
             placeholder="Search Applicant Name / Email / Applicant ID"
             size="small"
-            style={{ width: "450px" }}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setCurrentPage(1); // Corrected
+              setSuggestionsOpen(true);
             }}
+            onFocus={() => setSuggestionsOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
             sx={{
-              width: 450,
+              width: "100%",
               backgroundColor: "#fff",
               borderRadius: 1,
               "& .MuiOutlinedInput-root": {
@@ -1535,6 +1562,29 @@ const ApplicantProcessSuperAdmin = () => {
               startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
             }}
           />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, mt: 0.5, maxHeight: 260, overflowY: "auto", backgroundColor: "#fff", border: "1px solid #d6d6d6", borderRadius: 1, boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+              {applicantSuggestions.length > 0 ? (
+                applicantSuggestions.map((applicant) => {
+                  const applicantNumber = cleanSuggestionValue(applicant?.applicant_number);
+                  const name = [applicant?.last_name, applicant?.first_name, applicant?.middle_name]
+                    .map(cleanSuggestionValue)
+                    .filter(Boolean)
+                    .join(", ");
+                  const email = cleanSuggestionValue(applicant?.emailAddress || applicant?.email);
+
+                  return (
+                    <Box key={`${applicantNumber}-${email}`} onMouseDown={(e) => { e.preventDefault(); setSearchQuery(getApplicantSuggestionValue(applicant)); setCurrentPage(1); setSuggestionsOpen(false); }} sx={{ px: 2, py: 1, cursor: "pointer", display: "flex", alignItems: "center", gap: 1, fontSize: 14, borderBottom: "1px solid #f0f0f0", "&:hover": { backgroundColor: "#f5f7fb" } }}>
+                      <Typography component="span" sx={{ fontWeight: 700, minWidth: 120 }}>{applicantNumber || "No applicant ID"}</Typography>
+                      <Typography component="span" sx={{ color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[name, email].filter(Boolean).join(" - ")}</Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1, color: "#777", fontSize: 14 }}>No matching applicants</Box>
+              )}
+            </Box>
+          )}
         </Box>
       </Box>
 
@@ -1550,7 +1600,7 @@ const ApplicantProcessSuperAdmin = () => {
         <Table>
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
             }}
           >
             <TableRow>
@@ -1691,7 +1741,7 @@ const ApplicantProcessSuperAdmin = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               color: "white",
             }}
           >
@@ -1701,7 +1751,7 @@ const ApplicantProcessSuperAdmin = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -2113,7 +2163,7 @@ const ApplicantProcessSuperAdmin = () => {
       <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table size="small">
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor || "#1976d2" }}
           >
             <TableRow>
               <TableCell
@@ -2635,7 +2685,7 @@ const ApplicantProcessSuperAdmin = () => {
           >
             <DialogTitle
               sx={{
-                background: settings?.header_color || "#9E0000",
+                background: headerColor || "#9E0000",
                 color: "#fff",
                 fontWeight: 700,
                 fontSize: "1.2rem",
@@ -2749,7 +2799,7 @@ const ApplicantProcessSuperAdmin = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               color: "white",
             }}
           >
@@ -2759,7 +2809,7 @@ const ApplicantProcessSuperAdmin = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor || "#1976d2",
                   color: "white",
                 }}
               >
@@ -2956,7 +3006,7 @@ const ApplicantProcessSuperAdmin = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: headerColor || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",
@@ -3021,7 +3071,7 @@ const ApplicantProcessSuperAdmin = () => {
           {/* HEADER */}
           <Box
             sx={{
-              background: settings?.header_color || "#1976d2",
+              background: headerColor || "#1976d2",
               color: "#fff",
               px: 3,
               py: 2,

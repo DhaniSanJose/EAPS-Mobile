@@ -249,6 +249,10 @@ const SchoolBlock = ({ suffix = "", person, errors, handleChange, isStacked }) =
 // ─── Main Component ───────────────────────────────────────────────────────────
 const ApplicantEducationalAttainmentMobile = (props) => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const navigate = useNavigate();
   const theme = useTheme();
 
@@ -314,13 +318,13 @@ const ApplicantEducationalAttainmentMobile = (props) => {
   // ── Apply settings ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
   }, [settings]);
 
   // ── Auth + load (do not alter) ──────────────────────────────────────────
@@ -875,7 +879,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
                       transition: "all 0.25s ease-in-out",
                       "&:hover": !disabled && {
                         transform: { md: "scale(1.04)" },
-                        backgroundColor: settings?.header_color || "#6D2323",
+                        backgroundColor: headerColor || "#6D2323",
                         "& .chip-icon": { color: "#fff" },
                         "& .chip-text": { color: "#fff" },
                       },
@@ -968,7 +972,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
                     height: { xs: 42, md: 52 },
                     borderRadius: "50%",
                     border: `2px solid ${borderColor}`,
-                    backgroundColor: activeStep === index ? (settings?.header_color || "#6D2323") : "#E8C999",
+                    backgroundColor: activeStep === index ? (headerColor || "#6D2323") : "#E8C999",
                     color: activeStep === index ? "#fff" : "#333",
                     display: "flex",
                     alignItems: "center",
@@ -1014,7 +1018,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
         {/* ── Step Header Bar ─────────────────────────────────────────── */}
         <Box
           sx={{
-            backgroundColor: settings?.header_color || "#1976d2",
+            backgroundColor: headerColor || "#1976d2",
             border: `1px solid ${borderColor}`,
             color: "white",
             borderRadius: 2,
@@ -1042,7 +1046,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
         >
           <Box
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               color: "#fff",
               p: { xs: "10px 14px", md: "12px 18px" },
               fontSize: { xs: 13, md: 15 },
@@ -1077,7 +1081,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
         >
           <Box
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               color: "#fff",
               p: { xs: "10px 14px", md: "12px 18px" },
               fontSize: { xs: 13, md: 15 },
@@ -1128,7 +1132,7 @@ const ApplicantEducationalAttainmentMobile = (props) => {
         >
           <Box
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor || "#1976d2",
               color: "#fff",
               p: { xs: "10px 14px", md: "12px 18px" },
               fontSize: { xs: 13, md: 15 },

@@ -37,34 +37,22 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const settings = useContext(SettingsContext);
   const navigate = useNavigate();
 
-  // ── Theme ───────────────────────────────────────────────────────
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [stepperColor, setStepperColor] = useState("#000000");
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
+  // â”€â”€ Theme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const colors = settings?.colors || {};
+  const assets = settings?.assets || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const subtitleColor = colors.subtitle || "#555555";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
+  const fetchedLogo = branding.logoUrl || EaristLogo;
+  const companyName = branding.companyName || "";
+  const shortTerm = branding.shortTerm || "";
+  const campusAddress = branding.campusAddress || "";
 
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
-    if (settings.logo_url)
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    else setFetchedLogo(EaristLogo);
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-  }, [settings]);
 
-  // ── Auth ────────────────────────────────────────────────────────
+  // â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [userID, setUserID] = useState("");
   const [userRole, setUserRole] = useState("");
   const [employeeID, setEmployeeID] = useState("");
@@ -122,7 +110,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     }
   };
 
-  // ── Reference data ──────────────────────────────────────────────
+  // â”€â”€ Reference data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [years, setYears] = useState([]);
   const [programOptions, setProgramOptions] = useState([]);
   const [userDep, setUserDepartment] = useState("");
@@ -130,18 +118,18 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   const [hovered, setHovered] = useState(false);
   const fileInputRef = useRef(null);
 
-  // ── All students (raw from API) ─────────────────────────────────
+  // â”€â”€ All students (raw from API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // /api/student_number returns one row per student per enrolled subject
   // Fields include: student_number, campus, program_code, curriculum_id,
   // dprtmnt_id, semester_id, year_id, en_remarks, created_at,
   // year_level_description, semester_description, first_name, last_name
   const [allStudents, setAllStudents] = useState([]);
 
-  // ── Shared filter state ─────────────────────────────────────────
+  // â”€â”€ Shared filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedProgram, setSelectedProgram] = useState("");
 
-  // ── Derived chart / stat state ──────────────────────────────────
+  // â”€â”€ Derived chart / stat state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [enrollmentData, setEnrollmentData] = useState([
     { name: "Techvoc", value: 0 },
     { name: "Graduate", value: 0 },
@@ -158,19 +146,19 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
   });
   const [sectionData, setSectionData] = useState([]);
 
-  // ── Misc counts ─────────────────────────────────────────────────
+  // â”€â”€ Misc counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [enrolledCount, setEnrolledCount] = useState(0);
   const [professorCount, setProfessorCount] = useState(0);
   const [acceptedCount, setAcceptedCount] = useState(0);
   const [registrarCount, setRegistrarCount] = useState(0);
 
-  // ── Calendar ────────────────────────────────────────────────────
+  // â”€â”€ Calendar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [date, setDate] = useState(new Date());
   const [holidays, setHolidays] = useState({});
   const calYear = date.getFullYear();
   const calMonth = date.getMonth();
 
-  // ── Load reference data ─────────────────────────────────────────
+  // â”€â”€ Load reference data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/year_table`)
@@ -200,7 +188,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
   }, []);
 
-  // ── Set active school year as default ──────────────────────────
+  // â”€â”€ Set active school year as default â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/active_school_year`)
@@ -211,7 +199,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
   }, []);
 
-  // ── Load user's department ──────────────────────────────────────
+  // â”€â”€ Load user's department â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const email = localStorage.getItem("email");
     if (!email) return;
@@ -221,7 +209,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
   }, []);
 
-  // ── Load programs for this department ──────────────────────────
+  // â”€â”€ Load programs for this department â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!userDep) return;
     axios
@@ -237,7 +225,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
   }, [userDep]);
 
-  // ── Fetch ALL students once ─────────────────────────────────────
+  // â”€â”€ Fetch ALL students once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/student_number`)
@@ -248,7 +236,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch((err) => console.error("Failed to fetch students:", err));
   }, []);
 
-  // ── Person data ─────────────────────────────────────────────────
+  // â”€â”€ Person data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const person_id = localStorage.getItem("person_id");
     const role = localStorage.getItem("role");
@@ -279,7 +267,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     };
   }, [setProfileImage]);
 
-  // ── Holidays ────────────────────────────────────────────────────
+  // â”€â”€ Holidays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     axios
       .get(`https://date.nager.at/api/v3/PublicHolidays/${calYear}/PH`)
@@ -293,11 +281,11 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(() => setHolidays({}));
   }, [calYear]);
 
-  // ── CORE: recompute everything when filters or data changes ─────
+  // â”€â”€ CORE: recompute everything when filters or data changes â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!allStudents.length) return;
 
-    // ── Step 1: apply filters ──────────────────────────────────
+    // â”€â”€ Step 1: apply filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let filtered = [...allStudents];
 
     if (selectedYear) {
@@ -318,8 +306,8 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       );
     }
 
-    // ── Step 2: deduplicate by student_number ──────────────────
-    // Each student appears once per enrolled subject — collapse to unique students
+    // â”€â”€ Step 2: deduplicate by student_number â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Each student appears once per enrolled subject â€” collapse to unique students
     const seen = new Set();
     const unique = filtered.filter((s) => {
       if (seen.has(s.student_number)) return false;
@@ -327,7 +315,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       return true;
     });
 
-    // ── Step 3: Enrollment Statistics pie chart ────────────────
+    // â”€â”€ Step 3: Enrollment Statistics pie chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // academicProgram: "0" = Undergraduate, "1" = Graduate, "2" = Techvoc
     // classifiedAs: "Returnee" | "Shiftee" | "Foreign Student" | "Transferee" | others
     const countBy = (field, val) =>
@@ -346,7 +334,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       { name: "Transferee", value: countBy("classifiedAs", "Transferee") },
     ]);
 
-    // ── Step 4: Program stats ──────────────────────────────────
+    // â”€â”€ Step 4: Program stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const now = new Date();
 
     const weekStart = new Date(now);
@@ -378,7 +366,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       }).length,
     });
 
-    // ── Step 5: Class Population Tracker ──────────────────────
+    // â”€â”€ Step 5: Class Population Tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Group unique students by year_level_description
     const groups = {};
     unique.forEach((s) => {
@@ -395,7 +383,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     );
   }, [allStudents, selectedYear, selectedProgram, userDep]);
 
-  // ── Pie chart: fallback to enrollment stats API if allStudents ──
+  // â”€â”€ Pie chart: fallback to enrollment stats API if allStudents â”€â”€
   // fields don't include academicProgram / classifiedAs
   // This effect only runs when allStudents is populated but the
   // pie chart is still all zeros (meaning those fields are missing)
@@ -430,7 +418,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
       .catch(console.error);
   }, [enrollmentData, selectedYear, userDep, years]);
 
-  // ── Profile upload ──────────────────────────────────────────────
+  // â”€â”€ Profile upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -459,7 +447,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     }
   };
 
-  // ── Calendar helpers ────────────────────────────────────────────
+  // â”€â”€ Calendar helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const nowDate = new Date();
   const manilaDate = new Date(
     nowDate.toLocaleString("en-US", { timeZone: "Asia/Manila" }),
@@ -500,18 +488,17 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
     "#EC407A",
   ];
 
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "linear-gradient(to right, #e0e0e0, #bdbdbd)";
+  const backgroundImage =
+    assets.backgroundImage || "linear-gradient(to right, #e0e0e0, #bdbdbd)";
 
   if (loading || hasAccess === null)
     return <LoadingOverlay open={loading} message="Loading..." />;
   if (!hasAccess) return <Unauthorized />;
 
-     // 🔒 Disable right-click
+     // ðŸ”’ Disable right-click
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
+    // ðŸ”’ Block DevTools shortcuts + Ctrl+P silently
     document.addEventListener("keydown", (e) => {
         const isBlockedKey =
             e.key === "F12" ||
@@ -563,7 +550,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
           padding: 2,
         }}
       >
-        {/* ── Welcome card ── */}
+        {/* â”€â”€ Welcome card â”€â”€ */}
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Card
@@ -634,7 +621,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
                         >
                           <AddCircleIcon
                             sx={{
-                              color: settings?.header_color || "#1976d2",
+                              color: headerColor,
                               fontSize: 32,
                               borderRadius: "50%",
                             }}
@@ -677,7 +664,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
         </Grid>
 
         <Box style={{ display: "flex" }}>
-          {/* ── Left: Enrollment Statistics ── */}
+          {/* â”€â”€ Left: Enrollment Statistics â”€â”€ */}
           <Card
             sx={{
               width: 600,
@@ -702,7 +689,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
               Enrollment Statistics
             </Typography>
 
-            {/* Shared filters — control ALL three sections */}
+            {/* Shared filters â€” control ALL three sections */}
             <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>School Year</InputLabel>
@@ -782,7 +769,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
             </Box>
           </Card>
 
-          {/* ── Middle column ── */}
+          {/* â”€â”€ Middle column â”€â”€ */}
           <Box>
             {/* Total Student Per Program */}
             <Card
@@ -829,7 +816,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
                     )?.program_description || "Selected program"
                   : "All Programs"}
                 {selectedYear
-                  ? ` · ${
+                  ? ` Â· ${
                       years.find(
                         (y) => String(y.year_id) === String(selectedYear),
                       )?.year_description || ""
@@ -979,7 +966,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
             </Card>
           </Box>
 
-          {/* ── Right column ── */}
+          {/* â”€â”€ Right column â”€â”€ */}
           <Box>
             {/* Calendar */}
             <Card
@@ -1006,7 +993,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
                   alignItems="center"
                   justifyContent="space-between"
                   sx={{
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "white",
                     border: `2px solid ${borderColor}`,
                     borderBottom: "none",
@@ -1099,7 +1086,7 @@ const EnrollingOfficerDashboard = ({ profileImage, setProfileImage }) => {
                             justifyContent: "center",
                             borderRadius: "50%",
                             backgroundColor: isToday
-                              ? settings?.header_color || "#1976d2"
+                              ? headerColor
                               : isHoliday
                                 ? "#E8C999"
                                 : "#fff",

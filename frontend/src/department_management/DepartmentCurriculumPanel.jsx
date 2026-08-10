@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
+import EaristLogo from "../assets/EaristLogo.png";
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
 import {
@@ -45,6 +46,10 @@ import useAuditMac from "../utils/useAuditMac";
 export default function DepartmentCurriculumPanel() {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -63,38 +68,25 @@ export default function DepartmentCurriculumPanel() {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);   // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);           // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);   // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper);           // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    } else {
-      setBranches([]);
-    }
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+    setBranches(settings.branches || []);
 
 
   }, [settings]);
@@ -456,7 +448,7 @@ export default function DepartmentCurriculumPanel() {
       <br />
       <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}`, }}>
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2", }}>
+          <TableHead sx={{ backgroundColor: headerColor, }}>
             <TableRow>
               <TableCell sx={{ color: 'white', textAlign: "Center" }}>Select Department Curriculum Panel</TableCell>
             </TableRow>
@@ -571,7 +563,7 @@ export default function DepartmentCurriculumPanel() {
               <TableHead>
                 <TableRow style={{
                   border: `1px solid ${borderColor}`,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "#fff",
                   width: "10%",
                   textAlign: "center",
@@ -744,7 +736,7 @@ export default function DepartmentCurriculumPanel() {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

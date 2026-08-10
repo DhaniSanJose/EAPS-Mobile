@@ -48,6 +48,8 @@ const PAGE_ID = 170;
 
 const CollegeStudentGradeFile = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
   const location = useLocation();
 
   // Colors State
@@ -93,9 +95,9 @@ const CollegeStudentGradeFile = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
   }, [settings]);
 
   useEffect(() => {
@@ -675,7 +677,7 @@ const CollegeStudentGradeFile = () => {
         sx={{ width: "100%", border: `1px solid ${borderColor}` }}
       >
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead sx={{ backgroundColor: headerColor }}>
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
                 Student Personal Information
@@ -837,7 +839,7 @@ const CollegeStudentGradeFile = () => {
             {/* Term Header Info — no action buttons, view-only */}
             <Box
               sx={{
-                backgroundColor: settings?.header_color || "#1976d2",
+                backgroundColor: headerColor,
                 borderBottom: `1px solid ${borderColor}`,
                 display: "flex",
                 alignItems: "center",

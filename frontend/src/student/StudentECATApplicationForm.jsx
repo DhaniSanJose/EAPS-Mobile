@@ -9,6 +9,10 @@ import { useLocation } from "react-router-dom";
 import API_BASE_URL from "../apiConfig";
 const StudentECATApplicationForm = forwardRef((props, ref) => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -27,37 +31,25 @@ const StudentECATApplicationForm = forwardRef((props, ref) => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(`${assets.logoUrl}`);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const [userID, setUserID] = useState("");
@@ -169,12 +161,12 @@ const StudentECATApplicationForm = forwardRef((props, ref) => {
       return;
     }
 
-    if (settings.campus_address) {
-      setCampusAddress(settings.campus_address);
+    if (branding.campusAddress) {
+      setCampusAddress(branding.campusAddress);
       return;
     }
 
-    setCampusAddress(settings.address || "");
+    setCampusAddress(branding.campusAddress || "");
   }, [settings, branches, person?.campus]);
 
   // do not alter
@@ -1474,8 +1466,8 @@ const StudentECATApplicationForm = forwardRef((props, ref) => {
                    verticalAlign: "top",
                  }}
                >
-                 This document is a sole property of {companyName} ({settings?.short_term || shortTerm}, {person.campus === 2 ? "Cavite" : "Manila"}).
-                 Any disclosure, unauthorized reproduction or use is strictly prohibited except with permission from {settings?.short_term || shortTerm} {person.campus === 2 ? "Cavite" : "Manila"}.
+                 This document is a sole property of {companyName} ({branding.shortTerm || shortTerm}, {person.campus === 2 ? "Cavite" : "Manila"}).
+                 Any disclosure, unauthorized reproduction or use is strictly prohibited except with permission from {branding.shortTerm || shortTerm} {person.campus === 2 ? "Cavite" : "Manila"}.
  
  
                </td>

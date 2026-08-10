@@ -23,9 +23,11 @@ const Prerequisite = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000");
-  const [borderColor, setBorderColor] = useState("#000");
-  const [branches, setBranches] = useState([]);
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000";
+  const borderColor = colors.border || "#000";
+  const headerColor = colors.header || "#1976d2";
+  const branches = settings?.branches || [];
 
   const [curriculumList, setCurriculumList] = useState([]);
   const [selectedCurriculum, setSelectedCurriculum] = useState("");
@@ -56,27 +58,6 @@ const Prerequisite = () => {
     },
   });
   const pageId = 112; // 🔁 change if needed
-
-  /* ===================== SETTINGS ===================== */
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    } else {
-      setBranches([]);
-    }
-  }, [settings]);
 
   /* ===================== AUTH ===================== */
   useEffect(() => {
@@ -320,7 +301,7 @@ const Prerequisite = () => {
   }
 
   const headerStyle = {
-    backgroundColor: settings?.header_color || "#1976d2",
+    backgroundColor: headerColor,
     color: "#fff",
     border: `1px solid ${borderColor}`,
     padding: "8px",
@@ -497,7 +478,7 @@ const Prerequisite = () => {
                   textAlign: "center",
                   textTransform: "uppercase",
                   letterSpacing: "1px",
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   border: `1px solid ${borderColor}`,
                   borderRadius: 1,
                   p: 1,

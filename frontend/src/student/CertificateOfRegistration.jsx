@@ -37,31 +37,24 @@ const CertificateOfRegistration = forwardRef(
   ({ student_number, onReadyChange }, divToPrintRef) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
     const [branches, setBranches] = useState([]);
 
     useEffect(() => {
       if (settings) {
-        if (settings.logo_url) {
-          setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+        if (assets.logoUrl) {
+          setFetchedLogo(`${assets.logoUrl}`);
         } else {
           setFetchedLogo(EaristLogo);
         }
 
-        if (settings.company_name) setCompanyName(settings.company_name);
-        if (settings?.branches) {
-          try {
-            const parsed =
-              typeof settings.branches === "string"
-                ? JSON.parse(settings.branches)
-                : settings.branches;
-            setBranches(Array.isArray(parsed) ? parsed : []);
-          } catch (err) {
-            console.error("Failed to parse branches:", err);
-            setBranches([]);
-          }
-        }
+        if (branding.companyName) setCompanyName(branding.companyName);
+        setBranches(settings?.branches || []);
       }
     }, [settings]);
 
@@ -121,11 +114,11 @@ const CertificateOfRegistration = forwardRef(
         setCampusAddress(matchedBranch.address);
         return;
       }
-      if (settings.campus_address) {
-        setCampusAddress(settings.campus_address);
+      if (branding.campusAddress) {
+        setCampusAddress(branding.campusAddress);
         return;
       }
-      setCampusAddress(settings.address || "");
+      setCampusAddress(branding.campusAddress || "");
     }, [settings, branches, person?.campus]);
 
     const [approvedBy, setApprovedBy] = useState(null);

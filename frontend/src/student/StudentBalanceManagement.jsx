@@ -17,6 +17,10 @@ const fmt = (val) =>
 
 const ProgramPayment = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const navigate = useNavigate();
   const theme = useTheme();
 
@@ -33,8 +37,8 @@ const ProgramPayment = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   useEffect(() => {
@@ -106,7 +110,6 @@ const ProgramPayment = () => {
     });
   };
 
-  const headerColor = settings?.header_color || "#990000";
 
   return (
     <Box sx={{ minHeight: "calc(100vh - 150px)", overflowY: "auto", backgroundColor: "transparent", mt: 1, p: { xs: 1, sm: 2 } }}>

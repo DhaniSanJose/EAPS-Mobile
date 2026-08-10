@@ -49,6 +49,10 @@ import { Snackbar, Alert } from "@mui/material";
 const ProctorApplicantList = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
@@ -66,40 +70,26 @@ const ProctorApplicantList = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(Array.isArray(parsed) ? parsed : []);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    } else {
-      setBranches([]);
-    }
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   const words = companyName.trim().split(" ");
@@ -289,21 +279,36 @@ const ProctorApplicantList = () => {
     setAttendanceRows([]);
   }, [proctor?.schedule_id]);
 
-  const handleMarkAbsent = async () => {
-    if (
-      !proctor?.schedule_id ||
-      !window.confirm("Mark everyone who hasn't scanned as ABSENT?")
-    )
-      return;
+  const [openAbsentDialog, setOpenAbsentDialog] = useState(false);
+
+  const handleMarkAbsent = () => {
+    if (!proctor?.schedule_id) return;
+    setOpenAbsentDialog(true);
+  };
+
+  const handleConfirmMarkAbsent = async () => {
     try {
       await axios.put(
         `${API_BASE_URL}/api/exam-attendance/mark-absent/${proctor.schedule_id}`,
         auditActor(),
       );
       fetchAttendance(proctor.schedule_id);
+      setSnack({
+        open: true,
+        message: "Remaining applicants marked as absent.",
+        severity: "success",
+        key: Date.now(),
+      });
     } catch (err) {
       console.error("Error marking absent:", err);
+      setSnack({
+        open: true,
+        message: "Failed to mark absentees.",
+        severity: "error",
+        key: Date.now(),
+      });
     }
+    setOpenAbsentDialog(false);
   };
 
   const presentCount = attendanceRows.filter((r) => r.status === "present").length;
@@ -312,8 +317,154 @@ const ProctorApplicantList = () => {
     (r) => r.status === "not_arrived",
   ).length;
 
+  const handleExportAttendanceReportPdf = async () => {
+    const resolvedAddress = campusAddress || branding.campusAddress || "No address set in Settings";
+    const logoSrc = fetchedLogo || EaristLogo;
+    const name = companyName?.trim() || "";
+    const words = name.split(" ");
+    const middleIndex = Math.ceil(words.length / 2);
+    const firstLine = words.slice(0, middleIndex).join(" ");
+    const secondLine = words.slice(middleIndex).join(" ");
+
+    const startTimeStr = proctor?.start_time
+      ? new Date("1970-01-01T" + proctor.start_time).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+      : "";
+    const endTimeStr = proctor?.end_time
+      ? new Date("1970-01-01T" + proctor.end_time).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+      : "";
+
+    const statusLabel = (status) => {
+      if (status === "present") return "PRESENT";
+      if (status === "absent") return "ABSENT";
+      return "NOT YET ARRIVED";
+    };
+
+    const innerHtml = `
+    <div class="print-header">
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+          ${name
+        ? `
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                     <b>${secondLine}</b>
+                   </div>`
+          : ""
+        }
+            `
+        : ""
+      }
+          <div style="font-size: 12px; font-family: Arial">${resolvedAddress}</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">ENTRANCE EXAM ATTENDANCE REPORT</b>
+      </div>
+
+      <div class="info-row">
+        <div class="info-row-line">
+          <span><b>Proctor:</b> ${proctor?.proctor || "N/A"}</span>
+          <span><b>Building:</b> ${proctor?.building_description || "N/A"}</span>
+        </div>
+        <div class="info-row-line">
+          <span><b>Room:</b> ${proctor?.room_description || "N/A"}</span>
+          <span><b>Schedule:</b> ${formatDateLong(proctor?.day_description) || ""} | ${startTimeStr} - ${endTimeStr}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:6%">#</th>
+            <th style="width:12%">Applicant ID</th>
+            <th style="width:28%">Applicant Name</th>
+            <th style="width:14%">Status</th>
+            <th style="width:20%">Scanned At</th>
+            <th style="width:20%">Scanned By</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${attendanceRows
+        .map(
+          (r, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${r.applicant_id}</td>
+                <td class="applicant-name">${r.last_name}, ${r.first_name} ${r.middle_name || ""}</td>
+                <td>${statusLabel(r.status)}</td>
+                <td>${r.scanned_at ? new Date(r.scanned_at).toLocaleString("en-US", { timeZone: "Asia/Manila" }) : "—"}</td>
+                <td>${r.scanned_by || "—"}</td>
+              </tr>
+            `,
+        )
+        .join("")}
+
+          <tr>
+            <td
+              colspan="6"
+              style="border: 1.5px solid black; background-color: lightgray; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 6px 10px; font-weight: bold; text-align: right;"
+            >
+              <span style="margin-right: 24px;">Present: ${presentCount}</span>
+              <span style="margin-right: 24px;">Absent: ${absentCount}</span>
+              <span>Not Yet Arrived: ${notArrivedCount}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-attendance-report-pdf`,
+        {
+          html: innerHtml,
+          title: "Entrance Exam Attendance Report",
+          fileNamePrefix: "Attendance_Report",
+        },
+        {
+          responseType: "blob",
+          headers: getFlatAuditHeaders(auditActor()),
+        },
+      );
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", `Attendance_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Attendance Report PDF:", err);
+      setSnack({
+        open: true,
+        message: "Failed to generate Attendance Report PDF.",
+        severity: "error",
+        key: Date.now(),
+      });
+    }
+  };
+
   const handleExportProctorApplicantListPdf = async () => {
-    const resolvedAddress = campusAddress || settings?.address || "No address set in Settings";
+    const resolvedAddress = campusAddress || branding.campusAddress || "No address set in Settings";
 
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
@@ -458,12 +609,12 @@ const ProctorApplicantList = () => {
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       if (searchQuery.trim() !== "") {
-        handleSearch();
+        handleSearchByProctor(searchQuery);   // ✅ use the real function
       } else {
-        setApplicants([]); // clear results if empty search
+        setApplicants([]);
         setProctor(null);
       }
-    }, 500); // 500ms debounce
+    }, 500);
 
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
@@ -484,7 +635,7 @@ const ProctorApplicantList = () => {
   const headerFieldSx = {
     border: `1px solid ${borderColor}`,
     "& .MuiOutlinedInput-root": {
-      backgroundColor: settings?.header_color || "#1976d2",
+      backgroundColor: headerColor,
       borderRadius: 0,
       "& fieldset": { border: "none" },
     },
@@ -596,12 +747,12 @@ const ProctorApplicantList = () => {
                 color: "#757575",
 
                 "&.Mui-selected": {
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "#fff",
                 },
 
                 "&.Mui-selected:hover": {
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                 },
               },
             }}
@@ -623,10 +774,8 @@ const ProctorApplicantList = () => {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              setCurrentPage(1);
-              handleSearch();
             }}
-               sx={{
+            sx={{
               width: 450,
               backgroundColor: "#fff",
               borderRadius: 1,
@@ -639,7 +788,6 @@ const ProctorApplicantList = () => {
             }}
           />
 
-          {/* DOWNLOAD APPLICANT LIST */}
           {viewMode === "applicants" && applicants.length > 0 && (
             <Button
               onClick={handleExportProctorApplicantListPdf}
@@ -655,17 +803,35 @@ const ProctorApplicantList = () => {
                 fontWeight: "bold",
                 whiteSpace: "nowrap",
                 textTransform: "none",
-
-                "&:hover": {
-                  backgroundColor: "#d3d3d3",
-                },
-
-                "&:active": {
-                  transform: "scale(0.97)",
-                },
+                "&:hover": { backgroundColor: "#d3d3d3" },
+                "&:active": { transform: "scale(0.97)" },
               }}
             >
               Download Applicant List
+            </Button>
+          )}
+
+          {/* DOWNLOAD ATTENDANCE REPORT */}
+          {viewMode === "attendance" && (
+            <Button
+              onClick={handleExportAttendanceReportPdf}
+              startIcon={<FcPrint size={20} />}
+              sx={{
+                height: "40px",
+                px: 2,
+                border: "2px solid black",
+                backgroundColor: "#f0f0f0",
+                color: "black",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                whiteSpace: "nowrap",
+                textTransform: "none",
+                "&:hover": { backgroundColor: "#d3d3d3" },
+                "&:active": { transform: "scale(0.97)" },
+              }}
+            >
+              Download Attendance Report
             </Button>
           )}
         </Box>
@@ -682,11 +848,11 @@ const ProctorApplicantList = () => {
       >
         <Table>
           <TableHead
-            sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+            sx={{ backgroundColor: headerColor }}
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
-             Proctor Applicant List / Applicant Attendance Report
+                Proctor Applicant List / Applicant Attendance Report
               </TableCell>
             </TableRow>
           </TableHead>
@@ -846,7 +1012,7 @@ const ProctorApplicantList = () => {
             <TableContainer component={Paper}>
               <Table>
                 <TableHead
-                  sx={{ backgroundColor: settings?.header_color || "#1976d2" }}
+                  sx={{ backgroundColor: headerColor }}
                 >
                   <TableRow>
                     <TableCell
@@ -1083,7 +1249,7 @@ const ProctorApplicantList = () => {
                 textTransform: "none",
                 fontWeight: 700,
                 fontSize: "13px",
-             
+
                 px: 2.5,
                 boxShadow: "none",
                 "&:hover": { backgroundColor: "#b71c1c", boxShadow: "none" },
@@ -1098,7 +1264,7 @@ const ProctorApplicantList = () => {
             sx={{ border: `1px solid ${borderColor}` }}
           >
             <Table>
-              <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+              <TableHead sx={{ backgroundColor: headerColor }}>
                 <TableRow>
                   <TableCell
                     sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
@@ -1164,7 +1330,7 @@ const ProctorApplicantList = () => {
                       <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
                         {`${r.last_name}, ${r.first_name} ${r.middle_name || ""}`}
                       </TableCell>
-                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                      <TableCell align="center" sx={{ border: `1px solid ${borderColor}` }}>
                         {statusChip(r.status)}
                       </TableCell>
                       <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
@@ -1211,7 +1377,7 @@ const ProctorApplicantList = () => {
       >
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#9E0000",
+            background: colors.header || "#9E0000",
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",
@@ -1263,6 +1429,72 @@ const ProctorApplicantList = () => {
             }}
           >
             Yes, Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={openAbsentDialog}
+        onClose={() => setOpenAbsentDialog(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle
+          sx={{
+            background: colors.header || "#9E0000",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.2rem",
+            py: 2,
+          }}
+        >
+          ⚠️ Confirm Mark Absent
+        </DialogTitle>
+
+        <DialogContent sx={{ maxHeight: 400, overflowY: "auto", p: 3, mt: 2 }}>
+          <Box
+            sx={{
+              backgroundColor: "#fdfdfd",
+              borderRadius: "8px",
+              px: 2,
+              py: 2,
+              border: "1px solid #ddd",
+              fontSize: "0.95rem",
+              lineHeight: 1.8,
+            }}
+          >
+            <Typography>
+              Are you sure you want to mark everyone who hasn't scanned in as{" "}
+              <strong>ABSENT</strong> for this schedule?
+              <br />
+              <br />
+              Marked by:{" "}
+              <strong>{localStorage.getItem("email")}</strong>
+            </Typography>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            color="error"
+            variant="outlined"
+            onClick={() => setOpenAbsentDialog(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleConfirmMarkAbsent}
+            sx={{
+              backgroundColor: colors.header || "#9E0000",
+              "&:hover": {
+                backgroundColor: colors.header
+                  ? `${colors.header}cc`
+                  : "#7a0000",
+              },
+            }}
+          >
+            Yes, Confirm
           </Button>
         </DialogActions>
       </Dialog>

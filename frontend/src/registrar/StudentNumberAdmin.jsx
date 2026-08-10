@@ -51,9 +51,12 @@ const ROWS_PER_PAGE = 25;
 
 const StudentNumberAdmin = () => {
   const settings = useContext(SettingsContext);
-  const headerColor = settings?.header_color || "#1976d2";
-  const titleColor = settings?.title_color || "#000000";
-  const borderColor = settings?.border_color || "#000000";
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
 
   // ── access control ────────────────────────────────────────────────────
   const [hasAccess, setHasAccess] = useState(null);
@@ -140,10 +143,10 @@ const StudentNumberAdmin = () => {
     const newWin = window.open("", "Print-Window");
     newWin.document.open();
 
-    const logoSrc = settings?.logo_url
-      ? `${API_BASE_URL}${settings.logo_url}`
+    const logoSrc = assets.logoUrl
+      ? assets.logoUrl
       : EaristLogo;
-    const name = settings?.company_name?.trim() || "";
+    const name = branding.companyName?.trim() || "";
 
     // ✅ Balanced split
     const words = name.split(" ");
@@ -153,10 +156,8 @@ const StudentNumberAdmin = () => {
 
     // ✅ Address
     let campusAddress = "";
-    if (settings?.campus_address && settings.campus_address.trim() !== "") {
-      campusAddress = settings.campus_address;
-    } else if (settings?.address && settings.address.trim() !== "") {
-      campusAddress = settings.address;
+    if (branding.campusAddress && branding.campusAddress.trim() !== "") {
+      campusAddress = branding.campusAddress;
     } else {
       campusAddress = "No address set in Settings";
     }

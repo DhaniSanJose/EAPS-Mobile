@@ -81,6 +81,10 @@ const getDeviceType = (width) => {
 
 const StudentSchedule = () => {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -88,7 +92,7 @@ const StudentSchedule = () => {
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
   // Matches the maroon default used as the header accent in
   // StudentCurriculumSubjects.jsx, so both pages share one identity.
-  const headerBg = settings?.header_color || "#800000";
+  const headerBg = headerColor || "#800000";
 
   const [studentSchedule, setStudentSchedule] = useState([]);
   const [activeDay, setActiveDay] = useState("MON");
@@ -129,10 +133,10 @@ const StudentSchedule = () => {
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
   }, [settings]);
 
   // Single resize listener drives device type (mobile / tablet / desktop)
@@ -787,8 +791,8 @@ const StudentSchedule = () => {
           ...studentInfo,
           programSection: resolvedProgramSection,
         },
-        companyName: settings?.company_name,
-        campusAddress: settings?.campus_address,
+        companyName: branding.companyName,
+        campusAddress: branding.campusAddress,
         // Department (right-corner header field) and the active
         // semester line — department is now resolved through the
         // curriculum ⇄ department mapping (see
@@ -796,8 +800,8 @@ const StudentSchedule = () => {
         // settings if that lookup comes back empty.
         collegeName: studentInfo.department || settings?.college_name || "",
         semesterLabel: activeSemesterLabel || settings?.active_semester_label || "",
-        logoUrl: settings?.logo_url
-          ? `${API_BASE_URL}${settings.logo_url}`
+        logoUrl: assets.logoUrl
+          ? `${assets.logoUrl}`
           : `${window.location.origin}${EaristLogo}`,
       });
     } catch (error) {

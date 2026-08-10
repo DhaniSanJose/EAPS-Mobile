@@ -67,9 +67,47 @@ const dedupeCurriculumOptions = (list) => {
     return [...seen.values()];
 };
 
+const cleanStudentValue = (value) => {
+    if (value === null || value === undefined) return "";
+    const text = String(value).trim();
+    return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatStudentSuggestionName = (student) =>
+    [
+        cleanStudentValue(student?.last_name),
+        cleanStudentValue(student?.first_name),
+        cleanStudentValue(student?.middle_name),
+        cleanStudentValue(student?.extension),
+    ]
+        .filter(Boolean)
+        .join(" ");
+
+const getStudentSuggestionText = (student) =>
+    [
+        student?.student_number,
+        student?.first_name,
+        student?.middle_name,
+        student?.last_name,
+        student?.extension,
+        student?.emailAddress,
+    ]
+        .map(cleanStudentValue)
+        .join(" ")
+        .toLowerCase();
+
+const getStudentSuggestionValue = (student) =>
+    cleanStudentValue(student?.student_number) ||
+    formatStudentSuggestionName(student) ||
+    cleanStudentValue(student?.emailAddress);
+
 const RegistrarStudentList = () => {
     const socket = useRef(null);
     const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
     const [titleColor, setTitleColor] = useState("#000000");
     const [subtitleColor, setSubtitleColor] = useState("#555555");
     const [borderColor, setBorderColor] = useState("#000000");
@@ -85,35 +123,24 @@ const RegistrarStudentList = () => {
     useEffect(() => {
         if (!settings) return;
 
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-        if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-        if (settings.stepper_color) setStepperColor(settings.stepper_color);
+        if (colors.title) setTitleColor(colors.title);
+        if (colors.subtitle) setSubtitleColor(colors.subtitle);
+        if (colors.border) setBorderColor(colors.border);
+        if (colors.mainButton) setMainButtonColor(colors.mainButton);
+        if (colors.subButton) setSubButtonColor(colors.subButton);
+        if (colors.stepper) setStepperColor(colors.stepper);
 
-        if (settings.logo_url) {
-            setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+        if (assets.logoUrl) {
+            setFetchedLogo(assets.logoUrl);
         } else {
             setFetchedLogo(EaristLogo);
         }
 
-        if (settings.company_name) setCompanyName(settings.company_name);
-        if (settings.short_term) setShortTerm(settings.short_term);
-        if (settings.campus_address) setCampusAddress(settings.campus_address);
+        if (branding.companyName) setCompanyName(branding.companyName);
+        if (branding.shortTerm) setShortTerm(branding.shortTerm);
+        if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
-        if (settings?.branches) {
-            try {
-                const parsed =
-                    typeof settings.branches === "string"
-                        ? JSON.parse(settings.branches)
-                        : settings.branches;
-                setBranches(parsed);
-            } catch (err) {
-                console.error("Failed to parse branches:", err);
-                setBranches([]);
-            }
-        }
+        setBranches(settings?.branches || []);
     }, [settings]);
 
     useEffect(() => {
@@ -278,6 +305,7 @@ const RegistrarStudentList = () => {
 
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [suggestionsOpen, setSuggestionsOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [snack, setSnack] = useState({ open: false, message: '', severity: 'info' });
     const [person, setPerson] = useState({
@@ -303,13 +331,13 @@ const RegistrarStudentList = () => {
             return;
         }
 
-        if (settings.campus_address) {
-            setCampusAddress(settings.campus_address);
+        if (branding.campusAddress) {
+            setCampusAddress(branding.campusAddress);
             return;
         }
 
-        setCampusAddress(settings.address || "");
-    }, [settings, branches, person?.campus]);
+        setCampusAddress(branding.campusAddress || "");
+    }, [settings, branches, person?.campus, branding.campusAddress]);
 
     const [curriculumOptions, setCurriculumOptions] = useState([]);
     const [selectedApplicantStatus, setSelectedApplicantStatus] = useState("");
@@ -619,6 +647,16 @@ const RegistrarStudentList = () => {
         if (fieldA > fieldB) return sortOrder === "asc" ? 1 : -1;
         return 0;
     });
+    const studentSuggestions =
+        searchQuery.trim().length >= 2
+            ? persons
+                .filter((student) =>
+                    getStudentSuggestionText(student).includes(
+                        searchQuery.trim().toLowerCase(),
+                    ),
+                )
+                .slice(0, 10)
+            : [];
 
     const getRemarkText = (en_remarks) => {
         switch (en_remarks) {
@@ -1023,26 +1061,100 @@ const RegistrarStudentList = () => {
                     STUDENT LIST
                 </Typography>
 
-
-                <TextField
-                    variant="outlined"
-                    placeholder="Search Student Name / Email / Student"
-                    size="small"
-                    value={searchQuery}
-                    onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setCurrentPage(1);
-                    }}
-                    sx={{
-                        width: 450,
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": { borderRadius: "10px" },
-                    }}
-                    InputProps={{
-                        startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-                    }}
-                />
+                <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+                    <TextField
+                        variant="outlined"
+                        placeholder="Search Student Name / Email / Student"
+                        size="small"
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setCurrentPage(1);
+                            setSuggestionsOpen(true);
+                        }}
+                        onFocus={() => {
+                            if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+                        }}
+                        onBlur={() => {
+                            setTimeout(() => setSuggestionsOpen(false), 150);
+                        }}
+                        sx={{
+                            width: "100%",
+                            backgroundColor: "#fff",
+                            borderRadius: 1,
+                            "& .MuiOutlinedInput-root": { borderRadius: "10px" },
+                        }}
+                        InputProps={{
+                            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+                        }}
+                    />
+                    {suggestionsOpen && searchQuery.trim().length >= 2 && (
+                        <Box
+                            sx={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                zIndex: 20,
+                                backgroundColor: "#fff",
+                                border: "1px solid #d0d0d0",
+                                borderRadius: "8px",
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                                overflow: "hidden",
+                                maxHeight: 320,
+                            }}
+                        >
+                            {studentSuggestions.length > 0 ? (
+                                studentSuggestions.map((student) => {
+                                    const studentNumber = cleanStudentValue(
+                                        student?.student_number,
+                                    );
+                                    const name = formatStudentSuggestionName(student);
+                                    return (
+                                        <Box
+                                            key={`${studentNumber || student?.person_id}-${name}`}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                setSearchQuery(getStudentSuggestionValue(student));
+                                                setCurrentPage(1);
+                                                setSuggestionsOpen(false);
+                                            }}
+                                            sx={{
+                                                px: 2,
+                                                py: 1,
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                                fontSize: 14,
+                                                borderBottom: "1px solid #f0f0f0",
+                                                "&:hover": {
+                                                    backgroundColor: "#f5f7fb",
+                                                },
+                                            }}
+                                        >
+                                            <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                                                {studentNumber || "N/A"}
+                                            </Typography>
+                                            <Typography sx={{ fontSize: 14, color: "#555" }}>
+                                                |
+                                            </Typography>
+                                            <Typography sx={{ fontSize: 14 }} noWrap>
+                                                {name ||
+                                                    cleanStudentValue(student?.emailAddress) ||
+                                                    "Unnamed Student"}
+                                            </Typography>
+                                        </Box>
+                                    );
+                                })
+                            ) : (
+                                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                                    No matching students found
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </Box>
 
 
             </Box>
@@ -1059,7 +1171,7 @@ const RegistrarStudentList = () => {
 
             <TableContainer component={Paper} sx={{ width: '100%', border: `1px solid ${borderColor}` }}>
                 <Table>
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                    <TableHead sx={{ backgroundColor: headerColor }}>
                         <TableRow>
                             <TableCell sx={{ color: 'white', textAlign: "Center", height: "60px" }}></TableCell>
                         </TableRow>
@@ -1132,7 +1244,7 @@ const RegistrarStudentList = () => {
                 <Table size="small">
                     <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
                         <TableRow>
-                            <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                            <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
                                         Total Student's Records: {totalRecords}
@@ -1300,7 +1412,7 @@ const RegistrarStudentList = () => {
             {/* Main Table */}
             <TableContainer component={Paper} sx={{ width: "100%" }}>
                 <Table size="small">
-                    <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                    <TableHead sx={{ backgroundColor: headerColor }}>
                         <TableRow>
                             <TableCell sx={{ color: "white", textAlign: "center", width: "5%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>#</TableCell>
                             <TableCell sx={{ color: "white", textAlign: "center", width: "15%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Student Number</TableCell>
@@ -1366,7 +1478,7 @@ const RegistrarStudentList = () => {
                 <Table size="small">
                     <TableHead sx={{ backgroundColor: '#6D2323', color: "white" }}>
                         <TableRow>
-                            <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}>
+                            <TableCell colSpan={12} sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: headerColor, color: "white" }}>
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography fontSize="14px" fontWeight="bold" color="white">
                                         Total Student's Records: {totalRecords}

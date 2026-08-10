@@ -51,13 +51,15 @@ import useAuditMac from "../utils/useAuditMac";
 export default function EmailTemplateManager() {
   useAuditMac();
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
   const [titleColor, setTitleColor] = useState("#000000");
   const [borderColor, setBorderColor] = useState("#000000");
 
   useEffect(() => {
     if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.border) setBorderColor(colors.border);
   }, [settings]);
 
   // ── Auth / Access ──────────────────────────────────────────────────────────
@@ -574,7 +576,7 @@ export default function EmailTemplateManager() {
       sx={{
         border: `1px solid ${borderColor}`,
         py: 0.5,
-        backgroundColor: settings?.header_color || "#1976d2",
+        backgroundColor: headerColor,
         color: "white",
       }}
     >
@@ -806,12 +808,12 @@ export default function EmailTemplateManager() {
 
                             {/* Sub-table header label */}
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                              <PeopleIcon sx={{ color: settings?.header_color || "#1976d2", fontSize: 18 }} />
-                              <Typography fontSize="13px" fontWeight={700} color={settings?.header_color || "#1976d2"}>
+                              <PeopleIcon sx={{ color: headerColor, fontSize: 18 }} />
+                              <Typography fontSize="13px" fontWeight={700} color={headerColor}>
                                 Tagged Employees — {r.sender_name}
                               </Typography>
                               <Chip label={tagged.length} size="small"
-                                sx={{ backgroundColor: settings?.header_color || "#1976d2", color: "white", fontSize: "11px", height: 20 }} />
+                                sx={{ backgroundColor: headerColor, color: "white", fontSize: "11px", height: 20 }} />
                             </Box>
 
                             {isLoadingTagged ? (
@@ -827,8 +829,8 @@ export default function EmailTemplateManager() {
                                 <Button size="small" variant="outlined"
                                   sx={{
                                     mt: 1, textTransform: "none", fontSize: "12px",
-                                    borderColor: settings?.header_color || "#1976d2",
-                                    color: settings?.header_color || "#1976d2"
+                                    borderColor: headerColor,
+                                    color: headerColor
                                   }}
                                   onClick={() => handleEdit(r)}>
                                   Edit to Tag Employees
@@ -837,7 +839,7 @@ export default function EmailTemplateManager() {
                             ) : (
                               <Table size="small" sx={{ border: `1px solid ${borderColor}` }}>
                                 <TableHead>
-                                  <TableRow sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+                                  <TableRow sx={{ backgroundColor: headerColor }}>
                                     {["#", "Employee ID", "Name", "Email", "Position", "Action"].map((h) => (
                                       <TableCell key={h} align={h === "Action" ? "center" : "left"}
                                         sx={{
@@ -943,7 +945,7 @@ export default function EmailTemplateManager() {
         PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}>
 
         <DialogTitle sx={{
-          background: settings?.header_color || "#1976d2", color: "#fff",
+          background: headerColor, color: "#fff",
           fontWeight: 700, fontSize: "1.2rem", py: 2
         }}>
           {editing ? "Edit Email Template" : "New Email Registration"}

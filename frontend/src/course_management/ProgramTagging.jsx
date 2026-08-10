@@ -37,70 +37,49 @@ import SaveIcon from "@mui/icons-material/Save";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
+const cleanSearchValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const getProgramTaggingSearchText = (tag) =>
+  [
+    tag?.curriculum_description,
+    tag?.program_code,
+    tag?.program_description,
+    tag?.major,
+    tag?.course_code,
+    tag?.course_description,
+    tag?.prereq,
+    tag?.year_level_description,
+    tag?.semester_description,
+  ]
+    .map(cleanSearchValue)
+    .join(" ")
+    .toLowerCase();
+
+const getProgramTaggingSuggestionValue = (tag) =>
+  cleanSearchValue(tag?.course_code) ||
+  cleanSearchValue(tag?.course_description) ||
+  cleanSearchValue(tag?.program_code);
+
 const ProgramTagging = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
-
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-  const [branches, setBranches] = useState([]);
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const headerColor = colors.header || "#1976d2";
+  const branches = settings?.branches || [];
 
   const [selectedCurriculum, setSelectedCurriculum] = useState("");
   const [selectedYearLevel, setSelectedYearLevel] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("");
-
   const [filteredPrograms, setFilteredPrograms] = useState([]);
-
   const [canCreate, setCanCreate] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
-
-  useEffect(() => {
-    if (!settings) return;
-
-    // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color); // ✅ NEW
-    if (settings.stepper_color) setStepperColor(settings.stepper_color); // ✅ NEW
-
-    // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
-    } else {
-      setFetchedLogo(EaristLogo);
-    }
-
-    // 🏷️ School Information
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    } else {
-      setBranches([]);
-    }
-  }, [settings]);
 
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
@@ -188,6 +167,7 @@ const ProgramTagging = () => {
   const [taggedPrograms, setTaggedPrograms] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [courseSearch, setCourseSearch] = useState("");
   const [curriculumSearch, setCurriculumSearch] = useState("");
 
@@ -259,6 +239,16 @@ const ProgramTagging = () => {
     selectedSemester,
     taggedPrograms,
   ]);
+  const programTaggingSuggestions =
+    searchQuery.trim().length >= 2
+      ? taggedPrograms
+          .filter((tag) =>
+            getProgramTaggingSearchText(tag).includes(
+              searchQuery.trim().toLowerCase(),
+            ),
+          )
+          .slice(0, 10)
+      : [];
 
   const filteredCourses = courseList.filter((course) => {
     const words = courseSearch.toLowerCase().split(" ");
@@ -754,26 +744,90 @@ const ProgramTagging = () => {
             justifyContent: "flex-end",
           }}
         >
-          <TextField
-            variant="outlined"
-            placeholder="Search Curriculum / Course / Year / Semester"
-            size="small"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-            }}
-            sx={{
-              width: 450,
-              backgroundColor: "#fff",
-              borderRadius: 1,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-              },
-            }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-            }}
-          />
+          <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+            <TextField
+              variant="outlined"
+              placeholder="Search Curriculum / Course / Year / Semester"
+              size="small"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+              }}
+              onBlur={() => {
+                setTimeout(() => setSuggestionsOpen(false), 150);
+              }}
+              sx={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                },
+              }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+              }}
+            />
+            {suggestionsOpen && searchQuery.trim().length >= 2 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  backgroundColor: "#fff",
+                  border: "1px solid #d0d0d0",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}
+              >
+                {programTaggingSuggestions.length > 0 ? (
+                  programTaggingSuggestions.map((tag) => (
+                    <Box
+                      key={tag.program_tagging_id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearchQuery(getProgramTaggingSuggestionValue(tag));
+                        setCurrentPage(1);
+                        setSuggestionsOpen(false);
+                      }}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": { backgroundColor: "#f5f7fb" },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {cleanSearchValue(tag.course_code) || "N/A"}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        {cleanSearchValue(tag.course_description) || "Unnamed Course"} -{" "}
+                        {cleanSearchValue(tag.program_code) || "No Program"}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                    No matching tagged programs found
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
           <input
             ref={importInputRef}
             type="file"
@@ -835,7 +889,7 @@ const ProgramTagging = () => {
           <Table size="small">
             <TableHead
               sx={{
-                backgroundColor: settings?.header_color || "#1976d2",
+                backgroundColor: headerColor,
               }}
             >
               <TableRow>
@@ -844,7 +898,7 @@ const ProgramTagging = () => {
                   sx={{
 
                     py: 0.5,
-                    backgroundColor: settings?.header_color || "#1976d2",
+                    backgroundColor: headerColor,
                     color: "white",
                   }}
                 >
@@ -952,7 +1006,7 @@ const ProgramTagging = () => {
                     sx={{
                       border: `1px solid ${borderColor}`,
                       py: 0.5,
-                      backgroundColor: settings?.header_color || "#1976d2",
+                      backgroundColor: headerColor,
                       color: "white",
                     }}
                   >
@@ -1475,7 +1529,7 @@ const ProgramTagging = () => {
                     sx={{
                       border: `1px solid ${borderColor}`,
                       py: 0.5,
-                      backgroundColor: settings?.header_color || "#1976d2",
+                      backgroundColor: headerColor,
                       color: "white",
                     }}
                   >
@@ -1680,7 +1734,7 @@ const ProgramTagging = () => {
         {/* HEADER */}
         <DialogTitle
           sx={{
-            background: settings?.header_color || "#1976d2",
+            background: headerColor,
             color: "#fff",
             fontWeight: 700,
             fontSize: "1.2rem",

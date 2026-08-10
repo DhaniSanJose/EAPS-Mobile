@@ -24,6 +24,8 @@ import { SettingsContext } from "../App";
 */
 export default function QRScanner({ open, onClose, onScan }) {
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
 
   const scannerRef = useRef(null);
   const html5QrRef = useRef(null);
@@ -163,7 +165,7 @@ export default function QRScanner({ open, onClose, onScan }) {
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle
         sx={{
-          bgcolor: settings?.header_color || "#1976d2",
+          bgcolor: headerColor || "#1976d2",
           color: "white",
           display: "flex",
           justifyContent: "space-between",

@@ -149,9 +149,10 @@ const FacultyDashboard = ({ profileImage, setProfileImage }) => {
   const [holidays, setHolidays] = useState({});
   const [sidebarHeight, setSidebarHeight] = useState(null);
 
-  const headerColor = settings?.header_color || MAROON;
-  const maroon = settings?.header_color || MAROON;
-  const borderColor = settings?.border_color || "#000000";
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || MAROON;
+  const maroon = colors.header || MAROON;
+  const borderColor = colors.border || "#000000";
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");

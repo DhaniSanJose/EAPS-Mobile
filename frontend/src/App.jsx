@@ -2,6 +2,7 @@ import React, {
   createContext,
   useState,
   useEffect,
+  useMemo,
   Suspense,
   lazy,
 } from "react";
@@ -43,6 +44,100 @@ import GradeConversionAdmin from "./system_management/GradeConversionAdmin";
 import HonorsReport from "./system_management/HonorsReport";
 
 export const SettingsContext = createContext(null);
+
+const SETTINGS_FALLBACKS = {
+  title_color: "",
+  subtitle_color: "",
+  border_color: "",
+  header_color: "",
+  main_button_color: "",
+  sub_button_color: "",
+  stepper_color: "",
+  footer_color: "",
+  footer_text: "",
+  company_name: "",
+  short_term: "",
+  campus_address: "",
+  bg_image: "",
+  logo_url: "",
+  academic_year: "",
+  branches: [],
+};
+
+const getSettingValue = (data, key, fallbackKey = key) => {
+  const value = data?.[key];
+  return value === undefined || value === null || value === ""
+    ? SETTINGS_FALLBACKS[fallbackKey]
+    : value;
+};
+
+const getAssetUrl = (path) => {
+  if (!path) return null;
+  if (/^(https?:)?\/\//i.test(path) || path.startsWith("data:")) return path;
+  return `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+};
+
+const parseSettingsBranches = (branches) => {
+  if (!branches) return [];
+  if (Array.isArray(branches)) return branches;
+
+  try {
+    const parsed =
+      typeof branches === "string" ? JSON.parse(branches) : branches;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const normalizeSettings = (data = {}) => {
+  const source = data || {};
+  const branches = parseSettingsBranches(source.branches);
+  const campusAddress =
+    getSettingValue(source, "campus_address", "campus_address") ||
+    getSettingValue(source, "address", "campus_address");
+  const logoUrl = getAssetUrl(source.logo_url);
+  const backgroundUrl = getAssetUrl(source.bg_image);
+  const backgroundImage = backgroundUrl ? `url(${backgroundUrl})` : null;
+
+  return {
+    ...source,
+    branches,
+    campus_address: campusAddress,
+    address: source.address ?? campusAddress,
+    colors: {
+      title: getSettingValue(source, "title_color"),
+      subtitle: getSettingValue(source, "subtitle_color"),
+      border: getSettingValue(source, "border_color"),
+      header: getSettingValue(source, "header_color"),
+      mainButton: getSettingValue(source, "main_button_color"),
+      subButton: getSettingValue(source, "sub_button_color"),
+      stepper: getSettingValue(source, "stepper_color"),
+      footer: getSettingValue(source, "footer_color"),
+    },
+    branding: {
+      companyName: getSettingValue(source, "company_name"),
+      shortTerm: getSettingValue(source, "short_term"),
+      campusAddress,
+      logoUrl,
+      footerText: getSettingValue(source, "footer_text"),
+    },
+    assets: {
+      logoUrl,
+      backgroundImage,
+    },
+    academic: {
+      academicYear: getSettingValue(source, "academic_year"),
+    },
+  };
+};
+
+const hasRequiredSettings = (settings) =>
+  Boolean(
+    settings?.colors?.header &&
+      settings?.colors?.mainButton &&
+      settings?.branding?.companyName,
+  );
 
 const UploadApplicants = lazy(
   () => import("./account_management/UploadApplicants"),
@@ -145,6 +240,10 @@ const UserPageAccess = lazy(
 const AdmissionFormProcess = lazy(
   () => import("./admission/AdmissionFormProcess"),
 );
+const EmptyAdmissionFormProcess = lazy(
+  () => import("./admission/EmptyAdmissionFormProcess"),
+);
+
 const AdmissionPersonalInformation = lazy(
   () => import("./admission/AdmissionPersonalInformation"),
 );
@@ -644,13 +743,7 @@ function App() {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return null;
-      return {
-        ...parsed,
-        branches:
-          typeof parsed.branches === "string"
-            ? JSON.parse(parsed.branches)
-            : parsed.branches || [],
-      };
+      return normalizeSettings(parsed);
     } catch {
       return null;
     }
@@ -659,7 +752,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [settings, setSettings] = useState(() => getCachedSettings());
   const [settingsReady, setSettingsReady] = useState(() =>
-    Boolean(getCachedSettings()),
+    hasRequiredSettings(getCachedSettings()),
   );
   const [profileImage, setProfileImage] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -772,23 +865,17 @@ function App() {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/settings`);
       const data = response.data;
-      const normalized = {
-        ...data,
-        branches:
-          typeof data.branches === "string"
-            ? JSON.parse(data.branches)
-            : data.branches || [],
-      };
+      const normalized = normalizeSettings(data);
       setSettings(normalized);
       localStorage.setItem("app_settings_cache", JSON.stringify(normalized));
       setLogoVersion(Date.now());
+      setSettingsReady(hasRequiredSettings(normalized));
     } catch (error) {
       console.error(
         "Error fetching settings:",
         error.response?.data || error.message,
       );
-    } finally {
-      setSettingsReady(true);
+      setSettingsReady(false);
     }
   };
 
@@ -853,14 +940,9 @@ function App() {
 
       try {
         const parsed = JSON.parse(event.newValue);
-        setSettings({
-          ...parsed,
-          branches:
-            typeof parsed.branches === "string"
-              ? JSON.parse(parsed.branches)
-              : parsed.branches || [],
-        });
-        setSettingsReady(true);
+        const normalized = normalizeSettings(parsed);
+        setSettings(normalized);
+        setSettingsReady(hasRequiredSettings(normalized));
       } catch (error) {
         console.error("Error reading cached settings update:", error);
       }
@@ -913,6 +995,19 @@ function App() {
     typography: { fontFamily: "Poppins, sans-serif" },
   });
 
+  const settingsContextValue = useMemo(
+    () =>
+      settings
+        ? {
+            ...settings,
+            refreshSettings: fetchSettings,
+          }
+        : null,
+    [settings],
+  );
+  const appColors = settings?.colors || {};
+  const appBranding = settings?.branding || {};
+
   const ForcePasswordGuard = ({ children }) => {
     const forced = localStorage.getItem("force_password_change") === "true";
     const role = localStorage.getItem("role");
@@ -943,20 +1038,23 @@ function App() {
   const isCorExportRenderRoute =
     window.location.pathname === "/cor_export_render";
 
-  // Compute sidebar spacer width — zero on mobile (sidebar overlays)
-  const sidebarSpacerWidth =
-    !isAuthenticated || isCorExportRenderRoute
-      ? 0
-      : isMobile
-        ? 0
-        : isSidebarCollapsed
-          ? 75
-          : 290;
+  const settingsOk = settingsReady && hasRequiredSettings(settings);
 
-  if (!settingsReady) {
+  if (!settingsOk) {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
+        <Box
+          sx={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "Poppins, sans-serif",
+          }}
+        >
+          <Typography variant="h6">Loading....</Typography>
+        </Box>
       </ThemeProvider>
     );
   }
@@ -964,7 +1062,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <SettingsContext.Provider value={settings}>
+      <SettingsContext.Provider value={settingsContextValue}>
         <Suspense
           fallback={
             <Box
@@ -1017,7 +1115,7 @@ function App() {
                       position="fixed"
                       sx={{
                         zIndex: (theme) => theme.zIndex.drawer + 1,
-                        bgcolor: settings?.header_color || "#1976d2",
+                        bgcolor: appColors.header,
                         // On desktop, offset AppBar by sidebar width so it doesn't sit under the sidebar
                         left: { xs: 0, sm: 0 },
                         width: "100%",
@@ -1051,9 +1149,9 @@ function App() {
                             </IconButton>
                           )}
 
-                          {settings?.logo_url && (
+                          {appBranding.logoUrl && (
                             <img
-                              src={`${API_BASE_URL}${settings.logo_url}?t=${Date.now()}`}
+                              src={`${appBranding.logoUrl}?t=${Date.now()}`}
                               alt="Logo"
                               style={{
                                 height: isMobile ? "42px" : "50px",
@@ -1100,13 +1198,13 @@ function App() {
                                 component="span"
                                 sx={{ display: { xs: "inline", sm: "none" } }}
                               >
-                                {settings?.short_term || "SCHOOL"}
+                                {appBranding.shortTerm || "SCHOOL"}
                               </Box>
                               <Box
                                 component="span"
                                 sx={{ display: { xs: "none", sm: "inline" } }}
                               >
-                                {settings?.company_name || "SCHOOL NAME"}
+                                {appBranding.companyName || "SCHOOL NAME"}
                               </Box>
                             </Typography>
                             <Typography
@@ -1121,7 +1219,7 @@ function App() {
                                 display: { xs: "none", sm: "block" },
                               }}
                             >
-                              {settings?.short_term || "SCHOOL NAME"} ACADEMIC
+                              {appBranding.shortTerm || "SCHOOL NAME"} ACADEMIC
                               INFORMATION SYSTEM
                             </Typography>
                           </Box>
@@ -2612,6 +2710,14 @@ function App() {
                         }
                       />
                       <Route
+                        path="/empty_admission_form_process"
+                        element={
+                          <ProtectedRoute allowedRoles={["registrar"]}>
+                            <EmptyAdmissionFormProcess />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
                         path="/admin_office_of_the_registrar"
                         element={
                           <ProtectedRoute allowedRoles={["registrar"]}>
@@ -3009,14 +3115,14 @@ function App() {
                     bottom: 0,
                     left: 0,
                     zIndex: (theme) => theme.zIndex.drawer + 1,
-                    bgcolor: settings?.footer_color || "#ffffff",
+                    bgcolor: appColors.footer || "#ffffff",
                     color: "white",
                     textAlign: "center",
                     padding: "8px 5px",
                   }}
                 >
                   <Typography style={{ fontSize: "14px" }}>
-                    {settings?.footer_text || ""}
+                    {appBranding.footerText || ""}
                   </Typography>
                 </Box>
               )}

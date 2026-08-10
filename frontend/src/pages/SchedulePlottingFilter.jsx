@@ -67,19 +67,14 @@ const ScheduleFilterer = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
+  const colors = settings?.colors || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const headerColor = colors.header || "#1976d2";
   const [employeeID, setEmployeeID] = useState("");
   const [canEditAccess, setCanEditAccess] = useState(false);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!settings) return;
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-  }, [settings]);
 
   const [departmentList, setDepartmentList] = useState([]);
   const [filterDepId, setFilterDepId] = useState(null);
@@ -314,7 +309,7 @@ const ScheduleFilterer = () => {
                 py: 1,
                 backgroundColor:
                   filterDepId === department.dprtmnt_id
-                    ? settings?.header_color || "#1976d2"
+                    ? headerColor
                     : "white",
                 color: filterDepId === department.dprtmnt_id ? "white" : "maroon",
                 fontSize: "0.8rem",
@@ -394,7 +389,7 @@ const ScheduleFilterer = () => {
                           border: `1px solid ${borderColor}`,
                           textAlign: "center",
                           backgroundColor:
-                            settings?.header_color || "#1976d2",
+                            headerColor,
                         }}
                       >
                         Department
@@ -409,7 +404,7 @@ const ScheduleFilterer = () => {
                           border: `1px solid ${borderColor}`,
                           textAlign: "center",
                           backgroundColor:
-                            settings?.header_color || "#1976d2",
+                            headerColor,
                         }}
                       >
                         Allowed
@@ -557,7 +552,7 @@ const ScheduleFilterer = () => {
                               border: `1px solid ${borderColor}`,
                               textAlign: "center",
                               backgroundColor:
-                                settings?.header_color || "#1976d2",
+                                headerColor,
                             }}
                           >
                             {label}

@@ -39,11 +39,49 @@ import useAuditMac from "../utils/useAuditMac";
 import { io } from "socket.io-client";
 import RegistrarApplicantProcessTabs from "../components/RegistrarApplicantProcessTabs";
 
+const cleanApplicantValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatApplicantSuggestionName = (applicant) =>
+  [
+    cleanApplicantValue(applicant?.last_name),
+    cleanApplicantValue(applicant?.first_name),
+    cleanApplicantValue(applicant?.middle_name),
+    cleanApplicantValue(applicant?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+const getApplicantSuggestionText = (applicant) =>
+  [
+    applicant?.applicant_number,
+    applicant?.first_name,
+    applicant?.middle_name,
+    applicant?.last_name,
+    applicant?.extension,
+    applicant?.emailAddress,
+  ]
+    .map(cleanApplicantValue)
+    .join(" ")
+    .toLowerCase();
+
+const getApplicantSuggestionValue = (applicant) =>
+  cleanApplicantValue(applicant?.applicant_number) ||
+  formatApplicantSuggestionName(applicant) ||
+  cleanApplicantValue(applicant?.emailAddress);
+
 const RegistrarQualifyingInterviewExamScore = () => {
   useAuditMac();
   const socket = useRef(null);
 
   const settings = useContext(SettingsContext);
+  const colors = settings?.colors || {};
+  const branding = settings?.branding || {};
+  const assets = settings?.assets || {};
+  const headerColor = colors.header || "#1976d2";
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -62,40 +100,28 @@ const RegistrarQualifyingInterviewExamScore = () => {
     if (!settings) return;
 
     // 🎨 Colors
-    if (settings.title_color) setTitleColor(settings.title_color);
-    if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-    if (settings.border_color) setBorderColor(settings.border_color);
-    if (settings.main_button_color)
-      setMainButtonColor(settings.main_button_color);
-    if (settings.sub_button_color) setSubButtonColor(settings.sub_button_color);
-    if (settings.stepper_color) setStepperColor(settings.stepper_color);
+    if (colors.title) setTitleColor(colors.title);
+    if (colors.subtitle) setSubtitleColor(colors.subtitle);
+    if (colors.border) setBorderColor(colors.border);
+    if (colors.mainButton)
+      setMainButtonColor(colors.mainButton);
+    if (colors.subButton) setSubButtonColor(colors.subButton);
+    if (colors.stepper) setStepperColor(colors.stepper);
 
     // 🏫 Logo
-    if (settings.logo_url) {
-      setFetchedLogo(`${API_BASE_URL}${settings.logo_url}`);
+    if (assets.logoUrl) {
+      setFetchedLogo(assets.logoUrl);
     } else {
       setFetchedLogo(EaristLogo);
     }
 
     // 🏷️ School Info
-    if (settings.company_name) setCompanyName(settings.company_name);
-    if (settings.short_term) setShortTerm(settings.short_term);
-    if (settings.campus_address) setCampusAddress(settings.campus_address);
+    if (branding.companyName) setCompanyName(branding.companyName);
+    if (branding.shortTerm) setShortTerm(branding.shortTerm);
+    if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    if (settings?.branches) {
-      try {
-        const parsed =
-          typeof settings.branches === "string"
-            ? JSON.parse(settings.branches)
-            : settings.branches;
-
-        setBranches(parsed);
-      } catch (err) {
-        console.error("Failed to parse branches:", err);
-        setBranches([]);
-      }
-    }
+    setBranches(settings?.branches || []);
   }, [settings]);
 
   useEffect(() => {
@@ -118,7 +144,6 @@ const RegistrarQualifyingInterviewExamScore = () => {
   const queryParams = new URLSearchParams(location.search);
 
   const queryPersonId = (queryParams.get("person_id") || "").trim();
-
 
   const handleRowClick = (applicant) => {
     const personId = applicant?.person_id;
@@ -288,7 +313,10 @@ const RegistrarQualifyingInterviewExamScore = () => {
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
-  const [adminData, setAdminData] = useState({ dprtmnt_id: "", dprtmnt_ids: [] });
+  const [adminData, setAdminData] = useState({
+    dprtmnt_id: "",
+    dprtmnt_ids: [],
+  });
   const [loading, setLoading] = useState(false);
   const [loading2, setLoading2] = useState(false);
 
@@ -374,6 +402,7 @@ const RegistrarQualifyingInterviewExamScore = () => {
 
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [snack, setSnack] = useState({
     open: false,
@@ -501,7 +530,6 @@ const RegistrarQualifyingInterviewExamScore = () => {
     fetchDepartments();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-
   useEffect(() => {
     const departmentIds =
       Array.isArray(adminData.dprtmnt_ids) && adminData.dprtmnt_ids.length
@@ -520,9 +548,10 @@ const RegistrarQualifyingInterviewExamScore = () => {
           ),
         );
 
-
         const merged = responses.flatMap((response) => response.data || []);
-        const restricted = dedupeByProgramCode(restrictToRegistrarCurriculum(merged));
+        const restricted = dedupeByProgramCode(
+          restrictToRegistrarCurriculum(merged),
+        );
         setCurriculumOptions(restricted);
         setAllCurriculums(restricted);
       } catch (error) {
@@ -557,14 +586,16 @@ const RegistrarQualifyingInterviewExamScore = () => {
     allCurriculums.some(
       (curriculum) =>
         String(curriculum.dprtmnt_id) === String(dep.dprtmnt_id) &&
-        (!person.campus || String(curriculum.components) === String(person.campus))
-    )
+        (!person.campus ||
+          String(curriculum.components) === String(person.campus)),
+    ),
   );
   const filteredCurriculumOptions = allCurriculums.filter(
     (curriculum) =>
-      (!person.campus || String(curriculum.components) === String(person.campus)) &&
+      (!person.campus ||
+        String(curriculum.components) === String(person.campus)) &&
       (!selectedDepartmentFilter ||
-        String(curriculum.dprtmnt_id) === String(selectedDepartmentFilter))
+        String(curriculum.dprtmnt_id) === String(selectedDepartmentFilter)),
   );
   const [schoolYears, setSchoolYears] = useState([]);
   const [semesters, setSchoolSemester] = useState([]);
@@ -675,7 +706,7 @@ const RegistrarQualifyingInterviewExamScore = () => {
     const matchesSemester =
       selectedSchoolSemester === "" ||
       normalize(personData.middle_code) ===
-      normalize(selectedSemester?.semester_code);
+        normalize(selectedSemester?.semester_code);
 
     /* 🧮 SCORE COMPUTATION (MUST COME BEFORE FILTERS) */
     const subjectScores = subjects.map((subject) =>
@@ -724,25 +755,25 @@ const RegistrarQualifyingInterviewExamScore = () => {
       .sort((a, b) => {
         const aExam = Number(
           editScores[a.person_id]?.qualifying_exam_score ??
-          a.qualifying_exam_score ??
-          0,
+            a.qualifying_exam_score ??
+            0,
         );
         const aInterview = Number(
           editScores[a.person_id]?.qualifying_interview_score ??
-          a.qualifying_interview_score ??
-          0,
+            a.qualifying_interview_score ??
+            0,
         );
         const aTotal = (aExam + aInterview) / 2;
 
         const bExam = Number(
           editScores[b.person_id]?.qualifying_exam_score ??
-          b.qualifying_exam_score ??
-          0,
+            b.qualifying_exam_score ??
+            0,
         );
         const bInterview = Number(
           editScores[b.person_id]?.qualifying_interview_score ??
-          b.qualifying_interview_score ??
-          0,
+            b.qualifying_interview_score ??
+            0,
         );
         const bTotal = (bExam + bInterview) / 2;
 
@@ -764,6 +795,16 @@ const RegistrarQualifyingInterviewExamScore = () => {
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentPersons = sortedPersons.slice(indexOfFirstItem, indexOfLastItem);
+  const applicantSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+          .filter((applicant) =>
+            getApplicantSuggestionText(applicant).includes(
+              searchQuery.trim().toLowerCase(),
+            ),
+          )
+          .slice(0, 10)
+      : [];
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -811,8 +852,6 @@ const RegistrarQualifyingInterviewExamScore = () => {
     fetchDepartments();
   }, [adminData.dprtmnt_id, adminData.dprtmnt_ids, scopeRevision]);
 
-
-
   const handleSnackClose = (_, reason) => {
     if (reason === "clickaway") return;
     setSnack((prev) => ({ ...prev, open: false }));
@@ -827,7 +866,6 @@ const RegistrarQualifyingInterviewExamScore = () => {
       setSelectedProgramFilter(assignedCurriculum.program_code);
     }
   }, [curriculumOptions, isProgramLocked]);
-
 
   const handleDepartmentChange = (selectedDept) => {
     setSelectedDepartmentFilter(selectedDept);
@@ -959,218 +997,6 @@ const RegistrarQualifyingInterviewExamScore = () => {
           err.response?.data?.message ||
           err.response?.data?.error ||
           "Failed to update status.",
-        severity: "error",
-      });
-    }
-  };
-
-  const divToPrintRef = useRef();
-
-  const handleExportQualifyingInterviewScorePdf = async () => {
-    const logoSrc = fetchedLogo || EaristLogo;
-    const name = companyName?.trim() || "";
-
-    const words = name.split(" ");
-    const middleIndex = Math.ceil(words.length / 2);
-    const firstLine = words.slice(0, middleIndex).join(" ");
-    const secondLine = words.slice(middleIndex).join(" ");
-
-    const resolvedCampusAddress =
-      campusAddress || settings?.campus_address || settings?.address || "No address set in Settings";
-
-    const selectedProgramLabel = selectedProgramFilter
-      ? filteredCurriculumOptions.find(
-        (p) => String(p.curriculum_id) === String(selectedProgramFilter),
-      )?.program_description || "N/A"
-      : "All Programs";
-
-    const selectedDepartmentLabel = selectedDepartmentFilter
-      ? department.find(
-        (d) => String(d.dprtmnt_id) === String(selectedDepartmentFilter),
-      )?.dprtmnt_name || "N/A"
-      : "All Departments";
-
-    // Only the .print-container's INNER markup — no <html>/<head>/<body>,
-    // no onload print script. The server wraps this with matching CSS.
-    const innerHtml = `
-    <div class="print-header">
-      <div class="print-corner-label left">
-        Department:<br/>${selectedDepartmentLabel}
-      </div>
-
-      <div class="print-corner-label right">
-        Program:<br/>${selectedProgramLabel}
-      </div>
-
-      <div class="header-content">
-        <img src="${logoSrc}" alt="School Logo" />
-
-        <div class="header-text">
-          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
-
-          ${name
-        ? `
-              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
-                ${firstLine}
-              </b>
-              ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
-                     <b>${secondLine}</b>
-                   </div>`
-          : ""
-        }
-            `
-        : ""
-      }
-
-          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
-        </div>
-      </div>
-
-      <div style="margin-top: 20px; text-align: center;">
-        <b style="font-size: 20px; letter-spacing: 1px;">QUALIFYING / INTERVIEW EXAMINATION SCORE</b>
-      </div>
-    </div>
-
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:10%">Applicant ID</th>
-            <th style="width:24%">Applicant Name</th>
-            <th style="width:12%">Program</th>
-            <th style="width:10%">Qualifying Exam Score</th>
-            <th style="width:9%">Qualifying Status</th>
-            <th style="width:10%">Interview Exam Score</th>
-            <th style="width:9%">Interview Status</th>
-            <th style="width:8%">Total Avg</th>
-            <th style="width:8%">Status</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          ${filteredPersons
-        .map((person) => {
-          const qualifyingExam =
-            editScores[person.person_id]?.qualifying_exam_score ??
-            person.qualifying_exam_score ??
-            0;
-
-          const qualifyingInterview =
-            editScores[person.person_id]?.qualifying_interview_score ??
-            person.qualifying_interview_score ??
-            0;
-
-          const computedTotalAve =
-            (Number(qualifyingExam) + Number(qualifyingInterview)) / 2;
-
-          // Fixed: build the full name safely instead of concatenating
-          // possibly-undefined fields directly into the string.
-          const fullName = [
-            person.last_name,
-            [person.first_name, person.middle_name, person.extension]
-              .filter(Boolean)
-              .join(" "),
-          ]
-            .filter(Boolean)
-            .join(", ");
-
-          const qualifyingStatusVal =
-            editScores[person.person_id]?.qualifying_status !== undefined
-              ? editScores[person.person_id].qualifying_status
-              : person.qualifying_status;
-
-          const interviewStatusVal =
-            editScores[person.person_id]?.interview_status_result !== undefined
-              ? editScores[person.person_id].interview_status_result
-              : person.interview_status_result;
-
-          const qualifyingStatusLabel =
-            qualifyingStatusVal === 0
-              ? "Passed"
-              : qualifyingStatusVal === 1
-                ? "Failed"
-                : "—";
-
-          const interviewStatusLabel =
-            interviewStatusVal === 0
-              ? "Passed"
-              : interviewStatusVal === 1
-                ? "Failed"
-                : "—";
-
-          const collegeStatusLabel =
-            Number(getCurrentCollegeApprovalStatus(person)) === 1
-              ? "Accepted"
-              : Number(getCurrentCollegeApprovalStatus(person)) === 2
-                ? "Rejected"
-                : "Waiting List";
-
-          const programCode =
-            allCurriculums.find(
-              (item) =>
-                item.curriculum_id?.toString() === person.program?.toString(),
-            )?.program_code ?? "N/A";
-
-          return `
-                <tr>
-                  <td>${person.applicant_number ?? "N/A"}</td>
-                  <td class="applicant-name">${fullName}</td>
-                  <td>${programCode}</td>
-                  <td>${qualifyingExam}</td>
-                  <td>${qualifyingStatusLabel}</td>
-                  <td>${qualifyingInterview}</td>
-                  <td>${interviewStatusLabel}</td>
-                  <td>${computedTotalAve.toFixed(2)}</td>
-                  <td>${collegeStatusLabel}</td>
-                </tr>
-              `;
-        })
-        .join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/generate-qualifying-interview-score-pdf`,
-        { html: innerHtml },
-        {
-          responseType: "blob",
-          headers: {
-            "x-audit-actor-id":
-              employeeID ||
-              localStorage.getItem("employee_id") ||
-              localStorage.getItem("email") ||
-              "unknown",
-            "x-audit-actor-role":
-              localStorage.getItem("access_description") ||
-              userRole ||
-              localStorage.getItem("role") ||
-              "registrar",
-          },
-        },
-      );
-
-      const blobUrl = window.URL.createObjectURL(
-        new Blob([response.data], { type: "application/pdf" }),
-      );
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.setAttribute(
-        "download",
-        `Qualifying_Interview_Score_${new Date().toISOString().slice(0, 10)}.pdf`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (err) {
-      console.error("Failed to generate Qualifying/Interview Score PDF:", err);
-      setSnack({
-        open: true,
-        message: "Failed to generate Qualifying / Interview Score PDF.",
         severity: "error",
       });
     }
@@ -1451,14 +1277,14 @@ const RegistrarQualifyingInterviewExamScore = () => {
       prev.map((p) =>
         applicantNumberSet.has(String(p.applicant_number))
           ? {
-            ...p,
-            assigned: nextStatus === COLLEGE_APPROVAL_STATUS.ACCEPTED,
-            college_approval_status: nextStatus,
-            applicant_interview_status:
-              nextStatus === COLLEGE_APPROVAL_STATUS.WAITING_LIST
-                ? 0
-                : p.applicant_interview_status,
-          }
+              ...p,
+              assigned: nextStatus === COLLEGE_APPROVAL_STATUS.ACCEPTED,
+              college_approval_status: nextStatus,
+              applicant_interview_status:
+                nextStatus === COLLEGE_APPROVAL_STATUS.WAITING_LIST
+                  ? 0
+                  : p.applicant_interview_status,
+            }
           : p,
       ),
     );
@@ -1482,8 +1308,8 @@ const RegistrarQualifyingInterviewExamScore = () => {
   const getCurrentCollegeApprovalStatus = (personData) =>
     Number(
       editScores[personData.person_id]?.status ??
-      personData.college_approval_status ??
-      0,
+        personData.college_approval_status ??
+        0,
     );
 
   const handleAssignSingle = (applicant_number) => {
@@ -2054,7 +1880,7 @@ ${reqText}`.trim();
     const reqText = buildRequirementsText(applicant, requirements);
 
     // ✅ Use dynamic company name from settings
-    const companyName = settings?.company_name || "Student Information System";
+    const companyName = branding.companyName || "Student Information System";
 
     const defaultMessage = `
 Dear ${applicant?.last_name || ""}, ${applicant?.first_name || ""} ${applicant?.middle_name || ""}
@@ -2099,7 +1925,7 @@ Thank you, best regards
     const reqText = buildRequirementsText(applicant, requirements);
 
     // ✅ Use dynamic company name from settings
-    const companyName = settings?.company_name || "Student Information System";
+    const companyName = branding.companyName || "Student Information System";
 
     const defaultMessage = `
 Dear ${applicant?.last_name || ""}, ${applicant?.first_name || ""} ${applicant?.middle_name || ""}
@@ -2140,11 +1966,11 @@ Thank you, best regards
     return selectedApplicant
       ? persons.filter((p) => p.applicant_number === selectedApplicant)
       : persons.filter(
-        (p) =>
-          Number(p.college_approval_status) ===
-          COLLEGE_APPROVAL_STATUS.ACCEPTED &&
-          Number(p.applicant_interview_status) !== 1,
-      );
+          (p) =>
+            Number(p.college_approval_status) ===
+              COLLEGE_APPROVAL_STATUS.ACCEPTED &&
+            Number(p.applicant_interview_status) !== 1,
+        );
   };
 
   const getApplicantDisplayName = (applicant) =>
@@ -2193,7 +2019,11 @@ Thank you, best regards
 
     if (targets.length === 0) {
       setLoading2(false);
-      setSnack({ open: true, message: "Please select one applicant first.", severity: "warning" });
+      setSnack({
+        open: true,
+        message: "Please select one applicant first.",
+        severity: "warning",
+      });
       return;
     }
 
@@ -2207,7 +2037,9 @@ Thank you, best regards
         applicant.email || applicant.email_address || applicant.emailAddress;
 
       if (!recipientEmail) {
-        console.warn(`⚠️ Applicant ${applicant.applicant_number} has no email field`);
+        console.warn(
+          `⚠️ Applicant ${applicant.applicant_number} has no email field`,
+        );
         continue;
       }
 
@@ -2215,7 +2047,8 @@ Thank you, best regards
         // ✅ Resolve department_id and program_id
         const programId = applicant?.program;
         const curriculumMatch = allCurriculums.find(
-          (curriculum) => String(curriculum.curriculum_id) === String(programId),
+          (curriculum) =>
+            String(curriculum.curriculum_id) === String(programId),
         );
         const departmentId =
           curriculumMatch?.dprtmnt_id ||
@@ -2233,13 +2066,15 @@ Thank you, best regards
           applicant_number: applicant.applicant_number,
           update_interview_status: true,
           interview_status_value: 1,
-          department_id: departmentId,   // ✅ ADDED
-          program_id: programId,         // ✅ ADDED
+          department_id: departmentId, // ✅ ADDED
+          program_id: programId, // ✅ ADDED
           applicant_name: [
             applicant.first_name,
             applicant.middle_name,
             applicant.last_name,
-          ].filter(Boolean).join(" "),
+          ]
+            .filter(Boolean)
+            .join(" "),
           ...auditPayload(),
         });
 
@@ -2276,14 +2111,19 @@ Thank you, best regards
     const targets = selectedApplicant
       ? persons.filter((p) => p.applicant_number === selectedApplicant)
       : persons.filter(
-        (p) =>
-          Number(p.college_approval_status) === COLLEGE_APPROVAL_STATUS.ACCEPTED &&
-          Number(p.applicant_interview_status) !== 1,
-      );
+          (p) =>
+            Number(p.college_approval_status) ===
+              COLLEGE_APPROVAL_STATUS.ACCEPTED &&
+            Number(p.applicant_interview_status) !== 1,
+        );
 
     if (targets.length === 0) {
       setLoading2(false);
-      setSnack({ open: true, message: "No applicants to send email to.", severity: "warning" });
+      setSnack({
+        open: true,
+        message: "No applicants to send email to.",
+        severity: "warning",
+      });
       return;
     }
 
@@ -2295,7 +2135,9 @@ Thank you, best regards
         applicant.email || applicant.email_address || applicant.emailAddress;
 
       if (!recipientEmail) {
-        console.warn(`⚠️ Applicant ${applicant.applicant_number} has no email field`);
+        console.warn(
+          `⚠️ Applicant ${applicant.applicant_number} has no email field`,
+        );
         continue;
       }
 
@@ -2303,7 +2145,8 @@ Thank you, best regards
         // ✅ Resolve department_id and program_id per applicant
         const programId = applicant?.program;
         const curriculumMatch = allCurriculums.find(
-          (curriculum) => String(curriculum.curriculum_id) === String(programId),
+          (curriculum) =>
+            String(curriculum.curriculum_id) === String(programId),
         );
         const departmentId =
           curriculumMatch?.dprtmnt_id ||
@@ -2321,13 +2164,15 @@ Thank you, best regards
           applicant_number: applicant.applicant_number,
           update_interview_status: true,
           interview_status_value: 1,
-          department_id: departmentId,   // ✅ ADDED
-          program_id: programId,         // ✅ ADDED
+          department_id: departmentId, // ✅ ADDED
+          program_id: programId, // ✅ ADDED
           applicant_name: [
             applicant.first_name,
             applicant.middle_name,
             applicant.last_name,
-          ].filter(Boolean).join(" "),
+          ]
+            .filter(Boolean)
+            .join(" "),
           ...auditPayload(),
         });
 
@@ -2429,7 +2274,7 @@ Thank you, best regards
         const matchesSemester =
           !selectedSchoolSemester ||
           normalize(p.middle_code) ===
-          normalize(selectedSemester?.semester_code);
+            normalize(selectedSemester?.semester_code);
 
         return (
           matchesDepartment &&
@@ -2541,7 +2386,6 @@ Thank you, best regards
   //   }
   // });
 
-
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
   }
@@ -2561,7 +2405,12 @@ Thank you, best regards
         padding: 2,
       }}
     >
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={2}
+      >
         <Typography
           variant="h4"
           sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}
@@ -2569,23 +2418,92 @@ Thank you, best regards
           QUALIFYING / INTERVIEW EXAMINATION SCORE
         </Typography>
 
-        <TextField
-          variant="outlined"
-          placeholder="Search Applicant Name / Email / Applicant ID"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1);
-          }}
-          sx={{
-            width: 450,
-            backgroundColor: "#fff",
-            borderRadius: 1,
-            "& .MuiOutlinedInput-root": { borderRadius: "10px" },
-          }}
-          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
-        />
+        <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+          <TextField
+            variant="outlined"
+            placeholder="Search Applicant Name / Email / Applicant ID"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => {
+              if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+            }}
+            onBlur={() => {
+              setTimeout(() => setSuggestionsOpen(false), 150);
+            }}
+            sx={{
+              width: "100%",
+              backgroundColor: "#fff",
+              borderRadius: 1,
+              "& .MuiOutlinedInput-root": { borderRadius: "10px" },
+            }}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+            }}
+          />
+          {suggestionsOpen && searchQuery.trim().length >= 2 && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                backgroundColor: "#fff",
+                border: "1px solid #d0d0d0",
+                borderRadius: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                overflow: "hidden",
+                maxHeight: 320,
+              }}
+            >
+              {applicantSuggestions.length > 0 ? (
+                applicantSuggestions.map((applicant) => {
+                  const applicantNumber = cleanApplicantValue(applicant?.applicant_number);
+                  const name = formatApplicantSuggestionName(applicant);
+                  return (
+                    <Box
+                      key={`${applicantNumber || applicant?.person_id}-${name}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSearchQuery(getApplicantSuggestionValue(applicant));
+                        setCurrentPage(1);
+                        setSuggestionsOpen(false);
+                      }}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": { backgroundColor: "#f5f7fb" },
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {applicantNumber || "N/A"}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        {name || cleanApplicantValue(applicant?.emailAddress) || "Unnamed Applicant"}
+                      </Typography>
+                    </Box>
+                  );
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                  No matching applicants found
+                </Box>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
@@ -2597,9 +2515,14 @@ Thank you, best regards
       <br />
       <br />
 
-      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}` }}>
+      <TableContainer
+        component={Paper}
+        sx={{ width: "100%", border: `1px solid ${borderColor}` }}
+      >
         <Table>
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead
+            sx={{ backgroundColor: headerColor }}
+          >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
                 Qualifying / Interview Examination Score
@@ -2609,31 +2532,47 @@ Thank you, best regards
         </Table>
       </TableContainer>
 
-      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}>
-        <Box display="flex" justifyContent="space-between" flexWrap="wrap" rowGap={2}>
+      <TableContainer
+        component={Paper}
+        sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}
+      >
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          flexWrap="wrap"
+          rowGap={2}
+        >
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="flex-end" gap={2}>
               <FormControl size="small" sx={{ width: 200 }}>
-                <InputLabel shrink htmlFor="from-date">From Date</InputLabel>
+                <InputLabel shrink htmlFor="from-date">
+                  From Date
+                </InputLabel>
                 <DateField
                   id="from-date"
                   size="small"
                   name="fromDate"
                   value={person.fromDate || ""}
-                  onChange={(e) => setPerson((prev) => ({ ...prev, fromDate: e.target.value }))}
+                  onChange={(e) =>
+                    setPerson((prev) => ({ ...prev, fromDate: e.target.value }))
+                  }
                 />
               </FormControl>
             </Box>
 
             <Box display="flex" alignItems="flex-end" gap={2}>
               <FormControl size="small" sx={{ width: 200 }}>
-                <InputLabel shrink htmlFor="to-date">To Date</InputLabel>
+                <InputLabel shrink htmlFor="to-date">
+                  To Date
+                </InputLabel>
                 <DateField
                   id="to-date"
                   size="small"
                   name="toDate"
                   value={person.toDate || ""}
-                  onChange={(e) => setPerson((prev) => ({ ...prev, toDate: e.target.value }))}
+                  onChange={(e) =>
+                    setPerson((prev) => ({ ...prev, toDate: e.target.value }))
+                  }
                 />
               </FormControl>
             </Box>
@@ -2654,7 +2593,9 @@ Thank you, best regards
                     setCurrentPage(1);
                   }}
                 >
-                  <MenuItem value=""><em>All Campuses</em></MenuItem>
+                  <MenuItem value="">
+                    <em>All Campuses</em>
+                  </MenuItem>
                   {branches.map((branch) => (
                     <MenuItem key={branch.id} value={branch.id}>
                       {branch.branch}
@@ -2663,35 +2604,6 @@ Thank you, best regards
                 </Select>
               </FormControl>
             </Box>
-
-            <button
-              onClick={handleExportQualifyingInterviewScorePdf}
-              style={{
-                padding: "5px 20px",
-                border: "2px solid black",
-                backgroundColor: "#f0f0f0",
-                color: "black",
-                borderRadius: "5px",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: "bold",
-                transition: "background-color 0.3s, transform 0.2s",
-                height: "40px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                userSelect: "none",
-                width: "315px",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
-              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-              type="button"
-            >
-              <FcPrint size={20} />
-              Download Applicant Qualfying / Interview Scores
-            </button>
           </Box>
         </Box>
       </TableContainer>
@@ -2702,9 +2614,18 @@ Thank you, best regards
             <TableRow>
               <TableCell
                 colSpan={10}
-                sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  py: 0.5,
+                  backgroundColor: headerColor,
+                  color: "white",
+                }}
               >
-                <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
                   <Typography fontSize="14px" fontWeight="bold" color="white">
                     Total Applicants: {filteredPersons.length}
                   </Typography>
@@ -2716,23 +2637,47 @@ Thank you, best regards
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       First
                     </Button>
 
                     <Button
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
                       disabled={currentPage === 1}
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       Prev
@@ -2744,16 +2689,32 @@ Thank you, best regards
                         onChange={(e) => setCurrentPage(Number(e.target.value))}
                         displayEmpty
                         sx={{
-                          fontSize: "12px", height: 36, color: "white", border: "1px solid white", backgroundColor: "transparent",
-                          ".MuiOutlinedInput-notchedOutline": { borderColor: "white" },
-                          "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+                          fontSize: "12px",
+                          height: 36,
+                          color: "white",
+                          border: "1px solid white",
+                          backgroundColor: "transparent",
+                          ".MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
                           "& svg": { color: "white" },
                         }}
-                        MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } } }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: { maxHeight: 200, backgroundColor: "#fff" },
+                          },
+                        }}
                       >
                         {Array.from({ length: totalPages }, (_, i) => (
-                          <MenuItem key={i + 1} value={i + 1}>Page {i + 1}</MenuItem>
+                          <MenuItem key={i + 1} value={i + 1}>
+                            Page {i + 1}
+                          </MenuItem>
                         ))}
                       </Select>
                     </FormControl>
@@ -2763,14 +2724,27 @@ Thank you, best regards
                     </Typography>
 
                     <Button
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      }
                       disabled={currentPage === totalPages}
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       Next
@@ -2782,9 +2756,20 @@ Thank you, best regards
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       Last
@@ -2797,22 +2782,43 @@ Thank you, best regards
         </Table>
       </TableContainer>
 
-      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}>
-        <Box display="flex" justifyContent="space-between" flexWrap="wrap" rowGap={3} columnGap={5}>
+      <TableContainer
+        component={Paper}
+        sx={{ width: "100%", border: `1px solid ${borderColor}`, p: 2 }}
+      >
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          flexWrap="wrap"
+          rowGap={3}
+          columnGap={5}
+        >
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "10px" }}>Sort By:</Typography>
+              <Typography fontSize={13} sx={{ minWidth: "10px" }}>
+                Sort By:
+              </Typography>
               <FormControl size="small" sx={{ width: "200px" }}>
-                <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} displayEmpty>
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  displayEmpty
+                >
                   <MenuItem value="">Select Field</MenuItem>
                   <MenuItem value="name">Applicant's Name</MenuItem>
                   <MenuItem value="id">Applicant ID</MenuItem>
                   <MenuItem value="email">Email Address</MenuItem>
                 </Select>
               </FormControl>
-              <Typography fontSize={13} sx={{ minWidth: "10px" }}>Sort Order:</Typography>
+              <Typography fontSize={13} sx={{ minWidth: "10px" }}>
+                Sort Order:
+              </Typography>
               <FormControl size="small" sx={{ width: "200px" }}>
-                <Select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} displayEmpty>
+                <Select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  displayEmpty
+                >
                   <MenuItem value="">Select Order</MenuItem>
                   <MenuItem value="asc">Ascending</MenuItem>
                   <MenuItem value="desc">Descending</MenuItem>
@@ -2821,7 +2827,10 @@ Thank you, best regards
             </Box>
 
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "80px", textAlign: "right" }}>
+              <Typography
+                fontSize={13}
+                sx={{ minWidth: "80px", textAlign: "right" }}
+              >
                 Top Highest:
               </Typography>
               <FormControl size="small" sx={{ width: 120 }}>
@@ -2843,10 +2852,17 @@ Thank you, best regards
 
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>School Year:</Typography>
+              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+                School Year:
+              </Typography>
               <FormControl size="small" sx={{ width: "200px" }}>
                 <InputLabel id="school-year-label">School Years</InputLabel>
-                <Select labelId="school-year-label" value={selectedSchoolYear} onChange={handleSchoolYearChange} displayEmpty>
+                <Select
+                  labelId="school-year-label"
+                  value={selectedSchoolYear}
+                  onChange={handleSchoolYearChange}
+                  displayEmpty
+                >
                   {schoolYears.length > 0 ? (
                     schoolYears.map((sy) => (
                       <MenuItem value={sy.year_id} key={sy.year_id}>
@@ -2861,10 +2877,17 @@ Thank you, best regards
             </Box>
 
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>Semester:</Typography>
+              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+                Semester:
+              </Typography>
               <FormControl size="small" sx={{ width: "200px" }}>
                 <InputLabel id="semester-label">School Semester</InputLabel>
-                <Select labelId="semester-label" value={selectedSchoolSemester} onChange={handleSchoolSemesterChange} displayEmpty>
+                <Select
+                  labelId="semester-label"
+                  value={selectedSchoolSemester}
+                  onChange={handleSchoolSemesterChange}
+                  displayEmpty
+                >
                   {semesters.length > 0 ? (
                     semesters.map((sem) => (
                       <MenuItem value={sem.semester_id} key={sem.semester_id}>
@@ -2881,7 +2904,9 @@ Thank you, best regards
 
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>Department:</Typography>
+              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+                Department:
+              </Typography>
               <FormControl size="small" sx={{ width: "400px" }}>
                 <Select
                   value={selectedDepartmentFilter}
@@ -2903,7 +2928,9 @@ Thank you, best regards
             </Box>
 
             <Box display="flex" alignItems="center" gap={1}>
-              <Typography fontSize={13} sx={{ minWidth: "100px" }}>Program:</Typography>
+              <Typography fontSize={13} sx={{ minWidth: "100px" }}>
+                Program:
+              </Typography>
               <FormControl size="small" sx={{ width: "350px" }}>
                 <Select
                   value={selectedProgramFilter}
@@ -2914,9 +2941,14 @@ Thank you, best regards
                   disabled={isProgramLocked}
                   displayEmpty
                 >
-                  {!isProgramLocked && <MenuItem value="">All Programs</MenuItem>}
+                  {!isProgramLocked && (
+                    <MenuItem value="">All Programs</MenuItem>
+                  )}
                   {curriculumOptions.map((prog) => (
-                    <MenuItem key={prog.curriculum_id} value={prog.program_code}>
+                    <MenuItem
+                      key={prog.curriculum_id}
+                      value={prog.program_code}
+                    >
                       {prog.program_code} - {prog.program_description}
                     </MenuItem>
                   ))}
@@ -2926,11 +2958,17 @@ Thank you, best regards
           </Box>
         </Box>
 
-        <Typography textAlign="left" color="maroon" sx={{ mb: 1, mt: 3, fontWeight: "bold" }}>
+        <Typography
+          textAlign="left"
+          color="maroon"
+          sx={{ mb: 1, mt: 3, fontWeight: "bold" }}
+        >
           Entrance Exam Total Score:
         </Typography>
         <Box display="flex" gap={2} mt={2} flexWrap="wrap">
-          <Typography fontSize={13} sx={{ minWidth: "70px" }}>Total:</Typography>
+          <Typography fontSize={13} sx={{ minWidth: "70px" }}>
+            Total:
+          </Typography>
           <TextField
             label="Total"
             size="small"
@@ -2938,7 +2976,9 @@ Thank you, best regards
             value={minTotal}
             onChange={(e) => setMinTotal(e.target.value)}
           />
-          <Typography fontSize={13} sx={{ minWidth: "70px" }}>Score:</Typography>
+          <Typography fontSize={13} sx={{ minWidth: "70px" }}>
+            Score:
+          </Typography>
           <TextField
             label="Score %"
             size="small"
@@ -2949,24 +2989,156 @@ Thank you, best regards
         </Box>
       </TableContainer>
 
-      <div ref={divToPrintRef}></div>
-
       <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table size="small">
-          <TableHead sx={{ backgroundColor: settings?.header_color || "#1976d2" }}>
+          <TableHead
+            sx={{ backgroundColor: headerColor }}
+          >
             <TableRow>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "2%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>#</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Applicant ID</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "22%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Name</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "15%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Program</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>SHS GWA</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Qualifying Exam Score</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Qualifying Result</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Interview Exam Score</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Interview Result</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Total Ave.</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>College Status</TableCell>
-              <TableCell sx={{ color: "white", textAlign: "center", width: "8%", py: 0.5, fontSize: "12px", border: `1px solid ${borderColor}` }}>Date</TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "2%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                #
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Applicant ID
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "22%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Name
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "15%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Program
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                SHS GWA
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Qualifying Exam Score
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Qualifying Result
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Interview Exam Score
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Interview Result
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Total Ave.
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                College Status
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: "white",
+                  textAlign: "center",
+                  width: "8%",
+                  py: 0.5,
+                  fontSize: "12px",
+                  border: `1px solid ${borderColor}`,
+                }}
+              >
+                Date
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -2974,7 +3146,13 @@ Thank you, best regards
               <TableRow>
                 <TableCell
                   colSpan={12}
-                  sx={{ textAlign: "center", py: 3, fontStyle: "italic", color: "gray", border: `1px solid ${borderColor}` }}
+                  sx={{
+                    textAlign: "center",
+                    py: 3,
+                    fontStyle: "italic",
+                    color: "gray",
+                    border: `1px solid ${borderColor}`,
+                  }}
                 >
                   No Applicants available.
                 </TableCell>
@@ -2983,10 +3161,15 @@ Thank you, best regards
               currentPersons.map((p, index) => {
                 const qualifyingExam = p.qualifying_exam_score ?? 0;
                 const qualifyingInterview = p.qualifying_interview_score ?? 0;
-                const computedTotalAve = (Number(qualifyingExam) + Number(qualifyingInterview)) / 2;
+                const computedTotalAve =
+                  (Number(qualifyingExam) + Number(qualifyingInterview)) / 2;
 
                 const qualifyingStatusLabel =
-                  p.qualifying_status === 0 ? "Passed" : p.qualifying_status === 1 ? "Failed" : "—";
+                  p.qualifying_status === 0
+                    ? "Passed"
+                    : p.qualifying_status === 1
+                      ? "Failed"
+                      : "—";
                 const interviewStatusLabel =
                   p.interview_status_result === 0
                     ? "Passed"
@@ -3002,61 +3185,146 @@ Thank you, best regards
                       : "Waiting List";
 
                 return (
-                  <TableRow key={p.person_id} sx={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "lightgray" }}>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px" }}>
+                  <TableRow
+                    key={p.person_id}
+                    sx={{
+                      backgroundColor:
+                        index % 2 === 0 ? "#ffffff" : "lightgray",
+                    }}
+                  >
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                      }}
+                    >
                       {index + 1}
                     </TableCell>
 
                     <TableCell
-                      sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px", color: "blue", cursor: "pointer" }}
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                        color: "blue",
+                        cursor: "pointer",
+                      }}
                       onClick={() => handleRowClick(p)}
                     >
                       {p.applicant_number ?? "N/A"}
                     </TableCell>
 
                     <TableCell
-                      sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px", color: "blue", cursor: "pointer" }}
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                        color: "blue",
+                        cursor: "pointer",
+                      }}
                       onClick={() => handleRowClick(p)}
                     >
                       {`${p.last_name}, ${p.first_name} ${p.middle_name ?? ""} ${p.extension ?? ""}`}
                     </TableCell>
 
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                      }}
+                    >
                       {allCurriculums.find(
-                        (item) => item.curriculum_id?.toString() === p.program?.toString(),
+                        (item) =>
+                          item.curriculum_id?.toString() ===
+                          p.program?.toString(),
                       )?.program_code ?? "N/A"}
                     </TableCell>
 
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                      }}
+                    >
                       {p.generalAverage1 || "0"}
                     </TableCell>
 
                     {/* READ-ONLY score / status display */}
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "13px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "13px",
+                      }}
+                    >
                       {qualifyingExam}
                     </TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "13px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "13px",
+                      }}
+                    >
                       {qualifyingStatusLabel}
                     </TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "13px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "13px",
+                      }}
+                    >
                       {qualifyingInterview}
                     </TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "13px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "13px",
+                      }}
+                    >
                       {interviewStatusLabel}
                     </TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "13px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "13px",
+                      }}
+                    >
                       {computedTotalAve.toFixed(2)}
                     </TableCell>
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "13px", fontWeight: "bold" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "13px",
+                        fontWeight: "bold",
+                      }}
+                    >
                       {collegeStatusLabel}
                     </TableCell>
 
-                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", fontSize: "12px" }}>
+                    <TableCell
+                      sx={{
+                        border: `1px solid ${borderColor}`,
+                        textAlign: "center",
+                        fontSize: "12px",
+                      }}
+                    >
                       {(() => {
                         if (!p.created_at?.split("T")[0]) return "";
                         const date = new Date(p.created_at.split("T")[0]);
                         if (isNaN(date)) return p.created_at.split("T")[0];
-                        return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+                        return date.toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        });
                       })()}
                     </TableCell>
                   </TableRow>
@@ -3073,9 +3341,18 @@ Thank you, best regards
             <TableRow>
               <TableCell
                 colSpan={10}
-                sx={{ border: `1px solid ${borderColor}`, py: 0.5, backgroundColor: settings?.header_color || "#1976d2", color: "white" }}
+                sx={{
+                  border: `1px solid ${borderColor}`,
+                  py: 0.5,
+                  backgroundColor: headerColor,
+                  color: "white",
+                }}
               >
-                <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
                   <Typography fontSize="14px" fontWeight="bold" color="white">
                     Total Applicants: {filteredPersons.length}
                   </Typography>
@@ -3087,23 +3364,47 @@ Thank you, best regards
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       First
                     </Button>
 
                     <Button
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
                       disabled={currentPage === 1}
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       Prev
@@ -3115,16 +3416,32 @@ Thank you, best regards
                         onChange={(e) => setCurrentPage(Number(e.target.value))}
                         displayEmpty
                         sx={{
-                          fontSize: "12px", height: 36, color: "white", border: "1px solid white", backgroundColor: "transparent",
-                          ".MuiOutlinedInput-notchedOutline": { borderColor: "white" },
-                          "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+                          fontSize: "12px",
+                          height: 36,
+                          color: "white",
+                          border: "1px solid white",
+                          backgroundColor: "transparent",
+                          ".MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "white",
+                          },
                           "& svg": { color: "white" },
                         }}
-                        MenuProps={{ PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } } }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: { maxHeight: 200, backgroundColor: "#fff" },
+                          },
+                        }}
                       >
                         {Array.from({ length: totalPages }, (_, i) => (
-                          <MenuItem key={i + 1} value={i + 1}>Page {i + 1}</MenuItem>
+                          <MenuItem key={i + 1} value={i + 1}>
+                            Page {i + 1}
+                          </MenuItem>
                         ))}
                       </Select>
                     </FormControl>
@@ -3134,14 +3451,27 @@ Thank you, best regards
                     </Typography>
 
                     <Button
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      }
                       disabled={currentPage === totalPages}
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       Next
@@ -3153,9 +3483,20 @@ Thank you, best regards
                       variant="outlined"
                       size="small"
                       sx={{
-                        minWidth: 80, color: "white", borderColor: "white", backgroundColor: "transparent",
-                        "&:hover": { borderColor: "white", backgroundColor: "rgba(255,255,255,0.1)" },
-                        "&.Mui-disabled": { color: "white", borderColor: "white", backgroundColor: "transparent", opacity: 1 },
+                        minWidth: 80,
+                        color: "white",
+                        borderColor: "white",
+                        backgroundColor: "transparent",
+                        "&:hover": {
+                          borderColor: "white",
+                          backgroundColor: "rgba(255,255,255,0.1)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "white",
+                          borderColor: "white",
+                          backgroundColor: "transparent",
+                          opacity: 1,
+                        },
                       }}
                     >
                       Last
@@ -3173,7 +3514,11 @@ Thank you, best regards
         onClose={handleSnackClose}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert onClose={handleSnackClose} severity={snack.severity} sx={{ width: "100%" }}>
+        <Alert
+          onClose={handleSnackClose}
+          severity={snack.severity}
+          sx={{ width: "100%" }}
+        >
           {snack.message}
         </Alert>
       </Snackbar>

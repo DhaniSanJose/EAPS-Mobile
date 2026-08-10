@@ -54,8 +54,10 @@ const formatDate = (value) => {
 const AuditLogs = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
-  const titleColor = settings?.title_color || "#000000";
-  const borderColor = settings?.border_color || "#d1d5db";
+  const colors = settings?.colors || {};
+  const headerColor = colors.header || "#1976d2";
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#d1d5db";
 
   const scrollRef = useRef(null);
   const requestRef = useRef(false);
@@ -275,7 +277,7 @@ const AuditLogs = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
             }}
           >
             <TableRow>
@@ -283,7 +285,7 @@ const AuditLogs = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >
@@ -668,7 +670,7 @@ const AuditLogs = () => {
         <Table size="small">
           <TableHead
             sx={{
-              backgroundColor: settings?.header_color || "#1976d2",
+              backgroundColor: headerColor,
             }}
           >
             <TableRow>
@@ -676,7 +678,7 @@ const AuditLogs = () => {
                 sx={{
                   border: `1px solid ${borderColor}`,
                   py: 0.5,
-                  backgroundColor: settings?.header_color || "#1976d2",
+                  backgroundColor: headerColor,
                   color: "white",
                 }}
               >

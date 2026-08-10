@@ -45,10 +45,10 @@ const AdmissionAnnouncement = () => {
   useAuditMac();
     const settings = useContext(SettingsContext);
 
-    const [titleColor, setTitleColor] = useState("#000");
-    const [subtitleColor, setSubtitleColor] = useState("#555");
-    const [borderColor, setBorderColor] = useState("#000");
-    const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
+    const colors = settings?.colors || {};
+    const titleColor = colors.title || "#000";
+    const borderColor = colors.border || "#000";
+    const headerColor = colors.header || "#1976d2";
 
     const [announcements, setAnnouncements] = useState([]);
     const [form, setForm] = useState({
@@ -82,23 +82,12 @@ const AdmissionAnnouncement = () => {
         });
 
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-    const branches = Array.isArray(settings?.branches)
-        ? settings.branches
-        : [];
+    const branches = settings?.branches || [];
     const getBranchName = (branchId) => {
         if (!branchId) return "All Campus";
         const branch = branches.find((b) => String(b.id) === String(branchId));
         return branch?.branch || branchId;
     };
-
-    // Fetch settings colors
-    useEffect(() => {
-        if (!settings) return;
-        if (settings.title_color) setTitleColor(settings.title_color);
-        if (settings.subtitle_color) setSubtitleColor(settings.subtitle_color);
-        if (settings.border_color) setBorderColor(settings.border_color);
-        if (settings.main_button_color) setMainButtonColor(settings.main_button_color);
-    }, [settings]);
 
     // Check access
     useEffect(() => {
@@ -491,7 +480,7 @@ const AdmissionAnnouncement = () => {
                 <Table size="small">
                     <TableHead
                         sx={{
-                            backgroundColor: settings?.header_color || "#1976d2",
+                            backgroundColor: headerColor,
                         }}
                     >
                         <TableRow>
@@ -876,7 +865,7 @@ const AdmissionAnnouncement = () => {
                 <Table size="small">
                     <TableHead
                         sx={{
-                            backgroundColor: settings?.header_color || "#1976d2",
+                            backgroundColor: headerColor,
                         }}
                     >
                         <TableRow>
@@ -991,7 +980,7 @@ const AdmissionAnnouncement = () => {
             <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)} maxWidth="xs" fullWidth>
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#9E0000",
+                        background: headerColor,
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.2rem",
@@ -1091,7 +1080,7 @@ const AdmissionAnnouncement = () => {
                 {/* HEADER */}
                 <DialogTitle
                     sx={{
-                        background: settings?.header_color || "#1976d2",
+                        background: headerColor,
                         color: "#fff",
                         fontWeight: 700,
                         fontSize: "1.2rem",

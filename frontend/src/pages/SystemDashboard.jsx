@@ -17,15 +17,15 @@ import {
   Email,
   Settings,
   Campaign,
-  School,           // ✅ Added
-  Grade,            // ✅ Added
-  EmojiEvents,      // ✅ Added
-  AccountTree,      // ✅ Added
-  People,           // ✅ Added
-  Assessment,       // ✅ Added
-  Payments,         // ✅ Added
-  HistoryEdu,       // ✅ Added
-  HelpOutline,      // ✅ Fixed: was imported as HelpOutlineIcon but used as HelpOutline
+  School,           // âœ… Added
+  Grade,            // âœ… Added
+  EmojiEvents,      // âœ… Added
+  AccountTree,      // âœ… Added
+  People,           // âœ… Added
+  Assessment,       // âœ… Added
+  Payments,         // âœ… Added
+  HistoryEdu,       // âœ… Added
+  HelpOutline,      // âœ… Fixed: was imported as HelpOutlineIcon but used as HelpOutline
 } from "@mui/icons-material";
 
 import { Link } from "react-router-dom";
@@ -35,36 +35,14 @@ import API_BASE_URL from "../apiConfig";
 const SystemDashboardPanel = () => {
   const settings = useContext(SettingsContext);
 
-  const [titleColor, setTitleColor] = useState("#000000");
-  const [subtitleColor, setSubtitleColor] = useState("#555555");
-  const [borderColor, setBorderColor] = useState("#000000");
-  const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");
-  const [stepperColor, setStepperColor] = useState("#000000");
+  const colors = settings?.colors || {};
+  const assets = settings?.assets || {};
+  const branding = settings?.branding || {};
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
+  const mainButtonColor = colors.mainButton || "#1976d2";
+  const shortTerm = branding.shortTerm || "";
 
-  const [fetchedLogo, setFetchedLogo] = useState(null);
-  const [companyName, setCompanyName] = useState("");
-  const [shortTerm, setShortTerm] = useState("");
-  const [campusAddress, setCampusAddress] = useState("");
-
-  // ✅ Fixed: merged duplicate useEffects into one
-  useEffect(() => {
-    if (!settings) return;
-
-    setTitleColor(settings.title_color || "#000000");
-    setSubtitleColor(settings.subtitle_color || "#555555");
-    setBorderColor(settings.border_color || "#000000");
-    setMainButtonColor(settings.main_button_color || "#1976d2");
-    setSubButtonColor(settings.sub_button_color || "#ffffff");
-    setStepperColor(settings.stepper_color || "#000000");
-
-    // ✅ Fixed: removed EaristLogo reference; fallback is just null
-    setFetchedLogo(settings.logo_url ? `${API_BASE_URL}${settings.logo_url}` : null);
-
-    setCompanyName(settings.company_name || "");
-    setShortTerm(settings.short_term || "");
-    setCampusAddress(settings.campus_address || "");
-  }, [settings]);
 
   // Access Control
   const [userID, setUserID] = useState("");
@@ -220,15 +198,14 @@ const SystemDashboardPanel = () => {
 
   if (!hasAccess) return <Unauthorized />;
 
-  const backgroundImage = settings?.bg_image
-    ? `url(${API_BASE_URL}${settings.bg_image})`
-    : "linear-gradient(to right, #e0e0e0, #bdbdbd)";
+  const backgroundImage =
+    assets.backgroundImage || "linear-gradient(to right, #e0e0e0, #bdbdbd)";
 
 
-  // 🔒 Disable right-click
+  // ðŸ”’ Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // ðŸ”’ Block DevTools shortcuts + Ctrl+P silently
   document.addEventListener("keydown", (e) => {
     const isBlockedKey =
       e.key === "F12" ||
