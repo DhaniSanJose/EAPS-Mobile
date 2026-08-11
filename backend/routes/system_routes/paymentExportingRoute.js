@@ -3,6 +3,8 @@ const nodemailer = require("nodemailer");
 const { db, db3 } = require("../database/database");
 const { getMatriculationFeeLines } = require("../../utils/matriculationFeeLines");
 const { getMatriculationPaymentLine } = require("../../utils/matriculationPaymentLines");
+const { getUnifastFeeLines } = require("../../utils/unifastFeeLines");
+const { getUnifastPaymentLine } = require("../../utils/unifastPaymentLines");
 const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/auditLogger");
 
 const router = express.Router();
@@ -91,7 +93,24 @@ router.get("/get_student_data_unifast", async (req, res) => {
             INNER JOIN person_table pt ON snt.person_id = pt.person_id
         WHERE sst.enrolled_status = 1 GROUP BY u.student_number, u.active_school_year_id;
     `);
-    res.json(rows);
+
+    const rowsWithPaymentData = await Promise.all(
+      rows.map(async (row) => {
+        const paymentLine = await getUnifastPaymentLine(db3, row.id);
+        const feeLines = await getUnifastFeeLines(db3, row.id);
+
+        return {
+          ...row,
+          tuition_fees: paymentLine?.tuition_fees ?? row.tuition_fees ?? 0,
+          total_tosf: paymentLine?.total_tosf ?? row.total_tosf ?? 0,
+          payment: paymentLine?.payment ?? row.payment ?? 0,
+          balance: paymentLine?.balance ?? row.balance ?? 0,
+          fee_lines: Array.isArray(feeLines) ? feeLines : [],
+        };
+      }),
+    );
+
+    res.json(rowsWithPaymentData);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error while fetching data" });

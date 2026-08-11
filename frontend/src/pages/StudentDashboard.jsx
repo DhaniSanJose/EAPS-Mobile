@@ -474,11 +474,48 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     return `${num}${s[(v - 20) % 10] || s[v] || s[0]} Yr`;
   };
 
+  const getTermSortValue = (row) => {
+    const schoolYear = Number(row?.year_description) || 0;
+    const semester = Number(row?.semester_id) || 0;
+    const schoolYearId = Number(row?.active_school_year_id) || 0;
+    return schoolYear * 10000 + semester * 100 + schoolYearId;
+  };
+
+  const getAcademicTermKey = (row) =>
+    `${row?.active_school_year_id || row?.year_description || "N/A"}-${row?.semester_id || row?.semester_description || "N/A"}`;
+
+  const isMigratedGrade = (row) =>
+    Number(row?.is_migrated) === 1 || row?.is_migrated === true;
+
+  const isEvaluatedGrade = (row) => Number(row?.fe_status) === 1;
+  const isPostedGrade = (row) => Number(row?.is_posted) === 1;
+
+  const getLatestMigratedTermKey = (rows) => {
+    const latestMigratedRow = rows
+      .filter(isMigratedGrade)
+      .sort((a, b) => getTermSortValue(b) - getTermSortValue(a))[0];
+
+    return latestMigratedRow ? getAcademicTermKey(latestMigratedRow) : null;
+  };
+
+  const getGradeVisibility = (row, latestMigratedTermKey) => {
+    if (isMigratedGrade(row)) {
+      if (isEvaluatedGrade(row)) return "show";
+      if (getAcademicTermKey(row) !== latestMigratedTermKey) return "show";
+      return "hidden";
+    }
+
+    if (!isEvaluatedGrade(row)) return "hidden";
+    if (isPostedGrade(row)) return "show";
+    return "not_posted";
+  };
+
   const fetchTermGwa = async (id) => {
     setTermGwaLoading(true);
     try {
       const res = await axios.get(`${API_BASE_URL}/api/student_grade/${id}`);
       const rows = Array.isArray(res.data) ? res.data : [];
+      const latestMigratedTermKey = getLatestMigratedTermKey(rows);
 
       const groupedByTerm = {};
       rows.forEach((row) => {
@@ -496,6 +533,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           };
         }
         if (Number(row.is_gwa_excluded) === 1) return;
+        if (getGradeVisibility(row, latestMigratedTermKey) !== "show") return;
 
         const grade = Number(row.numeric_grade);
         const units = Number(row.gwa_units) || 0;
@@ -505,7 +543,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         groupedByTerm[key].units += units;
       });
 
-      // Only show regular "year" levels 1stâ€“4th Year â€” bridging, 5th year,
       // masteral/doctoral terms are excluded here to keep the strip readable.
       // (Adjust the "<= 4" below if a program legitimately needs 5th year shown.)
       const MAX_YEAR_LEVEL_TO_SHOW = 4;
@@ -575,7 +612,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     fetchAnnouncements();
   }, []);
 
-  // Lightbox state â€” add near your other useState declarations
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -674,7 +710,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     fontSize: "14px",
                   }}
                 >
-                  â€¢
+                  
                 </span>
                 <span
                   style={{

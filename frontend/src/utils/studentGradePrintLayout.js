@@ -16,6 +16,27 @@ const escapeHtml = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+const resolveLogoDataUrl = async (logoUrl) => {
+  if (!logoUrl) return "";
+  const src = String(logoUrl);
+  if (src.startsWith("data:")) return src;
+
+  try {
+    const response = await fetch(src);
+    if (!response.ok) return "";
+    const blob = await response.blob();
+
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result || ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+};
+
 // Mirrors getUnitDisplay() in StudentGradePage.jsx
 const getUnitDisplay = (row) => {
   const course = parseInt(row.course_unit) || 0;
@@ -254,6 +275,34 @@ const triggerBlobDownload = (blob, fileName) => {
   window.URL.revokeObjectURL(url);
 };
 
+// ── Reads the real error message out of an axios error when
+//    responseType: "blob" was used. On failure the server still sends
+//    back JSON (e.g. { message: "PDF generation failed", error: "..." }),
+//    but axios hands it to us as an unreadable Blob instead of parsed
+//    JSON because the request was configured to expect a PDF blob back.
+//    This converts that Blob to text (and JSON-parses it if possible) so
+//    callers can surface the actual server-side reason instead of a
+//    generic "Network Error" / silent failure.
+const extractAxiosBlobErrorMessage = async (err) => {
+  const data = err?.response?.data;
+
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      try {
+        const parsed = JSON.parse(text);
+        return parsed.error || parsed.message || text;
+      } catch {
+        return text;
+      }
+    } catch {
+      // fall through to generic message below
+    }
+  }
+
+  return err?.message || "Unknown error";
+};
+
 /**
  * Downloads a "Student Grades" PDF, either for every semester on record
  * (scope: "all") or for a single semester (scope: "term").
@@ -283,27 +332,39 @@ export const downloadStudentGradesPdf = async ({
   // Was a no-op ternary (both branches returned the same string) —
   // simplified to a plain constant since scope no longer changes the title.
   const title = "STUDENT GRADES";
+  const embeddedLogoUrl = await resolveLogoDataUrl(logoUrl);
 
   const html = buildGradesHtml({
     studentInfo,
     terms,
     companyName,
     campusAddress,
-    logoUrl,
+    logoUrl: embeddedLogoUrl,
     title,
     formatYearLabel,
   });
 
-  const response = await axios.post(
-    `${apiBaseUrl}/api/generate-student-grades-pdf`,
-    {
-      html,
-      student_number: studentInfo.studentNumber,
-      last_name: studentInfo.lastName,
-      first_name: studentInfo.firstName,
-    },
-    { responseType: "blob" },
-  );
+  let response;
+  try {
+    response = await axios.post(
+      `${apiBaseUrl}/api/generate-student-grades-pdf`,
+      {
+        html,
+        student_number: studentInfo.studentNumber,
+        last_name: studentInfo.lastName,
+        first_name: studentInfo.firstName,
+      },
+      { responseType: "blob" },
+    );
+  } catch (err) {
+    // Surface the real server-side reason instead of letting callers
+    // catch a useless "Request failed with status code 500" / a Blob
+    // they can't read. See extractAxiosBlobErrorMessage() above.
+    const status = err?.response?.status;
+    const serverMessage = await extractAxiosBlobErrorMessage(err);
+    const prefix = status ? `Grades PDF request failed (${status})` : "Grades PDF request failed";
+    throw new Error(`${prefix}: ${serverMessage}`);
+  }
 
   const safeLastName = String(studentInfo.lastName || "Student")
     .trim()

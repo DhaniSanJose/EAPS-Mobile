@@ -584,10 +584,15 @@ const StudentGradePage = () => {
     });
 
   // ── PDF download helpers ────────────────────────────────────────────
-  const resolveLogoUrl = () =>
-    assets.logoUrl
-      ? `${assets.logoUrl}`
-      : `${window.location.origin}${EaristLogo}`;
+  const resolveLogoUrl = () => {
+    const configuredLogoUrl = assets.logoUrl ? String(assets.logoUrl) : "";
+    if (configuredLogoUrl) {
+      if (/^https?:\/\//i.test(configuredLogoUrl)) return configuredLogoUrl;
+      return `${API_BASE_URL}${configuredLogoUrl.startsWith("/") ? "" : "/"}${configuredLogoUrl}`;
+    }
+
+    return `${window.location.origin}${EaristLogo}`;
+  };
 
   const buildStudentInfoForPdf = () => {
     if (!programInfo) return null;
@@ -630,6 +635,23 @@ const StudentGradePage = () => {
   // semester asc) ordering for free.
   const chronologicalTerms = [...sortedTerms].reverse();
 
+  // ── Helper: axios with responseType:"blob" returns error bodies as a
+  // Blob too, not parsed JSON — this decodes it so we can show the real
+  // server message instead of a generic failure.
+  const extractErrorMessage = async (error, fallback) => {
+    const data = error?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const text = await data.text();
+        const parsed = JSON.parse(text);
+        return parsed?.error || parsed?.message || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return data?.error || data?.message || error?.message || fallback;
+  };
+
   const handleDownloadAllGrades = async () => {
     const info = buildStudentInfoForPdf();
     if (!info || !chronologicalTerms.length) return;
@@ -655,6 +677,11 @@ const StudentGradePage = () => {
       });
     } catch (error) {
       console.error("Failed to download grades PDF:", error);
+      const msg = await extractErrorMessage(
+        error,
+        "Failed to generate your grades PDF. Please try again in a moment, or contact the Registrar's Office if this keeps happening.",
+      );
+      setMessage(msg);
     } finally {
       setIsDownloadingAllGrades(false);
     }
@@ -687,6 +714,11 @@ const StudentGradePage = () => {
       });
     } catch (error) {
       console.error("Failed to download term grades PDF:", error);
+      const msg = await extractErrorMessage(
+        error,
+        "Failed to generate the PDF for this semester. Please try again in a moment.",
+      );
+      setMessage(msg);
     } finally {
       setDownloadingTermKey(null);
     }

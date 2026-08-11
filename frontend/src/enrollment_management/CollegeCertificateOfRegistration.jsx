@@ -49,6 +49,7 @@ import {
   computeTotalAssessment,
   computeTuitionAmount,
   fetchResolvedFees,
+  filterAssessedFeeLines,
   toNumber as toFeeNumber,
 } from "../utils/corDynamicFees";
 
@@ -911,6 +912,9 @@ const CertificateOfRegistrationForCollege = forwardRef(
     const [tosf, setTosfData] = useState([]);
     const [scholarshipTypes, setScholarshipTypes] = useState([]);
     const selectedScholarshipCode =
+      selectedPaymentData?.scholarship_code ||
+      selectedPaymentData?.scholarship_name ||
+      selectedPaymentData?.matriculation_remark ||
       data[0]?.scholarship_code ||
       data[0]?.scholarship_name ||
       scholarshipTypes.find((item) => Number(item.id) === Number(selectedScholarshipId))
@@ -992,6 +996,42 @@ const CertificateOfRegistrationForCollege = forwardRef(
     const [computedTuitionAmount, setComputedTuitionAmount] = useState(0);
     const [computedTotalAssessment, setComputedTotalAssessment] = useState(0);
     const shouldUseDynamicFees = resolvedFeeLines.length > 0;
+    const savedFeeLines = Array.isArray(selectedPaymentData?.fee_lines)
+      ? selectedPaymentData.fee_lines
+      : [];
+    const displayFeeLines = filterAssessedFeeLines(
+      savedFeeLines.length ? savedFeeLines : resolvedFeeLines,
+    );
+    const hasSavedAssessment = Boolean(selectedPaymentData);
+    const displayTuitionAmount = hasSavedAssessment
+      ? toFeeNumber(selectedPaymentData?.tuition_fees)
+      : shouldUseDynamicFees
+        ? computedTuitionAmount
+        : Number(totalLecFees) + Number(totalLabFees);
+    const baseTotalAssessment = shouldUseDynamicFees
+      ? computedTotalAssessment
+      : totalLecFees +
+        totalLabFees +
+        Number(tosf[0]?.cultural_fee || 0) +
+        Number(tosf[0]?.athletic_fee || 0) +
+        (isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0) +
+        Number(tosf[0]?.developmental_fee || 0) +
+        Number(tosf[0]?.guidance_fee || 0) +
+        Number(tosf[0]?.library_fee || 0) +
+        Number(tosf[0]?.medical_and_dental_fee || 0) +
+        Number(tosf[0]?.registration_fee || 0) +
+        (isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0) +
+        (isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0);
+    const savedNetAssessment = savedUnifast
+      ? 0
+      : toFeeNumber(selectedPaymentData?.total_tosf);
+    const displayTotalAssessment = hasSavedAssessment
+      ? savedNetAssessment
+      : baseTotalAssessment;
+    const displayFinancialAidAmount = hasSavedAssessment
+      ? Math.max(baseTotalAssessment - savedNetAssessment, 0)
+      : "";
+    const displayNetAssessment = hasSavedAssessment ? savedNetAssessment : "";
 
     useEffect(() => {
       if (
@@ -2818,11 +2858,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           >
                             <input
                               type="text"
-                              value={
-                                shouldUseDynamicFees
-                                  ? computedTuitionAmount
-                                  : Number(totalLecFees) + Number(totalLabFees)
-                              }
+                              value={displayTuitionAmount}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2839,7 +2875,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           </td>
                         </tr>
 
-                        {resolvedFeeLines.map((fee, index) => (
+                        {displayFeeLines.map((fee, index) => (
                           <tr
                             key={
                               fee.fee_rate_id ||
@@ -3637,28 +3673,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           >
                             <input
                               type="text"
-                              value={
-                                shouldUseDynamicFees
-                                  ? computedTotalAssessment
-                                  : totalLecFees +
-                                    totalLabFees +
-                                    Number(tosf[0]?.cultural_fee || 0) +
-                                    Number(tosf[0]?.athletic_fee || 0) +
-                                    (isHaveNSTP !== 0
-                                      ? Number(tosf[0]?.nstp_fees || 0)
-                                      : 0) +
-                                    Number(tosf[0]?.developmental_fee || 0) +
-                                    Number(tosf[0]?.guidance_fee || 0) +
-                                    Number(tosf[0]?.library_fee || 0) +
-                                    Number(tosf[0]?.medical_and_dental_fee || 0) +
-                                    Number(tosf[0]?.registration_fee || 0) +
-                                    (isHaveComputerFees !== 0
-                                      ? Number(tosf[0]?.computer_fees || 0)
-                                      : 0) +
-                                    (isHaveLaboratory !== 0
-                                      ? Number(tosf[0]?.laboratory_fees || 0)
-                                      : 0)
-                              }
+                              value={displayTotalAssessment}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3716,6 +3731,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           >
                             <input
                               type="text"
+                              value={displayFinancialAidAmount}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3773,6 +3789,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           >
                             <input
                               type="text"
+                              value={displayNetAssessment}
                               readOnly
                               style={{
                                 textAlign: "center",

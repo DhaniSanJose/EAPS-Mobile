@@ -73,6 +73,53 @@ import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar"
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
 import CollegeEnrollmentTabs from "../components/CollegeEnrollmentTabs";
 
+const cleanStudentValue = (value) => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    const fallback =
+      value.label ??
+      value.name ??
+      value.description ??
+      value.program_description ??
+      value.program_code ??
+      "";
+    if (fallback === value) return "";
+    return cleanStudentValue(fallback);
+  }
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatStudentSuggestionName = (student) =>
+  [
+    cleanStudentValue(student?.last_name),
+    cleanStudentValue(student?.first_name),
+    cleanStudentValue(student?.middle_name),
+    cleanStudentValue(student?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+const getStudentSuggestionText = (student) =>
+  [
+    student?.student_number,
+    student?.first_name,
+    student?.middle_name,
+    student?.last_name,
+    student?.extension,
+    student?.emailAddress,
+    student?.program_code,
+    student?.program_description,
+  ]
+    .map(cleanStudentValue)
+    .join(" ")
+    .toLowerCase();
+
+const getStudentSuggestionValue = (student) =>
+  cleanStudentValue(student?.student_number) ||
+  formatStudentSuggestionName(student) ||
+  cleanStudentValue(student?.emailAddress);
+
 const StudentCollegePersonalInformation = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
@@ -1286,6 +1333,7 @@ const StudentCollegePersonalInformation = () => {
   const [errors, setErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [searchError, setSearchError] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       if (searchQuery.trim() === "") return;
@@ -1346,9 +1394,7 @@ const StudentCollegePersonalInformation = () => {
 
     // 🔹 Try to find a matching applicant from the list
     const match = persons.find((p) =>
-      `${p.first_name} ${p.middle_name} ${p.last_name} ${p.emailAddress} ${p.student_number || ""}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()),
+      getStudentSuggestionText(p).includes(searchQuery.toLowerCase()),
     );
 
     if (match) {
@@ -1370,6 +1416,39 @@ const StudentCollegePersonalInformation = () => {
       });
     }
   }, [searchQuery, persons]);
+
+  useEffect(() => {
+    const fetchPersons = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/student_upload_documents_data`,
+        );
+        setPersons(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Error fetching student suggestions:", err);
+      }
+    };
+
+    fetchPersons();
+  }, []);
+
+  const studentSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+          .filter((student) =>
+            getStudentSuggestionText(student).includes(
+              searchQuery.trim().toLowerCase(),
+            ),
+          )
+          .slice(0, 10)
+      : [];
+
+  const handleStudentSuggestionSelect = (student) => {
+    const nextValue = getStudentSuggestionValue(student);
+    setSearchQuery(nextValue);
+    setSelectedPerson(student);
+    setSuggestionsOpen(false);
+  };
 
   const [studentData, setStudentData] = useState(null);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -1441,7 +1520,7 @@ const StudentCollegePersonalInformation = () => {
       .then((res) => {
         if (res.data?.student_number) {
           // AUTO-INSERT applicant_number into search bar
-          setSearchQuery(res.data.student_number);
+          setSearchQuery(cleanStudentValue(res.data.student_number));
 
           // If you have a fetchUploads() or fetchExamScore() — call it
           if (typeof fetchUploadsByApplicantNumber === "function") {
@@ -1798,23 +1877,90 @@ const StudentCollegePersonalInformation = () => {
 
         {/* ✅ Right side: Search + Excel Import side by side */}
         <Box display="flex" alignItems="center" gap={2}>
-          <TextField
-            size="small"
-            placeholder="Search Student Name / Email / Student Number"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              width: 450,
-              backgroundColor: "#fff",
-              borderRadius: 1,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-              },
-            }}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-            }}
-          />
+          <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+            <TextField
+              size="small"
+              placeholder="Search Student Name / Email / Student Number"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+              }}
+              onBlur={() => {
+                setTimeout(() => setSuggestionsOpen(false), 150);
+              }}
+              sx={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: 1,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                },
+              }}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+              }}
+            />
+            {suggestionsOpen && searchQuery.trim().length >= 2 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 20,
+                  backgroundColor: "#fff",
+                  border: "1px solid #d0d0d0",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}
+              >
+                {studentSuggestions.length > 0 ? (
+                  studentSuggestions.map((student) => {
+                    const studentNumber = cleanStudentValue(student?.student_number);
+                    const name = formatStudentSuggestionName(student);
+                    return (
+                      <Box
+                        key={`${studentNumber || student?.person_id}-${name}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleStudentSuggestionSelect(student);
+                        }}
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          fontSize: 14,
+                          borderBottom: "1px solid #f0f0f0",
+                          "&:hover": { backgroundColor: "#f5f7fb" },
+                        }}
+                      >
+                        <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                          {studentNumber || "N/A"}
+                        </Typography>
+                        <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                        <Typography sx={{ fontSize: 14 }} noWrap>
+                          {name || cleanStudentValue(student?.emailAddress) || "Unnamed Student"}
+                        </Typography>
+                      </Box>
+                    );
+                  })
+                ) : (
+                  <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                    No matching students found
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
           <PrintingHistoryDialog
             employeeId={employeeID}
             action={PRINTING_STUDENT_ACTION}

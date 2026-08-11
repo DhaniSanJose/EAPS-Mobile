@@ -58,7 +58,9 @@ const StatusChip = ({ active }) => (
       fontWeight: 600,
       fontSize: "0.7rem",
       color: active ? "#1e7d34" : "#8a8f98",
-      backgroundColor: active ? "rgba(46, 160, 67, 0.12)" : "rgba(140, 140, 140, 0.12)",
+      backgroundColor: active
+        ? "rgba(46, 160, 67, 0.12)"
+        : "rgba(140, 140, 140, 0.12)",
     }}
   />
 );
@@ -90,7 +92,9 @@ const SectionHeading = ({ icon, title, subtitle, accentColor, actions }) => (
         {icon}
       </Box>
       <Box>
-        <Typography sx={{ fontWeight: 700, fontSize: "1.05rem", lineHeight: 1.3 }}>
+        <Typography
+          sx={{ fontWeight: 700, fontSize: "1.05rem", lineHeight: 1.3 }}
+        >
           {title}
         </Typography>
         {subtitle && (
@@ -116,11 +120,75 @@ const cardSx = (borderColor) => ({
   boxShadow: "0 1px 3px rgba(16,24,40,0.06)",
 });
 
-const fieldLabelSx = { fontWeight: 600, fontSize: "0.72rem", letterSpacing: "0.04em", color: "text.secondary", mb: 0.5 };
+const fieldLabelSx = {
+  fontWeight: 600,
+  fontSize: "0.72rem",
+  letterSpacing: "0.04em",
+  color: "text.secondary",
+  mb: 0.5,
+};
+
+const FEE_CATEGORY = {
+  TUITION: 2,
+  MISCELLANEOUS: 3,
+  OTHER: 5,
+};
+
+const COMPUTED_TUITION_FEE_RATE_ID = 0;
+
+const feeCategoryOptions = [
+  { value: FEE_CATEGORY.TUITION, label: "Tuition" },
+  { value: FEE_CATEGORY.MISCELLANEOUS, label: "Miscellaneous" },
+  { value: FEE_CATEGORY.OTHER, label: "Other" },
+];
+
+const normalizeFeeText = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const normalizedFeeTokens = (fee) =>
+  `${normalizeFeeText(fee?.fee_code)} ${normalizeFeeText(fee?.fee_name)}`;
+
+const isNstpFee = (fee) => normalizedFeeTokens(fee).includes("NSTP");
+
+const isTuitionCategory = (fee) =>
+  Number(fee?.fee_category) === FEE_CATEGORY.TUITION;
+
+const isBaseComputedTuitionFee = (fee) => {
+  const tokens = normalizedFeeTokens(fee);
+  if (!tokens.trim() || isNstpFee(fee)) return false;
+
+  return (
+    tokens.includes("TUITION") ||
+    tokens.includes("TUITION_FEE") ||
+    tokens.includes("LEC_LAB") ||
+    tokens.includes("UNIT_TUITION")
+  );
+};
+
+const isComputedTuitionRate = (rate) =>
+  Number(rate?.fee_rate_id) === COMPUTED_TUITION_FEE_RATE_ID ||
+  Boolean(rate?.isComputedTuition);
 
 // Reusable clean table shell — replaces the old "border on every single cell" pattern
-const CleanTable = ({ headers, showActionColumn, headerColor, children, emptyMessage, colSpanOverride }) => (
-  <TableContainer sx={{ borderRadius: "12px", border: "1px solid #eef0f3", overflow: "hidden" }}>
+const CleanTable = ({
+  headers,
+  showActionColumn,
+  headerColor,
+  children,
+  emptyMessage,
+  colSpanOverride,
+}) => (
+  <TableContainer
+    sx={{
+      borderRadius: "12px",
+      border: "1px solid #eef0f3",
+      overflow: "hidden",
+    }}
+  >
     <Table size="small">
       <TableHead>
         <TableRow sx={{ backgroundColor: headerColor || "#1976d2" }}>
@@ -142,7 +210,7 @@ const CleanTable = ({ headers, showActionColumn, headerColor, children, emptyMes
                 >
                   {header}
                 </TableCell>
-              )
+              ),
           )}
         </TableRow>
       </TableHead>
@@ -150,12 +218,20 @@ const CleanTable = ({ headers, showActionColumn, headerColor, children, emptyMes
         sx={{
           "& tr:nth-of-type(odd)": { backgroundColor: "#fafbfc" },
           "& tr:hover": { backgroundColor: "#f1f5fb" },
-          "& td": { border: "none", borderBottom: "1px solid #f0f1f3", textAlign: "center", py: 1 },
+          "& td": {
+            border: "none",
+            borderBottom: "1px solid #f0f1f3",
+            textAlign: "center",
+            py: 1,
+          },
         }}
       >
         {React.Children.count(children) === 0 && (
           <TableRow>
-            <TableCell colSpan={colSpanOverride || headers.length} sx={{ textAlign: "center", color: "text.secondary", py: 3 }}>
+            <TableCell
+              colSpan={colSpanOverride || headers.length}
+              sx={{ textAlign: "center", color: "text.secondary", py: 3 }}
+            >
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -173,7 +249,15 @@ const RowActions = ({ canEdit, canDelete, onEdit, onDelete }) => (
         onClick={onEdit}
         size="small"
         startIcon={<EditIcon fontSize="small" />}
-        sx={{ textTransform: "none", minWidth: 0, px: 1.4, borderRadius: "8px", backgroundColor: "#e8f5e9", color: "#1e7d34", "&:hover": { backgroundColor: "#d7efd9" } }}
+        sx={{
+          textTransform: "none",
+          minWidth: 0,
+          px: 1.4,
+          borderRadius: "8px",
+          backgroundColor: "#e8f5e9",
+          color: "#1e7d34",
+          "&:hover": { backgroundColor: "#d7efd9" },
+        }}
       >
         Edit
       </Button>
@@ -183,7 +267,15 @@ const RowActions = ({ canEdit, canDelete, onEdit, onDelete }) => (
         onClick={onDelete}
         size="small"
         startIcon={<DeleteIcon fontSize="small" />}
-        sx={{ textTransform: "none", minWidth: 0, px: 1.4, borderRadius: "8px", backgroundColor: "#fdecea", color: "#b3261e", "&:hover": { backgroundColor: "#fbdedb" } }}
+        sx={{
+          textTransform: "none",
+          minWidth: 0,
+          px: 1.4,
+          borderRadius: "8px",
+          backgroundColor: "#fdecea",
+          color: "#b3261e",
+          "&:hover": { backgroundColor: "#fbdedb" },
+        }}
       >
         Delete
       </Button>
@@ -198,12 +290,6 @@ const TOSF = () => {
   const colors = settings?.colors || {};
   const branding = settings?.branding || {};
   const assets = settings?.assets || {};
-
-  const feeCategoryOptions = [
-    { value: 2, label: "Tuition" },
-    { value: 3, label: "Miscellaneous" },
-    { value: 5, label: "Other" },
-  ];
 
   const [titleColor, setTitleColor] = useState("#000000");
   const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -262,7 +348,8 @@ const TOSF = () => {
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID,
-      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role":
+        userRole || localStorage.getItem("role") || "registrar",
     },
   };
 
@@ -290,7 +377,9 @@ const TOSF = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -313,10 +402,16 @@ const TOSF = () => {
   };
 
   // Snackbar state
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
-  const [scholarshipUpdateDialogOpen, setScholarshipUpdateDialogOpen] = useState(false);
-  const [scholarshipDeleteDialogOpen, setScholarshipDeleteDialogOpen] = useState(false);
+  const [scholarshipUpdateDialogOpen, setScholarshipUpdateDialogOpen] =
+    useState(false);
+  const [scholarshipDeleteDialogOpen, setScholarshipDeleteDialogOpen] =
+    useState(false);
   const [selectedScholarshipId, setSelectedScholarshipId] = useState(null);
   const [scholarshipTypes, setScholarshipTypes] = useState([]);
   const [scholarshipForm, setScholarshipForm] = useState({
@@ -337,9 +432,11 @@ const TOSF = () => {
     years: [],
     semesters: [],
   });
-  const [selectedScholarshipForRules, setSelectedScholarshipForRules] = useState("");
+  const [selectedScholarshipForRules, setSelectedScholarshipForRules] =
+    useState("");
   const [scholarshipRules, setScholarshipRules] = useState([]);
-  const [editingScholarshipRuleId, setEditingScholarshipRuleId] = useState(null);
+  const [editingScholarshipRuleId, setEditingScholarshipRuleId] =
+    useState(null);
   const [scholarshipRuleForm, setScholarshipRuleForm] = useState({
     scholarship_id: "",
     fee_rate_id: "",
@@ -350,9 +447,12 @@ const TOSF = () => {
     semester_id: "",
     status: 1,
   });
-  const [scholarshipRuleUpdateDialogOpen, setScholarshipRuleUpdateDialogOpen] = useState(false);
-  const [scholarshipRuleDeleteDialogOpen, setScholarshipRuleDeleteDialogOpen] = useState(false);
-  const [selectedScholarshipRuleId, setSelectedScholarshipRuleId] = useState(null);
+  const [scholarshipRuleUpdateDialogOpen, setScholarshipRuleUpdateDialogOpen] =
+    useState(false);
+  const [scholarshipRuleDeleteDialogOpen, setScholarshipRuleDeleteDialogOpen] =
+    useState(false);
+  const [selectedScholarshipRuleId, setSelectedScholarshipRuleId] =
+    useState(null);
 
   const fetchScholarshipTypes = async () => {
     try {
@@ -370,13 +470,21 @@ const TOSF = () => {
 
   const fetchScholarshipRuleOptions = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fee-options`);
-      const schoolYears = Array.isArray(res.data?.schoolYears) ? res.data.schoolYears : [];
-      const semesters = Array.isArray(res.data?.semesters) ? res.data.semesters : [];
+      const res = await axios.get(
+        `${API_BASE_URL}/api/tosf/scholarship-fee-options`,
+      );
+      const schoolYears = Array.isArray(res.data?.schoolYears)
+        ? res.data.schoolYears
+        : [];
+      const semesters = Array.isArray(res.data?.semesters)
+        ? res.data.semesters
+        : [];
       const activeSchoolYear = res.data?.activeSchoolYear || null;
 
       setScholarshipRuleOptions({
-        yearLevels: Array.isArray(res.data?.yearLevels) ? res.data.yearLevels : [],
+        yearLevels: Array.isArray(res.data?.yearLevels)
+          ? res.data.yearLevels
+          : [],
         schoolYears,
         activeSchoolYear,
         years: Array.isArray(res.data?.years) ? res.data.years : [],
@@ -384,8 +492,16 @@ const TOSF = () => {
       });
       setScholarshipRuleForm((prev) => ({
         ...prev,
-        school_year_id: prev.school_year_id || (activeSchoolYear?.year_id == null ? "" : String(activeSchoolYear.year_id)),
-        semester_id: prev.semester_id || (activeSchoolYear?.semester_id == null ? "" : String(activeSchoolYear.semester_id)),
+        school_year_id:
+          prev.school_year_id ||
+          (activeSchoolYear?.year_id == null
+            ? ""
+            : String(activeSchoolYear.year_id)),
+        semester_id:
+          prev.semester_id ||
+          (activeSchoolYear?.semester_id == null
+            ? ""
+            : String(activeSchoolYear.semester_id)),
       }));
     } catch (error) {
       console.error("Error fetching scholarship fee options:", error);
@@ -424,7 +540,7 @@ const TOSF = () => {
   const defaultFeeCatalogForm = {
     fee_code: "",
     fee_name: "",
-    fee_category: 5,
+    fee_category: FEE_CATEGORY.OTHER,
     is_active: 1,
     sort_order: 1,
     fee_group: "",
@@ -447,16 +563,47 @@ const TOSF = () => {
   const [yearLevelOptions, setYearLevelOptions] = useState([]);
   const [feeCatalogForm, setFeeCatalogForm] = useState(defaultFeeCatalogForm);
   const [feeRateForm, setFeeRateForm] = useState(defaultFeeRateForm);
-  const [feeCatalogDeleteDialogOpen, setFeeCatalogDeleteDialogOpen] = useState(false);
+  const [feeCatalogDeleteDialogOpen, setFeeCatalogDeleteDialogOpen] =
+    useState(false);
   const [feeRateDeleteDialogOpen, setFeeRateDeleteDialogOpen] = useState(false);
   const [selectedFeeCatalog, setSelectedFeeCatalog] = useState(null);
   const [selectedFeeRate, setSelectedFeeRate] = useState(null);
-  const [feeCatalogEditDialogOpen, setFeeCatalogEditDialogOpen] = useState(false);
-  const [feeCatalogEditForm, setFeeCatalogEditForm] = useState(defaultFeeCatalogForm);
+  const [feeCatalogEditDialogOpen, setFeeCatalogEditDialogOpen] =
+    useState(false);
+  const [feeCatalogEditForm, setFeeCatalogEditForm] = useState(
+    defaultFeeCatalogForm,
+  );
   const [feeCatalogEditId, setFeeCatalogEditId] = useState(null);
   const [feeRateEditDialogOpen, setFeeRateEditDialogOpen] = useState(false);
   const [feeRateEditForm, setFeeRateEditForm] = useState(defaultFeeRateForm);
   const [feeRateEditId, setFeeRateEditId] = useState(null);
+  const baseComputedTuitionRate =
+    feeRates.find((rate) => isBaseComputedTuitionFee(rate)) || null;
+  const baseComputedTuitionFee =
+    baseComputedTuitionRate ||
+    feeCatalog.find((fee) => isBaseComputedTuitionFee(fee)) ||
+    null;
+  const sortedScholarshipFeeRates = [...feeRates].sort((a, b) => {
+    const tuitionCompare =
+      Number(isTuitionCategory(b)) - Number(isTuitionCategory(a));
+    if (tuitionCompare !== 0) return tuitionCompare;
+    return (
+      Number(a.sort_order ?? 999999) - Number(b.sort_order ?? 999999) ||
+      String(a.fee_name || "").localeCompare(String(b.fee_name || "")) ||
+      Number(a.fee_rate_id || 0) - Number(b.fee_rate_id || 0)
+    );
+  });
+  const scholarshipFeeRateOptions = [
+    {
+      fee_rate_id: COMPUTED_TUITION_FEE_RATE_ID,
+      fee_code: baseComputedTuitionFee?.fee_code || "TUITION",
+      fee_name: baseComputedTuitionFee?.fee_name || "Tuition Fee",
+      fee_category: baseComputedTuitionFee?.fee_category ?? FEE_CATEGORY.TUITION,
+      amount: null,
+      isComputedTuition: true,
+    },
+    ...sortedScholarshipFeeRates,
+  ];
 
   const defaultFeeGroupForm = { description: "" };
   const defaultAccountTypeForm = { description: "" };
@@ -464,43 +611,59 @@ const TOSF = () => {
   const [feeGroups, setFeeGroups] = useState([]);
   const [accountTypes, setAccountTypes] = useState([]);
   const [feeGroupForm, setFeeGroupForm] = useState(defaultFeeGroupForm);
-  const [accountTypeForm, setAccountTypeForm] = useState(defaultAccountTypeForm);
-  const [feeGroupDeleteDialogOpen, setFeeGroupDeleteDialogOpen] = useState(false);
-  const [accountTypeDeleteDialogOpen, setAccountTypeDeleteDialogOpen] = useState(false);
+  const [accountTypeForm, setAccountTypeForm] = useState(
+    defaultAccountTypeForm,
+  );
+  const [feeGroupDeleteDialogOpen, setFeeGroupDeleteDialogOpen] =
+    useState(false);
+  const [accountTypeDeleteDialogOpen, setAccountTypeDeleteDialogOpen] =
+    useState(false);
   const [selectedFeeGroup, setSelectedFeeGroup] = useState(null);
   const [selectedAccountType, setSelectedAccountType] = useState(null);
   const [feeGroupEditDialogOpen, setFeeGroupEditDialogOpen] = useState(false);
   const [feeGroupEditForm, setFeeGroupEditForm] = useState(defaultFeeGroupForm);
   const [feeGroupEditId, setFeeGroupEditId] = useState(null);
-  const [accountTypeEditDialogOpen, setAccountTypeEditDialogOpen] = useState(false);
-  const [accountTypeEditForm, setAccountTypeEditForm] = useState(defaultAccountTypeForm);
+  const [accountTypeEditDialogOpen, setAccountTypeEditDialogOpen] =
+    useState(false);
+  const [accountTypeEditForm, setAccountTypeEditForm] = useState(
+    defaultAccountTypeForm,
+  );
   const [accountTypeEditId, setAccountTypeEditId] = useState(null);
 
   const fetchDynamicFees = async () => {
     try {
-      const [catalogRes, ratesRes, optionsRes, feeGroupsRes, accountTypesRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/tosf/fee-catalog`),
-        axios.get(`${API_BASE_URL}/api/tosf/fee-rates`),
-        axios.get(`${API_BASE_URL}/api/tosf/fee-options`),
-        axios.get(`${API_BASE_URL}/api/tosf/fee-groups`),
-        axios.get(`${API_BASE_URL}/api/tosf/account-types`),
-      ]);
+      const [catalogRes, ratesRes, optionsRes, feeGroupsRes, accountTypesRes] =
+        await Promise.all([
+          axios.get(`${API_BASE_URL}/api/tosf/fee-catalog`),
+          axios.get(`${API_BASE_URL}/api/tosf/fee-rates`),
+          axios.get(`${API_BASE_URL}/api/tosf/fee-options`),
+          axios.get(`${API_BASE_URL}/api/tosf/fee-groups`),
+          axios.get(`${API_BASE_URL}/api/tosf/account-types`),
+        ]);
 
       setFeeCatalog(Array.isArray(catalogRes.data) ? catalogRes.data : []);
       setFeeRates(Array.isArray(ratesRes.data) ? ratesRes.data : []);
       setFeeGroups(Array.isArray(feeGroupsRes.data) ? feeGroupsRes.data : []);
-      setAccountTypes(Array.isArray(accountTypesRes.data) ? accountTypesRes.data : []);
+      setAccountTypes(
+        Array.isArray(accountTypesRes.data) ? accountTypesRes.data : [],
+      );
       const nextYearLevels = Array.isArray(optionsRes.data?.yearLevels)
         ? optionsRes.data.yearLevels
         : [];
-      setCurriculumOptions(Array.isArray(optionsRes.data?.curricula) ? optionsRes.data.curricula : []);
+      setCurriculumOptions(
+        Array.isArray(optionsRes.data?.curricula)
+          ? optionsRes.data.curricula
+          : [],
+      );
       setYearLevelOptions(nextYearLevels);
       setFeeRateForm((prev) => {
         if (!nextYearLevels.length) return prev;
         const exists = nextYearLevels.some(
-          (level) => String(level.year_level_id) === String(prev.applied_to)
+          (level) => String(level.year_level_id) === String(prev.applied_to),
         );
-        return exists || Number(prev.applied_to) === 0 ? prev : { ...prev, applied_to: 0 };
+        return exists || Number(prev.applied_to) === 0
+          ? prev
+          : { ...prev, applied_to: 0 };
       });
     } catch (err) {
       console.error("Error fetching dynamic fees:", err);
@@ -516,8 +679,16 @@ const TOSF = () => {
     const { name, value } = e.target;
     setFeeCatalogForm((prev) => ({
       ...prev,
-      [name]: ["fee_category", "is_active", "sort_order", "fee_group", "account_type"].includes(name)
-        ? value === "" ? "" : Number(value)
+      [name]: [
+        "fee_category",
+        "is_active",
+        "sort_order",
+        "fee_group",
+        "account_type",
+      ].includes(name)
+        ? value === ""
+          ? ""
+          : Number(value)
         : value,
     }));
   };
@@ -526,52 +697,89 @@ const TOSF = () => {
     const { name, value } = e.target;
     setFeeCatalogEditForm((prev) => ({
       ...prev,
-      [name]: ["fee_category", "is_active", "sort_order", "fee_group", "account_type"].includes(name)
-        ? value === "" ? "" : Number(value)
+      [name]: [
+        "fee_category",
+        "is_active",
+        "sort_order",
+        "fee_group",
+        "account_type",
+      ].includes(name)
+        ? value === ""
+          ? ""
+          : Number(value)
         : value,
     }));
   };
 
+  const getFeeCatalogItemById = (feeId) =>
+    feeCatalog.find((fee) => String(fee.fee_id) === String(feeId)) || null;
+
+  const isFeeRateFormForTuition = (form) =>
+    isBaseComputedTuitionFee(getFeeCatalogItemById(form.fee_id));
+
   const handleFeeRateChange = (e) => {
     const { name, value } = e.target;
-    setFeeRateForm((prev) => ({
-      ...prev,
-      [name]: ["fee_id", "applied_to", "applies_to_all", "is_active"].includes(name)
-        ? Number(value)
-        : name === "amount"
-          ? value.replace(/\D/g, "")
-        : value,
-      ...(name === "applies_to_all" && Number(value) === 1
-        ? { dprtmnt_curriculum_id: "" }
-        : {}),
-    }));
+    setFeeRateForm((prev) => {
+      const next = {
+        ...prev,
+        [name]: [
+          "fee_id",
+          "applied_to",
+          "applies_to_all",
+          "is_active",
+        ].includes(name)
+          ? Number(value)
+          : name === "amount"
+            ? value.replace(/\D/g, "")
+            : value,
+        ...(name === "applies_to_all" && Number(value) === 1
+          ? { dprtmnt_curriculum_id: "" }
+          : {}),
+      };
+
+      return isFeeRateFormForTuition(next) ? { ...next, amount: 0 } : next;
+    });
   };
 
   const handleFeeRateEditChange = (e) => {
     const { name, value } = e.target;
-    setFeeRateEditForm((prev) => ({
-      ...prev,
-      [name]: ["fee_id", "applied_to", "applies_to_all", "is_active"].includes(name)
-        ? Number(value)
-        : name === "amount"
-          ? value.replace(/\D/g, "")
-        : value,
-      ...(name === "applies_to_all" && Number(value) === 1
-        ? { dprtmnt_curriculum_id: "" }
-        : {}),
-    }));
+    setFeeRateEditForm((prev) => {
+      const next = {
+        ...prev,
+        [name]: [
+          "fee_id",
+          "applied_to",
+          "applies_to_all",
+          "is_active",
+        ].includes(name)
+          ? Number(value)
+          : name === "amount"
+            ? value.replace(/\D/g, "")
+            : value,
+        ...(name === "applies_to_all" && Number(value) === 1
+          ? { dprtmnt_curriculum_id: "" }
+          : {}),
+      };
+
+      return isFeeRateFormForTuition(next) ? { ...next, amount: 0 } : next;
+    });
   };
 
   const normalizeFeeRateParams = (form) => {
     const appliesToAll = Number(form.applies_to_all ?? 1) === 1 ? 1 : 0;
     const appliedTo =
-      form.applied_to === "" || form.applied_to == null ? 0 : Number(form.applied_to);
+      form.applied_to === "" || form.applied_to == null
+        ? 0
+        : Number(form.applied_to);
     const branchId =
-      form.branch_id === "" || form.branch_id == null ? null : Number(form.branch_id);
+      form.branch_id === "" || form.branch_id == null
+        ? null
+        : Number(form.branch_id);
     const dprtmntCurriculumId =
       appliesToAll === 1
         ? null
-        : form.dprtmnt_curriculum_id === "" || form.dprtmnt_curriculum_id == null
+        : form.dprtmnt_curriculum_id === "" ||
+            form.dprtmnt_curriculum_id == null
           ? null
           : Number(form.dprtmnt_curriculum_id);
     const feeId =
@@ -593,7 +801,10 @@ const TOSF = () => {
 
     return (
       feeRates.find((rate) => {
-        if (excludeFeeRateId && String(rate.fee_rate_id) === String(excludeFeeRateId)) {
+        if (
+          excludeFeeRateId &&
+          String(rate.fee_rate_id) === String(excludeFeeRateId)
+        ) {
           return false;
         }
 
@@ -602,7 +813,8 @@ const TOSF = () => {
           dprtmntCurriculumId:
             Number(rate.applies_to_all ?? 1) === 1
               ? null
-              : rate.dprtmnt_curriculum_id == null || rate.dprtmnt_curriculum_id === ""
+              : rate.dprtmnt_curriculum_id == null ||
+                  rate.dprtmnt_curriculum_id === ""
                 ? null
                 : Number(rate.dprtmnt_curriculum_id),
           branchId:
@@ -628,7 +840,7 @@ const TOSF = () => {
     feeCatalog.find(
       (fee) =>
         Number(fee.sort_order) === Number(sortOrder) &&
-        String(fee.fee_id) !== String(excludeFeeId)
+        String(fee.fee_id) !== String(excludeFeeId),
     );
 
   const getSortOrderConflictMessage = (sortOrder, excludeFeeId = null) => {
@@ -672,11 +884,16 @@ const TOSF = () => {
 
   const createFeeCatalog = async () => {
     if (!canCreate) {
-      showSnackbar("You do not have permission to create items on this page", "error");
+      showSnackbar(
+        "You do not have permission to create items on this page",
+        "error",
+      );
       return;
     }
 
-    const sortOrderConflict = getSortOrderConflictMessage(feeCatalogForm.sort_order);
+    const sortOrderConflict = getSortOrderConflictMessage(
+      feeCatalogForm.sort_order,
+    );
     const sortOrderError = validateSortOrder(feeCatalogForm.sort_order);
     if (sortOrderError) {
       showSnackbar(sortOrderError, "warning");
@@ -688,13 +905,20 @@ const TOSF = () => {
     }
 
     try {
-      await axios.post(`${API_BASE_URL}/api/tosf/fee-catalog`, feeCatalogForm, permissionHeaders);
+      await axios.post(
+        `${API_BASE_URL}/api/tosf/fee-catalog`,
+        feeCatalogForm,
+        permissionHeaders,
+      );
       showSnackbar("Fee added successfully!");
       resetFeeCatalogForm();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error saving fee:", error);
-      showSnackbar(error.response?.data?.message || "Error saving fee", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error saving fee",
+        "error",
+      );
     }
   };
 
@@ -706,7 +930,7 @@ const TOSF = () => {
 
     const sortOrderConflict = getSortOrderConflictMessage(
       feeCatalogEditForm.sort_order,
-      feeCatalogEditId
+      feeCatalogEditId,
     );
     const sortOrderError = validateSortOrder(feeCatalogEditForm.sort_order);
     if (sortOrderError) {
@@ -722,14 +946,17 @@ const TOSF = () => {
       await axios.put(
         `${API_BASE_URL}/api/tosf/fee-catalog/${feeCatalogEditId}`,
         feeCatalogEditForm,
-        permissionHeaders
+        permissionHeaders,
       );
       showSnackbar("Fee updated successfully!");
       closeFeeCatalogEditDialog();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error updating fee:", error);
-      showSnackbar(error.response?.data?.message || "Error updating fee", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error updating fee",
+        "error",
+      );
     }
   };
 
@@ -752,11 +979,13 @@ const TOSF = () => {
     setFeeCatalogEditForm({
       fee_code: fee.fee_code || "",
       fee_name: fee.fee_name || "",
-      fee_category: [2, 3, 5].includes(Number(fee.fee_category))
+      fee_category: feeCategoryOptions.some(
+        (option) => Number(option.value) === Number(fee.fee_category),
+      )
         ? Number(fee.fee_category)
-        : 5,
+        : FEE_CATEGORY.OTHER,
       is_active: Number(fee.is_active ?? 1),
-      sort_order: Number(fee.sort_order ?? 0),
+      sort_order: Number(fee.sort_order ?? 1),
       fee_group: fee.fee_group ?? "",
       account_type: fee.account_type ?? "",
     });
@@ -777,12 +1006,18 @@ const TOSF = () => {
     if (!selectedFeeCatalog) return;
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/tosf/fee-catalog/${selectedFeeCatalog.fee_id}`, permissionHeaders);
+      await axios.delete(
+        `${API_BASE_URL}/api/tosf/fee-catalog/${selectedFeeCatalog.fee_id}`,
+        permissionHeaders,
+      );
       showSnackbar("Fee deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
       console.error("Error deleting fee:", error);
-      showSnackbar(error.response?.data?.message || "Error deleting fee", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error deleting fee",
+        "error",
+      );
     } finally {
       setFeeCatalogDeleteDialogOpen(false);
       setSelectedFeeCatalog(null);
@@ -831,7 +1066,10 @@ const TOSF = () => {
 
   const createFeeGroup = async () => {
     if (!canCreate) {
-      showSnackbar("You do not have permission to create items on this page", "error");
+      showSnackbar(
+        "You do not have permission to create items on this page",
+        "error",
+      );
       return;
     }
 
@@ -841,13 +1079,20 @@ const TOSF = () => {
     }
 
     try {
-      await axios.post(`${API_BASE_URL}/api/tosf/fee-groups`, feeGroupForm, permissionHeaders);
+      await axios.post(
+        `${API_BASE_URL}/api/tosf/fee-groups`,
+        feeGroupForm,
+        permissionHeaders,
+      );
       showSnackbar("Fee group added successfully!");
       resetFeeGroupForm();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error saving fee group:", error);
-      showSnackbar(error.response?.data?.message || "Error saving fee group", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error saving fee group",
+        "error",
+      );
     }
   };
 
@@ -866,14 +1111,17 @@ const TOSF = () => {
       await axios.put(
         `${API_BASE_URL}/api/tosf/fee-groups/${feeGroupEditId}`,
         feeGroupEditForm,
-        permissionHeaders
+        permissionHeaders,
       );
       showSnackbar("Fee group updated successfully!");
       closeFeeGroupEditDialog();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error updating fee group:", error);
-      showSnackbar(error.response?.data?.message || "Error updating fee group", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error updating fee group",
+        "error",
+      );
     }
   };
 
@@ -911,12 +1159,18 @@ const TOSF = () => {
     if (!selectedFeeGroup) return;
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/tosf/fee-groups/${selectedFeeGroup.id}`, permissionHeaders);
+      await axios.delete(
+        `${API_BASE_URL}/api/tosf/fee-groups/${selectedFeeGroup.id}`,
+        permissionHeaders,
+      );
       showSnackbar("Fee group deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
       console.error("Error deleting fee group:", error);
-      showSnackbar(error.response?.data?.message || "Error deleting fee group", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error deleting fee group",
+        "error",
+      );
     } finally {
       setFeeGroupDeleteDialogOpen(false);
       setSelectedFeeGroup(null);
@@ -925,7 +1179,10 @@ const TOSF = () => {
 
   const createAccountType = async () => {
     if (!canCreate) {
-      showSnackbar("You do not have permission to create items on this page", "error");
+      showSnackbar(
+        "You do not have permission to create items on this page",
+        "error",
+      );
       return;
     }
 
@@ -935,13 +1192,20 @@ const TOSF = () => {
     }
 
     try {
-      await axios.post(`${API_BASE_URL}/api/tosf/account-types`, accountTypeForm, permissionHeaders);
+      await axios.post(
+        `${API_BASE_URL}/api/tosf/account-types`,
+        accountTypeForm,
+        permissionHeaders,
+      );
       showSnackbar("Account type added successfully!");
       resetAccountTypeForm();
       fetchDynamicFees();
     } catch (error) {
-      console.error("Error saving account type:", error);
-      showSnackbar(error.response?.data?.message || "Error saving account type", "error");
+      console.error("Error saving fund number:", error);
+      showSnackbar(
+        error.response?.data?.message || "Error saving fund number",
+        "error",
+      );
     }
   };
 
@@ -960,14 +1224,17 @@ const TOSF = () => {
       await axios.put(
         `${API_BASE_URL}/api/tosf/account-types/${accountTypeEditId}`,
         accountTypeEditForm,
-        permissionHeaders
+        permissionHeaders,
       );
       showSnackbar("Account type updated successfully!");
       closeAccountTypeEditDialog();
       fetchDynamicFees();
     } catch (error) {
-      console.error("Error updating account type:", error);
-      showSnackbar(error.response?.data?.message || "Error updating account type", "error");
+      console.error("Error updating fund number:", error);
+      showSnackbar(
+        error.response?.data?.message || "Error updating fund number",
+        "error",
+      );
     }
   };
 
@@ -1005,12 +1272,18 @@ const TOSF = () => {
     if (!selectedAccountType) return;
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/tosf/account-types/${selectedAccountType.id}`, permissionHeaders);
+      await axios.delete(
+        `${API_BASE_URL}/api/tosf/account-types/${selectedAccountType.id}`,
+        permissionHeaders,
+      );
       showSnackbar("Account type deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
-      console.error("Error deleting account type:", error);
-      showSnackbar(error.response?.data?.message || "Error deleting account type", "error");
+      console.error("Error deleting fund number:", error);
+      showSnackbar(
+        error.response?.data?.message || "Error deleting fund number",
+        "error",
+      );
     } finally {
       setAccountTypeDeleteDialogOpen(false);
       setSelectedAccountType(null);
@@ -1019,7 +1292,10 @@ const TOSF = () => {
 
   const createFeeRate = async () => {
     if (!canCreate) {
-      showSnackbar("You do not have permission to create items on this page", "error");
+      showSnackbar(
+        "You do not have permission to create items on this page",
+        "error",
+      );
       return;
     }
 
@@ -1030,13 +1306,23 @@ const TOSF = () => {
     }
 
     try {
-      await axios.post(`${API_BASE_URL}/api/tosf/fee-rates`, feeRateForm, permissionHeaders);
+      const payload = isFeeRateFormForTuition(feeRateForm)
+        ? { ...feeRateForm, amount: 0 }
+        : feeRateForm;
+      await axios.post(
+        `${API_BASE_URL}/api/tosf/fee-rates`,
+        payload,
+        permissionHeaders,
+      );
       showSnackbar("Fee rate added successfully!");
       resetFeeRateForm();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error saving fee rate:", error);
-      showSnackbar(error.response?.data?.message || "Error saving fee rate", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error saving fee rate",
+        "error",
+      );
     }
   };
 
@@ -1053,17 +1339,23 @@ const TOSF = () => {
     }
 
     try {
+      const payload = isFeeRateFormForTuition(feeRateEditForm)
+        ? { ...feeRateEditForm, amount: 0 }
+        : feeRateEditForm;
       await axios.put(
         `${API_BASE_URL}/api/tosf/fee-rates/${feeRateEditId}`,
-        feeRateEditForm,
-        permissionHeaders
+        payload,
+        permissionHeaders,
       );
       showSnackbar("Fee rate updated successfully!");
       closeFeeRateEditDialog();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error updating fee rate:", error);
-      showSnackbar(error.response?.data?.message || "Error updating fee rate", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error updating fee rate",
+        "error",
+      );
     }
   };
 
@@ -1088,11 +1380,13 @@ const TOSF = () => {
       dprtmnt_curriculum_id: rate.dprtmnt_curriculum_id || "",
       branch_id: rate.branch_id || "",
       amount: rate.amount || "",
-      applied_to: Number(rate.applied_to) === 0 || yearLevelOptions.some(
-        (level) => String(level.year_level_id) === String(rate.applied_to)
-      )
-        ? Number(rate.applied_to)
-        : 0,
+      applied_to:
+        Number(rate.applied_to) === 0 ||
+        yearLevelOptions.some(
+          (level) => String(level.year_level_id) === String(rate.applied_to),
+        )
+          ? Number(rate.applied_to)
+          : 0,
       applies_to_all: Number(rate.applies_to_all ?? 1),
       is_active: Number(rate.is_active ?? 1),
     });
@@ -1113,12 +1407,18 @@ const TOSF = () => {
     if (!selectedFeeRate) return;
 
     try {
-      await axios.delete(`${API_BASE_URL}/api/tosf/fee-rates/${selectedFeeRate.fee_rate_id}`, permissionHeaders);
+      await axios.delete(
+        `${API_BASE_URL}/api/tosf/fee-rates/${selectedFeeRate.fee_rate_id}`,
+        permissionHeaders,
+      );
       showSnackbar("Fee rate deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
       console.error("Error deleting fee rate:", error);
-      showSnackbar(error.response?.data?.message || "Error deleting fee rate", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error deleting fee rate",
+        "error",
+      );
     } finally {
       setFeeRateDeleteDialogOpen(false);
       setSelectedFeeRate(null);
@@ -1152,12 +1452,19 @@ const TOSF = () => {
 
   const saveScholarshipType = async () => {
     if (!canCreate) {
-      showSnackbar("You do not have permission to create items on this page", "error");
+      showSnackbar(
+        "You do not have permission to create items on this page",
+        "error",
+      );
       return;
     }
 
     try {
-      await axios.post(`${API_BASE_URL}/api/insert_scholarship_type`, scholarshipForm, permissionHeaders);
+      await axios.post(
+        `${API_BASE_URL}/api/insert_scholarship_type`,
+        scholarshipForm,
+        permissionHeaders,
+      );
       showSnackbar("Scholarship type added successfully!");
       resetScholarshipForm();
       fetchScholarshipTypes();
@@ -1230,8 +1537,14 @@ const TOSF = () => {
       discount_type: 0,
       discount_value: "Full Discount",
       year_level_id: 0,
-      school_year_id: activeSchoolYear?.year_id == null ? "" : String(activeSchoolYear.year_id),
-      semester_id: activeSchoolYear?.semester_id == null ? "" : String(activeSchoolYear.semester_id),
+      school_year_id:
+        activeSchoolYear?.year_id == null
+          ? ""
+          : String(activeSchoolYear.year_id),
+      semester_id:
+        activeSchoolYear?.semester_id == null
+          ? ""
+          : String(activeSchoolYear.semester_id),
       status: 1,
     });
     setEditingScholarshipRuleId(null);
@@ -1261,18 +1574,26 @@ const TOSF = () => {
       return;
     }
     if (!editingScholarshipRuleId && !canCreate) {
-      showSnackbar("You do not have permission to create items on this page", "error");
+      showSnackbar(
+        "You do not have permission to create items on this page",
+        "error",
+      );
       return;
     }
 
     try {
       const payload = {
-        scholarship_id: Number(scholarshipRuleForm.scholarship_id || selectedScholarshipForRules),
+        scholarship_id: Number(
+          scholarshipRuleForm.scholarship_id || selectedScholarshipForRules,
+        ),
         fee_rate_id: Number(scholarshipRuleForm.fee_rate_id),
         discount_type: Number(scholarshipRuleForm.discount_type),
-        discount_value: Number(scholarshipRuleForm.discount_type) === 0 || scholarshipRuleForm.discount_value === "" || scholarshipRuleForm.discount_value === "Full Discount"
-          ? null
-          : Number(scholarshipRuleForm.discount_value),
+        discount_value:
+          Number(scholarshipRuleForm.discount_type) === 0 ||
+          scholarshipRuleForm.discount_value === "" ||
+          scholarshipRuleForm.discount_value === "Full Discount"
+            ? null
+            : Number(scholarshipRuleForm.discount_value),
         year_level_id: Number(scholarshipRuleForm.year_level_id || 0),
         school_year_id: Number(scholarshipRuleForm.school_year_id),
         semester_id: Number(scholarshipRuleForm.semester_id),
@@ -1299,7 +1620,10 @@ const TOSF = () => {
       fetchScholarshipRules(selectedScholarshipForRules);
     } catch (error) {
       console.error("Error saving scholarship fee:", error);
-      showSnackbar(error.response?.data?.message || "Error saving scholarship fee", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error saving scholarship fee",
+        "error",
+      );
     }
   };
 
@@ -1319,12 +1643,18 @@ const TOSF = () => {
     }
     setEditingScholarshipRuleId(rule.id);
     setScholarshipRuleForm({
-      scholarship_id: String(rule.scholarship_id ?? selectedScholarshipForRules ?? ""),
+      scholarship_id: String(
+        rule.scholarship_id ?? selectedScholarshipForRules ?? "",
+      ),
       fee_rate_id: String(rule.fee_rate_id ?? ""),
       discount_type: Number(rule.discount_type ?? 0),
-      discount_value: Number(rule.discount_type ?? 0) === 0 ? "Full Discount" : String(rule.discount_value ?? ""),
+      discount_value:
+        Number(rule.discount_type ?? 0) === 0
+          ? "Full Discount"
+          : String(rule.discount_value ?? ""),
       year_level_id: Number(rule.year_level_id ?? 0),
-      school_year_id: rule.school_year_id == null ? "" : String(rule.school_year_id),
+      school_year_id:
+        rule.school_year_id == null ? "" : String(rule.school_year_id),
       semester_id: rule.semester_id == null ? "" : String(rule.semester_id),
       status: Number(rule.status ?? 1),
     });
@@ -1350,7 +1680,10 @@ const TOSF = () => {
       fetchScholarshipRules(selectedScholarshipForRules);
     } catch (error) {
       console.error("Error deleting scholarship fee:", error);
-      showSnackbar(error.response?.data?.message || "Error deleting scholarship fee", "error");
+      showSnackbar(
+        error.response?.data?.message || "Error deleting scholarship fee",
+        "error",
+      );
     } finally {
       setScholarshipRuleDeleteDialogOpen(false);
       setSelectedScholarshipRuleId(null);
@@ -1375,7 +1708,10 @@ const TOSF = () => {
       return;
     }
     try {
-      await axios.delete(`${API_BASE_URL}/api/delete_scholarship_type/${selectedScholarshipId}`, permissionHeaders);
+      await axios.delete(
+        `${API_BASE_URL}/api/delete_scholarship_type/${selectedScholarshipId}`,
+        permissionHeaders,
+      );
       showSnackbar("Scholarship type deleted successfully!");
       fetchScholarshipTypes();
     } catch (error) {
@@ -1398,7 +1734,7 @@ const TOSF = () => {
   // ---------------------------------------------------------------------
   const [activeTab, setActiveTab] = useState(0);
 
-  // NEW: Fee Groups / Account Types CRUD now lives in modals, triggered from
+  // NEW: Fee Groups / Fund Numbers CRUD now lives in modals, triggered from
   // the Fee Catalog section header, instead of taking up their own tab.
   const [feeGroupsModalOpen, setFeeGroupsModalOpen] = useState(false);
   const [accountTypesModalOpen, setAccountTypesModalOpen] = useState(false);
@@ -1414,47 +1750,78 @@ const TOSF = () => {
 
   const showCreateActions = canCreate;
   const showActionColumn = canEdit || canDelete;
+  const feeRateFormIsTuition = isFeeRateFormForTuition(feeRateForm);
+  const feeRateEditFormIsTuition = isFeeRateFormForTuition(feeRateEditForm);
   const getFeeCategoryLabel = (value) =>
-    feeCategoryOptions.find((option) => Number(option.value) === Number(value))?.label || "-";
+    feeCategoryOptions.find((option) => Number(option.value) === Number(value))
+      ?.label || "-";
   const getFeeGroupLabel = (fee) =>
-    fee.fee_group_description
-      || feeGroups.find((item) => String(item.id) === String(fee.fee_group))?.description
-      || "-";
+    fee.fee_group_description ||
+    feeGroups.find((item) => String(item.id) === String(fee.fee_group))
+      ?.description ||
+    "-";
   const getAccountTypeLabel = (fee) =>
-    fee.account_type_description
-      || accountTypes.find((item) => String(item.id) === String(fee.account_type))?.description
-      || "-";
+    fee.account_type_description ||
+    accountTypes.find((item) => String(item.id) === String(fee.account_type))
+      ?.description ||
+    "-";
   const getAppliedToLabel = (value) =>
     Number(value) === 0
       ? "All Year Level"
-      : yearLevelOptions.find((level) => String(level.year_level_id) === String(value))
-        ?.year_level_description || "-";
+      : yearLevelOptions.find(
+          (level) => String(level.year_level_id) === String(value),
+        )?.year_level_description || "-";
   const getBranchLabel = (value) =>
-    branches.find((branch) => String(branch.id) === String(value))?.branch || "All Branches";
+    branches.find((branch) => String(branch.id) === String(value))?.branch ||
+    "All Branches";
+  const getFeeRateOptionLabel = (rate) => {
+    if (!rate) return "-";
+    return `${rate.fee_code || ""}${rate.fee_code ? " - " : ""}${rate.fee_name || "Fee"}`;
+  };
   const getScholarshipFeeRateLabel = (rule) => {
-    const rate = feeRates.find((item) => String(item.fee_rate_id) === String(rule.fee_rate_id));
+    if (isComputedTuitionRate(rule)) {
+      return getFeeRateOptionLabel(
+        baseComputedTuitionFee || scholarshipFeeRateOptions[0],
+      );
+    }
+    const rate = feeRates.find(
+      (item) => String(item.fee_rate_id) === String(rule.fee_rate_id),
+    );
     if (rate) {
-      return `${rate.fee_code || ""}${rate.fee_code ? " - " : ""}${rate.fee_name || "Fee"} (${Number(rate.amount || 0).toLocaleString()})`;
+      return getFeeRateOptionLabel(rate);
     }
     return rule.fee_name || rule.fee_code || rule.fee_rate_id || "-";
   };
   const getScholarshipYearLevelLabel = (value) =>
     Number(value) === 0
       ? "All Year Level"
-      : scholarshipRuleOptions.yearLevels.find((level) => String(level.year_level_id) === String(value))
-        ?.year_level_description || value || "-";
+      : scholarshipRuleOptions.yearLevels.find(
+          (level) => String(level.year_level_id) === String(value),
+        )?.year_level_description ||
+        value ||
+        "-";
   const getScholarshipSchoolYearLabel = (value) => {
-    const schoolYear = scholarshipRuleOptions.schoolYears.find((item) => String(item.year_id) === String(value));
+    const schoolYear = scholarshipRuleOptions.schoolYears.find(
+      (item) => String(item.year_id) === String(value),
+    );
     return formatScholarshipAcademicYear(schoolYear) || value || "-";
   };
   const getScholarshipSemesterLabel = (value) =>
-    scholarshipRuleOptions.semesters.find((item) => String(item.semester_id) === String(value))
-      ?.semester_description || value || "-";
+    scholarshipRuleOptions.semesters.find(
+      (item) => String(item.semester_id) === String(value),
+    )?.semester_description ||
+    value ||
+    "-";
   const getScholarshipDiscountDisplayLabel = (rule) => {
     const type = Number(rule?.discount_type ?? 0);
     const value = rule?.discount_value;
 
-    if (type === 0 || value == null || value === "" || value === "Full Discount") {
+    if (
+      type === 0 ||
+      value == null ||
+      value === "" ||
+      value === "Full Discount"
+    ) {
       return "Full Discount";
     }
 
@@ -1515,18 +1882,30 @@ const TOSF = () => {
   };
 
   return (
-    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", backgroundColor: "transparent", mt: 1, p: { xs: 1.5, md: 2.5 } }}>
+    <Box
+      sx={{
+        height: "calc(100vh - 150px)",
+        overflowY: "auto",
+        backgroundColor: "transparent",
+        mt: 1,
+        p: { xs: 1.5, md: 2.5 },
+      }}
+    >
       {/* Page header */}
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1} sx={{ mb: 2.5 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: titleColor, fontSize: { xs: "24px", md: "30px" } }}>
-            Tuition Fee Management
-          </Typography>
-          <Typography sx={{ color: subtitleColor, fontSize: "0.85rem", mt: 0.3 }}>
-            Configure fees, rate schedules, and scholarship discounts in one place.
-          </Typography>
-        </Box>
-      </Stack>
+      <Typography
+        variant="h4"
+        sx={{
+          fontWeight: "bold",
+          color: titleColor,
+          fontSize: "36px",
+        }}
+      >
+        TUITION FEE MANAGEMENT
+      </Typography>
+      <br />
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+
+      <br />
 
       {/* Tab navigation — replaces the long single-page stack of six sections */}
       <Tabs
@@ -1546,11 +1925,23 @@ const TOSF = () => {
             gap: 0.75,
           },
           "& .Mui-selected": { color: `${headerColor} !important` },
-          "& .MuiTabs-indicator": { backgroundColor: headerColor, height: 3, borderRadius: "3px 3px 0 0" },
+          "& .MuiTabs-indicator": {
+            backgroundColor: headerColor,
+            height: 3,
+            borderRadius: "3px 3px 0 0",
+          },
         }}
       >
-        <Tab icon={<ReceiptLongIcon fontSize="small" />} iconPosition="start" label="Fees & Rates" />
-        <Tab icon={<SchoolIcon fontSize="small" />} iconPosition="start" label="Scholarships" />
+        <Tab
+          icon={<ReceiptLongIcon fontSize="small" />}
+          iconPosition="start"
+          label="Fees & Rates"
+        />
+        <Tab
+          icon={<SchoolIcon fontSize="small" />}
+          iconPosition="start"
+          label="Scholarships"
+        />
       </Tabs>
 
       {/* ================================================================ */}
@@ -1571,7 +1962,12 @@ const TOSF = () => {
                     variant="outlined"
                     size="small"
                     startIcon={<CategoryIcon fontSize="small" />}
-                    sx={{ textTransform: "none", borderRadius: "8px", borderColor: `${headerColor}55`, color: headerColor }}
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      borderColor: `${headerColor}55`,
+                      color: headerColor,
+                    }}
                   >
                     Fee Groups
                   </Button>
@@ -1580,9 +1976,14 @@ const TOSF = () => {
                     variant="outlined"
                     size="small"
                     startIcon={<AccountBalanceIcon fontSize="small" />}
-                    sx={{ textTransform: "none", borderRadius: "8px", borderColor: `${headerColor}55`, color: headerColor }}
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      borderColor: `${headerColor}55`,
+                      color: headerColor,
+                    }}
                   >
-                    Account Types
+                    Fund Numbers
                   </Button>
                 </>
               }
@@ -1591,17 +1992,41 @@ const TOSF = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4} md={3}>
                   <Typography sx={fieldLabelSx}>FEE CODE</Typography>
-                  <TextField name="fee_code" value={feeCatalogForm.fee_code} onChange={handleFeeCatalogChange} size="small" fullWidth required />
+                  <TextField
+                    name="fee_code"
+                    value={feeCatalogForm.fee_code}
+                    onChange={handleFeeCatalogChange}
+                    size="small"
+                    fullWidth
+                    required
+                  />
                 </Grid>
                 <Grid item xs={12} sm={8} md={5}>
                   <Typography sx={fieldLabelSx}>FEE NAME</Typography>
-                  <TextField name="fee_name" value={feeCatalogForm.fee_name} onChange={handleFeeCatalogChange} size="small" fullWidth required />
+                  <TextField
+                    name="fee_name"
+                    value={feeCatalogForm.fee_name}
+                    onChange={handleFeeCatalogChange}
+                    size="small"
+                    fullWidth
+                    required
+                  />
                 </Grid>
                 <Grid item xs={12} sm={4} md={2}>
                   <Typography sx={fieldLabelSx}>CATEGORY</Typography>
-                  <TextField select SelectProps={{ native: true }} name="fee_category" value={feeCatalogForm.fee_category} onChange={handleFeeCatalogChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="fee_category"
+                    value={feeCatalogForm.fee_category}
+                    onChange={handleFeeCatalogChange}
+                    size="small"
+                    fullWidth
+                  >
                     {feeCategoryOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
@@ -1619,26 +2044,54 @@ const TOSF = () => {
                 </Grid>
                 <Grid item xs={6} sm={4} md={1}>
                   <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField select SelectProps={{ native: true }} name="is_active" value={feeCatalogForm.is_active} onChange={handleFeeCatalogChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="is_active"
+                    value={feeCatalogForm.is_active}
+                    onChange={handleFeeCatalogChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={1}>Active</option>
                     <option value={0}>Inactive</option>
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography sx={fieldLabelSx}>FEE GROUP</Typography>
-                  <TextField select SelectProps={{ native: true }} name="fee_group" value={feeCatalogForm.fee_group} onChange={handleFeeCatalogChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="fee_group"
+                    value={feeCatalogForm.fee_group}
+                    onChange={handleFeeCatalogChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value="">Select Fee Group</option>
                     {feeGroups.map((item) => (
-                      <option key={item.id} value={item.id}>{item.description}</option>
+                      <option key={item.id} value={item.id}>
+                        {item.description}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <Typography sx={fieldLabelSx}>ACCOUNT TYPE</Typography>
-                  <TextField select SelectProps={{ native: true }} name="account_type" value={feeCatalogForm.account_type} onChange={handleFeeCatalogChange} size="small" fullWidth>
-                    <option value="">Select Account Type</option>
+                  <Typography sx={fieldLabelSx}>FUND NUMBER</Typography>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="account_type"
+                    value={feeCatalogForm.account_type}
+                    onChange={handleFeeCatalogChange}
+                    size="small"
+                    fullWidth
+                  >
+                    <option value="">Select Fund Number</option>
                     {accountTypes.map((item) => (
-                      <option key={item.id} value={item.id}>{item.description}</option>
+                      <option key={item.id} value={item.id}>
+                        {item.description}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
@@ -1646,7 +2099,16 @@ const TOSF = () => {
 
               <Box sx={{ mt: 2, textAlign: "right" }}>
                 {showCreateActions && (
-                  <Button type="submit" variant="contained" startIcon={<SaveIcon fontSize="small" />} sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    startIcon={<SaveIcon fontSize="small" />}
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      backgroundColor: headerColor,
+                    }}
+                  >
                     Save Fee
                   </Button>
                 )}
@@ -1656,7 +2118,17 @@ const TOSF = () => {
             <Divider sx={{ my: 3 }} />
 
             <CleanTable
-              headers={["Order", "Code", "Name", "Category", "Fee Group", "Account Type", "Status", "Rates", "Actions"]}
+              headers={[
+                "Order",
+                "Code",
+                "Name",
+                "Category",
+                "Fee Group",
+                "Fund Number",
+                "Status",
+                "Rates",
+                "Actions",
+              ]}
               showActionColumn={showActionColumn}
               headerColor={headerColor}
               emptyMessage="No dynamic fees found."
@@ -1669,11 +2141,18 @@ const TOSF = () => {
                   <TableCell>{getFeeCategoryLabel(fee.fee_category)}</TableCell>
                   <TableCell>{getFeeGroupLabel(fee)}</TableCell>
                   <TableCell>{getAccountTypeLabel(fee)}</TableCell>
-                  <TableCell><StatusChip active={Number(fee.is_active) === 1} /></TableCell>
+                  <TableCell>
+                    <StatusChip active={Number(fee.is_active) === 1} />
+                  </TableCell>
                   <TableCell>{fee.rate_count || 0}</TableCell>
                   {showActionColumn && (
                     <TableCell>
-                      <RowActions canEdit={canEdit} canDelete={canDelete} onEdit={() => handleFeeCatalogEdit(fee)} onDelete={() => handleFeeCatalogDelete(fee)} />
+                      <RowActions
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        onEdit={() => handleFeeCatalogEdit(fee)}
+                        onDelete={() => handleFeeCatalogDelete(fee)}
+                      />
                     </TableCell>
                   )}
                 </TableRow>
@@ -1692,51 +2171,129 @@ const TOSF = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6} md={4}>
                   <Typography sx={fieldLabelSx}>FEE</Typography>
-                  <TextField select SelectProps={{ native: true }} name="fee_id" value={feeRateForm.fee_id} onChange={handleFeeRateChange} size="small" fullWidth required>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="fee_id"
+                    value={feeRateForm.fee_id}
+                    onChange={handleFeeRateChange}
+                    size="small"
+                    fullWidth
+                    required
+                  >
                     <option value="">Select Fee</option>
                     {feeCatalog.map((fee) => (
-                      <option key={fee.fee_id} value={fee.fee_id}>{fee.fee_code} - {fee.fee_name}</option>
+                      <option key={fee.fee_id} value={fee.fee_id}>
+                        {fee.fee_code} - {fee.fee_name}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
                 <Grid item xs={6} sm={3} md={2}>
                   <Typography sx={fieldLabelSx}>AMOUNT</Typography>
-                  <TextField name="amount" type="number" value={feeRateForm.amount} onChange={handleFeeRateChange} size="small" fullWidth required inputProps={{ inputMode: "numeric", pattern: "[0-9]*", step: 1, min: 0 }} />
+                  <TextField
+                    name="amount"
+                    type="number"
+                    value={feeRateFormIsTuition ? 0 : feeRateForm.amount}
+                    onChange={handleFeeRateChange}
+                    size="small"
+                    fullWidth
+                    required={!feeRateFormIsTuition}
+                    disabled={feeRateFormIsTuition}
+                    helperText={
+                      feeRateFormIsTuition
+                        ? "Computed from enrolled subjects"
+                        : ""
+                    }
+                    inputProps={{
+                      inputMode: "numeric",
+                      pattern: "[0-9]*",
+                      step: 1,
+                      min: 0,
+                    }}
+                  />
                 </Grid>
                 <Grid item xs={6} sm={3} md={3}>
                   <Typography sx={fieldLabelSx}>YEAR LEVEL</Typography>
-                  <TextField select SelectProps={{ native: true }} name="applied_to" value={feeRateForm.applied_to} onChange={handleFeeRateChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="applied_to"
+                    value={feeRateForm.applied_to}
+                    onChange={handleFeeRateChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={0}>All Year Level</option>
                     {yearLevelOptions.map((level) => (
-                      <option key={level.year_level_id} value={level.year_level_id}>{level.year_level_description}</option>
+                      <option
+                        key={level.year_level_id}
+                        value={level.year_level_id}
+                      >
+                        {level.year_level_description}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography sx={fieldLabelSx}>BRANCH</Typography>
-                  <TextField select SelectProps={{ native: true }} name="branch_id" value={feeRateForm.branch_id} onChange={handleFeeRateChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="branch_id"
+                    value={feeRateForm.branch_id}
+                    onChange={handleFeeRateChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value="">All Branches</option>
                     {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>{branch.branch}</option>
+                      <option key={branch.id} value={branch.id}>
+                        {branch.branch}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
 
                 <Grid item xs={6} sm={4} md={3}>
                   <Typography sx={fieldLabelSx}>SCOPE</Typography>
-                  <TextField select SelectProps={{ native: true }} name="applies_to_all" value={feeRateForm.applies_to_all} onChange={handleFeeRateChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="applies_to_all"
+                    value={feeRateForm.applies_to_all}
+                    onChange={handleFeeRateChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={1}>All Curricula</option>
                     <option value={0}>Specific Curriculum</option>
                   </TextField>
                 </Grid>
                 {Number(feeRateForm.applies_to_all) === 0 && (
                   <Grid item xs={12} sm={8} md={6}>
-                    <Typography sx={fieldLabelSx}>DEPARTMENT CURRICULUM</Typography>
-                    <TextField select SelectProps={{ native: true }} name="dprtmnt_curriculum_id" value={feeRateForm.dprtmnt_curriculum_id} onChange={handleFeeRateChange} size="small" fullWidth required>
+                    <Typography sx={fieldLabelSx}>
+                      DEPARTMENT CURRICULUM
+                    </Typography>
+                    <TextField
+                      select
+                      SelectProps={{ native: true }}
+                      name="dprtmnt_curriculum_id"
+                      value={feeRateForm.dprtmnt_curriculum_id}
+                      onChange={handleFeeRateChange}
+                      size="small"
+                      fullWidth
+                      required
+                    >
                       <option value="">Select Curriculum</option>
                       {curriculumOptions.map((item) => (
-                        <option key={item.dprtmnt_curriculum_id} value={item.dprtmnt_curriculum_id}>
-                          {item.dprtmnt_name} - ({item.program_code}) {item.program_description} {item.major || ""} - {item.year_description}
+                        <option
+                          key={item.dprtmnt_curriculum_id}
+                          value={item.dprtmnt_curriculum_id}
+                        >
+                          {item.dprtmnt_name} - ({item.program_code}){" "}
+                          {item.program_description} {item.major || ""} -{" "}
+                          {item.year_description}
                         </option>
                       ))}
                     </TextField>
@@ -1744,7 +2301,15 @@ const TOSF = () => {
                 )}
                 <Grid item xs={6} sm={4} md={3}>
                   <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField select SelectProps={{ native: true }} name="is_active" value={feeRateForm.is_active} onChange={handleFeeRateChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="is_active"
+                    value={feeRateForm.is_active}
+                    onChange={handleFeeRateChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={1}>Active</option>
                     <option value={0}>Inactive</option>
                   </TextField>
@@ -1753,7 +2318,16 @@ const TOSF = () => {
 
               <Box sx={{ mt: 2, textAlign: "right" }}>
                 {showCreateActions && (
-                  <Button type="submit" variant="contained" startIcon={<SaveIcon fontSize="small" />} sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    startIcon={<SaveIcon fontSize="small" />}
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      backgroundColor: headerColor,
+                    }}
+                  >
                     Add Rate
                   </Button>
                 )}
@@ -1763,7 +2337,16 @@ const TOSF = () => {
             <Divider sx={{ my: 3 }} />
 
             <CleanTable
-              headers={["ID", "Fee", "Amount", "Year Level", "Scope / Department Curriculum", "Branch", "Status", "Actions"]}
+              headers={[
+                "ID",
+                "Fee",
+                "Amount",
+                "Year Level",
+                "Scope / Department Curriculum",
+                "Branch",
+                "Status",
+                "Actions",
+              ]}
               showActionColumn={showActionColumn}
               headerColor={headerColor}
               emptyMessage="No fee rates found."
@@ -1771,8 +2354,14 @@ const TOSF = () => {
               {feeRates.map((rate, index) => (
                 <TableRow key={rate.fee_rate_id}>
                   <TableCell>{index + 1}</TableCell>
-                  <TableCell>{rate.fee_code} - {rate.fee_name}</TableCell>
-                  <TableCell>{Number(rate.amount || 0).toLocaleString()}</TableCell>
+                  <TableCell>
+                    {rate.fee_code} - {rate.fee_name}
+                  </TableCell>
+                  <TableCell>
+                    {isBaseComputedTuitionFee(rate)
+                      ? "Computed from subjects"
+                      : Number(rate.amount || 0).toLocaleString()}
+                  </TableCell>
                   <TableCell>{getAppliedToLabel(rate.applied_to)}</TableCell>
                   <TableCell>
                     {Number(rate.applies_to_all) === 1
@@ -1780,10 +2369,17 @@ const TOSF = () => {
                       : `${rate.dprtmnt_name || ""} - ${rate.program_code || ""} ${rate.year_description || ""}`}
                   </TableCell>
                   <TableCell>{getBranchLabel(rate.branch_id)}</TableCell>
-                  <TableCell><StatusChip active={Number(rate.is_active) === 1} /></TableCell>
+                  <TableCell>
+                    <StatusChip active={Number(rate.is_active) === 1} />
+                  </TableCell>
                   {showActionColumn && (
                     <TableCell>
-                      <RowActions canEdit={canEdit} canDelete={canDelete} onEdit={() => handleFeeRateEdit(rate)} onDelete={() => handleFeeRateDelete(rate)} />
+                      <RowActions
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        onEdit={() => handleFeeRateEdit(rate)}
+                        onDelete={() => handleFeeRateDelete(rate)}
+                      />
                     </TableCell>
                   )}
                 </TableRow>
@@ -1799,20 +2395,47 @@ const TOSF = () => {
       {activeTab === 1 && (
         <Box>
           <Card sx={cardSx(borderColor)}>
-            <SectionHeading icon={<SchoolIcon />} title="Scholarship Types" subtitle="Define the scholarships available to students." accentColor={headerColor} />
+            <SectionHeading
+              icon={<SchoolIcon />}
+              title="Scholarship Types"
+              subtitle="Define the scholarships available to students."
+              accentColor={headerColor}
+            />
             <form onSubmit={handleScholarshipSubmit}>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <Typography sx={fieldLabelSx}>SCHOLARSHIP CODE</Typography>
-                  <TextField name="scholarship_code" value={scholarshipForm.scholarship_code} onChange={handleScholarshipChange} size="small" required fullWidth />
+                  <TextField
+                    name="scholarship_code"
+                    value={scholarshipForm.scholarship_code}
+                    onChange={handleScholarshipChange}
+                    size="small"
+                    required
+                    fullWidth
+                  />
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <Typography sx={fieldLabelSx}>SCHOLARSHIP NAME</Typography>
-                  <TextField name="scholarship_name" value={scholarshipForm.scholarship_name} onChange={handleScholarshipChange} size="small" required fullWidth />
+                  <TextField
+                    name="scholarship_name"
+                    value={scholarshipForm.scholarship_name}
+                    onChange={handleScholarshipChange}
+                    size="small"
+                    required
+                    fullWidth
+                  />
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField select SelectProps={{ native: true }} name="scholarship_status" value={scholarshipForm.scholarship_status} onChange={handleScholarshipChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="scholarship_status"
+                    value={scholarshipForm.scholarship_status}
+                    onChange={handleScholarshipChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={1}>Active</option>
                     <option value={0}>Inactive</option>
                   </TextField>
@@ -1821,8 +2444,18 @@ const TOSF = () => {
 
               <Box sx={{ mt: 2, textAlign: "right" }}>
                 {showCreateActions && (
-                  <Button type="submit" variant="contained" sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor }}>
-                    <><SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save</>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      backgroundColor: headerColor,
+                    }}
+                  >
+                    <>
+                      <SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save
+                    </>
                   </Button>
                 )}
               </Box>
@@ -1830,17 +2463,44 @@ const TOSF = () => {
 
             <Divider sx={{ my: 3 }} />
 
-            <CleanTable headers={["#", "Scholarship Code", "Scholarship Name", "Status", "Created At", "Actions"]} showActionColumn={showActionColumn} headerColor={headerColor} emptyMessage="No scholarship types found.">
+            <CleanTable
+              headers={[
+                "#",
+                "Scholarship Code",
+                "Scholarship Name",
+                "Status",
+                "Created At",
+                "Actions",
+              ]}
+              showActionColumn={showActionColumn}
+              headerColor={headerColor}
+              emptyMessage="No scholarship types found."
+            >
               {scholarshipTypes.map((item, index) => (
                 <TableRow key={item.id}>
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{item.scholarship_code || "-"}</TableCell>
                   <TableCell>{item.scholarship_name}</TableCell>
-                  <TableCell><StatusChip active={Number(item.scholarship_status) === 1} /></TableCell>
-                  <TableCell>{item.created_at ? new Date(Number(item.created_at) * 1000).toLocaleString() : "-"}</TableCell>
+                  <TableCell>
+                    <StatusChip
+                      active={Number(item.scholarship_status) === 1}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {item.created_at
+                      ? new Date(
+                          Number(item.created_at) * 1000,
+                        ).toLocaleString()
+                      : "-"}
+                  </TableCell>
                   {showActionColumn && (
                     <TableCell>
-                      <RowActions canEdit={canEdit} canDelete={canDelete} onEdit={() => handleScholarshipEdit(item)} onDelete={() => handleScholarshipDelete(item.id)} />
+                      <RowActions
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        onEdit={() => handleScholarshipEdit(item)}
+                        onDelete={() => handleScholarshipDelete(item.id)}
+                      />
                     </TableCell>
                   )}
                 </TableRow>
@@ -1849,7 +2509,12 @@ const TOSF = () => {
           </Card>
 
           <Card sx={cardSx(borderColor)}>
-            <SectionHeading icon={<RuleIcon />} title="Scholarship Fees" subtitle="Assign scholarship discounts to fee rates by year level, school year, and semester." accentColor={headerColor} />
+            <SectionHeading
+              icon={<RuleIcon />}
+              title="Scholarship Fees"
+              subtitle="Assign scholarship discounts to fee rates by year level, school year, and semester."
+              accentColor={headerColor}
+            />
 
             <Box
               sx={{
@@ -1862,7 +2527,9 @@ const TOSF = () => {
             >
               <Grid container spacing={2} alignItems="flex-end">
                 <Grid item xs={12} md={6}>
-                  <Typography sx={fieldLabelSx}>STEP 1 · SELECT SCHOLARSHIP</Typography>
+                  <Typography sx={fieldLabelSx}>
+                    STEP 1 · SELECT SCHOLARSHIP
+                  </Typography>
                   <TextField
                     select
                     SelectProps={{ native: true }}
@@ -1870,7 +2537,10 @@ const TOSF = () => {
                     onChange={(e) => {
                       const next = e.target.value;
                       setSelectedScholarshipForRules(next);
-                      setScholarshipRuleForm((prev) => ({ ...prev, scholarship_id: next }));
+                      setScholarshipRuleForm((prev) => ({
+                        ...prev,
+                        scholarship_id: next,
+                      }));
                       setEditingScholarshipRuleId(null);
                       fetchScholarshipRules(next);
                     }}
@@ -1887,8 +2557,11 @@ const TOSF = () => {
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
-                    Choose a scholarship above, then assign the fee rate it discounts.
+                  <Typography
+                    sx={{ fontSize: "0.78rem", color: "text.secondary" }}
+                  >
+                    Choose a scholarship above, then assign the fee rate it
+                    discounts.
                   </Typography>
                 </Grid>
               </Grid>
@@ -1898,18 +2571,38 @@ const TOSF = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} md={4}>
                   <Typography sx={fieldLabelSx}>FEE RATE</Typography>
-                  <TextField select SelectProps={{ native: true }} name="fee_rate_id" value={scholarshipRuleForm.fee_rate_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="fee_rate_id"
+                    value={scholarshipRuleForm.fee_rate_id}
+                    onChange={handleScholarshipRuleChange}
+                    size="small"
+                    fullWidth
+                    required
+                  >
                     <option value="">Select Fee Rate</option>
-                    {feeRates.map((rate) => (
-                      <option key={rate.fee_rate_id} value={rate.fee_rate_id}>
-                        {rate.fee_code} - {rate.fee_name} ({Number(rate.amount || 0).toLocaleString()})
+                    {scholarshipFeeRateOptions.map((rate) => (
+                      <option
+                        key={`${isComputedTuitionRate(rate) ? "computed" : "rate"}-${rate.fee_rate_id}`}
+                        value={rate.fee_rate_id}
+                      >
+                        {getFeeRateOptionLabel(rate)}
                       </option>
                     ))}
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography sx={fieldLabelSx}>DISCOUNT TYPE</Typography>
-                  <TextField select SelectProps={{ native: true }} name="discount_type" value={scholarshipRuleForm.discount_type} onChange={handleScholarshipRuleChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="discount_type"
+                    value={scholarshipRuleForm.discount_type}
+                    onChange={handleScholarshipRuleChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={0}>Full Discount</option>
                     <option value={1}>Percentage</option>
                     <option value={2}>Number</option>
@@ -1926,29 +2619,60 @@ const TOSF = () => {
                     fullWidth
                     disabled={Number(scholarshipRuleForm.discount_type) === 0}
                     required={Number(scholarshipRuleForm.discount_type) !== 0}
-                    placeholder={Number(scholarshipRuleForm.discount_type) === 0 ? "Full Discount" : ""}
+                    placeholder={
+                      Number(scholarshipRuleForm.discount_type) === 0
+                        ? "Full Discount"
+                        : ""
+                    }
                     inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6} md={2}>
                   <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField select SelectProps={{ native: true }} name="status" value={scholarshipRuleForm.status} onChange={handleScholarshipRuleChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="status"
+                    value={scholarshipRuleForm.status}
+                    onChange={handleScholarshipRuleChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={1}>Active</option>
                     <option value={0}>Inactive</option>
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={6} md={2}>
                   <Typography sx={fieldLabelSx}>YEAR LEVEL</Typography>
-                  <TextField select SelectProps={{ native: true }} name="year_level_id" value={scholarshipRuleForm.year_level_id} onChange={handleScholarshipRuleChange} size="small" fullWidth>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="year_level_id"
+                    value={scholarshipRuleForm.year_level_id}
+                    onChange={handleScholarshipRuleChange}
+                    size="small"
+                    fullWidth
+                  >
                     <option value={0}>All</option>
                     {scholarshipRuleOptions.yearLevels.map((yl) => (
-                      <option key={yl.year_level_id} value={yl.year_level_id}>{yl.year_level_description}</option>
+                      <option key={yl.year_level_id} value={yl.year_level_id}>
+                        {yl.year_level_description}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
                 <Grid item xs={12} sm={6} md={6}>
                   <Typography sx={fieldLabelSx}>SCHOOL YEAR</Typography>
-                  <TextField select SelectProps={{ native: true }} name="school_year_id" value={scholarshipRuleForm.school_year_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="school_year_id"
+                    value={scholarshipRuleForm.school_year_id}
+                    onChange={handleScholarshipRuleChange}
+                    size="small"
+                    fullWidth
+                    required
+                  >
                     <option value="">Select School Year</option>
                     {scholarshipRuleOptions.schoolYears.map((sy) => (
                       <option key={sy.year_id} value={sy.year_id}>
@@ -1959,23 +2683,55 @@ const TOSF = () => {
                 </Grid>
                 <Grid item xs={12} sm={6} md={6}>
                   <Typography sx={fieldLabelSx}>SEMESTER</Typography>
-                  <TextField select SelectProps={{ native: true }} name="semester_id" value={scholarshipRuleForm.semester_id} onChange={handleScholarshipRuleChange} size="small" fullWidth required>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="semester_id"
+                    value={scholarshipRuleForm.semester_id}
+                    onChange={handleScholarshipRuleChange}
+                    size="small"
+                    fullWidth
+                    required
+                  >
                     <option value="">Select Semester</option>
                     {scholarshipRuleOptions.semesters.map((sem) => (
-                      <option key={sem.semester_id} value={sem.semester_id}>{sem.semester_description}</option>
+                      <option key={sem.semester_id} value={sem.semester_id}>
+                        {sem.semester_description}
+                      </option>
                     ))}
                   </TextField>
                 </Grid>
               </Grid>
 
               <Box sx={{ mt: 2, textAlign: "right" }}>
-                {(showCreateActions || (editingScholarshipRuleId && canEdit)) && (
-                  <Button type="submit" variant="contained" sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor }}>
-                    {editingScholarshipRuleId ? "Update Fee" : (<><SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save</>)}
+                {(showCreateActions ||
+                  (editingScholarshipRuleId && canEdit)) && (
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    sx={{
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      backgroundColor: headerColor,
+                    }}
+                  >
+                    {editingScholarshipRuleId ? (
+                      "Update Fee"
+                    ) : (
+                      <>
+                        <SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save
+                      </>
+                    )}
                   </Button>
                 )}
                 {editingScholarshipRuleId && (
-                  <Button onClick={resetScholarshipRuleForm} color="error" variant="outlined" startIcon={<CloseIcon fontSize="small" />} sx={{ ml: 2, textTransform: "none", borderRadius: "8px" }}>
+                  <Button
+                    onClick={resetScholarshipRuleForm}
+                    color="error"
+                    variant="outlined"
+                    startIcon={<CloseIcon fontSize="small" />}
+                    sx={{ ml: 2, textTransform: "none", borderRadius: "8px" }}
+                  >
                     Cancel
                   </Button>
                 )}
@@ -1985,28 +2741,57 @@ const TOSF = () => {
             <Divider sx={{ my: 3 }} />
 
             <CleanTable
-              headers={["#", "Fee Rate", "Discount", "Year Level", "School Year", "Semester", "Status", "Actions"]}
+              headers={[
+                "#",
+                "Fee Rate",
+                "Discount",
+                "Year Level",
+                "School Year",
+                "Semester",
+                "Status",
+                "Actions",
+              ]}
               showActionColumn={showActionColumn}
               headerColor={headerColor}
-              emptyMessage={selectedScholarshipForRules ? "No scholarship fees found." : "Select a scholarship to manage fees."}
+              emptyMessage={
+                selectedScholarshipForRules
+                  ? "No scholarship fees found."
+                  : "Select a scholarship to manage fees."
+              }
               colSpanOverride={showActionColumn ? 8 : 7}
             >
-              {selectedScholarshipForRules && scholarshipRules.map((rule, index) => (
-                <TableRow key={rule.id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{getScholarshipFeeRateLabel(rule)}</TableCell>
-                  <TableCell>{getScholarshipDiscountDisplayLabel(rule)}</TableCell>
-                  <TableCell>{getScholarshipYearLevelLabel(rule.year_level_id)}</TableCell>
-                  <TableCell>{getScholarshipSchoolYearLabel(rule.school_year_id)}</TableCell>
-                  <TableCell>{getScholarshipSemesterLabel(rule.semester_id)}</TableCell>
-                  <TableCell><StatusChip active={Number(rule.status) === 1} /></TableCell>
-                  {showActionColumn && (
+              {selectedScholarshipForRules &&
+                scholarshipRules.map((rule, index) => (
+                  <TableRow key={rule.id}>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{getScholarshipFeeRateLabel(rule)}</TableCell>
                     <TableCell>
-                      <RowActions canEdit={canEdit} canDelete={canDelete} onEdit={() => handleScholarshipRuleEdit(rule)} onDelete={() => handleScholarshipRuleDelete(rule.id)} />
+                      {getScholarshipDiscountDisplayLabel(rule)}
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                    <TableCell>
+                      {getScholarshipYearLevelLabel(rule.year_level_id)}
+                    </TableCell>
+                    <TableCell>
+                      {getScholarshipSchoolYearLabel(rule.school_year_id)}
+                    </TableCell>
+                    <TableCell>
+                      {getScholarshipSemesterLabel(rule.semester_id)}
+                    </TableCell>
+                    <TableCell>
+                      <StatusChip active={Number(rule.status) === 1} />
+                    </TableCell>
+                    {showActionColumn && (
+                      <TableCell>
+                        <RowActions
+                          canEdit={canEdit}
+                          canDelete={canDelete}
+                          onEdit={() => handleScholarshipRuleEdit(rule)}
+                          onDelete={() => handleScholarshipRuleDelete(rule.id)}
+                        />
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
             </CleanTable>
           </Card>
         </Box>
@@ -2022,7 +2807,12 @@ const TOSF = () => {
         onClose={() => setFeeGroupsModalOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 460 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2041,25 +2831,65 @@ const TOSF = () => {
               <CategoryIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
                 Fee Groups
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 Group fees together for reporting and display
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={() => setFeeGroupsModalOpen(false)} sx={verificationDialogCloseSx}>
+          <IconButton
+            onClick={() => setFeeGroupsModalOpen(false)}
+            sx={verificationDialogCloseSx}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
           <form onSubmit={handleFeeGroupSubmit}>
-            <Typography sx={{fontWeight: 600, fontSize: "0.72rem", letterSpacing: "0.04em", color: "text.secondary", mb: 0.5, pt: 2.5}}>DESCRIPTION</Typography>
+            <Typography
+              sx={{
+                fontWeight: 600,
+                fontSize: "0.72rem",
+                letterSpacing: "0.04em",
+                color: "text.secondary",
+                mb: 0.5,
+                pt: 2.5,
+              }}
+            >
+              DESCRIPTION
+            </Typography>
             <Stack direction="row" spacing={1.5}>
-              <TextField name="description" value={feeGroupForm.description} onChange={handleFeeGroupChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
+              <TextField
+                name="description"
+                value={feeGroupForm.description}
+                onChange={handleFeeGroupChange}
+                size="small"
+                fullWidth
+                required
+                inputProps={{ maxLength: 60 }}
+              />
               {showCreateActions && (
-                <Button type="submit" variant="contained" sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor, whiteSpace: "nowrap" }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: "8px",
+                    backgroundColor: headerColor,
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   <SaveIcon fontSize="small" />
                 </Button>
               )}
@@ -2068,14 +2898,24 @@ const TOSF = () => {
 
           <Divider sx={{ my: 3 }} />
 
-          <CleanTable headers={["#", "Description", "Actions"]} showActionColumn={showActionColumn} headerColor={headerColor} emptyMessage="No fee groups found.">
+          <CleanTable
+            headers={["#", "Description", "Actions"]}
+            showActionColumn={showActionColumn}
+            headerColor={headerColor}
+            emptyMessage="No fee groups found."
+          >
             {feeGroups.map((item, index) => (
               <TableRow key={item.id}>
                 <TableCell>{index + 1}</TableCell>
                 <TableCell>{item.description}</TableCell>
                 {showActionColumn && (
                   <TableCell>
-                    <RowActions canEdit={canEdit} canDelete={canDelete} onEdit={() => handleFeeGroupEdit(item)} onDelete={() => handleFeeGroupDelete(item)} />
+                    <RowActions
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                      onEdit={() => handleFeeGroupEdit(item)}
+                      onDelete={() => handleFeeGroupDelete(item)}
+                    />
                   </TableCell>
                 )}
               </TableRow>
@@ -2083,19 +2923,28 @@ const TOSF = () => {
           </CleanTable>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
-          <Button onClick={() => setFeeGroupsModalOpen(false)} variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>
+          <Button
+            onClick={() => setFeeGroupsModalOpen(false)}
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
             Close
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Account Types — CRUD modal, opened from the Fee Catalog header */}
+      {/* Fund Numbers — CRUD modal, opened from the Fee Catalog header */}
       <Dialog
         open={accountTypesModalOpen}
         onClose={() => setAccountTypesModalOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 460 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2114,25 +2963,65 @@ const TOSF = () => {
               <AccountBalanceIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
-                Account Types
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
+                Fund Numbers
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
-                Classify fees by the accounting bucket they post to
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
+                Classify fees by the fund number they post to
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={() => setAccountTypesModalOpen(false)} sx={verificationDialogCloseSx}>
+          <IconButton
+            onClick={() => setAccountTypesModalOpen(false)}
+            sx={verificationDialogCloseSx}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
           <form onSubmit={handleAccountTypeSubmit}>
-            <Typography sx={{fontWeight: 600, fontSize: "0.72rem", letterSpacing: "0.04em", color: "text.secondary", mb: 0.5, pt: 2.5}}>DESCRIPTION</Typography>
+            <Typography
+              sx={{
+                fontWeight: 600,
+                fontSize: "0.72rem",
+                letterSpacing: "0.04em",
+                color: "text.secondary",
+                mb: 0.5,
+                pt: 2.5,
+              }}
+            >
+              DESCRIPTION
+            </Typography>
             <Stack direction="row" spacing={1.5}>
-              <TextField name="description" value={accountTypeForm.description} onChange={handleAccountTypeChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
+              <TextField
+                name="description"
+                value={accountTypeForm.description}
+                onChange={handleAccountTypeChange}
+                size="small"
+                fullWidth
+                required
+                inputProps={{ maxLength: 60 }}
+              />
               {showCreateActions && (
-                <Button type="submit" variant="contained" sx={{ textTransform: "none", borderRadius: "8px", backgroundColor: headerColor, whiteSpace: "nowrap" }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: "8px",
+                    backgroundColor: headerColor,
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   <SaveIcon fontSize="small" />
                 </Button>
               )}
@@ -2141,14 +3030,24 @@ const TOSF = () => {
 
           <Divider sx={{ my: 3 }} />
 
-          <CleanTable headers={["#", "Description", "Actions"]} showActionColumn={showActionColumn} headerColor={headerColor} emptyMessage="No account types found.">
+          <CleanTable
+            headers={["#", "Description", "Actions"]}
+            showActionColumn={showActionColumn}
+            headerColor={headerColor}
+            emptyMessage="No fund numbers found."
+          >
             {accountTypes.map((item, index) => (
               <TableRow key={item.id}>
                 <TableCell>{index + 1}</TableCell>
                 <TableCell>{item.description}</TableCell>
                 {showActionColumn && (
                   <TableCell>
-                    <RowActions canEdit={canEdit} canDelete={canDelete} onEdit={() => handleAccountTypeEdit(item)} onDelete={() => handleAccountTypeDelete(item)} />
+                    <RowActions
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                      onEdit={() => handleAccountTypeEdit(item)}
+                      onDelete={() => handleAccountTypeDelete(item)}
+                    />
                   </TableCell>
                 )}
               </TableRow>
@@ -2156,7 +3055,11 @@ const TOSF = () => {
           </CleanTable>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
-          <Button onClick={() => setAccountTypesModalOpen(false)} variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>
+          <Button
+            onClick={() => setAccountTypesModalOpen(false)}
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
             Close
           </Button>
         </DialogActions>
@@ -2167,7 +3070,12 @@ const TOSF = () => {
         onClose={closeFeeCatalogEditDialog}
         maxWidth="md"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", md: 860 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", md: 860 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2186,15 +3094,27 @@ const TOSF = () => {
               <EditIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
                 Edit Fee
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 Update the selected fee catalog entry
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={closeFeeCatalogEditDialog} sx={verificationDialogCloseSx}>
+          <IconButton
+            onClick={closeFeeCatalogEditDialog}
+            sx={verificationDialogCloseSx}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
@@ -2203,35 +3123,79 @@ const TOSF = () => {
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
               <Grid item xs={12} md={4}>
                 <Typography sx={fieldLabelSx}>FEE CODE</Typography>
-                <TextField name="fee_code" value={feeCatalogEditForm.fee_code} onChange={handleFeeCatalogEditChange} size="small" fullWidth required />
+                <TextField
+                  name="fee_code"
+                  value={feeCatalogEditForm.fee_code}
+                  onChange={handleFeeCatalogEditChange}
+                  size="small"
+                  fullWidth
+                  required
+                />
               </Grid>
               <Grid item xs={12} md={8}>
                 <Typography sx={fieldLabelSx}>FEE NAME</Typography>
-                <TextField name="fee_name" value={feeCatalogEditForm.fee_name} onChange={handleFeeCatalogEditChange} size="small" fullWidth required />
+                <TextField
+                  name="fee_name"
+                  value={feeCatalogEditForm.fee_name}
+                  onChange={handleFeeCatalogEditChange}
+                  size="small"
+                  fullWidth
+                  required
+                />
               </Grid>
               <Grid item xs={12} md={4}>
                 <Typography sx={fieldLabelSx}>CATEGORY</Typography>
-                <TextField select SelectProps={{ native: true }} name="fee_category" value={feeCatalogEditForm.fee_category} onChange={handleFeeCatalogEditChange} size="small" fullWidth>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="fee_category"
+                  value={feeCatalogEditForm.fee_category}
+                  onChange={handleFeeCatalogEditChange}
+                  size="small"
+                  fullWidth
+                >
                   {feeCategoryOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={4}>
                 <Typography sx={fieldLabelSx}>FEE GROUP</Typography>
-                <TextField select SelectProps={{ native: true }} name="fee_group" value={feeCatalogEditForm.fee_group} onChange={handleFeeCatalogEditChange} size="small" fullWidth>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="fee_group"
+                  value={feeCatalogEditForm.fee_group}
+                  onChange={handleFeeCatalogEditChange}
+                  size="small"
+                  fullWidth
+                >
                   <option value="">Select Fee Group</option>
                   {feeGroups.map((item) => (
-                    <option key={item.id} value={item.id}>{item.description}</option>
+                    <option key={item.id} value={item.id}>
+                      {item.description}
+                    </option>
                   ))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={4}>
-                <Typography sx={fieldLabelSx}>ACCOUNT TYPE</Typography>
-                <TextField select SelectProps={{ native: true }} name="account_type" value={feeCatalogEditForm.account_type} onChange={handleFeeCatalogEditChange} size="small" fullWidth>
-                  <option value="">Select Account Type</option>
+                <Typography sx={fieldLabelSx}>FUND NUMBER</Typography>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="account_type"
+                  value={feeCatalogEditForm.account_type}
+                  onChange={handleFeeCatalogEditChange}
+                  size="small"
+                  fullWidth
+                >
+                  <option value="">Select Fund Number</option>
                   {accountTypes.map((item) => (
-                    <option key={item.id} value={item.id}>{item.description}</option>
+                    <option key={item.id} value={item.id}>
+                      {item.description}
+                    </option>
                   ))}
                 </TextField>
               </Grid>
@@ -2249,7 +3213,15 @@ const TOSF = () => {
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>STATUS</Typography>
-                <TextField select SelectProps={{ native: true }} name="is_active" value={feeCatalogEditForm.is_active} onChange={handleFeeCatalogEditChange} size="small" fullWidth>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="is_active"
+                  value={feeCatalogEditForm.is_active}
+                  onChange={handleFeeCatalogEditChange}
+                  size="small"
+                  fullWidth
+                >
                   <option value={1}>Active</option>
                   <option value={0}>Inactive</option>
                 </TextField>
@@ -2257,8 +3229,22 @@ const TOSF = () => {
             </Grid>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button onClick={closeFeeCatalogEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-            <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Fee</Button>
+            <Button
+              onClick={closeFeeCatalogEditDialog}
+              color="error"
+              variant="outlined"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="warning"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Update Fee
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
@@ -2268,7 +3254,12 @@ const TOSF = () => {
         onClose={closeFeeGroupEditDialog}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 460 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2287,26 +3278,60 @@ const TOSF = () => {
               <CategoryIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
                 Edit Fee Group
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 Update the selected fee group
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={closeFeeGroupEditDialog} sx={verificationDialogCloseSx}>
+          <IconButton
+            onClick={closeFeeGroupEditDialog}
+            sx={verificationDialogCloseSx}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <form onSubmit={handleFeeGroupEditSubmit}>
           <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
             <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
-            <TextField name="description" value={feeGroupEditForm.description} onChange={handleFeeGroupEditChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
+            <TextField
+              name="description"
+              value={feeGroupEditForm.description}
+              onChange={handleFeeGroupEditChange}
+              size="small"
+              fullWidth
+              required
+              inputProps={{ maxLength: 60 }}
+            />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button onClick={closeFeeGroupEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-            <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Fee Group</Button>
+            <Button
+              onClick={closeFeeGroupEditDialog}
+              color="error"
+              variant="outlined"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="warning"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Update Fee Group
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
@@ -2316,7 +3341,12 @@ const TOSF = () => {
         onClose={closeAccountTypeEditDialog}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 460 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2335,26 +3365,60 @@ const TOSF = () => {
               <AccountBalanceIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
-                Edit Account Type
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
+                Edit Fund Number
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
-                Update the selected account type
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
+                Update the selected fund number
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={closeAccountTypeEditDialog} sx={verificationDialogCloseSx}>
+          <IconButton
+            onClick={closeAccountTypeEditDialog}
+            sx={verificationDialogCloseSx}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <form onSubmit={handleAccountTypeEditSubmit}>
           <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
             <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
-            <TextField name="description" value={accountTypeEditForm.description} onChange={handleAccountTypeEditChange} size="small" fullWidth required inputProps={{ maxLength: 60 }} />
+            <TextField
+              name="description"
+              value={accountTypeEditForm.description}
+              onChange={handleAccountTypeEditChange}
+              size="small"
+              fullWidth
+              required
+              inputProps={{ maxLength: 60 }}
+            />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button onClick={closeAccountTypeEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-            <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Account Type</Button>
+            <Button
+              onClick={closeAccountTypeEditDialog}
+              color="error"
+              variant="outlined"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="warning"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Update Fund Number
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
@@ -2364,7 +3428,12 @@ const TOSF = () => {
         onClose={closeFeeRateEditDialog}
         maxWidth="md"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", md: 860 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", md: 860 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2383,15 +3452,27 @@ const TOSF = () => {
               <PriceChangeIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
                 Edit Fee Rate
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 Update the selected fee rate details
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={closeFeeRateEditDialog} sx={verificationDialogCloseSx}>
+          <IconButton
+            onClick={closeFeeRateEditDialog}
+            sx={verificationDialogCloseSx}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
@@ -2400,41 +3481,109 @@ const TOSF = () => {
             <Grid container spacing={2} sx={{ mt: 0.5 }}>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>FEE</Typography>
-                <TextField select SelectProps={{ native: true }} name="fee_id" value={feeRateEditForm.fee_id} onChange={handleFeeRateEditChange} size="small" fullWidth required>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="fee_id"
+                  value={feeRateEditForm.fee_id}
+                  onChange={handleFeeRateEditChange}
+                  size="small"
+                  fullWidth
+                  required
+                >
                   <option value="">Select Fee</option>
                   {feeCatalog.map((fee) => (
-                    <option key={fee.fee_id} value={fee.fee_id}>{fee.fee_code} - {fee.fee_name}</option>
+                    <option key={fee.fee_id} value={fee.fee_id}>
+                      {fee.fee_code} - {fee.fee_name}
+                    </option>
                   ))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>AMOUNT</Typography>
-                <TextField name="amount" type="number" value={feeRateEditForm.amount} onChange={handleFeeRateEditChange} size="small" fullWidth required inputProps={{ inputMode: "numeric", pattern: "[0-9]*", step: 1, min: 0 }} />
+                <TextField
+                  name="amount"
+                  type="number"
+                  value={feeRateEditFormIsTuition ? 0 : feeRateEditForm.amount}
+                  onChange={handleFeeRateEditChange}
+                  size="small"
+                  fullWidth
+                  required={!feeRateEditFormIsTuition}
+                  disabled={feeRateEditFormIsTuition}
+                  helperText={
+                    feeRateEditFormIsTuition
+                      ? "Computed from enrolled subjects"
+                      : ""
+                  }
+                  inputProps={{
+                    inputMode: "numeric",
+                    pattern: "[0-9]*",
+                    step: 1,
+                    min: 0,
+                  }}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>YEAR LEVEL</Typography>
-                <TextField select SelectProps={{ native: true }} name="applied_to" value={feeRateEditForm.applied_to} onChange={handleFeeRateEditChange} size="small" fullWidth>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="applied_to"
+                  value={feeRateEditForm.applied_to}
+                  onChange={handleFeeRateEditChange}
+                  size="small"
+                  fullWidth
+                >
                   <option value={0}>All Year Level</option>
                   {yearLevelOptions.map((level) => (
-                    <option key={level.year_level_id} value={level.year_level_id}>{level.year_level_description}</option>
+                    <option
+                      key={level.year_level_id}
+                      value={level.year_level_id}
+                    >
+                      {level.year_level_description}
+                    </option>
                   ))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>SCOPE</Typography>
-                <TextField select SelectProps={{ native: true }} name="applies_to_all" value={feeRateEditForm.applies_to_all} onChange={handleFeeRateEditChange} size="small" fullWidth>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="applies_to_all"
+                  value={feeRateEditForm.applies_to_all}
+                  onChange={handleFeeRateEditChange}
+                  size="small"
+                  fullWidth
+                >
                   <option value={1}>All Curricula</option>
                   <option value={0}>Specific Curriculum</option>
                 </TextField>
               </Grid>
               {Number(feeRateEditForm.applies_to_all) === 0 && (
                 <Grid item xs={12}>
-                  <Typography sx={fieldLabelSx}>DEPARTMENT CURRICULUM</Typography>
-                  <TextField select SelectProps={{ native: true }} name="dprtmnt_curriculum_id" value={feeRateEditForm.dprtmnt_curriculum_id} onChange={handleFeeRateEditChange} size="small" fullWidth required>
+                  <Typography sx={fieldLabelSx}>
+                    DEPARTMENT CURRICULUM
+                  </Typography>
+                  <TextField
+                    select
+                    SelectProps={{ native: true }}
+                    name="dprtmnt_curriculum_id"
+                    value={feeRateEditForm.dprtmnt_curriculum_id}
+                    onChange={handleFeeRateEditChange}
+                    size="small"
+                    fullWidth
+                    required
+                  >
                     <option value="">Select Curriculum</option>
                     {curriculumOptions.map((item) => (
-                      <option key={item.dprtmnt_curriculum_id} value={item.dprtmnt_curriculum_id}>
-                        {item.dprtmnt_name} - ({item.program_code}) {item.program_description} {item.major || ""} - {item.year_description}
+                      <option
+                        key={item.dprtmnt_curriculum_id}
+                        value={item.dprtmnt_curriculum_id}
+                      >
+                        {item.dprtmnt_name} - ({item.program_code}){" "}
+                        {item.program_description} {item.major || ""} -{" "}
+                        {item.year_description}
                       </option>
                     ))}
                   </TextField>
@@ -2442,16 +3591,34 @@ const TOSF = () => {
               )}
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>BRANCH</Typography>
-                <TextField select SelectProps={{ native: true }} name="branch_id" value={feeRateEditForm.branch_id} onChange={handleFeeRateEditChange} size="small" fullWidth>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="branch_id"
+                  value={feeRateEditForm.branch_id}
+                  onChange={handleFeeRateEditChange}
+                  size="small"
+                  fullWidth
+                >
                   <option value="">All Branches</option>
                   {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>{branch.branch}</option>
+                    <option key={branch.id} value={branch.id}>
+                      {branch.branch}
+                    </option>
                   ))}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography sx={fieldLabelSx}>STATUS</Typography>
-                <TextField select SelectProps={{ native: true }} name="is_active" value={feeRateEditForm.is_active} onChange={handleFeeRateEditChange} size="small" fullWidth>
+                <TextField
+                  select
+                  SelectProps={{ native: true }}
+                  name="is_active"
+                  value={feeRateEditForm.is_active}
+                  onChange={handleFeeRateEditChange}
+                  size="small"
+                  fullWidth
+                >
                   <option value={1}>Active</option>
                   <option value={0}>Inactive</option>
                 </TextField>
@@ -2459,18 +3626,40 @@ const TOSF = () => {
             </Grid>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button onClick={closeFeeRateEditDialog} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-            <Button type="submit" variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Update Rate</Button>
+            <Button
+              onClick={closeFeeRateEditDialog}
+              color="error"
+              variant="outlined"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="warning"
+              sx={{ textTransform: "none", borderRadius: "8px" }}
+            >
+              Update Rate
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
 
       <Dialog
         open={feeCatalogDeleteDialogOpen}
-        onClose={() => { setFeeCatalogDeleteDialogOpen(false); setSelectedFeeCatalog(null); }}
+        onClose={() => {
+          setFeeCatalogDeleteDialogOpen(false);
+          setSelectedFeeCatalog(null);
+        }}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 460 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 460 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2489,39 +3678,78 @@ const TOSF = () => {
               <DeleteIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
                 Delete Fee
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 This action cannot be undone
               </Typography>
             </Box>
           </Box>
           <IconButton
-            onClick={() => { setFeeCatalogDeleteDialogOpen(false); setSelectedFeeCatalog(null); }}
+            onClick={() => {
+              setFeeCatalogDeleteDialogOpen(false);
+              setSelectedFeeCatalog(null);
+            }}
             sx={verificationDialogCloseSx}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
-            Are you sure you want to delete {selectedFeeCatalog?.fee_name || "this fee"}?
-            This is dangerous because all rate records connected to this fee will also be deleted.
+          <DialogContentText
+            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
+          >
+            Are you sure you want to delete{" "}
+            {selectedFeeCatalog?.fee_name || "this fee"}? This is dangerous
+            because all rate records connected to this fee will also be deleted.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-          <Button onClick={() => { setFeeCatalogDeleteDialogOpen(false); setSelectedFeeCatalog(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={executeFeeCatalogDelete} color="error" sx={{ textTransform: "none" }}>Delete Fee</Button>
+          <Button
+            onClick={() => {
+              setFeeCatalogDeleteDialogOpen(false);
+              setSelectedFeeCatalog(null);
+            }}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={executeFeeCatalogDelete}
+            color="error"
+            sx={{ textTransform: "none" }}
+          >
+            Delete Fee
+          </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog
         open={feeGroupDeleteDialogOpen}
-        onClose={() => { setFeeGroupDeleteDialogOpen(false); setSelectedFeeGroup(null); }}
+        onClose={() => {
+          setFeeGroupDeleteDialogOpen(false);
+          setSelectedFeeGroup(null);
+        }}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 420 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 420 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2540,38 +3768,78 @@ const TOSF = () => {
               <DeleteIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
                 Delete Fee Group
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 This action cannot be undone
               </Typography>
             </Box>
           </Box>
           <IconButton
-            onClick={() => { setFeeGroupDeleteDialogOpen(false); setSelectedFeeGroup(null); }}
+            onClick={() => {
+              setFeeGroupDeleteDialogOpen(false);
+              setSelectedFeeGroup(null);
+            }}
             sx={verificationDialogCloseSx}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
-            Are you sure you want to delete {selectedFeeGroup?.description || "this fee group"}? This action cannot be undone.
+          <DialogContentText
+            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
+          >
+            Are you sure you want to delete{" "}
+            {selectedFeeGroup?.description || "this fee group"}? This action
+            cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-          <Button onClick={() => { setFeeGroupDeleteDialogOpen(false); setSelectedFeeGroup(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={executeFeeGroupDelete} color="error" sx={{ textTransform: "none" }}>Delete Fee Group</Button>
+          <Button
+            onClick={() => {
+              setFeeGroupDeleteDialogOpen(false);
+              setSelectedFeeGroup(null);
+            }}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={executeFeeGroupDelete}
+            color="error"
+            sx={{ textTransform: "none" }}
+          >
+            Delete Fee Group
+          </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog
         open={accountTypeDeleteDialogOpen}
-        onClose={() => { setAccountTypeDeleteDialogOpen(false); setSelectedAccountType(null); }}
+        onClose={() => {
+          setAccountTypeDeleteDialogOpen(false);
+          setSelectedAccountType(null);
+        }}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 420 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 420 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2590,38 +3858,78 @@ const TOSF = () => {
               <DeleteIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
-                Delete Account Type
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
+                Delete Fund Number
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 This action cannot be undone
               </Typography>
             </Box>
           </Box>
           <IconButton
-            onClick={() => { setAccountTypeDeleteDialogOpen(false); setSelectedAccountType(null); }}
+            onClick={() => {
+              setAccountTypeDeleteDialogOpen(false);
+              setSelectedAccountType(null);
+            }}
             sx={verificationDialogCloseSx}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
-            Are you sure you want to delete Account Type: <b>{selectedAccountType?.description || "this account type"}</b>? This action cannot be undone.
+          <DialogContentText
+            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
+          >
+            Are you sure you want to delete Fund Number:{" "}
+            <b>{selectedAccountType?.description || "this fund number"}</b>?
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-          <Button onClick={() => { setAccountTypeDeleteDialogOpen(false); setSelectedAccountType(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={executeAccountTypeDelete} color="error" sx={{ textTransform: "none" }}>Delete Account Type</Button>
+          <Button
+            onClick={() => {
+              setAccountTypeDeleteDialogOpen(false);
+              setSelectedAccountType(null);
+            }}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={executeAccountTypeDelete}
+            color="error"
+            sx={{ textTransform: "none" }}
+          >
+            Delete Fund Number
+          </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog
         open={feeRateDeleteDialogOpen}
-        onClose={() => { setFeeRateDeleteDialogOpen(false); setSelectedFeeRate(null); }}
+        onClose={() => {
+          setFeeRateDeleteDialogOpen(false);
+          setSelectedFeeRate(null);
+        }}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { ...verificationDialogPaperSx, minWidth: { xs: "92vw", sm: 420 } } }}
+        PaperProps={{
+          sx: {
+            ...verificationDialogPaperSx,
+            minWidth: { xs: "92vw", sm: 420 },
+          },
+        }}
       >
         <DialogTitle sx={verificationDialogTitleSx}>
           <Box display="flex" alignItems="center" gap={1.5}>
@@ -2640,40 +3948,85 @@ const TOSF = () => {
               <DeleteIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography fontWeight="bold" fontSize={16} color="white" lineHeight={1.2}>
+              <Typography
+                fontWeight="bold"
+                fontSize={16}
+                color="white"
+                lineHeight={1.2}
+              >
                 Delete Fee Rate
               </Typography>
-              <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+              <Typography
+                fontSize={12}
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.2}
+              >
                 This action cannot be undone
               </Typography>
             </Box>
           </Box>
           <IconButton
-            onClick={() => { setFeeRateDeleteDialogOpen(false); setSelectedFeeRate(null); }}
+            onClick={() => {
+              setFeeRateDeleteDialogOpen(false);
+              setSelectedFeeRate(null);
+            }}
             sx={verificationDialogCloseSx}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}>
-            Are you sure you want to delete this fee rate? This action cannot be undone.
+          <DialogContentText
+            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
+          >
+            Are you sure you want to delete this fee rate? This action cannot be
+            undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-          <Button onClick={() => { setFeeRateDeleteDialogOpen(false); setSelectedFeeRate(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={executeFeeRateDelete} color="error" sx={{ textTransform: "none" }}>Delete Rate</Button>
+          <Button
+            onClick={() => {
+              setFeeRateDeleteDialogOpen(false);
+              setSelectedFeeRate(null);
+            }}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={executeFeeRateDelete}
+            color="error"
+            sx={{ textTransform: "none" }}
+          >
+            Delete Rate
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: "100%" }}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
 
-      <Dialog open={scholarshipUpdateDialogOpen} onClose={resetScholarshipEditForm}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Scholarship Type</DialogTitle>
+      <Dialog
+        open={scholarshipUpdateDialogOpen}
+        onClose={resetScholarshipEditForm}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Edit Scholarship Type
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 1 }}>
             <Grid container spacing={2}>
@@ -2682,7 +4035,12 @@ const TOSF = () => {
                 <TextField
                   name="scholarship_code"
                   value={scholarshipEditForm.scholarship_code}
-                  onChange={(e) => setScholarshipEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))}
+                  onChange={(e) =>
+                    setScholarshipEditForm((prev) => ({
+                      ...prev,
+                      [e.target.name]: e.target.value,
+                    }))
+                  }
                   size="small"
                   required
                   fullWidth
@@ -2693,7 +4051,12 @@ const TOSF = () => {
                 <TextField
                   name="scholarship_name"
                   value={scholarshipEditForm.scholarship_name}
-                  onChange={(e) => setScholarshipEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))}
+                  onChange={(e) =>
+                    setScholarshipEditForm((prev) => ({
+                      ...prev,
+                      [e.target.name]: e.target.value,
+                    }))
+                  }
                   size="small"
                   required
                   fullWidth
@@ -2723,45 +4086,130 @@ const TOSF = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={resetScholarshipEditForm} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={async () => { await saveScholarshipEdit(); }} variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Save Changes</Button>
+          <Button
+            onClick={resetScholarshipEditForm}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              await saveScholarshipEdit();
+            }}
+            variant="contained"
+            color="warning"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Save Changes
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={scholarshipDeleteDialogOpen} onClose={() => { setScholarshipDeleteDialogOpen(false); setSelectedScholarshipId(null); }}>
+      <Dialog
+        open={scholarshipDeleteDialogOpen}
+        onClose={() => {
+          setScholarshipDeleteDialogOpen(false);
+          setSelectedScholarshipId(null);
+        }}
+      >
         <DialogTitle sx={{ fontWeight: 700 }}>Delete Confirmation</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ pt: 2.5 }}>Are you sure you want to delete this scholarship type? This action cannot be undone.</DialogContentText>
+          <DialogContentText sx={{ pt: 2.5 }}>
+            Are you sure you want to delete this scholarship type? This action
+            cannot be undone.
+          </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => { setScholarshipDeleteDialogOpen(false); setSelectedScholarshipId(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={executeScholarshipDelete} color="error" sx={{ textTransform: "none" }}>Delete</Button>
+          <Button
+            onClick={() => {
+              setScholarshipDeleteDialogOpen(false);
+              setSelectedScholarshipId(null);
+            }}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={executeScholarshipDelete}
+            color="error"
+            sx={{ textTransform: "none" }}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={scholarshipRuleUpdateDialogOpen} onClose={() => setScholarshipRuleUpdateDialogOpen(false)}>
+      <Dialog
+        open={scholarshipRuleUpdateDialogOpen}
+        onClose={() => setScholarshipRuleUpdateDialogOpen(false)}
+      >
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Update</DialogTitle>
         <DialogContent>
-          <DialogContentText>Do you want to save the updated scholarship fee?</DialogContentText>
+          <DialogContentText>
+            Do you want to save the updated scholarship fee?
+          </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setScholarshipRuleUpdateDialogOpen(false)} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={executeScholarshipRuleUpdate} variant="contained" color="warning" sx={{ textTransform: "none", borderRadius: "8px" }}>Yes, Update</Button>
+          <Button
+            onClick={() => setScholarshipRuleUpdateDialogOpen(false)}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={executeScholarshipRuleUpdate}
+            variant="contained"
+            color="warning"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Yes, Update
+          </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={scholarshipRuleDeleteDialogOpen} onClose={() => { setScholarshipRuleDeleteDialogOpen(false); setSelectedScholarshipRuleId(null); }}>
+      <Dialog
+        open={scholarshipRuleDeleteDialogOpen}
+        onClose={() => {
+          setScholarshipRuleDeleteDialogOpen(false);
+          setSelectedScholarshipRuleId(null);
+        }}
+      >
         <DialogTitle sx={{ fontWeight: 700 }}>Delete Confirmation</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ pt: 2.5 }}>Are you sure you want to delete this scholarship fee? This action cannot be undone.</DialogContentText>
+          <DialogContentText sx={{ pt: 2.5 }}>
+            Are you sure you want to delete this scholarship fee? This action
+            cannot be undone.
+          </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => { setScholarshipRuleDeleteDialogOpen(false); setSelectedScholarshipRuleId(null); }} color="error" variant="outlined" sx={{ textTransform: "none", borderRadius: "8px" }}>Cancel</Button>
-          <Button onClick={executeScholarshipRuleDelete} color="error" sx={{ textTransform: "none" }}>Delete</Button>
+          <Button
+            onClick={() => {
+              setScholarshipRuleDeleteDialogOpen(false);
+              setSelectedScholarshipRuleId(null);
+            }}
+            color="error"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={executeScholarshipRuleDelete}
+            color="error"
+            sx={{ textTransform: "none" }}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
 
-export default TOSF;    
+export default TOSF;

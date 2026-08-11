@@ -1,5 +1,6 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
+const fs = require("fs");
 
 const {
   insertAuditLogAdmission,
@@ -125,14 +126,30 @@ const insertPdfExportAudit = async (
 };
 
 // ─── Shared Puppeteer launch config ─────────────────────────────────────────
-const launchBrowser = () =>
-  puppeteer.launch({
+const resolveBrowserExecutablePath = () => {
+  const configuredPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (configuredPath && fs.existsSync(configuredPath)) {
+    return configuredPath;
+  }
+
+  if (process.platform === "win32") {
+    const windowsChromePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+    if (fs.existsSync(windowsChromePath)) {
+      return windowsChromePath;
+    }
+  }
+
+  return undefined;
+};
+
+const launchBrowser = () => {
+  const executablePath = resolveBrowserExecutablePath();
+  return puppeteer.launch({
     headless: true,
-    executablePath:
-      process.env.PUPPETEER_EXECUTABLE_PATH ||
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    ...(executablePath ? { executablePath } : {}),
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
+};
 
 const buildOutputFilename = (
   prefix,
@@ -759,7 +776,7 @@ router.post("/generate-personal-data-form-pdf", async (req, res) => {
       width: 100%;
       height: 100%;
       box-sizing: border-box;
-      zoom: 0.85;
+      zoom: 0.82;
     }
 
     .student-table {
@@ -1177,7 +1194,6 @@ router.post("/generate-admission-services-pdf", async (req, res) => {
   }
 });
 
-// ─── 6. Exam Permit ─────────────────────────────────────────────────────────
 router.post("/generate-exam-permit-pdf", async (req, res) => {
   let browser;
 
@@ -1191,12 +1207,11 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
     browser = await launchBrowser();
     const page = await browser.newPage();
 
-    // Letter size (8.5in x 11in), not A4 — this form's own @page rule and
-    // container width (width: "8.5in" in ExamPermit.jsx) are both sized
-    // for Letter, unlike the other admission/registrar forms.
+    // A4 size (8.27in x 11.69in) — viewport, inline CSS width, and
+    // page.pdf() format below are all kept in sync to this.
     await page.setViewport({
-      width: 816, // 8.5in @ 96dpi
-      height: 1056, // 11in @ 96dpi
+      width: 794, // 8.27in @ 96dpi
+      height: 1123, // 11.69in @ 96dpi
       deviceScaleFactor: 2,
     });
 
@@ -1219,11 +1234,10 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
       }
     });
 
-    // Mirrors the <style> block embedded directly in ExamPermit.jsx
-    // (it doesn't use a separate printDiv()/window.open() flow like the
-    // other forms — its print CSS lives inline in the component itself).
-    // No transform/scale here — this form isn't scaled down like the
-    // others, it renders at native size within the Letter page.
+    // Mirrors the <style> block embedded directly in ExamPermit.jsx.
+    // Content width is now pinned to A4 (8.27in) instead of Letter
+    // (8.5in) so it matches the page.pdf() format below and doesn't
+    // get clipped or off-center.
     const wrappedHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1233,7 +1247,7 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
     html, body {
       margin: 0;
       padding: 0;
-      width: 8.5in;
+      width: 8.27in;
       background: #ffffff;
       font-family: Arial, sans-serif;
       -webkit-print-color-adjust: exact;
@@ -1269,16 +1283,14 @@ router.post("/generate-exam-permit-pdf", async (req, res) => {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const pdfBuffer = await page.pdf({
-      format: "Letter",
+      format: "A4",
       printBackground: true,
       preferCSSPageSize: false,
-      // Matches @page { size: 8.5in 11in; margin: 0.25in; } from the
-      // component's own embedded print styles.
       margin: {
         top: "0.25in",
         bottom: "0.25in",
-        left: "0.25in",
-        right: "0.25in",
+        left: "0.50in",
+        right: "0.50in",
       },
     });
 
@@ -4318,6 +4330,9 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
       ),
     );
 
+    // ── Block only media (audio/video), and give every other request
+    // (including images like the school logo) a hard per-request timeout
+    // so an unreachable asset host can't stall the whole render for 60s.
     await page.setRequestInterception(true);
     page.on("request", (request) => {
       if (request.resourceType() === "media") {
@@ -4384,18 +4399,6 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
       font-size: 10px;
     }
 
-    .header-text .program-title {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      margin-top: 3px;
-    }
-
-    .header-text .semester {
-      font-size: 10px;
-      font-weight: 600;
-    }
-
     .schedule-title {
       text-align: center;
       font-size: 14px;
@@ -4456,6 +4459,8 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
     table.grade-table {
       width: 100%;
       border-collapse: collapse;
+      border-left: none;
+      border-right: none;
     }
 
     table.grade-table th,
@@ -4468,10 +4473,6 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
       word-wrap: break-word;
     }
 
-    table.grade-table {
-      border-left: none;
-      border-right: none;
-    }
     table.grade-table tr:first-child th {
       border-top: none;
     }
@@ -4520,21 +4521,31 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
 </html>
     `.trim();
 
+    // Give page.setContent its own timeout distinct from the outer
+    // request, and don't let a slow/unreachable image (logo, etc.)
+    // block rendering forever — 'domcontentloaded' plus our own image
+    // wait (with a cap) is more resilient than 'networkidle0' alone,
+    // which never resolves if any asset never finishes loading.
     await page.setContent(wrappedHtml, {
-      waitUntil: "networkidle0",
-      timeout: 60000,
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
     });
 
-    await waitForImages(page);
+    // Wait for images, but cap it — don't let one broken image URL
+    // hang the whole export for 60s+.
+    await Promise.race([
+      waitForImages(page),
+      new Promise((resolve) => setTimeout(resolve, 8000)),
+    ]);
+
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    // ── Cap the export at ~3 pages ──────────────────────────────────
     const contentHeightPx = await page.evaluate(
       () => document.documentElement.scrollHeight,
     );
 
-    const A4_HEIGHT_PX = 1123; // A4 @ 96dpi
-    const MARGIN_PX = 37.8; // 10mm top + 10mm bottom
+    const A4_HEIGHT_PX = 1123;
+    const MARGIN_PX = 37.8;
     const usableHeightPerPagePx = A4_HEIGHT_PX - MARGIN_PX * 2;
     const MAX_PAGES = 3;
     const maxAllowedHeightPx = usableHeightPerPagePx * MAX_PAGES;
@@ -4544,12 +4555,6 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
       scale = Math.max(0.55, maxAllowedHeightPx / contentHeightPx);
     }
 
-    // ── "Page X of Y" footer, repeated on every page ────────────────
-    // Same footerTemplate pattern as /generate-class-list-pdf and
-    // /generate-grading-sheet-pdf: Puppeteer's pageNumber/totalPages
-    // classes are populated automatically per physical page, so this
-    // works even though the letterhead/table content flows freely
-    // without any manual page-break markup.
     const footerTemplate = `
       <div style="width:100%;box-sizing:border-box;padding:4px 10mm 0;font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#000;border-top:1px solid #000;display:flex;justify-content:flex-end;align-items:center;">
         <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
@@ -4564,11 +4569,9 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
       displayHeaderFooter: true,
       headerTemplate: "<div></div>",
       footerTemplate,
-      // Bottom margin bumped from 10mm to 14mm so the footer band has
-      // room and doesn't overlap the last table row — same adjustment
-      // used on the Class List / Grading Sheet routes.
       margin: { top: "10mm", bottom: "14mm", left: "10mm", right: "10mm" },
       scale,
+      timeout: 30000,
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {
@@ -4598,13 +4601,23 @@ router.post("/generate-student-grades-pdf", async (req, res) => {
     return res.end(pdfBuffer);
   } catch (err) {
     console.error("Student Grades PDF ERROR:", err);
-    return res.status(500).json({
-      message: "PDF generation failed",
-      error: err.message,
-      stack: err.stack,
-    });
+    // Always send JSON back so the frontend's axios catch block has a
+    // real message to show, instead of the request just hanging or the
+    // client getting a blank/broken blob response.
+    if (!res.headersSent) {
+      return res.status(500).json({
+        message: "PDF generation failed",
+        error: err.message,
+      });
+    }
   } finally {
-    if (browser) await browser.close();
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeErr) {
+        console.error("Error closing browser:", closeErr.message);
+      }
+    }
   }
 });
 
@@ -4692,10 +4705,28 @@ router.post("/generate-attendance-report-pdf", async (req, res) => {
       border-radius: 50%;
       object-fit: cover;
       flex-shrink: 0;
+      
     }
 
     .header-text {
       text-align: center;
+    }
+
+    .print-corner-label {
+      position: absolute;
+      top: 0;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .print-corner-label.left {
+      left: 0;
+      text-align: left;
+    }
+
+    .print-corner-label.right {
+      right: 0;
+      text-align: right;
     }
 
     .info-row {
@@ -4766,7 +4797,7 @@ router.post("/generate-attendance-report-pdf", async (req, res) => {
       landscape: false,
       printBackground: true,
       preferCSSPageSize: false,
-      margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" },
+      margin: { top: "0mm", bottom: "8mm", left: "8mm", right: "8mm" },
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {

@@ -140,30 +140,36 @@ router.get("/verified-exam-applicants", async (req, res) => {
   }
 });
 
-router.get("/exam-schedule/:applicant_number", async (req, res) => {
+const fetchApplicantExamSchedule = async (applicant_number) => {
+  const [rows] = await db.query(`
+    SELECT
+      s.day_description AS date_of_exam,
+      s.start_time,
+      s.end_time,
+      s.building_description,
+      s.room_description,
+      rt.floor,
+      s.proctor,
+      s.created_at AS schedule_created_at
+    FROM exam_applicants ea
+    JOIN entrance_exam_schedule s
+      ON ea.schedule_id = s.schedule_id
+    LEFT JOIN enrollment.room_table rt
+      ON rt.room_description = s.room_description
+      AND rt.building_description = s.building_description
+    WHERE ea.applicant_id = ?
+      AND COALESCE(ea.email_sent, 0) = 1
+    LIMIT 1
+  `, [applicant_number]);
+
+  return rows;
+};
+
+const sendApplicantExamSchedule = async (req, res) => {
     const { applicant_number } = req.params;
 
     try {
-      const [rows] = await db.query(`
-      SELECT 
-        s.day_description AS date_of_exam,
-        s.start_time,
-        s.end_time,
-        s.building_description,
-        s.room_description,
-        rt.floor,
-        s.proctor,
-        s.created_at AS schedule_created_at
-      FROM exam_applicants ea
-      JOIN entrance_exam_schedule s 
-        ON ea.schedule_id = s.schedule_id
-      LEFT JOIN enrollment.room_table rt
-        ON rt.room_description = s.room_description
-        AND rt.building_description = s.building_description
-      WHERE ea.applicant_id = ?
-        AND COALESCE(ea.email_sent, 0) = 1
-      LIMIT 1
-    `, [applicant_number]);
+      const rows = await fetchApplicantExamSchedule(applicant_number);
 
       if (rows.length === 0) {
         return res.status(404).json({ message: "No exam schedule found" });
@@ -174,7 +180,10 @@ router.get("/exam-schedule/:applicant_number", async (req, res) => {
       console.error("Error fetching exam schedule:", err);
       res.status(500).json({ error: "Database error" });
     }
-});
+};
+
+router.get("/exam-schedule/:applicant_number", sendApplicantExamSchedule);
+router.get("/applicant-schedule/:applicant_number", sendApplicantExamSchedule);
 
 router.get("/scheduled-by/:role", async (req, res) => {
   const { role } = req.params;

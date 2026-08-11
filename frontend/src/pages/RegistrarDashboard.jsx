@@ -7,11 +7,7 @@ import {
   CardContent,
   Typography,
   Grid,
-  MenuItem,
-  FormControl,
   IconButton,
-  Select,
-  InputLabel,
   Avatar,
   useMediaQuery,
   useTheme,
@@ -221,21 +217,21 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
   });
   const [months, setMonths] = useState("January");
 
-  // ── SINGLE shared School Year filter ────────────────────────────
-  const [years, setYears] = useState([]);
+  // ── Active school year (astatus = 1) ────────────────────────────
+  const [activeSchoolYear, setActiveSchoolYear] = useState(null);
   const [selectedYear, setSelectedYear] = useState("");
 
   useEffect(() => {
     axios
-      .get(`${API_BASE_URL}/api/get_school_year`)
+      .get(`${API_BASE_URL}/api/active_school_year`)
       .then((res) => {
-        const currentYear = new Date().getFullYear();
-        const filtered = res.data.filter(
-          (y) => Number(y.current_year) <= currentYear
-        );
-        setYears(filtered);
-        if (filtered.length > 0) {
-          setSelectedYear(filtered[filtered.length - 1].year_id);
+        const active = Array.isArray(res.data) && res.data.length > 0
+          ? res.data[0]
+          : null;
+
+        setActiveSchoolYear(active);
+        if (active?.year_id) {
+          setSelectedYear(active.year_id);
         }
       })
       .catch(console.error);
@@ -263,24 +259,16 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
 
     let filtered = [...allApplicants];
 
-    if (selectedYear) {
-      const sy = years.find(
-        (y) => String(y.year_id) === String(selectedYear)
+    if (activeSchoolYear?.current_year) {
+      const yearNum = Number(activeSchoolYear.current_year);
+      filtered = filtered.filter(
+        (p) => new Date(p.created_at).getFullYear() === yearNum
       );
-      if (sy) {
-        const yearNum = Number(sy.current_year);
-        filtered = filtered.filter(
-          (p) => new Date(p.created_at).getFullYear() === yearNum
-        );
-      }
     }
 
     // Bar chart: applicants per month
-    const targetYear = years.find(
-      (y) => String(y.year_id) === String(selectedYear)
-    );
-    const chartYear = targetYear
-      ? Number(targetYear.current_year)
+    const chartYear = activeSchoolYear?.current_year
+      ? Number(activeSchoolYear.current_year)
       : new Date().getFullYear();
 
     const monthCounts = {};
@@ -327,10 +315,12 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
       female,
       statusCounts: [],
     });
-  }, [allApplicants, selectedYear, years]);
+  }, [allApplicants, activeSchoolYear]);
 
   // Enrollment statistics bar charts via API
   useEffect(() => {
+    if (!selectedYear) return;
+
     axios
       .get(`${API_BASE_URL}/api/get_enrollment_statistic`, {
         params: { year: selectedYear },
@@ -426,6 +416,10 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
       { name: "Techvoc", value: Number(data.Techvoc) || 0 },
       { name: "Graduate", value: Number(data.Graduate) || 0 },
       { name: "Undergraduate", value: Number(data.Undergraduate) || 0 },
+      {
+        name: "Unclassified",
+        value: Number(data.AcademicProgramUnclassified) || 0,
+      },
     ]
     : [];
 
@@ -435,6 +429,10 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
       { name: "Shiftee", value: Number(data.Shiftee) || 0 },
       { name: "Foreign", value: Number(data.ForeignStudent) || 0 },
       { name: "Transferee", value: Number(data.Transferee) || 0 },
+      {
+        name: "Unclassified",
+        value: Number(data.ClassificationUnclassified) || 0,
+      },
     ]
     : [];
 
@@ -985,23 +983,6 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
               >
                 Enrollment Statistics
               </Typography>
-
-              {/* School Year dropdown — drives enrollment bar charts */}
-              <FormControl fullWidth size="small" sx={{ mb: 3 }}>
-                <InputLabel>School Year</InputLabel>
-                <Select
-                  value={selectedYear}
-                  label="School Year"
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                >
-                  {years.map((yr) => (
-                    <MenuItem key={yr.year_id} value={yr.year_id}>
-                      {yr.current_year}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
               <Typography fontWeight="bold" mb={1}>
                 Academic Program Distribution
               </Typography>
@@ -1023,7 +1004,9 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
                         <Cell
                           key={index}
                           fill={
-                            ["#5C6BC0", "#26A69A", "#FFA726"][index % 3]
+                            ["#5C6BC0", "#26A69A", "#FFA726", "#8D6E63"][
+                              index % 4
+                            ]
                           }
                         />
                       ))}
@@ -1058,7 +1041,8 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
                               "#66BB6A",
                               "#42A5F5",
                               "#FFCA28",
-                            ][index % 4]
+                              "#8D6E63",
+                            ][index % 5]
                           }
                         />
                       ))}

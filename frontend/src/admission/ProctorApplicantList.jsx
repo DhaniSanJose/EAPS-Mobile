@@ -16,7 +16,7 @@ import {
   Chip,
   ToggleButton,
   ToggleButtonGroup,
-  Grid
+  Grid,
 } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 import { Search } from "@mui/icons-material";
@@ -73,8 +73,7 @@ const ProctorApplicantList = () => {
     if (colors.title) setTitleColor(colors.title);
     if (colors.subtitle) setSubtitleColor(colors.subtitle);
     if (colors.border) setBorderColor(colors.border);
-    if (colors.mainButton)
-      setMainButtonColor(colors.mainButton);
+    if (colors.mainButton) setMainButtonColor(colors.mainButton);
     if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
     if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
@@ -262,6 +261,34 @@ const ProctorApplicantList = () => {
     }
   };
 
+  const handleManualAttendance = async (applicantId, newStatus) => {
+    if (!proctor?.schedule_id) return;
+    try {
+      await axios.put(`${API_BASE_URL}/api/exam-attendance/manual`, {
+        schedule_id: proctor.schedule_id,
+        applicant_id: applicantId,
+        status: newStatus, // "present" | "absent"
+        scanned_by: employeeID || localStorage.getItem("email"),
+        scanned_by_role: userRole,
+      });
+      fetchAttendance(proctor.schedule_id);
+      setSnack({
+        open: true,
+        message: `Marked as ${newStatus === "present" ? "Present" : "Absent"}.`,
+        severity: "success",
+        key: Date.now(),
+      });
+    } catch (err) {
+      console.error("Error setting manual attendance:", err);
+      setSnack({
+        open: true,
+        message: "Failed to update attendance.",
+        severity: "error",
+        key: Date.now(),
+      });
+    }
+  };
+
   // Poll attendance every 10s while the Attendance tab is active
   useEffect(() => {
     if (viewMode !== "attendance" || !proctor?.schedule_id) return;
@@ -311,14 +338,19 @@ const ProctorApplicantList = () => {
     setOpenAbsentDialog(false);
   };
 
-  const presentCount = attendanceRows.filter((r) => r.status === "present").length;
-  const absentCount = attendanceRows.filter((r) => r.status === "absent").length;
+  const presentCount = attendanceRows.filter(
+    (r) => r.status === "present",
+  ).length;
+  const absentCount = attendanceRows.filter(
+    (r) => r.status === "absent",
+  ).length;
   const notArrivedCount = attendanceRows.filter(
     (r) => r.status === "not_arrived",
   ).length;
 
   const handleExportAttendanceReportPdf = async () => {
-    const resolvedAddress = campusAddress || branding.campusAddress || "No address set in Settings";
+    const resolvedAddress =
+      campusAddress || branding.campusAddress || "No address set in Settings";
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
     const words = name.split(" ");
@@ -327,18 +359,21 @@ const ProctorApplicantList = () => {
     const secondLine = words.slice(middleIndex).join(" ");
 
     const startTimeStr = proctor?.start_time
-      ? new Date("1970-01-01T" + proctor.start_time).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
+      ? new Date("1970-01-01T" + proctor.start_time).toLocaleTimeString(
+          "en-US",
+          {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          },
+        )
       : "";
     const endTimeStr = proctor?.end_time
       ? new Date("1970-01-01T" + proctor.end_time).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
       : "";
 
     const statusLabel = (status) => {
@@ -353,20 +388,22 @@ const ProctorApplicantList = () => {
         <img src="${logoSrc}" alt="School Logo" />
         <div class="header-text">
           <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
-          ${name
-        ? `
+          ${
+            name
+              ? `
               <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
                 ${firstLine}
               </b>
-              ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+              ${
+                secondLine
+                  ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
                      <b>${secondLine}</b>
                    </div>`
-          : ""
-        }
+                  : ""
+              }
             `
-        : ""
-      }
+              : ""
+          }
           <div style="font-size: 12px; font-family: Arial">${resolvedAddress}</div>
         </div>
       </div>
@@ -401,8 +438,8 @@ const ProctorApplicantList = () => {
         </thead>
         <tbody>
           ${attendanceRows
-        .map(
-          (r, idx) => `
+            .map(
+              (r, idx) => `
               <tr>
                 <td>${idx + 1}</td>
                 <td>${r.applicant_id}</td>
@@ -412,8 +449,8 @@ const ProctorApplicantList = () => {
                 <td>${r.scanned_by || "—"}</td>
               </tr>
             `,
-        )
-        .join("")}
+            )
+            .join("")}
 
           <tr>
             <td
@@ -444,10 +481,15 @@ const ProctorApplicantList = () => {
         },
       );
 
-      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.setAttribute("download", `Attendance_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+      link.setAttribute(
+        "download",
+        `Attendance_Report_${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -464,7 +506,8 @@ const ProctorApplicantList = () => {
   };
 
   const handleExportProctorApplicantListPdf = async () => {
-    const resolvedAddress = campusAddress || branding.campusAddress || "No address set in Settings";
+    const resolvedAddress =
+      campusAddress || branding.campusAddress || "No address set in Settings";
 
     const logoSrc = fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
@@ -474,20 +517,22 @@ const ProctorApplicantList = () => {
     const firstLine = words.slice(0, middleIndex).join(" ");
     const secondLine = words.slice(middleIndex).join(" ");
 
-
     const startTimeStr = proctor?.start_time
-      ? new Date("1970-01-01T" + proctor.start_time).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
+      ? new Date("1970-01-01T" + proctor.start_time).toLocaleTimeString(
+          "en-US",
+          {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          },
+        )
       : "";
     const endTimeStr = proctor?.end_time
       ? new Date("1970-01-01T" + proctor.end_time).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      })
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
       : "";
 
     // Only the .print-container's INNER markup — no <html>/<head>/<body>,
@@ -503,20 +548,22 @@ const ProctorApplicantList = () => {
         <div class="header-text">
           <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
 
-          ${name
-        ? `
+          ${
+            name
+              ? `
               <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
                 ${firstLine}
               </b>
-              ${secondLine
-          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+              ${
+                secondLine
+                  ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
                        <b>${secondLine}</b>
                      </div>`
-          : ""
-        }
+                  : ""
+              }
             `
-        : ""
-      }
+              : ""
+          }
 
           <div style="font-size: 12px; font-family: Arial">${resolvedAddress}</div>
         </div>
@@ -550,14 +597,15 @@ const ProctorApplicantList = () => {
       </thead>
       <tbody>
         ${applicants
-        .map((a) => {
-          const programItem = curriculumOptions.find(
-            (item) => item.curriculum_id?.toString() === a.program?.toString(),
-          );
-          const program = programItem
-            ? `(${programItem.program_code}) - ${programItem.program_description} ${programItem.major || ""}`
-            : "N/A";
-          return `
+          .map((a) => {
+            const programItem = curriculumOptions.find(
+              (item) =>
+                item.curriculum_id?.toString() === a.program?.toString(),
+            );
+            const program = programItem
+              ? `(${programItem.program_code}) - ${programItem.program_description} ${programItem.major || ""}`
+              : "N/A";
+            return `
               <tr>
                 <td>${a.applicant_number}</td>
                 <td class="applicant-name">${a.last_name}, ${a.first_name} ${a.middle_name || ""}</td>
@@ -565,8 +613,8 @@ const ProctorApplicantList = () => {
               
               </tr>
             `;
-        })
-        .join("")}
+          })
+          .join("")}
       </tbody>
     </table>
     </div>
@@ -586,10 +634,15 @@ const ProctorApplicantList = () => {
         },
       );
 
-      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.setAttribute("download", `Proctor_Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`);
+      link.setAttribute(
+        "download",
+        `Proctor_Applicant_List_${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -609,7 +662,7 @@ const ProctorApplicantList = () => {
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       if (searchQuery.trim() !== "") {
-        handleSearchByProctor(searchQuery);   // ✅ use the real function
+        handleSearchByProctor(searchQuery); // ✅ use the real function
       } else {
         setApplicants([]);
         setProctor(null);
@@ -757,13 +810,9 @@ const ProctorApplicantList = () => {
               },
             }}
           >
-            <ToggleButton value="applicants">
-              Applicant List
-            </ToggleButton>
+            <ToggleButton value="applicants">Applicant List</ToggleButton>
 
-            <ToggleButton value="attendance">
-              Attendance
-            </ToggleButton>
+            <ToggleButton value="attendance">Attendance</ToggleButton>
           </ToggleButtonGroup>
 
           {/* SEARCH */}
@@ -838,8 +887,6 @@ const ProctorApplicantList = () => {
       </Box>
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
-
-
       <br />
       <br />
       <TableContainer
@@ -847,9 +894,7 @@ const ProctorApplicantList = () => {
         sx={{ width: "100%", border: `1px solid ${borderColor}` }}
       >
         <Table>
-          <TableHead
-            sx={{ backgroundColor: headerColor }}
-          >
+          <TableHead sx={{ backgroundColor: headerColor }}>
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
                 Proctor Applicant List / Applicant Attendance Report
@@ -859,7 +904,6 @@ const ProctorApplicantList = () => {
         </Table>
       </TableContainer>
       {proctor && (
-
         <Box
           sx={{
             display: "flex",
@@ -880,7 +924,11 @@ const ProctorApplicantList = () => {
             <Grid container spacing={2}>
               {/* Proctor */}
               <Grid item xs={12} md={2.4}>
-                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                <Typography
+                  textAlign="left"
+                  color="maroon"
+                  sx={{ mb: 1, fontWeight: "bold" }}
+                >
                   Proctor:
                 </Typography>
                 <TextField
@@ -899,7 +947,11 @@ const ProctorApplicantList = () => {
 
               {/* Building */}
               <Grid item xs={12} md={2.4}>
-                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                <Typography
+                  textAlign="left"
+                  color="maroon"
+                  sx={{ mb: 1, fontWeight: "bold" }}
+                >
                   Building:
                 </Typography>
                 <TextField
@@ -918,7 +970,11 @@ const ProctorApplicantList = () => {
 
               {/* Room */}
               <Grid item xs={12} md={2.4}>
-                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                <Typography
+                  textAlign="left"
+                  color="maroon"
+                  sx={{ mb: 1, fontWeight: "bold" }}
+                >
                   Room:
                 </Typography>
                 <TextField
@@ -937,7 +993,11 @@ const ProctorApplicantList = () => {
 
               {/* Schedule */}
               <Grid item xs={12} md={2.4}>
-                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                <Typography
+                  textAlign="left"
+                  color="maroon"
+                  sx={{ mb: 1, fontWeight: "bold" }}
+                >
                   Schedule:
                 </Typography>
                 <TextField
@@ -956,22 +1016,30 @@ const ProctorApplicantList = () => {
 
               {/* Time */}
               <Grid item xs={12} md={2.4}>
-                <Typography textAlign="left" color="maroon" sx={{ mb: 1, fontWeight: "bold" }}>
+                <Typography
+                  textAlign="left"
+                  color="maroon"
+                  sx={{ mb: 1, fontWeight: "bold" }}
+                >
                   Time:
                 </Typography>
                 <TextField
                   fullWidth
                   value={
                     proctor?.start_time && proctor?.end_time
-                      ? `${new Date(`1970-01-01T${proctor.start_time}`).toLocaleTimeString("en-US", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true,
-                      })} - ${new Date(`1970-01-01T${proctor.end_time}`).toLocaleTimeString("en-US", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true,
-                      })}`
+                      ? `${new Date(
+                          `1970-01-01T${proctor.start_time}`,
+                        ).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })} - ${new Date(
+                          `1970-01-01T${proctor.end_time}`,
+                        ).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}`
                       : "N/A"
                   }
                   InputProps={{ readOnly: true }}
@@ -1011,9 +1079,7 @@ const ProctorApplicantList = () => {
           {applicants.length > 0 && (
             <TableContainer component={Paper}>
               <Table>
-                <TableHead
-                  sx={{ backgroundColor: headerColor }}
-                >
+                <TableHead sx={{ backgroundColor: headerColor }}>
                   <TableRow>
                     <TableCell
                       sx={{
@@ -1119,7 +1185,8 @@ const ProctorApplicantList = () => {
                         {(() => {
                           const item = curriculumOptions.find(
                             (x) =>
-                              x.curriculum_id?.toString() === a.program?.toString(),
+                              x.curriculum_id?.toString() ===
+                              a.program?.toString(),
                           );
 
                           return item
@@ -1141,7 +1208,9 @@ const ProctorApplicantList = () => {
                         align="left"
                         sx={{ border: `1px solid ${borderColor}` }}
                       >
-                        {a.room_description || proctor?.room_description || "N/A"}{" "}
+                        {a.room_description ||
+                          proctor?.room_description ||
+                          "N/A"}{" "}
                         {/* ✅ NEW */}
                       </TableCell>
                       <TableCell
@@ -1198,8 +1267,17 @@ const ProctorApplicantList = () => {
                   border: "1px solid #a5d6a7",
                 }}
               >
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#2e7d32" }} />
-                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#2e7d32" }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    backgroundColor: "#2e7d32",
+                  }}
+                />
+                <Typography
+                  sx={{ fontSize: "13px", fontWeight: 700, color: "#2e7d32" }}
+                >
                   Present: {presentCount}
                 </Typography>
               </Box>
@@ -1216,8 +1294,17 @@ const ProctorApplicantList = () => {
                   border: "1px solid #ef9a9a",
                 }}
               >
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#c62828" }} />
-                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#c62828" }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    backgroundColor: "#c62828",
+                  }}
+                />
+                <Typography
+                  sx={{ fontSize: "13px", fontWeight: 700, color: "#c62828" }}
+                >
                   Absent: {absentCount}
                 </Typography>
               </Box>
@@ -1234,8 +1321,17 @@ const ProctorApplicantList = () => {
                   border: "1px solid #e0e0e0",
                 }}
               >
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#757575" }} />
-                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#616161" }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    backgroundColor: "#757575",
+                  }}
+                />
+                <Typography
+                  sx={{ fontSize: "13px", fontWeight: 700, color: "#616161" }}
+                >
                   Not Yet Arrived: {notArrivedCount}
                 </Typography>
               </Box>
@@ -1267,34 +1363,67 @@ const ProctorApplicantList = () => {
               <TableHead sx={{ backgroundColor: headerColor }}>
                 <TableRow>
                   <TableCell
-                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                    sx={{
+                      color: "white",
+                      textAlign: "center",
+                      border: `1px solid ${borderColor}`,
+                    }}
                   >
                     #
                   </TableCell>
                   <TableCell
-                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                    sx={{
+                      color: "white",
+                      textAlign: "center",
+                      border: `1px solid ${borderColor}`,
+                    }}
                   >
                     Applicant ID
                   </TableCell>
                   <TableCell
-                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                    sx={{
+                      color: "white",
+                      textAlign: "center",
+                      border: `1px solid ${borderColor}`,
+                    }}
                   >
                     Name
                   </TableCell>
                   <TableCell
-                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                    sx={{
+                      color: "white",
+                      textAlign: "center",
+                      border: `1px solid ${borderColor}`,
+                    }}
                   >
                     Status
                   </TableCell>
                   <TableCell
-                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                    sx={{
+                      color: "white",
+                      textAlign: "center",
+                      border: `1px solid ${borderColor}`,
+                    }}
                   >
                     Scanned At
                   </TableCell>
                   <TableCell
-                    sx={{ color: "white", textAlign: "center", border: `1px solid ${borderColor}` }}
+                    sx={{
+                      color: "white",
+                      textAlign: "center",
+                      border: `1px solid ${borderColor}`,
+                    }}
                   >
                     Scanned By
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      color: "white",
+                      textAlign: "center",
+                      border: `1px solid ${borderColor}`,
+                    }}
+                  >
+                    Action
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -1313,7 +1442,11 @@ const ProctorApplicantList = () => {
                   <TableRow>
                     <TableCell
                       colSpan={6}
-                      sx={{ textAlign: "center", p: 2, border: `1px solid ${borderColor}` }}
+                      sx={{
+                        textAlign: "center",
+                        p: 2,
+                        border: `1px solid ${borderColor}`,
+                      }}
                     >
                       No applicants found for this schedule.
                     </TableCell>
@@ -1321,27 +1454,92 @@ const ProctorApplicantList = () => {
                 ) : (
                   attendanceRows.map((r, i) => (
                     <TableRow key={r.applicant_id}>
-                      <TableCell align="center" sx={{ border: `1px solid ${borderColor}` }}>
+                      <TableCell
+                        align="center"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
                         {i + 1}
                       </TableCell>
-                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
                         {r.applicant_id}
                       </TableCell>
-                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
                         {`${r.last_name}, ${r.first_name} ${r.middle_name || ""}`}
                       </TableCell>
-                      <TableCell align="center" sx={{ border: `1px solid ${borderColor}` }}>
+                      <TableCell
+                        align="center"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
                         {statusChip(r.status)}
                       </TableCell>
-                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
                         {r.scanned_at
                           ? new Date(r.scanned_at).toLocaleString("en-US", {
-                            timeZone: "Asia/Manila",
-                          })
+                              timeZone: "Asia/Manila",
+                            })
                           : "—"}
                       </TableCell>
-                      <TableCell align="left" sx={{ border: `1px solid ${borderColor}` }}>
+                      <TableCell
+                        align="left"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
                         {r.scanned_by || "—"}
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{ border: `1px solid ${borderColor}` }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Button
+                            size="small"
+                            variant={
+                              r.status === "present" ? "contained" : "outlined"
+                            }
+                            color="success"
+                            onClick={() =>
+                              handleManualAttendance(r.applicant_id, "present")
+                            }
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 600,
+                              minWidth: 72,
+                            }}
+                          >
+                            Present
+                          </Button>
+                          <Button
+                            size="small"
+                            variant={
+                              r.status === "absent" ? "contained" : "outlined"
+                            }
+                            color="error"
+                            onClick={() =>
+                              handleManualAttendance(r.applicant_id, "absent")
+                            }
+                            sx={{
+                              textTransform: "none",
+                              fontWeight: 600,
+                              minWidth: 72,
+                            }}
+                          >
+                            Absent
+                          </Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))
@@ -1371,7 +1569,10 @@ const ProctorApplicantList = () => {
 
       <Dialog
         open={openDeleteDialog}
-        onClose={() => { setOpenDeleteDialog(false); setApplicantToDelete(null); }}
+        onClose={() => {
+          setOpenDeleteDialog(false);
+          setApplicantToDelete(null);
+        }}
         maxWidth="xs"
         fullWidth
       >
@@ -1390,12 +1591,15 @@ const ProctorApplicantList = () => {
         <DialogContent sx={{ p: 3, mt: 2 }}>
           <Typography sx={{ mb: 2 }}>
             Are you sure you want to remove applicant{" "}
-            <strong>{applicantToDelete?.last_name}, {applicantToDelete?.first_name}</strong>{" "}
+            <strong>
+              {applicantToDelete?.last_name}, {applicantToDelete?.first_name}
+            </strong>{" "}
             from the exam schedule?
           </Typography>
 
           <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>
-            Removing this applicant will unassign them from the current exam schedule.
+            Removing this applicant will unassign them from the current exam
+            schedule.
             <br />
             They will need to be reassigned to another schedule if necessary.
           </Typography>
@@ -1405,7 +1609,10 @@ const ProctorApplicantList = () => {
           <Button
             color="error"
             variant="outlined"
-            onClick={() => { setOpenDeleteDialog(false); setApplicantToDelete(null); }}
+            onClick={() => {
+              setOpenDeleteDialog(false);
+              setApplicantToDelete(null);
+            }}
           >
             Cancel
           </Button>
@@ -1419,10 +1626,25 @@ const ProctorApplicantList = () => {
                   applicant_id: applicantToDelete.applicant_number,
                   ...auditActor(),
                 });
-                setApplicants((prev) => prev.filter((a) => a.applicant_number !== applicantToDelete.applicant_number));
-                setSnack({ open: true, message: "Applicant successfully removed.", severity: "success", key: Date.now() });
+                setApplicants((prev) =>
+                  prev.filter(
+                    (a) =>
+                      a.applicant_number !== applicantToDelete.applicant_number,
+                  ),
+                );
+                setSnack({
+                  open: true,
+                  message: "Applicant successfully removed.",
+                  severity: "success",
+                  key: Date.now(),
+                });
               } catch (error) {
-                setSnack({ open: true, message: "Failed to remove applicant.", severity: "error", key: Date.now() });
+                setSnack({
+                  open: true,
+                  message: "Failed to remove applicant.",
+                  severity: "error",
+                  key: Date.now(),
+                });
               }
               setOpenDeleteDialog(false);
               setApplicantToDelete(null);
@@ -1468,8 +1690,7 @@ const ProctorApplicantList = () => {
               <strong>ABSENT</strong> for this schedule?
               <br />
               <br />
-              Marked by:{" "}
-              <strong>{localStorage.getItem("email")}</strong>
+              Marked by: <strong>{localStorage.getItem("email")}</strong>
             </Typography>
           </Box>
         </DialogContent>

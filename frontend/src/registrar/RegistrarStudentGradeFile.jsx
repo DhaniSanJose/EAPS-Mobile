@@ -584,13 +584,6 @@ const StudentGradeFile = () => {
             return;
         }
 
-        const empId = employeeID || localStorage.getItem("employee_id") || "";
-        if (!empId) {
-            setAllStudents([]);
-            setSearchStatus("Missing employee id for student search");
-            return;
-        }
-
         if (studentSearchAbortRef.current) {
             studentSearchAbortRef.current.abort();
         }
@@ -601,7 +594,6 @@ const StudentGradeFile = () => {
             setIsLoadingStudentDirectory(true);
             const res = await axios.get(`${API_BASE_URL}/api/student_enrollment`, {
                 params: {
-                    employee_id: empId,
                     q: trimmedQuery,
                     limit: 10,
                 },
@@ -633,11 +625,9 @@ const StudentGradeFile = () => {
         }
 
         try {
-            const empId = employeeID || localStorage.getItem("employee_id") || "";
             const res = await axios.get(`${API_BASE_URL}/api/student-info`, {
                 params: {
                     searchQuery: student_number,
-                    ...(empId ? { employee_id: empId } : {}),
                 },
             });
             setStudentInfo(Array.isArray(res.data) ? res.data : []);
@@ -654,12 +644,8 @@ const StudentGradeFile = () => {
 
     const fetchStudentGrade = async (student_number) => {
         try {
-            const empId = employeeID || localStorage.getItem("employee_id") || "";
             const res = await axios.get(
                 `${API_BASE_URL}/api/student-info/${student_number}`,
-                {
-                    params: empId ? { employee_id: empId } : undefined,
-                },
             );
             setStudentGradeList(res.data);
         } catch {

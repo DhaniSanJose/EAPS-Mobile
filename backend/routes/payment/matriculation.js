@@ -7,6 +7,7 @@ const {
 } = require('../../utils/matriculationPaymentLines');
 const {
     applyFeeLinePaymentAllocations,
+    getMatriculationFeeLines,
 } = require('../../utils/matriculationFeeLines');
 
 const router = express.Router();
@@ -492,28 +493,7 @@ router.put('/payment_matriculation/:id', async (req, res) => {
         const matriculationRow = matriculationRows[0];
         const { student_number } = matriculationRow;
 
-        const [feeLines] = await connection.query(
-            `SELECT
-                mfl.id,
-                mfl.matriculation_id,
-                mfl.fee_rate_id,
-                mfl.amount,
-                mfl.is_paid,
-                COALESCE(mfl.paid_amount, 0) AS paid_amount,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 'TUITION' ELSE fc.fee_code END AS fee_code,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END AS fee_name,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE fc.sort_order END AS sort_order,
-                CASE WHEN mfl.fee_rate_id = 0 THEN NULL ELSE fc.account_type END AS account_type,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 1 ELSE 0 END AS is_tuition
-             FROM matriculation_fee_lines mfl
-             LEFT JOIN fee_rate fr ON fr.fee_rate_id = mfl.fee_rate_id
-             LEFT JOIN fee_catalog fc ON fc.fee_id = fr.fee_id
-             WHERE mfl.matriculation_id = ?
-             ORDER BY
-                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE COALESCE(fc.sort_order, 999999) END ASC,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END ASC`,
-            [id]
-        );
+        const feeLines = await getMatriculationFeeLines(connection, id);
 
         const [activeSchoolYearRows] = await connection.query(
             `SELECT
@@ -606,28 +586,7 @@ router.put('/payment_matriculation/:id', async (req, res) => {
 
         await applyFeeLinePaymentAllocations(connection, paymentSummary.allocations);
 
-        const [updatedFeeLines] = await connection.query(
-            `SELECT
-                mfl.id,
-                mfl.matriculation_id,
-                mfl.fee_rate_id,
-                mfl.amount,
-                mfl.is_paid,
-                COALESCE(mfl.paid_amount, 0) AS paid_amount,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 'TUITION' ELSE fc.fee_code END AS fee_code,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END AS fee_name,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE fc.sort_order END AS sort_order,
-                CASE WHEN mfl.fee_rate_id = 0 THEN NULL ELSE fc.account_type END AS account_type,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 1 ELSE 0 END AS is_tuition
-             FROM matriculation_fee_lines mfl
-             LEFT JOIN fee_rate fr ON fr.fee_rate_id = mfl.fee_rate_id
-             LEFT JOIN fee_catalog fc ON fc.fee_id = fr.fee_id
-             WHERE mfl.matriculation_id = ?
-             ORDER BY
-                CASE WHEN mfl.fee_rate_id = 0 THEN 0 ELSE COALESCE(fc.sort_order, 999999) END ASC,
-                CASE WHEN mfl.fee_rate_id = 0 THEN 'Tuition Fees' ELSE fc.fee_name END ASC`,
-            [id]
-        );
+        const updatedFeeLines = await getMatriculationFeeLines(connection, id);
 
         await applyMatriculationPayment(connection, {
             matriculationId: Number(id),

@@ -147,11 +147,12 @@ const getScholarshipFeeRules = async (
        sf.discount_value,
        sf.year_level_id
      FROM scholarship_fees sf
-     INNER JOIN fee_rate fr ON fr.fee_rate_id = sf.fee_rate_id AND fr.is_active = 1
+     LEFT JOIN fee_rate fr ON fr.fee_rate_id = sf.fee_rate_id
      WHERE sf.scholarship_id = ?
        AND sf.school_year_id = ?
        AND sf.semester_id = ?
        AND sf.status = 1
+       AND (sf.fee_rate_id = 0 OR fr.is_active = 1)
        AND (sf.year_level_id = 0 OR sf.year_level_id IS NULL OR sf.year_level_id = ?)
      ORDER BY
        CASE
@@ -204,6 +205,11 @@ const applyDiscountToAmount = (amount, rule) => {
 
   return round2(Math.max(nextAmount, 0));
 };
+
+const getScholarshipRuleForFeeRate = (scholarshipRules, feeRateId) =>
+  (Array.isArray(scholarshipRules) ? scholarshipRules : []).find(
+    (rule) => String(rule.fee_rate_id) === String(feeRateId),
+  ) || null;
 
 const isTuitionMeta = (meta) => Number(meta?.fee_category) === 2;
 const isNstpMeta = (meta) =>
@@ -596,7 +602,10 @@ router.post("/save_to_matriculation", async (req, res) => {
                 );
               }
 
-              return applied;
+              return {
+                ...applied,
+                scholarshipRules,
+              };
             });
           })()
         : Promise.resolve({
@@ -609,11 +618,23 @@ router.post("/save_to_matriculation", async (req, res) => {
           });
 
       savedFees = await resolvedFees;
-      const resolvedTuitionFees = round2(tuition_fees || savedFees?.tuitionFees || 0);
+      const catalogTuitionFees = round2(savedFees?.tuitionFees || 0);
+      const tuitionRule = hasInputFeeLines
+        ? getScholarshipRuleForFeeRate(savedFees?.scholarshipRules, 0)
+        : null;
+      const resolvedTuitionFees = hasInputFeeLines
+        ? applyDiscountToAmount(tuition_fees || 0, tuitionRule)
+        : round2(tuition_fees || 0);
       savedFees = {
         ...savedFees,
+        catalogTuitionFees,
         tuitionFees: resolvedTuitionFees,
-        totalTosf: round2(resolvedTuitionFees + (savedFees?.totalMisc || 0)),
+        totalTosf: round2(
+          resolvedTuitionFees +
+            catalogTuitionFees +
+            (savedFees?.totalMisc || 0) +
+            (savedFees?.totalNstp || 0),
+        ),
       };
 
       scholarshipRemark =

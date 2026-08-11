@@ -336,9 +336,9 @@ router.get("/tosf/scholarship-fees", async (req, res) => {
       `SELECT
         sf.*,
         st.scholarship_name,
-        fc.fee_code,
-        fc.fee_name,
-        fr.amount,
+        CASE WHEN sf.fee_rate_id = 0 THEN 'TUITION' ELSE fc.fee_code END AS fee_code,
+        CASE WHEN sf.fee_rate_id = 0 THEN 'Computed Tuition' ELSE fc.fee_name END AS fee_name,
+        CASE WHEN sf.fee_rate_id = 0 THEN 0 ELSE fr.amount END AS amount,
         ylt.year_level_description,
         sf.school_year_id AS year_id,
         yt.year_description,
@@ -347,8 +347,8 @@ router.get("/tosf/scholarship-fees", async (req, res) => {
         sem.semester_description
        FROM scholarship_fees sf
        INNER JOIN scholarship_type st ON st.id = sf.scholarship_id
-       INNER JOIN fee_rate fr ON fr.fee_rate_id = sf.fee_rate_id
-       INNER JOIN fee_catalog fc ON fc.fee_id = fr.fee_id
+       LEFT JOIN fee_rate fr ON fr.fee_rate_id = sf.fee_rate_id
+       LEFT JOIN fee_catalog fc ON fc.fee_id = fr.fee_id
        LEFT JOIN year_level_table ylt ON ylt.year_level_id = sf.year_level_id
        LEFT JOIN year_table yt ON yt.year_id = sf.school_year_id
        LEFT JOIN semester_table sem ON sem.semester_id = sf.semester_id
@@ -369,7 +369,7 @@ router.post("/tosf/scholarship-fees", CanCreate, async (req, res) => {
   if (!payload.scholarshipId) {
     return res.status(400).json({ message: "scholarship_id is required" });
   }
-  if (!payload.feeRateId) {
+  if (payload.feeRateId === null || payload.feeRateId === undefined) {
     return res.status(400).json({ message: "fee_rate_id is required" });
   }
   if (!payload.schoolYearId) {
@@ -417,7 +417,7 @@ router.put("/tosf/scholarship-fees/:id", CanEdit, async (req, res) => {
   if (!payload.scholarshipId) {
     return res.status(400).json({ message: "scholarship_id is required" });
   }
-  if (!payload.feeRateId) {
+  if (payload.feeRateId === null || payload.feeRateId === undefined) {
     return res.status(400).json({ message: "fee_rate_id is required" });
   }
   if (!payload.schoolYearId) {
@@ -706,6 +706,7 @@ router.get("/tosf/fee-rates", async (req, res) => {
         fc.fee_code,
         fc.fee_name,
         fc.fee_category,
+        fc.sort_order,
         d.dprtmnt_name,
         p.program_code,
         p.program_description,

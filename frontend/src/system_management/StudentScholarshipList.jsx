@@ -22,9 +22,6 @@ import {
   FormControl,
   Select,
   MenuItem,
-  List,
-  ListItemButton,
-  ListItemText,
 } from "@mui/material";
 import '../styles/Print.css'
 import CertificateOfRegistration from '../components/CORForScholarship';
@@ -42,6 +39,37 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
+
+const cleanSuggestionValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatStudentSuggestionName = (student) =>
+  [
+    cleanSuggestionValue(student?.last_name),
+    cleanSuggestionValue(student?.first_name),
+    cleanSuggestionValue(student?.middle_name),
+    cleanSuggestionValue(student?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+const getStudentSuggestionText = (student) =>
+  [
+    student?.student_number,
+    student?.last_name,
+    student?.first_name,
+    student?.middle_name,
+    student?.extension,
+    student?.program_code,
+    student?.program_description,
+    student?.major,
+  ]
+    .map(cleanSuggestionValue)
+    .join(" ")
+    .toLowerCase();
 
 const StudentScholarshipList = () => {
   useAuditMac();
@@ -389,10 +417,14 @@ const StudentScholarshipList = () => {
     (page - 1) * rowsPerPage,
     page * rowsPerPage,
   );
-  const searchSuggestions = normalizedSearch
-    ? filteredNotAssignedStudents.slice(0, 8)
+  const searchSuggestions = normalizedSearch.length >= 2
+    ? notAssignedStudents
+      .filter((student) =>
+        getStudentSuggestionText(student).includes(normalizedSearch),
+      )
+      .slice(0, 10)
     : [];
-  const showSearchSuggestions = searchFocused && normalizedSearch && searchSuggestions.length > 0;
+  const showSearchSuggestions = searchFocused && normalizedSearch.length >= 2;
 
   const paginationButtonStyles = {
     minWidth: 70,
@@ -430,6 +462,7 @@ const StudentScholarshipList = () => {
 
   const handleSelectSuggestion = (student) => {
     setStudentNumber(student.student_number || "");
+    setPage(1);
     setSearchFocused(false);
     handleOpenCorModal(student.student_number);
   };
@@ -508,14 +541,18 @@ const StudentScholarshipList = () => {
         <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
           <TextField
             variant="outlined"
-            placeholder="Enter Student Number"
+            placeholder="Search Student Number / Name / Program / Major"
             size="small"
             value={studentNumber}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-            onChange={(e) => setStudentNumber(e.target.value)}
+            onChange={(e) => {
+              setStudentNumber(e.target.value);
+              setPage(1);
+              setSearchFocused(true);
+            }}
             sx={{
-              width: 450,
+              width: "100%",
               backgroundColor: "#fff",
               borderRadius: 1,
               "& .MuiOutlinedInput-root": {
@@ -527,62 +564,71 @@ const StudentScholarshipList = () => {
             }}
           />
           {showSearchSuggestions && (
-            <Paper
-              elevation={6}
+            <Box
               onMouseDown={(event) => event.preventDefault()}
               sx={{
                 position: "absolute",
-                top: "calc(100% + 6px)",
+                top: "calc(100% + 4px)",
                 left: 0,
                 right: 0,
                 zIndex: 20,
-                borderRadius: "10px",
+                backgroundColor: "#fff",
+                border: "1px solid #d0d0d0",
+                borderRadius: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
                 overflow: "hidden",
-                maxHeight: 360,
+                maxHeight: 320,
               }}
             >
-              <List dense disablePadding>
-                {searchSuggestions.map((student) => {
-                  const fullName = [
-                    student.first_name,
-                    student.middle_name,
-                    student.last_name,
-                    student.extension,
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
+              {searchSuggestions.length > 0 ? (
+                searchSuggestions.map((student) => {
+                  const studentNumberValue = cleanSuggestionValue(
+                    student?.student_number,
+                  );
+                  const name = formatStudentSuggestionName(student);
+                  const program = cleanSuggestionValue(
+                    student?.program_code || student?.program_description,
+                  );
 
                   return (
-                    <ListItemButton
-                      key={student.student_number}
-                      onClick={() => handleSelectSuggestion(student)}
+                    <Box
+                      key={`${studentNumberValue}-${student?.program_code || student?.major}`}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        handleSelectSuggestion(student);
+                      }}
                       sx={{
+                        px: 2,
                         py: 1,
-                        px: 1.5,
-                        "&:hover": { backgroundColor: "#f0f2f5" },
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        fontSize: 14,
+                        borderBottom: "1px solid #f0f0f0",
+                        "&:hover": { backgroundColor: "#f5f7fb" },
                       }}
                     >
-                      <ListItemText
-                        primary={
-                          fullName || student.student_number || "Unnamed Student"
-                        }
-                        secondary={`${student.student_number || "No student number"}${student.program_code ? ` - ${student.program_code}` : ""
-                          }${student.major ? ` - ${student.major}` : ""}`}
-                        primaryTypographyProps={{
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: "#1c1e21",
-                        }}
-                        secondaryTypographyProps={{
-                          fontSize: 12,
-                          color: "#65676b",
-                        }}
-                      />
-                    </ListItemButton>
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {studentNumberValue || "No number"}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14, color: "#555" }}>
+                        |
+                      </Typography>
+                      <Typography sx={{ fontSize: 14 }} noWrap>
+                        {[name || "Unnamed Student", program, student?.major]
+                          .filter(Boolean)
+                          .join(" - ")}
+                      </Typography>
+                    </Box>
                   );
-                })}
-              </List>
-            </Paper>
+                })
+              ) : (
+                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                  No matching students found
+                </Box>
+              )}
+            </Box>
           )}
         </Box>
       </Box>

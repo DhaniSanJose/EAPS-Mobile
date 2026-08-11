@@ -54,6 +54,33 @@ const cleanAuditValue = (value) => {
     return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
 };
 
+const cleanStudentValue = (value) => {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "object") {
+        const fallback =
+            value.label ??
+            value.name ??
+            value.description ??
+            value.program_description ??
+            value.program_code ??
+            "";
+        if (fallback === value) return "";
+        return cleanStudentValue(fallback);
+    }
+    const text = String(value).trim();
+    return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatStudentSuggestionName = (student) =>
+    [
+        cleanStudentValue(student?.last_name),
+        cleanStudentValue(student?.first_name),
+        cleanStudentValue(student?.middle_name),
+        cleanStudentValue(student?.extension),
+    ]
+        .filter(Boolean)
+        .join(" ");
+
 const formatStudentAuditName = (student) =>
     [
         cleanAuditValue(student?.first_name),
@@ -302,6 +329,9 @@ const CollegeSearchCertificateOfRegistration = () => {
         return sessionStorage.getItem(COLLEGE_COR_SEARCH_KEY) || localStorage.getItem("studentNumberForCOR") || "";
     });
     const [debouncedStudentNumber, setDebouncedStudentNumber] = useState("");
+    const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+    const [studentSuggestions, setStudentSuggestions] = useState([]);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [studentData, setStudentData] = useState([]);
     const [studentDetails, setStudentDetails] = useState([]);
@@ -652,6 +682,44 @@ const CollegeSearchCertificateOfRegistration = () => {
     }, [studentNumber]);
 
     useEffect(() => {
+        const query = studentNumber.trim();
+
+        if (!suggestionsOpen || query.length < 2) {
+            setStudentSuggestions([]);
+            setSuggestionsLoading(false);
+            return undefined;
+        }
+
+        let cancelled = false;
+        setSuggestionsLoading(true);
+
+        const delayDebounce = setTimeout(async () => {
+            try {
+                const res = await axios.get(
+                    `${API_BASE_URL}/api/cor-student-suggestions`,
+                    {
+                        params: { query, limit: 10 },
+                    },
+                );
+
+                if (!cancelled) {
+                    setStudentSuggestions(Array.isArray(res.data) ? res.data : []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch student suggestions:", err);
+                if (!cancelled) setStudentSuggestions([]);
+            } finally {
+                if (!cancelled) setSuggestionsLoading(false);
+            }
+        }, 250);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(delayDebounce);
+        };
+    }, [studentNumber, suggestionsOpen]);
+
+    useEffect(() => {
         const trimmed = studentNumber.trim();
         if (trimmed) {
             sessionStorage.setItem(COLLEGE_COR_SEARCH_KEY, trimmed);
@@ -710,6 +778,18 @@ const CollegeSearchCertificateOfRegistration = () => {
     const handleSaveToMatriculationClick = () => {
         if (paymentButtonsDisabled) return;
         corPaymentActionsRef.current?.openScholarshipModal();
+    };
+
+    const handleStudentSuggestionSelect = (student) => {
+        const nextStudentNumber = cleanStudentValue(student?.student_number);
+        if (!nextStudentNumber) return;
+
+        setStudentNumber(nextStudentNumber);
+        setDebouncedStudentNumber(nextStudentNumber);
+        setSuggestionsOpen(false);
+        setStudentSuggestions([]);
+        sessionStorage.setItem(COLLEGE_COR_SEARCH_KEY, nextStudentNumber);
+        sessionStorage.setItem("edit_student_number", nextStudentNumber);
     };
 
     // Put this at the very bottom before the return 
@@ -773,25 +853,102 @@ const CollegeSearchCertificateOfRegistration = () => {
                 </Typography>
 
                 <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                    <TextField
-                        variant="outlined"
-                        placeholder="Enter Student Number"
-                        size="small"
-                        value={studentNumber}
-                        disabled={departmentLoading}
-                        onChange={(e) => setStudentNumber(e.target.value)}
-                        sx={{
-                            width: 450,
-                            backgroundColor: "#fff",
-                            borderRadius: 1,
-                            "& .MuiOutlinedInput-root": {
-                                borderRadius: "10px",
-                            },
-                        }}
-                        InputProps={{
-                            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-                        }}
-                    />
+                    <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+                        <TextField
+                            variant="outlined"
+                            placeholder="Search Student Number / Name"
+                            size="small"
+                            value={studentNumber}
+                            disabled={departmentLoading}
+                            onChange={(e) => {
+                                setStudentNumber(e.target.value);
+                                setSuggestionsOpen(true);
+                            }}
+                            onFocus={() => {
+                                if (studentNumber.trim().length >= 2) {
+                                    setSuggestionsOpen(true);
+                                }
+                            }}
+                            onBlur={() => {
+                                setTimeout(() => setSuggestionsOpen(false), 150);
+                            }}
+                            sx={{
+                                width: "100%",
+                                backgroundColor: "#fff",
+                                borderRadius: 1,
+                                "& .MuiOutlinedInput-root": {
+                                    borderRadius: "10px",
+                                },
+                            }}
+                            InputProps={{
+                                startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+                            }}
+                        />
+                        {suggestionsOpen && studentNumber.trim().length >= 2 && (
+                            <Box
+                                sx={{
+                                    position: "absolute",
+                                    top: "calc(100% + 4px)",
+                                    left: 0,
+                                    right: 0,
+                                    zIndex: 20,
+                                    backgroundColor: "#fff",
+                                    border: "1px solid #d0d0d0",
+                                    borderRadius: "8px",
+                                    boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                                    overflow: "hidden",
+                                    maxHeight: 320,
+                                }}
+                            >
+                                {suggestionsLoading ? (
+                                    <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                                        Searching...
+                                    </Box>
+                                ) : studentSuggestions.length > 0 ? (
+                                    studentSuggestions.map((student) => {
+                                        const studentNumberValue = cleanStudentValue(
+                                            student?.student_number,
+                                        );
+                                        const name = formatStudentSuggestionName(student);
+                                        return (
+                                            <Box
+                                                key={`${studentNumberValue || student?.person_id}-${name}`}
+                                                onMouseDown={(event) => {
+                                                    event.preventDefault();
+                                                    handleStudentSuggestionSelect(student);
+                                                }}
+                                                sx={{
+                                                    px: 2,
+                                                    py: 1,
+                                                    cursor: "pointer",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    fontSize: 14,
+                                                    borderBottom: "1px solid #f0f0f0",
+                                                    "&:hover": { backgroundColor: "#f5f7fb" },
+                                                }}
+                                            >
+                                                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                                                    {studentNumberValue || "N/A"}
+                                                </Typography>
+                                                <Typography sx={{ fontSize: 14, color: "#555" }}>
+                                                    |
+                                                </Typography>
+                                                <Typography sx={{ fontSize: 14 }} noWrap>
+                                                    {name || "Unnamed Student"}
+                                                </Typography>
+                                            </Box>
+                                        );
+                                    })
+                                ) : (
+                                    <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                                        No matching students found
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+                    </Box>
                     <StudentHistoryDialog
                         studentNumber={debouncedStudentNumber || studentNumber}
                         buttonColor={mainButtonColor}

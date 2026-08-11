@@ -111,12 +111,10 @@ router.post("/exam-attendance/generate/:schedule_id", async (req, res) => {
     res.json({ success: true, generated: results });
   } catch (err) {
     console.error("Error generating attendance QR codes:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: "Failed to generate attendance QR codes.",
-      });
+    res.status(500).json({
+      success: false,
+      error: "Failed to generate attendance QR codes.",
+    });
   }
 });
 
@@ -279,6 +277,92 @@ router.put("/exam-attendance/mark-absent/:schedule_id", async (req, res) => {
     res
       .status(500)
       .json({ success: false, error: "Failed to mark absentees." });
+  }
+});
+
+// Manual override — registrar/proctor sets PRESENT or ABSENT by hand
+// Body: { schedule_id, applicant_id, status, scanned_by, scanned_by_role }
+router.put("/exam-attendance/manual", async (req, res) => {
+  const { schedule_id, applicant_id, status, scanned_by, scanned_by_role } =
+    req.body;
+
+  if (
+    !schedule_id ||
+    !applicant_id ||
+    !["present", "absent"].includes(status)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "schedule_id, applicant_id, and a valid status ('present' or 'absent') are required.",
+    });
+  }
+
+  try {
+    const [[existing]] = await db.query(
+      `SELECT id, qr_token FROM exam_attendance WHERE schedule_id = ? AND applicant_id = ? LIMIT 1`,
+      [schedule_id, applicant_id],
+    );
+
+    const stampPH = nowInManila();
+
+    if (!existing) {
+      // No row yet (QR never generated/scanned) — create one directly at the target status
+      const token = crypto.randomBytes(20).toString("hex");
+      await db.query(
+        `INSERT INTO exam_attendance
+           (schedule_id, applicant_id, qr_token, status, scanned_at, scanned_by, absent_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          schedule_id,
+          applicant_id,
+          token,
+          status,
+          status === "present" ? stampPH : null,
+          status === "present" ? scanned_by || "unknown" : null,
+          status === "absent" ? stampPH : null,
+        ],
+      );
+    } else {
+      await db.query(
+        `UPDATE exam_attendance
+         SET status = ?,
+             scanned_at = IF(? = 'present', ?, scanned_at),
+             scanned_by = IF(? = 'present', ?, scanned_by),
+             absent_at  = IF(? = 'absent', ?, absent_at)
+         WHERE schedule_id = ? AND applicant_id = ?`,
+        [
+          status,
+          status,
+          stampPH,
+          status,
+          scanned_by || "unknown",
+          status,
+          stampPH,
+          schedule_id,
+          applicant_id,
+        ],
+      );
+    }
+
+    const { actorId, actorRole } = resolveAuditActor(req);
+    await insertAuditLogAdmission({
+      actorId: scanned_by || actorId,
+      role: scanned_by_role || actorRole,
+      action: "EXAM_ATTENDANCE_MANUAL_OVERRIDE",
+      severity: "INFO",
+      message: `${formatActorRole(scanned_by_role || actorRole)} (${scanned_by || actorId}) manually set Applicant (${applicant_id}) attendance to ${status.toUpperCase()} for schedule ${schedule_id}.`,
+    });
+
+    res.json({ success: true, applicant_id, status });
+  } catch (err) {
+    console.error("Error setting manual attendance:", err);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Server error setting manual attendance.",
+      });
   }
 });
 

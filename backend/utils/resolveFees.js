@@ -22,12 +22,15 @@ const isNstpFeeCode = (code) => String(code || "").toUpperCase().includes("NSTP"
 
 const isBaseTuitionFee = (fee) => {
   const code = normalizeFeeCode(fee);
-  if (!code || isNstpFeeCode(code)) return false;
+  const name = String(fee?.fee_name || "").toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  const searchable = `${code} ${name}`;
+  if (!searchable.trim() || searchable.includes("NSTP")) return false;
   return (
     code === "TUITION" ||
-    code.includes("TUITION_FEE") ||
-    code.includes("LEC_LAB") ||
-    code.includes("UNIT_TUITION")
+    searchable.includes("TUITION") ||
+    searchable.includes("TUITION_FEE") ||
+    searchable.includes("LEC_LAB") ||
+    searchable.includes("UNIT_TUITION")
   );
 };
 

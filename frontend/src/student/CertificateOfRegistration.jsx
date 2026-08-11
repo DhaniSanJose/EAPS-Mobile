@@ -616,6 +616,9 @@ const CertificateOfRegistration = forwardRef(
     const [scholarshipTypes, setScholarshipTypes] = useState([]);
     const [activeSchoolYear, setActiveSchoolYear] = useState([]);
     const resolvedScholarshipCode =
+      selectedPaymentData?.scholarship_code ||
+      selectedPaymentData?.scholarship_name ||
+      selectedPaymentData?.matriculation_remark ||
       data[0]?.scholarship_code ||
       data[0]?.scholarship_name ||
       scholarshipTypes.find(
@@ -737,6 +740,33 @@ const CertificateOfRegistration = forwardRef(
     const isFirstYear = Number(yearlevel) === 1;
     const isFirstSemester = Number(activeSchoolYear[0]?.semester_id) === 1;
     const isFirstYearFirstSem = isFirstYear && isFirstSemester;
+    const baseTotalAssessment =
+      totalLecFees +
+      totalLabFees +
+      Number(tosf[0]?.cultural_fee || 0) +
+      Number(tosf[0]?.athletic_fee || 0) +
+      (isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0) +
+      Number(tosf[0]?.developmental_fee || 0) +
+      Number(tosf[0]?.guidance_fee || 0) +
+      Number(tosf[0]?.library_fee || 0) +
+      Number(tosf[0]?.medical_and_dental_fee || 0) +
+      Number(tosf[0]?.registration_fee || 0) +
+      (isFirstYearFirstSem ? Number(tosf[0]?.school_id_fees || 0) : 0) +
+      (isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0) +
+      (isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0);
+    const displayTuitionAmount = selectedPaymentData
+      ? Number(selectedPaymentData?.tuition_fees || 0)
+      : Number(totalLecFees) + Number(totalLabFees);
+    const savedNetAssessment = savedUnifast
+      ? 0
+      : Number(selectedPaymentData?.total_tosf || 0);
+    const displayTotalAssessment = selectedPaymentData
+      ? savedNetAssessment
+      : baseTotalAssessment;
+    const displayFinancialAidAmount = selectedPaymentData
+      ? Math.max(baseTotalAssessment - savedNetAssessment, 0)
+      : "";
+    const displayNetAssessment = selectedPaymentData ? savedNetAssessment : "";
 
     const [curriculumOptions, setCurriculumOptions] = useState([]);
 
@@ -2520,9 +2550,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={
-                                Number(totalLecFees) + Number(totalLabFees)
-                              }
+                              value={displayTuitionAmount}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3214,26 +3242,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={
-                                totalLecFees +
-                                totalLabFees +
-                                Number(tosf[0]?.cultural_fee || 0) +
-                                Number(tosf[0]?.athletic_fee || 0) +
-                                (isHaveNSTP !== 0
-                                  ? Number(tosf[0]?.nstp_fees || 0)
-                                  : 0) +
-                                Number(tosf[0]?.developmental_fee || 0) +
-                                Number(tosf[0]?.guidance_fee || 0) +
-                                Number(tosf[0]?.library_fee || 0) +
-                                Number(tosf[0]?.medical_and_dental_fee || 0) +
-                                Number(tosf[0]?.registration_fee || 0) +
-                                (isHaveComputerFees !== 0
-                                  ? Number(tosf[0]?.computer_fees || 0)
-                                  : 0) +
-                                (isHaveLaboratory !== 0
-                                  ? Number(tosf[0]?.laboratory_fees || 0)
-                                  : 0)
-                              }
+                              value={displayTotalAssessment}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3291,6 +3300,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
+                              value={displayFinancialAidAmount}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3348,6 +3358,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
+                              value={displayNetAssessment}
                               readOnly
                               style={{
                                 textAlign: "center",

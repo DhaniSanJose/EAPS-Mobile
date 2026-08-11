@@ -34,14 +34,24 @@ export const isBaseTuitionLine = (line) =>
   Boolean(line?.is_computed_tuition) ||
   (() => {
     const code = String(line?.fee_code || "").toUpperCase();
-    if (!code || isNstpFeeLine(line)) return false;
+    const name = String(line?.fee_name || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_");
+    const searchable = `${code} ${name}`;
+    if (!searchable.trim() || isNstpFeeLine(line)) return false;
     return (
       code === "TUITION" ||
-      code.includes("TUITION_FEE") ||
-      code.includes("LEC_LAB") ||
-      code.includes("UNIT_TUITION")
+      searchable.includes("TUITION") ||
+      searchable.includes("TUITION_FEE") ||
+      searchable.includes("LEC_LAB") ||
+      searchable.includes("UNIT_TUITION")
     );
   })();
+
+export const filterAssessedFeeLines = (feeLines = []) =>
+  (Array.isArray(feeLines) ? feeLines : []).filter(
+    (line) => !isBaseTuitionLine(line),
+  );
 
 export const fetchResolvedFees = async ({
   tuitionAmount,
@@ -66,7 +76,7 @@ export const fetchResolvedFees = async ({
     is_first_year_first_sem: firstYearFirstSem ? 1 : 0,
   });
 
-  const feeLines = Array.isArray(res.data?.fee_lines) ? res.data.fee_lines : [];
+  const feeLines = filterAssessedFeeLines(res.data?.fee_lines);
   const totals = res.data?.totals || {
     computed_tuition: tuitionAmount,
     tuition: tuitionAmount,
@@ -182,7 +192,7 @@ export const applyScholarshipToFeeLines = (feeLines, scholarship) =>
   applyScholarshipToAssessment(0, feeLines, scholarship);
 
 export const buildFeeLinesPayload = (feeLines) =>
-  feeLines.map((line) => ({
+  filterAssessedFeeLines(feeLines).map((line) => ({
     fee_rate_id: line.fee_rate_id,
     amount: Number(line.amount || 0),
   }));
@@ -204,5 +214,8 @@ export const computeTuitionAmount = ({
 export const computeTotalAssessment = (computedTuitionAmount, catalogFeeLines) =>
   round2(
     computedTuitionAmount +
-      catalogFeeLines.reduce((sum, line) => sum + toNumber(line.amount), 0),
+      filterAssessedFeeLines(catalogFeeLines).reduce(
+        (sum, line) => sum + toNumber(line.amount),
+        0,
+      ),
   );

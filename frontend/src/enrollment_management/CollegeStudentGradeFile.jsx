@@ -46,6 +46,22 @@ const bodyStyle = {
 
 const PAGE_ID = 170;
 
+const cleanStudentValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatStudentSuggestionName = (student) =>
+  [
+    cleanStudentValue(student?.last_name),
+    cleanStudentValue(student?.first_name),
+    cleanStudentValue(student?.middle_name),
+    cleanStudentValue(student?.extension),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
 const CollegeStudentGradeFile = () => {
   const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
@@ -62,6 +78,7 @@ const CollegeStudentGradeFile = () => {
   const [allStudents, setAllStudents] = useState([]);
   const [selectedStudentNumber, setSelectedStudentNumber] = useState("");
   const [searchStatus, setSearchStatus] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [isLoadingStudentDirectory, setIsLoadingStudentDirectory] =
     useState(false);
   const [isLoadingStudentRecord, setIsLoadingStudentRecord] = useState(false);
@@ -308,12 +325,14 @@ const CollegeStudentGradeFile = () => {
     const trimmedQuery = String(query || "").trim();
     if (trimmedQuery.length < 2) {
       setAllStudents([]);
+      setSuggestionsOpen(false);
       return;
     }
 
     const empId = employeeID || localStorage.getItem("employee_id") || "";
     if (!empId) {
       setAllStudents([]);
+      setSuggestionsOpen(false);
       setSearchStatus("Missing employee id for student search");
       return;
     }
@@ -419,12 +438,14 @@ const CollegeStudentGradeFile = () => {
     if (trimmedQuery.length === 0) {
       setAllStudents([]);
       setSearchStatus("");
+      setSuggestionsOpen(false);
       return undefined;
     }
 
     if (trimmedQuery.length < 2) {
       setAllStudents([]);
       setSearchStatus("Type at least 2 characters to search");
+      setSuggestionsOpen(false);
       return undefined;
     }
 
@@ -436,6 +457,7 @@ const CollegeStudentGradeFile = () => {
     }
 
     const timer = setTimeout(() => {
+      setSuggestionsOpen(true);
       searchStudents(trimmedQuery);
     }, 350);
 
@@ -459,6 +481,8 @@ const CollegeStudentGradeFile = () => {
     setSelectedStudentNumber(student.student_number);
     setGlobalSearch(student.student_number);
     setSearchStatus(`Selected ${student.student_number}`);
+    setSuggestionsOpen(false);
+    sessionStorage.setItem("edit_student_number", student.student_number);
   };
 
   useEffect(() => {
@@ -584,26 +608,36 @@ const CollegeStudentGradeFile = () => {
             options={filteredStudents}
             filterOptions={(options) => options}
             loading={isLoadingStudentDirectory}
+            loadingText="Searching..."
+            noOptionsText={
+              globalSearch.trim().length >= 2
+                ? "No matching students found"
+                : "Type at least 2 characters"
+            }
+            open={suggestionsOpen && globalSearch.trim().length >= 2}
+            onOpen={() => {
+              if (globalSearch.trim().length >= 2) setSuggestionsOpen(true);
+            }}
+            onClose={() => setSuggestionsOpen(false)}
             value={selectedStudent}
             inputValue={globalSearch}
             onChange={(_, student) => handleSelectStudent(student)}
             onInputChange={(_, value, reason) => {
               setGlobalSearch(value);
+              setSuggestionsOpen(value.trim().length >= 2);
 
               if (reason === "clear" || value.trim().length === 0) {
                 setSelectedStudentNumber("");
                 setStudentInfo(null);
                 setStudentGradeList([]);
                 setAllStudents([]);
+                setSuggestionsOpen(false);
               }
             }}
             getOptionLabel={(option) => {
               if (typeof option === "string") return option;
 
-              const fullName =
-                `${option.first_name || ""} ${option.middle_name || ""} ${option.last_name || ""}`
-                  .replace(/\s+/g, " ")
-                  .trim();
+              const fullName = formatStudentSuggestionName(option);
 
               return fullName
                 ? `${option.student_number} - ${fullName}`
@@ -618,6 +652,9 @@ const CollegeStudentGradeFile = () => {
                 variant="outlined"
                 placeholder="Search by name or student number"
                 size="small"
+                onFocus={() => {
+                  if (globalSearch.trim().length >= 2) setSuggestionsOpen(true);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && filteredStudents.length > 0) {
                     e.preventDefault();
@@ -636,23 +673,52 @@ const CollegeStudentGradeFile = () => {
               />
             )}
             renderOption={(props, option) => {
-              const fullName =
-                `${option.first_name || ""} ${option.middle_name || ""} ${option.last_name || ""}`
-                  .replace(/\s+/g, " ")
-                  .trim();
+              const studentNumber = cleanStudentValue(option?.student_number);
+              const fullName = formatStudentSuggestionName(option);
 
               return (
-                <Box component="li" {...props} key={option.student_number}>
-                  <Box>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                      {option.student_number}
-                    </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      {fullName || "Unnamed student"}
-                    </Typography>
-                  </Box>
+                <Box
+                  component="li"
+                  {...props}
+                  key={studentNumber || option?.person_id}
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    fontSize: 14,
+                    borderBottom: "1px solid #f0f0f0",
+                    "&:hover": { backgroundColor: "#f5f7fb" },
+                  }}
+                >
+                  <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                    {studentNumber || "N/A"}
+                  </Typography>
+                  <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                  <Typography sx={{ fontSize: 14 }} noWrap>
+                    {fullName || "Unnamed Student"}
+                  </Typography>
                 </Box>
               );
+            }}
+            slotProps={{
+              paper: {
+                sx: {
+                  border: "1px solid #d0d0d0",
+                  borderRadius: "8px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                  overflow: "hidden",
+                  mt: 0.5,
+                },
+              },
+              listbox: {
+                sx: {
+                  maxHeight: 320,
+                  p: 0,
+                },
+              },
             }}
           />
           <Typography sx={{ mt: 0.75, fontSize: 12, color: "text.secondary" }}>

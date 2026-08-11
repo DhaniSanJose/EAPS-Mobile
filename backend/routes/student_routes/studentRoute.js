@@ -117,9 +117,6 @@ router.get("/student-info", async (req, res) => {
   const { searchQuery, employee_id } = req.query;
 
   try {
-    if (!employee_id) {
-      return res.status(400).json({ error: "employee_id is required" });
-    }
     if (!searchQuery) {
       return res.status(400).json({ error: "searchQuery is required" });
     }
@@ -160,9 +157,11 @@ router.get("/student-info", async (req, res) => {
       student_number = searchStudentNumber[0].student_number;
     }
 
-    const access = await checkRegistrarAccess(student_number, employee_id);
-    if (!access.ok) {
-      return res.status(access.status).json({ error: access.error });
+    if (employee_id) {
+      const access = await checkRegistrarAccess(student_number, employee_id);
+      if (!access.ok) {
+        return res.status(access.status).json({ error: access.error });
+      }
     }
 
     const [rows] = await db3.query(
@@ -232,13 +231,11 @@ router.get("/student-info/:student_number", async (req, res) => {
   const { employee_id } = req.query;
 
   try {
-    if (!employee_id) {
-      return res.status(400).json({ error: "employee_id is required" });
-    }
-
-    const access = await checkRegistrarAccess(student_number, employee_id);
-    if (!access.ok) {
-      return res.status(access.status).json({ error: access.error });
+    if (employee_id) {
+      const access = await checkRegistrarAccess(student_number, employee_id);
+      if (!access.ok) {
+        return res.status(access.status).json({ error: access.error });
+      }
     }
 
     const [rows] = await db3.query(
@@ -1554,31 +1551,22 @@ router.get("/student_enrollment", async (req, res) => {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
 
   try {
-    if (!employee_id) {
-      return res.status(400).json({ error: "employee_id is required" });
-    }
-
     // Search mode: require at least 2 characters and return a small page.
     // Avoids dumping the full enrollment directory into the browser.
     if (q.length < 2) {
       return res.json([]);
     }
 
-    const scope = await getRegistrarScope(employee_id);
-    if (scope.length === 0) {
-      return res.json([]);
+    if (employee_id) {
+      const scope = await getRegistrarScope(employee_id);
+      if (scope.length === 0) {
+        return res.json([]);
+      }
     }
 
     const like = `%${q}%`;
-    const [rows] = await db3.query(
-      `
-        SELECT DISTINCT
-          snt.student_number,
-          pt.first_name,
-          pt.middle_name,
-          pt.last_name
-        FROM student_numbering_table snt
-        LEFT JOIN person_table pt ON snt.person_id = pt.person_id
+    const scopeJoinSql = employee_id
+      ? `
         INNER JOIN (
           SELECT
             ranked.student_number,
@@ -1604,6 +1592,22 @@ router.get("/student_enrollment", async (req, res) => {
           ) ranked
           WHERE ranked.rn = 1
         ) cur ON cur.student_number = snt.student_number
+      `
+      : "";
+    const params = employee_id
+      ? [employee_id, like, like, like, like, like, limit]
+      : [like, like, like, like, like, limit];
+
+    const [rows] = await db3.query(
+      `
+        SELECT DISTINCT
+          snt.student_number,
+          pt.first_name,
+          pt.middle_name,
+          pt.last_name
+        FROM student_numbering_table snt
+        LEFT JOIN person_table pt ON snt.person_id = pt.person_id
+        ${scopeJoinSql}
         WHERE (
           CAST(snt.student_number AS CHAR) LIKE ?
           OR pt.first_name LIKE ?
@@ -1614,7 +1618,7 @@ router.get("/student_enrollment", async (req, res) => {
         ORDER BY snt.student_number ASC
         LIMIT ?
       `,
-      [employee_id, like, like, like, like, like, limit],
+      params,
     );
 
     res.json(rows);

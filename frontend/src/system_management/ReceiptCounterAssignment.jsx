@@ -353,7 +353,7 @@ const ReceiptCounterAssignment = () => {
         if (!assignForm.counter || !assignForm.employee_id || !assignForm.school_year_id || !assignForm.semester_id || !assignForm.account_type_id) {
             setSnackbar({
                 open: true,
-                message: "Please complete all required fields including account type.",
+                message: "Please complete all required fields including fund number.",
                 severity: "error"
             });
             return;
@@ -737,7 +737,7 @@ const ReceiptCounterAssignment = () => {
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5" }}><strong>Employee ID</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Name</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Email Address</strong></TableCell>
-                            <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Account Type</strong></TableCell>
+                            <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Fund Number</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5" }}><strong>Position</strong></TableCell>
                             <TableCell sx={{ color: 'black', border: `1px solid ${borderColor}`, textAlign: 'center', backgroundColor: "#f5f5f5" }}><strong>Action</strong></TableCell>
                         </TableRow>
@@ -860,10 +860,10 @@ const ReceiptCounterAssignment = () => {
                             </Select>
                         </FormControl>
                         <FormControl fullWidth required>
-                            <InputLabel id="account-type-select-label">Account Type</InputLabel>
+                            <InputLabel id="account-type-select-label">Fund Number</InputLabel>
                             <Select
                                 labelId="account-type-select-label"
-                                label="Account Type"
+                                label="Fund Number"
                                 value={assignForm.account_type_id}
                                 onChange={(e) =>
                                     setAssignForm((prev) => ({

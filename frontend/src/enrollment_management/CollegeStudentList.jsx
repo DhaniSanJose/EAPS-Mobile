@@ -67,6 +67,44 @@ const dedupeCurriculumOptions = (list) => {
     return [...seen.values()];
 };
 
+const cleanStudentValue = (value) => {
+    if (value === null || value === undefined) return "";
+    const text = String(value).trim();
+    return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+};
+
+const formatStudentSuggestionName = (student) =>
+    [
+        cleanStudentValue(student?.last_name),
+        cleanStudentValue(student?.first_name),
+        cleanStudentValue(student?.middle_name),
+        cleanStudentValue(student?.extension),
+    ]
+        .filter(Boolean)
+        .join(" ");
+
+const getStudentSuggestionText = (student) =>
+    [
+        student?.student_number,
+        student?.first_name,
+        student?.middle_name,
+        student?.last_name,
+        student?.extension,
+        student?.emailAddress,
+        student?.email,
+        student?.program_code,
+        student?.program_description,
+        student?.major,
+    ]
+        .map(cleanStudentValue)
+        .join(" ")
+        .toLowerCase();
+
+const getStudentSuggestionValue = (student) =>
+    cleanStudentValue(student?.student_number) ||
+    formatStudentSuggestionName(student) ||
+    cleanStudentValue(student?.emailAddress || student?.email);
+
 const CollegeStudentList = () => {
     const socket = useRef(null);
     const settings = useContext(SettingsContext);
@@ -270,6 +308,7 @@ const CollegeStudentList = () => {
 
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [suggestionsOpen, setSuggestionsOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [snack, setSnack] = useState({ open: false, message: '', severity: 'info' });
     const [person, setPerson] = useState({
@@ -626,6 +665,16 @@ const CollegeStudentList = () => {
     const totalRecords = serverTotal;
     const totalPages = serverTotalPages;
     const currentPersons = filteredPersons;
+    const studentSuggestions =
+        searchQuery.trim().length >= 2
+            ? persons
+                .filter((student) =>
+                    getStudentSuggestionText(student).includes(
+                        searchQuery.trim().toLowerCase(),
+                    ),
+                )
+                .slice(0, 10)
+            : [];
     const indexOfFirstItem = (currentPage - 1) * itemsPerPage;
 
     const maxButtonsToShow = 5;
@@ -1016,25 +1065,92 @@ const CollegeStudentList = () => {
                 </Typography>
 
 
-                <TextField
-                    variant="outlined"
-                    placeholder="Search Student Name / Email / Student"
-                    size="small"
-                    value={searchQuery}
-                    onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setCurrentPage(1);
-                    }}
-                    sx={{
-                        width: 450,
-                        backgroundColor: "#fff",
-                        borderRadius: 1,
-                        "& .MuiOutlinedInput-root": { borderRadius: "10px" },
-                    }}
-                    InputProps={{
-                        startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
-                    }}
-                />
+                <Box sx={{ position: "relative", width: 450, maxWidth: "100%" }}>
+                    <TextField
+                        variant="outlined"
+                        placeholder="Search Student Name / Email / Student"
+                        size="small"
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setCurrentPage(1);
+                            setSuggestionsOpen(true);
+                        }}
+                        onFocus={() => {
+                            if (searchQuery.trim().length >= 2) setSuggestionsOpen(true);
+                        }}
+                        onBlur={() => {
+                            setTimeout(() => setSuggestionsOpen(false), 150);
+                        }}
+                        sx={{
+                            width: "100%",
+                            backgroundColor: "#fff",
+                            borderRadius: 1,
+                            "& .MuiOutlinedInput-root": { borderRadius: "10px" },
+                        }}
+                        InputProps={{
+                            startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} />,
+                        }}
+                    />
+                    {suggestionsOpen && searchQuery.trim().length >= 2 && (
+                        <Box
+                            sx={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                zIndex: 20,
+                                backgroundColor: "#fff",
+                                border: "1px solid #d0d0d0",
+                                borderRadius: "8px",
+                                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                                overflow: "hidden",
+                                maxHeight: 320,
+                            }}
+                        >
+                            {studentSuggestions.length > 0 ? (
+                                studentSuggestions.map((student) => {
+                                    const studentNumber = cleanStudentValue(student?.student_number);
+                                    const name = formatStudentSuggestionName(student);
+                                    return (
+                                        <Box
+                                            key={`${studentNumber || student?.person_id}-${name}`}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                setSearchQuery(getStudentSuggestionValue(student));
+                                                setCurrentPage(1);
+                                                setSuggestionsOpen(false);
+                                            }}
+                                            sx={{
+                                                px: 2,
+                                                py: 1,
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                                fontSize: 14,
+                                                borderBottom: "1px solid #f0f0f0",
+                                                "&:hover": { backgroundColor: "#f5f7fb" },
+                                            }}
+                                        >
+                                            <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                                                {studentNumber || "N/A"}
+                                            </Typography>
+                                            <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
+                                            <Typography sx={{ fontSize: 14 }} noWrap>
+                                                {name || cleanStudentValue(student?.emailAddress || student?.email) || "Unnamed Student"}
+                                            </Typography>
+                                        </Box>
+                                    );
+                                })
+                            ) : (
+                                <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
+                                    No matching students found
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </Box>
 
 
             </Box>

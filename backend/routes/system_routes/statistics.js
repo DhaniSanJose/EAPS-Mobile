@@ -517,35 +517,47 @@ router.get("/ecat-summary", async (req, res) => {
 
 router.get("/get_enrollment_statistic", async (req, res) => {
   try {
-    const { year, campus } = req.query; // Get year / campus from query string
+    const { campus } = req.query;
 
     let query = `
       SELECT
-        SUM(CASE WHEN academicProgram = 2 THEN 1 ELSE 0 END) AS Techvoc,
-        SUM(CASE WHEN academicProgram = 1 THEN 1 ELSE 0 END) AS Graduate,
-        SUM(CASE WHEN academicProgram = 0 THEN 1 ELSE 0 END) AS Undergraduate,
-        SUM(CASE WHEN classifiedAs = 'Returnee' THEN 1 ELSE 0 END) AS Returnee,
-        SUM(CASE WHEN classifiedAs = 'Shiftee' THEN 1 ELSE 0 END) AS Shiftee,
-        SUM(CASE WHEN classifiedAs = 'Foreign Student' THEN 1 ELSE 0 END) AS ForeignStudent,
-        SUM(CASE WHEN classifiedAs = 'Transferee' THEN 1 ELSE 0 END) AS Transferee
-      FROM person_table 
+        COUNT(DISTINCT CASE WHEN p.academicProgram = 2 THEN p.person_id END) AS Techvoc,
+        COUNT(DISTINCT CASE WHEN p.academicProgram = 1 THEN p.person_id END) AS Graduate,
+        COUNT(DISTINCT CASE WHEN p.academicProgram = 0 THEN p.person_id END) AS Undergraduate,
+        COUNT(DISTINCT CASE
+          WHEN p.academicProgram IS NULL OR p.academicProgram NOT IN (0, 1, 2)
+          THEN p.person_id
+        END) AS AcademicProgramUnclassified,
+        COUNT(DISTINCT CASE WHEN p.classifiedAs = 'Returnee' THEN p.person_id END) AS Returnee,
+        COUNT(DISTINCT CASE WHEN p.classifiedAs = 'Shiftee' THEN p.person_id END) AS Shiftee,
+        COUNT(DISTINCT CASE WHEN p.classifiedAs = 'Foreign Student' THEN p.person_id END) AS ForeignStudent,
+        COUNT(DISTINCT CASE WHEN p.classifiedAs = 'Transferee' THEN p.person_id END) AS Transferee,
+        COUNT(DISTINCT CASE
+          WHEN p.classifiedAs IS NULL
+            OR TRIM(p.classifiedAs) = ''
+            OR p.classifiedAs NOT IN ('Returnee', 'Shiftee', 'Foreign Student', 'Transferee')
+          THEN p.person_id
+        END) AS ClassificationUnclassified,
+        COUNT(DISTINCT p.person_id) AS TotalEnrolled
+      FROM person_table p
+      JOIN person_status_table ps
+        ON p.person_id = ps.person_id
+      JOIN student_numbering_table snt
+        ON p.person_id = snt.person_id
+      JOIN student_status_table sst
+        ON snt.student_number = sst.student_number
+      JOIN active_school_year_table sy
+        ON sst.active_school_year_id = sy.id
+      WHERE ps.student_registration_status = 1
+        AND sst.enrolled_status = 1
+        AND sy.astatus = 1
     `;
 
     const params = [];
-    const conditions = [];
-
-    if (year) {
-      conditions.push("YEAR(created_at) = ?");
-      params.push(year);
-    }
 
     if (campus !== undefined && campus !== "" && campus !== "all") {
-      conditions.push("campus = ?");
+      query += " AND p.campus = ?";
       params.push(campus);
-    }
-
-    if (conditions.length) {
-      query += " WHERE " + conditions.join(" AND ");
     }
 
     const [rows] = await db3.execute(query, params);

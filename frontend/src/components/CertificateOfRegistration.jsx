@@ -294,6 +294,7 @@ const CertificateOfRegistration = forwardRef(
     const [corActiveSchoolYearId, setCorActiveSchoolYearId] = useState("");
     const [major, setMajor] = useState(null);
     const [savedUnifast, setSavedUnifast] = useState(false);
+    const [savedMatriculation, setSavedMatriculation] = useState(false);
     const [scholarshipTypes, setScholarshipTypes] = useState([]);
     const [selectedPaymentData, setSelectedPaymentData] = useState(null);
 
@@ -345,11 +346,13 @@ const CertificateOfRegistration = forwardRef(
       setEnrolled([]);
       setCourses([]);
       setSavedUnifast(false);
+      setSavedMatriculation(false);
     }, [student_number]);
 
     useEffect(() => {
       if (!student_number?.trim()) {
         setSavedUnifast(false);
+        setSavedMatriculation(false);
         setSelectedPaymentData(null);
         return;
       }
@@ -357,10 +360,16 @@ const CertificateOfRegistration = forwardRef(
       axios
         .get(`${API_BASE_URL}/api/payment-status/${encodeURIComponent(student_number)}`)
         .then((res) => {
-          if (!cancelled) setSavedUnifast(!!res.data?.saved_unifast);
+          if (!cancelled) {
+            setSavedUnifast(!!res.data?.saved_unifast);
+            setSavedMatriculation(!!res.data?.saved_matriculation);
+          }
         })
         .catch(() => {
-          if (!cancelled) setSavedUnifast(false);
+          if (!cancelled) {
+            setSavedUnifast(false);
+            setSavedMatriculation(false);
+          }
         });
       return () => {
         cancelled = true;
@@ -368,16 +377,19 @@ const CertificateOfRegistration = forwardRef(
     }, [student_number]);
 
     useEffect(() => {
-      if (!student_number?.trim() || !savedUnifast) {
+      if (!student_number?.trim() || (!savedUnifast && !savedMatriculation)) {
         setSelectedPaymentData(null);
         return;
       }
 
       let cancelled = false;
+      const endpoint = savedUnifast
+        ? "/get_student_data_unifast"
+        : "/get_student_data_matriculation";
 
       const fetchSavedPaymentData = async () => {
         try {
-          const res = await axios.get(`${API_BASE_URL}/api/get_student_data_unifast`);
+          const res = await axios.get(`${API_BASE_URL}/api${endpoint}`);
           const rows = Array.isArray(res.data) ? res.data : [];
           const matched = rows
             .filter(
@@ -394,7 +406,7 @@ const CertificateOfRegistration = forwardRef(
             setSelectedPaymentData(matched[0] || null);
           }
         } catch (error) {
-          console.error("Failed to fetch saved UNIFAST payment data:", error);
+          console.error("Failed to fetch saved payment data:", error);
           if (!cancelled) {
             setSelectedPaymentData(null);
           }
@@ -406,7 +418,7 @@ const CertificateOfRegistration = forwardRef(
       return () => {
         cancelled = true;
       };
-    }, [student_number, corActiveSchoolYearId, savedUnifast]);
+    }, [student_number, corActiveSchoolYearId, savedUnifast, savedMatriculation]);
 
     useEffect(() => {
       const fetchScholarship = async () => {
@@ -779,14 +791,17 @@ const CertificateOfRegistration = forwardRef(
     const LEFT_LABEL_WIDTH = "7.6em"; // fits "Email Address"
     const MID_LABEL_WIDTH = "6.2em"; // fits "Year Level"
     const RIGHT_LABEL_WIDTH = "10.5em"; // fits "Scholarship/Discount"
-    const unifastScholarshipCode =
+    const scholarshipDiscountValue =
+      selectedPaymentData?.scholarship_code ||
+      selectedPaymentData?.scholarship_name ||
+      selectedPaymentData?.matriculation_remark ||
       data[0]?.scholarship_code ||
       data[0]?.scholarship_name ||
       scholarshipTypes.find((item) => {
         const label = String(item?.scholarship_code || item?.scholarship_name || "");
         return label.toUpperCase().includes("UNIFAST");
       })?.scholarship_code ||
-      "";
+      (savedUnifast ? "UNIFAST-FHE" : "");
     const showFreeTuitionStamp = savedUnifast;
 
     const totalCourseUnits = enrolled.reduce(
@@ -800,6 +815,33 @@ const CertificateOfRegistration = forwardRef(
     const totalCombined = totalCourseUnits + totalLabUnits;
 
     const [tosf, setTosfData] = useState([]);
+    const baseTotalAssessment =
+      totalLecFees +
+      totalLabFees +
+      Number(tosf[0]?.cultural_fee || 0) +
+      Number(tosf[0]?.athletic_fee || 0) +
+      (isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0) +
+      Number(tosf[0]?.developmental_fee || 0) +
+      Number(tosf[0]?.guidance_fee || 0) +
+      Number(tosf[0]?.library_fee || 0) +
+      Number(tosf[0]?.medical_and_dental_fee || 0) +
+      Number(tosf[0]?.registration_fee || 0) +
+      (isFirstYearFirstSem ? Number(tosf[0]?.school_id_fees || 0) : 0) +
+      (isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0) +
+      (isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0);
+    const displayTuitionAmount = selectedPaymentData
+      ? Number(selectedPaymentData?.tuition_fees || 0)
+      : Number(totalLecFees) + Number(totalLabFees);
+    const savedNetAssessment = savedUnifast
+      ? 0
+      : Number(selectedPaymentData?.total_tosf || 0);
+    const displayTotalAssessment = selectedPaymentData
+      ? savedNetAssessment
+      : baseTotalAssessment;
+    const displayFinancialAidAmount = selectedPaymentData
+      ? Math.max(baseTotalAssessment - savedNetAssessment, 0)
+      : "";
+    const displayNetAssessment = selectedPaymentData ? savedNetAssessment : "";
     const [curriculumOptions, setCurriculumOptions] = useState([]);
 
     useEffect(() => {
@@ -1377,7 +1419,7 @@ const CertificateOfRegistration = forwardRef(
                       >
                         {renderDetailField(
                           "Scholarship/Discount",
-                          unifastScholarshipCode || (savedUnifast ? "UNIFAST-FHE" : ""),
+                          scholarshipDiscountValue,
                           RIGHT_LABEL_WIDTH,
                         )}
                       </td>
@@ -2100,7 +2142,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={Number(totalLecFees) + Number(totalLabFees)}
+                              value={displayTuitionAmount}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2790,26 +2832,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
-                              value={
-                                totalLecFees +
-                                totalLabFees +
-                                Number(tosf[0]?.cultural_fee || 0) +
-                                Number(tosf[0]?.athletic_fee || 0) +
-                                (isHaveNSTP !== 0
-                                  ? Number(tosf[0]?.nstp_fees || 0)
-                                  : 0) +
-                                Number(tosf[0]?.developmental_fee || 0) +
-                                Number(tosf[0]?.guidance_fee || 0) +
-                                Number(tosf[0]?.library_fee || 0) +
-                                Number(tosf[0]?.medical_and_dental_fee || 0) +
-                                Number(tosf[0]?.registration_fee || 0) +
-                                (isHaveComputerFees !== 0
-                                  ? Number(tosf[0]?.computer_fees || 0)
-                                  : 0) +
-                                (isHaveLaboratory !== 0
-                                  ? Number(tosf[0]?.laboratory_fees || 0)
-                                  : 0)
-                              }
+                              value={displayTotalAssessment}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2867,6 +2890,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
+                              value={displayFinancialAidAmount}
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -2924,6 +2948,7 @@ const CertificateOfRegistration = forwardRef(
                           >
                             <input
                               type="text"
+                              value={displayNetAssessment}
                               readOnly
                               style={{
                                 textAlign: "center",

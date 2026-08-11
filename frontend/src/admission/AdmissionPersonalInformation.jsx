@@ -1,7 +1,37 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
-import { Button, Box, TextField, IconButton, Container, Card, Modal, Dialog, DialogTitle, DialogContent, DialogActions, TableContainer, Paper, Table, TableHead, TableRow, TableCell, Typography, FormControl, FormHelperText, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, CircularProgress, Snackbar, Alert, Autocomplete } from "@mui/material";
+import {
+  Button,
+  Box,
+  TextField,
+  IconButton,
+  Container,
+  Card,
+  Modal,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TableContainer,
+  Paper,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  Typography,
+  FormControl,
+  FormHelperText,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  FormControlLabel,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  Autocomplete,
+} from "@mui/material";
 import { Link } from "react-router-dom";
 import FamilyRestroomIcon from "@mui/icons-material/FamilyRestroom";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
@@ -10,12 +40,12 @@ import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CloseIcon from "@mui/icons-material/Close";
 import ErrorIcon from "@mui/icons-material/Error";
-import Search from '@mui/icons-material/Search';
+import Search from "@mui/icons-material/Search";
 import regions from "../data/region.json";
 import provinces from "../data/province.json";
 import cities from "../data/city.json";
 import barangays from "../data/barangay.json";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
@@ -30,14 +60,14 @@ import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
 import AdmissionProcessTabs from "../components/AdmissionProcessTabs";
 import KeyIcon from "@mui/icons-material/Key";
-import CampaignIcon from '@mui/icons-material/Campaign';
+import CampaignIcon from "@mui/icons-material/Campaign";
 import API_BASE_URL from "../apiConfig";
 import { getAuditConfig, getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import { postAuditEvent } from "../utils/auditEvents";
 import PrintingHistoryDialog from "../components/PrintingHistoryDialog";
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import DateField from "../components/DateField";
 import FormalExample from "../assets/formalexample.png";
 import AdminECATApplicationForm from "./AdminECATApplicationForm";
@@ -78,7 +108,7 @@ const getApplicantSuggestionValue = (applicant) =>
   cleanApplicantValue(applicant?.emailAddress);
 import AdminPersonalDataForm from "./AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
-import SaveIcon from '@mui/icons-material/Save';
+import SaveIcon from "@mui/icons-material/Save";
 
 const AdmissionPersonalInformation = () => {
   useAuditMac();
@@ -96,20 +126,26 @@ const AdmissionPersonalInformation = () => {
   const branches = settings?.branches || [];
 
   const getBranchLabel = (branchId) => {
-    const branch = branches.find((item) => String(item.id) === String(branchId));
+    const branch = branches.find(
+      (item) => String(item.id) === String(branchId),
+    );
     return branch?.branch || "—";
   };
 
-
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const navigate = useNavigate();
   const [explicitSelection, setExplicitSelection] = useState(false);
 
   const fetchByPersonId = async (personID) => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${personID}`);
+      const res = await axios.get(
+        `${API_BASE_URL}/api/person_with_applicant/${personID}`,
+      );
       setPerson(res.data);
       setSelectedPerson(res.data);
       if (res.data?.applicant_number) {
@@ -118,7 +154,6 @@ const AdmissionPersonalInformation = () => {
       console.error("❌ person_with_applicant failed:", err);
     }
   };
-
 
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
@@ -216,7 +251,6 @@ const AdmissionPersonalInformation = () => {
     return currentText;
   };
 
-
   const filteredYearLevels = yearLevelOptions.filter((yl) => {
     // If Graduate program → show only Master & Doctor
     if (Number(person.academicProgram) === 1) {
@@ -226,8 +260,6 @@ const AdmissionPersonalInformation = () => {
     // If College/Bachelor → show only year levels
     return yl.level_type === "year";
   });
-
-
 
   const [programAvailability, setProgramAvailability] = useState([]);
   const [activeYearId, setActiveYearId] = useState(null);
@@ -249,7 +281,7 @@ const AdmissionPersonalInformation = () => {
               year_id: activeYear.year_id,
               semester_id: activeYear.semester_id,
             },
-          }
+          },
         );
 
         setProgramAvailability(availRes.data);
@@ -271,12 +303,6 @@ const AdmissionPersonalInformation = () => {
     return map;
   }, [programAvailability]);
 
-
-
-
-
-
-
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -296,7 +322,6 @@ const AdmissionPersonalInformation = () => {
   });
 
   useEffect(() => {
-
     const storedUser = localStorage.getItem("email");
     const storedRole = localStorage.getItem("role");
     const storedID = localStorage.getItem("person_id");
@@ -323,19 +348,20 @@ const AdmissionPersonalInformation = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
         setHasAccess(false);
       }
     } catch (error) {
-      console.error('Error checking access:', error);
+      console.error("Error checking access:", error);
       setHasAccess(false);
       setLoading(false);
     }
   };
-
 
   const queryParams = new URLSearchParams(location.search);
   const queryPersonId = queryParams.get("person_id")?.trim() || "";
@@ -376,9 +402,6 @@ const AdmissionPersonalInformation = () => {
     setUserID("");
   }, [queryPersonId]);
 
-
-
-
   useEffect(() => {
     let consumedFlag = false;
 
@@ -415,16 +438,15 @@ const AdmissionPersonalInformation = () => {
     });
   }, [queryPersonId]);
 
-
-
-
   // Fetch person by ID (when navigating with ?person_id=... or sessionStorage)
   useEffect(() => {
     const fetchPersonById = async () => {
       if (!userID) return;
 
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${userID}`);
+        const res = await axios.get(
+          `${API_BASE_URL}/api/person_with_applicant/${userID}`,
+        );
         if (res.data) {
           setPerson(res.data);
           setSelectedPerson(res.data);
@@ -439,11 +461,6 @@ const AdmissionPersonalInformation = () => {
     fetchPersonById();
   }, [userID]);
 
-
-
-
-
-
   useEffect(() => {
     const fetchPersons = async () => {
       try {
@@ -457,24 +474,40 @@ const AdmissionPersonalInformation = () => {
     fetchPersons();
   }, []);
 
-
-
-
-
-
   const steps = person.person_id
     ? [
-      { label: "Personal Information", icon: <PersonIcon />, path: `/admission_personal_information?person_id=${userID}` },
-      { label: "Family Background", icon: <FamilyRestroomIcon />, path: `/admission_family_background?person_id=${userID}` },
-      { label: "Educational Attainment", icon: <SchoolIcon />, path: `/admission_educational_attainment?person_id=${userID}` },
-      { label: "Health Medical Records", icon: <HealthAndSafetyIcon />, path: `/admission_health_medical_records?person_id=${userID}` },
-      { label: "Other Information", icon: <InfoIcon />, path: `/admission_other_information?person_id=${userID}` },
-    ]
+        {
+          label: "Personal Information",
+          icon: <PersonIcon />,
+          path: `/admission_personal_information?person_id=${userID}`,
+        },
+        {
+          label: "Family Background",
+          icon: <FamilyRestroomIcon />,
+          path: `/admission_family_background?person_id=${userID}`,
+        },
+        {
+          label: "Educational Attainment",
+          icon: <SchoolIcon />,
+          path: `/admission_educational_attainment?person_id=${userID}`,
+        },
+        {
+          label: "Health Medical Records",
+          icon: <HealthAndSafetyIcon />,
+          path: `/admission_health_medical_records?person_id=${userID}`,
+        },
+        {
+          label: "Other Information",
+          icon: <InfoIcon />,
+          path: `/admission_other_information?person_id=${userID}`,
+        },
+      ]
     : [];
 
-
   const [activeStep, setActiveStep] = useState(0);
-  const [clickedSteps, setClickedSteps] = useState(Array(steps.length).fill(false));
+  const [clickedSteps, setClickedSteps] = useState(
+    Array(steps.length).fill(false),
+  );
 
   const handleStepClick = async (index, to) => {
     if (isFormValid()) {
@@ -513,9 +546,7 @@ const AdmissionPersonalInformation = () => {
     }
   };
 
-
   // dot not alter
-
 
   // ✅ Safe handleUpdate function (no DB errors, correct applicant update)
   const handleUpdate = async (updatedData) => {
@@ -523,7 +554,8 @@ const AdmissionPersonalInformation = () => {
 
     try {
       // ✅ Get correct applicant ID
-      const targetId = selectedPerson?.person_id || queryPersonId || person.person_id;
+      const targetId =
+        selectedPerson?.person_id || queryPersonId || person.person_id;
       if (!targetId) {
         console.warn("⚠️ No valid applicant ID found — skipping update.");
         return;
@@ -531,58 +563,166 @@ const AdmissionPersonalInformation = () => {
 
       // ✅ Only include valid columns existing in person_table
       const allowedFields = [
-        "person_id", "profile_img", "campus", "academicProgram", "classifiedAs", "applyingAs",
-        "program", "program2", "program3", "yearLevel",
-        "last_name", "first_name", "middle_name", "extension", "nickname",
-        "height", "weight", "lrnNumber", "nolrnNumber", "gender",
-        "pwdMember", "pwdType", "pwdId",
-        "birthOfDate", "age", "birthPlace", "languageDialectSpoken",
-        "citizenship", "religion", "civilStatus", "tribeEthnicGroup",
-        "cellphoneNumber", "emailAddress",
-        "presentStreet", "presentBarangay", "presentZipCode", "presentRegion",
-        "presentProvince", "presentMunicipality", "presentDswdHouseholdNumber",
+        "person_id",
+        "profile_img",
+        "campus",
+        "academicProgram",
+        "classifiedAs",
+        "applyingAs",
+        "program",
+        "program2",
+        "program3",
+        "yearLevel",
+        "last_name",
+        "first_name",
+        "middle_name",
+        "extension",
+        "nickname",
+        "height",
+        "weight",
+        "lrnNumber",
+        "nolrnNumber",
+        "gender",
+        "pwdMember",
+        "pwdType",
+        "pwdId",
+        "birthOfDate",
+        "age",
+        "birthPlace",
+        "languageDialectSpoken",
+        "citizenship",
+        "religion",
+        "civilStatus",
+        "tribeEthnicGroup",
+        "cellphoneNumber",
+        "emailAddress",
+        "presentStreet",
+        "presentBarangay",
+        "presentZipCode",
+        "presentRegion",
+        "presentProvince",
+        "presentMunicipality",
+        "presentDswdHouseholdNumber",
         "sameAsPresentAddress",
-        "permanentStreet", "permanentBarangay", "permanentZipCode",
-        "permanentRegion", "permanentProvince", "permanentMunicipality",
+        "permanentStreet",
+        "permanentBarangay",
+        "permanentZipCode",
+        "permanentRegion",
+        "permanentProvince",
+        "permanentMunicipality",
         "permanentDswdHouseholdNumber",
         "solo_parent",
-        "father_deceased", "father_family_name", "father_given_name", "father_middle_name",
-        "father_ext", "father_nickname", "father_education", "father_education_level",
-        "father_last_school", "father_course", "father_year_graduated", "father_school_address",
-        "father_contact", "father_occupation", "father_employer", "father_income", "father_email",
-        "mother_deceased", "mother_family_name", "mother_given_name", "mother_middle_name",
-        "mother_ext", "mother_nickname", "mother_education", "mother_education_level",
-        "mother_last_school", "mother_course", "mother_year_graduated", "mother_school_address",
-        "mother_contact", "mother_occupation", "mother_employer", "mother_income", "mother_email",
-        "guardian", "guardian_family_name", "guardian_given_name", "guardian_middle_name",
-        "guardian_ext", "guardian_nickname", "guardian_address", "guardian_contact", "guardian_email",
+        "father_deceased",
+        "father_family_name",
+        "father_given_name",
+        "father_middle_name",
+        "father_ext",
+        "father_nickname",
+        "father_education",
+        "father_education_level",
+        "father_last_school",
+        "father_course",
+        "father_year_graduated",
+        "father_school_address",
+        "father_contact",
+        "father_occupation",
+        "father_employer",
+        "father_income",
+        "father_email",
+        "mother_deceased",
+        "mother_family_name",
+        "mother_given_name",
+        "mother_middle_name",
+        "mother_ext",
+        "mother_nickname",
+        "mother_education",
+        "mother_education_level",
+        "mother_last_school",
+        "mother_course",
+        "mother_year_graduated",
+        "mother_school_address",
+        "mother_contact",
+        "mother_occupation",
+        "mother_employer",
+        "mother_income",
+        "mother_email",
+        "guardian",
+        "guardian_family_name",
+        "guardian_given_name",
+        "guardian_middle_name",
+        "guardian_ext",
+        "guardian_nickname",
+        "guardian_address",
+        "guardian_contact",
+        "guardian_email",
         "annual_income",
-        "schoolLevel", "schoolLastAttended", "schoolAddress", "courseProgram",
-        "honor", "generalAverage", "yearGraduated",
-        "schoolLevel1", "schoolLastAttended1", "schoolAddress1", "courseProgram1",
-        "honor1", "generalAverage1", "yearGraduated1",
+        "schoolLevel",
+        "schoolLastAttended",
+        "schoolAddress",
+        "courseProgram",
+        "honor",
+        "generalAverage",
+        "yearGraduated",
+        "schoolLevel1",
+        "schoolLastAttended1",
+        "schoolAddress1",
+        "courseProgram1",
+        "honor1",
+        "generalAverage1",
+        "yearGraduated1",
         "strand",
         // 🩺 Health and medical
-        "cough", "colds", "fever", "asthma", "faintingSpells", "heartDisease",
-        "tuberculosis", "frequentHeadaches", "hernia", "chronicCough", "headNeckInjury",
-        "hiv", "highBloodPressure", "diabetesMellitus", "allergies", "cancer",
-        "smokingCigarette", "alcoholDrinking", "hospitalized", "hospitalizationDetails",
+        "cough",
+        "colds",
+        "fever",
+        "asthma",
+        "faintingSpells",
+        "heartDisease",
+        "tuberculosis",
+        "frequentHeadaches",
+        "hernia",
+        "chronicCough",
+        "headNeckInjury",
+        "hiv",
+        "highBloodPressure",
+        "diabetesMellitus",
+        "allergies",
+        "cancer",
+        "smokingCigarette",
+        "alcoholDrinking",
+        "hospitalized",
+        "hospitalizationDetails",
         "medications",
         // 🧬 Covid / Vaccination
-        "hadCovid", "covidDate",
-        "vaccine1Brand", "vaccine1Date", "vaccine2Brand", "vaccine2Date",
-        "booster1Brand", "booster1Date", "booster2Brand", "booster2Date",
+        "hadCovid",
+        "covidDate",
+        "vaccine1Brand",
+        "vaccine1Date",
+        "vaccine2Brand",
+        "vaccine2Date",
+        "booster1Brand",
+        "booster1Date",
+        "booster2Brand",
+        "booster2Date",
         // 🧪 Lab results / medical findings
-        "chestXray", "cbc", "urinalysis", "otherworkups",
+        "chestXray",
+        "cbc",
+        "urinalysis",
+        "otherworkups",
         // 🧍 Additional fields
-        "symptomsToday", "remarks",
+        "symptomsToday",
+        "remarks",
         // ✅ Agreement / Meta
-        "termsOfAgreement", "created_at", "current_step"
+        "termsOfAgreement",
+        "created_at",
+        "current_step",
       ];
 
       // ✅ Clean the payload
       const cleanedData = Object.fromEntries(
-        Object.entries(updatedData).filter(([key]) => allowedFields.includes(key))
+        Object.entries(updatedData).filter(([key]) =>
+          allowedFields.includes(key),
+        ),
       );
 
       if (Object.keys(cleanedData).length === 0) {
@@ -591,7 +731,10 @@ const AdmissionPersonalInformation = () => {
       }
 
       // ✅ Send update request
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
+      await axios.put(
+        `${API_BASE_URL}/api/person/${targetId}`,
+        withAuditActor(cleanedData),
+      );
     } catch (error) {
       console.error("❌ SuperAdmin update failed:", {
         message: error.message,
@@ -601,8 +744,6 @@ const AdmissionPersonalInformation = () => {
       throw error;
     }
   };
-
-
 
   // Helper: parse "YYYY-MM-DD" safely (local date in Asia/Manila)
   const parseISODate = (dateString) => {
@@ -647,8 +788,6 @@ const AdmissionPersonalInformation = () => {
     return age < 0 ? "" : age;
   };
 
-
-
   // 🧩 Real-time handleChange with Manila-based age + filtering reset
   const handleChange = (e) => {
     const target = e && e.target ? e.target : {};
@@ -681,7 +820,6 @@ const AdmissionPersonalInformation = () => {
       updatedPerson.yearLevel = "First Year";
     }
 
-
     if (name === "campus" || name === "academicProgram") {
       updatedPerson.program = "";
     }
@@ -691,7 +829,8 @@ const AdmissionPersonalInformation = () => {
 
   const [saving, setSaving] = useState(false);
   const handleManualSave = async () => {
-    const targetId = selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
+    const targetId =
+      selectedPerson?.person_id || queryPersonId || person?.person_id || userID;
     if (!targetId) {
       setSnackbar({
         open: true,
@@ -723,65 +862,172 @@ const AdmissionPersonalInformation = () => {
   const handleBlur = async () => {
     try {
       // ✅ Determine correct applicant/person_id
-      const targetId = selectedPerson?.person_id || queryPersonId || person.person_id;
+      const targetId =
+        selectedPerson?.person_id || queryPersonId || person.person_id;
       if (!targetId) {
         console.warn("⚠️ No valid applicant ID found — skipping update.");
         return;
       }
 
       const allowedFields = [
-        "person_id", "profile_img", "campus", "academicProgram", "classifiedAs", "applyingAs",
-        "program", "program2", "program3", "yearLevel",
-        "last_name", "first_name", "middle_name", "extension", "nickname",
-        "height", "weight", "lrnNumber", "nolrnNumber", "gender",
-        "pwdMember", "pwdType", "pwdId",
-        "birthOfDate", "age", "birthPlace", "languageDialectSpoken",
-        "citizenship", "religion", "civilStatus", "tribeEthnicGroup",
-        "cellphoneNumber", "emailAddress",
-        "presentStreet", "presentBarangay", "presentZipCode", "presentRegion",
-        "presentProvince", "presentMunicipality", "presentDswdHouseholdNumber",
+        "person_id",
+        "profile_img",
+        "campus",
+        "academicProgram",
+        "classifiedAs",
+        "applyingAs",
+        "program",
+        "program2",
+        "program3",
+        "yearLevel",
+        "last_name",
+        "first_name",
+        "middle_name",
+        "extension",
+        "nickname",
+        "height",
+        "weight",
+        "lrnNumber",
+        "nolrnNumber",
+        "gender",
+        "pwdMember",
+        "pwdType",
+        "pwdId",
+        "birthOfDate",
+        "age",
+        "birthPlace",
+        "languageDialectSpoken",
+        "citizenship",
+        "religion",
+        "civilStatus",
+        "tribeEthnicGroup",
+        "cellphoneNumber",
+        "emailAddress",
+        "presentStreet",
+        "presentBarangay",
+        "presentZipCode",
+        "presentRegion",
+        "presentProvince",
+        "presentMunicipality",
+        "presentDswdHouseholdNumber",
         "sameAsPresentAddress",
-        "permanentStreet", "permanentBarangay", "permanentZipCode",
-        "permanentRegion", "permanentProvince", "permanentMunicipality",
+        "permanentStreet",
+        "permanentBarangay",
+        "permanentZipCode",
+        "permanentRegion",
+        "permanentProvince",
+        "permanentMunicipality",
         "permanentDswdHouseholdNumber",
         "solo_parent",
-        "father_deceased", "father_family_name", "father_given_name", "father_middle_name",
-        "father_ext", "father_nickname", "father_education", "father_education_level",
-        "father_last_school", "father_course", "father_year_graduated", "father_school_address",
-        "father_contact", "father_occupation", "father_employer", "father_income", "father_email",
-        "mother_deceased", "mother_family_name", "mother_given_name", "mother_middle_name",
-        "mother_ext", "mother_nickname", "mother_education", "mother_education_level",
-        "mother_last_school", "mother_course", "mother_year_graduated", "mother_school_address",
-        "mother_contact", "mother_occupation", "mother_employer", "mother_income", "mother_email",
-        "guardian", "guardian_family_name", "guardian_given_name", "guardian_middle_name",
-        "guardian_ext", "guardian_nickname", "guardian_address", "guardian_contact", "guardian_email",
+        "father_deceased",
+        "father_family_name",
+        "father_given_name",
+        "father_middle_name",
+        "father_ext",
+        "father_nickname",
+        "father_education",
+        "father_education_level",
+        "father_last_school",
+        "father_course",
+        "father_year_graduated",
+        "father_school_address",
+        "father_contact",
+        "father_occupation",
+        "father_employer",
+        "father_income",
+        "father_email",
+        "mother_deceased",
+        "mother_family_name",
+        "mother_given_name",
+        "mother_middle_name",
+        "mother_ext",
+        "mother_nickname",
+        "mother_education",
+        "mother_education_level",
+        "mother_last_school",
+        "mother_course",
+        "mother_year_graduated",
+        "mother_school_address",
+        "mother_contact",
+        "mother_occupation",
+        "mother_employer",
+        "mother_income",
+        "mother_email",
+        "guardian",
+        "guardian_family_name",
+        "guardian_given_name",
+        "guardian_middle_name",
+        "guardian_ext",
+        "guardian_nickname",
+        "guardian_address",
+        "guardian_contact",
+        "guardian_email",
         "annual_income",
-        "schoolLevel", "schoolLastAttended", "schoolAddress", "courseProgram",
-        "honor", "generalAverage", "yearGraduated",
-        "schoolLevel1", "schoolLastAttended1", "schoolAddress1", "courseProgram1",
-        "honor1", "generalAverage1", "yearGraduated1",
+        "schoolLevel",
+        "schoolLastAttended",
+        "schoolAddress",
+        "courseProgram",
+        "honor",
+        "generalAverage",
+        "yearGraduated",
+        "schoolLevel1",
+        "schoolLastAttended1",
+        "schoolAddress1",
+        "courseProgram1",
+        "honor1",
+        "generalAverage1",
+        "yearGraduated1",
         "strand",
         // 🩺 Health and medical
-        "cough", "colds", "fever", "asthma", "faintingSpells", "heartDisease",
-        "tuberculosis", "frequentHeadaches", "hernia", "chronicCough", "headNeckInjury",
-        "hiv", "highBloodPressure", "diabetesMellitus", "allergies", "cancer",
-        "smokingCigarette", "alcoholDrinking", "hospitalized", "hospitalizationDetails",
+        "cough",
+        "colds",
+        "fever",
+        "asthma",
+        "faintingSpells",
+        "heartDisease",
+        "tuberculosis",
+        "frequentHeadaches",
+        "hernia",
+        "chronicCough",
+        "headNeckInjury",
+        "hiv",
+        "highBloodPressure",
+        "diabetesMellitus",
+        "allergies",
+        "cancer",
+        "smokingCigarette",
+        "alcoholDrinking",
+        "hospitalized",
+        "hospitalizationDetails",
         "medications",
         // 🧬 Covid / Vaccination
-        "hadCovid", "covidDate",
-        "vaccine1Brand", "vaccine1Date", "vaccine2Brand", "vaccine2Date",
-        "booster1Brand", "booster1Date", "booster2Brand", "booster2Date",
+        "hadCovid",
+        "covidDate",
+        "vaccine1Brand",
+        "vaccine1Date",
+        "vaccine2Brand",
+        "vaccine2Date",
+        "booster1Brand",
+        "booster1Date",
+        "booster2Brand",
+        "booster2Date",
         // 🧪 Lab results / medical findings
-        "chestXray", "cbc", "urinalysis", "otherworkups",
+        "chestXray",
+        "cbc",
+        "urinalysis",
+        "otherworkups",
         // 🧍 Additional fields
-        "symptomsToday", "remarks",
+        "symptomsToday",
+        "remarks",
         // ✅ Agreement / Meta
-        "termsOfAgreement", "created_at", "current_step"
+        "termsOfAgreement",
+        "created_at",
+        "current_step",
       ];
 
       // ✅ Clean payload before sending
       const cleanedData = Object.fromEntries(
-        Object.entries(person).filter(([key]) => allowedFields.includes(key))
+        Object.entries(person).filter(([key]) => allowedFields.includes(key)),
       );
 
       if (Object.keys(cleanedData).length === 0) {
@@ -790,7 +1036,10 @@ const AdmissionPersonalInformation = () => {
       }
 
       // ✅ Execute safe update
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
+      await axios.put(
+        `${API_BASE_URL}/api/person/${targetId}`,
+        withAuditActor(cleanedData),
+      );
     } catch (err) {
       console.error("❌ Auto-save (on blur) failed:", {
         message: err.message,
@@ -803,63 +1052,170 @@ const AdmissionPersonalInformation = () => {
   // ✅ Safe autoSave for SuperAdmin — same logic as handleBlur
   const autoSave = async () => {
     try {
-      const targetId = selectedPerson?.person_id || queryPersonId || person.person_id;
+      const targetId =
+        selectedPerson?.person_id || queryPersonId || person.person_id;
       if (!targetId) {
         console.warn("⚠️ No valid applicant ID found — skipping autoSave.");
         return;
       }
 
       const allowedFields = [
-        "person_id", "profile_img", "campus", "academicProgram", "classifiedAs", "applyingAs",
-        "program", "program2", "program3", "yearLevel",
-        "last_name", "first_name", "middle_name", "extension", "nickname",
-        "height", "weight", "lrnNumber", "nolrnNumber", "gender",
-        "pwdMember", "pwdType", "pwdId",
-        "birthOfDate", "age", "birthPlace", "languageDialectSpoken",
-        "citizenship", "religion", "civilStatus", "tribeEthnicGroup",
-        "cellphoneNumber", "emailAddress",
-        "presentStreet", "presentBarangay", "presentZipCode", "presentRegion",
-        "presentProvince", "presentMunicipality", "presentDswdHouseholdNumber",
+        "person_id",
+        "profile_img",
+        "campus",
+        "academicProgram",
+        "classifiedAs",
+        "applyingAs",
+        "program",
+        "program2",
+        "program3",
+        "yearLevel",
+        "last_name",
+        "first_name",
+        "middle_name",
+        "extension",
+        "nickname",
+        "height",
+        "weight",
+        "lrnNumber",
+        "nolrnNumber",
+        "gender",
+        "pwdMember",
+        "pwdType",
+        "pwdId",
+        "birthOfDate",
+        "age",
+        "birthPlace",
+        "languageDialectSpoken",
+        "citizenship",
+        "religion",
+        "civilStatus",
+        "tribeEthnicGroup",
+        "cellphoneNumber",
+        "emailAddress",
+        "presentStreet",
+        "presentBarangay",
+        "presentZipCode",
+        "presentRegion",
+        "presentProvince",
+        "presentMunicipality",
+        "presentDswdHouseholdNumber",
         "sameAsPresentAddress",
-        "permanentStreet", "permanentBarangay", "permanentZipCode",
-        "permanentRegion", "permanentProvince", "permanentMunicipality",
+        "permanentStreet",
+        "permanentBarangay",
+        "permanentZipCode",
+        "permanentRegion",
+        "permanentProvince",
+        "permanentMunicipality",
         "permanentDswdHouseholdNumber",
         "solo_parent",
-        "father_deceased", "father_family_name", "father_given_name", "father_middle_name",
-        "father_ext", "father_nickname", "father_education", "father_education_level",
-        "father_last_school", "father_course", "father_year_graduated", "father_school_address",
-        "father_contact", "father_occupation", "father_employer", "father_income", "father_email",
-        "mother_deceased", "mother_family_name", "mother_given_name", "mother_middle_name",
-        "mother_ext", "mother_nickname", "mother_education", "mother_education_level",
-        "mother_last_school", "mother_course", "mother_year_graduated", "mother_school_address",
-        "mother_contact", "mother_occupation", "mother_employer", "mother_income", "mother_email",
-        "guardian", "guardian_family_name", "guardian_given_name", "guardian_middle_name",
-        "guardian_ext", "guardian_nickname", "guardian_address", "guardian_contact", "guardian_email",
+        "father_deceased",
+        "father_family_name",
+        "father_given_name",
+        "father_middle_name",
+        "father_ext",
+        "father_nickname",
+        "father_education",
+        "father_education_level",
+        "father_last_school",
+        "father_course",
+        "father_year_graduated",
+        "father_school_address",
+        "father_contact",
+        "father_occupation",
+        "father_employer",
+        "father_income",
+        "father_email",
+        "mother_deceased",
+        "mother_family_name",
+        "mother_given_name",
+        "mother_middle_name",
+        "mother_ext",
+        "mother_nickname",
+        "mother_education",
+        "mother_education_level",
+        "mother_last_school",
+        "mother_course",
+        "mother_year_graduated",
+        "mother_school_address",
+        "mother_contact",
+        "mother_occupation",
+        "mother_employer",
+        "mother_income",
+        "mother_email",
+        "guardian",
+        "guardian_family_name",
+        "guardian_given_name",
+        "guardian_middle_name",
+        "guardian_ext",
+        "guardian_nickname",
+        "guardian_address",
+        "guardian_contact",
+        "guardian_email",
         "annual_income",
-        "schoolLevel", "schoolLastAttended", "schoolAddress", "courseProgram",
-        "honor", "generalAverage", "yearGraduated",
-        "schoolLevel1", "schoolLastAttended1", "schoolAddress1", "courseProgram1",
-        "honor1", "generalAverage1", "yearGraduated1",
+        "schoolLevel",
+        "schoolLastAttended",
+        "schoolAddress",
+        "courseProgram",
+        "honor",
+        "generalAverage",
+        "yearGraduated",
+        "schoolLevel1",
+        "schoolLastAttended1",
+        "schoolAddress1",
+        "courseProgram1",
+        "honor1",
+        "generalAverage1",
+        "yearGraduated1",
         "strand",
         // 🩺 Health and medical
-        "cough", "colds", "fever", "asthma", "faintingSpells", "heartDisease",
-        "tuberculosis", "frequentHeadaches", "hernia", "chronicCough", "headNeckInjury",
-        "hiv", "highBloodPressure", "diabetesMellitus", "allergies", "cancer",
-        "smokingCigarette", "alcoholDrinking", "hospitalized", "hospitalizationDetails",
+        "cough",
+        "colds",
+        "fever",
+        "asthma",
+        "faintingSpells",
+        "heartDisease",
+        "tuberculosis",
+        "frequentHeadaches",
+        "hernia",
+        "chronicCough",
+        "headNeckInjury",
+        "hiv",
+        "highBloodPressure",
+        "diabetesMellitus",
+        "allergies",
+        "cancer",
+        "smokingCigarette",
+        "alcoholDrinking",
+        "hospitalized",
+        "hospitalizationDetails",
         "medications",
         // 🧬 Covid / Vaccination
-        "hadCovid", "covidDate",
-        "vaccine1Brand", "vaccine1Date", "vaccine2Brand", "vaccine2Date",
-        "booster1Brand", "booster1Date", "booster2Brand", "booster2Date",
+        "hadCovid",
+        "covidDate",
+        "vaccine1Brand",
+        "vaccine1Date",
+        "vaccine2Brand",
+        "vaccine2Date",
+        "booster1Brand",
+        "booster1Date",
+        "booster2Brand",
+        "booster2Date",
         // 🧪 Lab results / medical findings
-        "chestXray", "cbc", "urinalysis", "otherworkups",
+        "chestXray",
+        "cbc",
+        "urinalysis",
+        "otherworkups",
         // 🧍 Additional fields
-        "symptomsToday", "remarks",
+        "symptomsToday",
+        "remarks",
         // ✅ Agreement / Meta
-        "termsOfAgreement", "created_at", "current_step"
+        "termsOfAgreement",
+        "created_at",
+        "current_step",
       ];
       const cleanedData = Object.fromEntries(
-        Object.entries(person).filter(([key]) => allowedFields.includes(key))
+        Object.entries(person).filter(([key]) => allowedFields.includes(key)),
       );
 
       if (Object.keys(cleanedData).length === 0) {
@@ -867,7 +1223,10 @@ const AdmissionPersonalInformation = () => {
         return;
       }
 
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, withAuditActor(cleanedData));
+      await axios.put(
+        `${API_BASE_URL}/api/person/${targetId}`,
+        withAuditActor(cleanedData),
+      );
     } catch (err) {
       console.error("❌ Auto-save (manual) failed:", {
         message: err.message,
@@ -898,7 +1257,11 @@ const AdmissionPersonalInformation = () => {
 
     // Check file type
     if (!validTypes.includes(file.type)) {
-      setSnackbar({ open: true, message: "Please select a file first.", severity: "warning" });
+      setSnackbar({
+        open: true,
+        message: "Please select a file first.",
+        severity: "warning",
+      });
 
       setSelectedFile(null);
       setPreview(null);
@@ -936,7 +1299,7 @@ const AdmissionPersonalInformation = () => {
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
-        }
+        },
       );
 
       const fileName = response.data.filename || response.data.profile_img;
@@ -948,14 +1311,21 @@ const AdmissionPersonalInformation = () => {
       };
 
       setPerson(updatedPerson);
-      await
-        setUploadedImage(`${API_BASE_URL}/uploads/${fileName}`);
-      setSnackbar({ open: true, message: "Photo uploaded successfully!", severity: "success" });
+      await setUploadedImage(`${API_BASE_URL}/uploads/${fileName}`);
+      setSnackbar({
+        open: true,
+        message: "Photo uploaded successfully!",
+        severity: "success",
+      });
 
       handleClose();
     } catch (error) {
       console.error("Upload failed:", error);
-      setSnackbar({ open: true, message: "Upload failed. Please try again.", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Upload failed. Please try again.",
+        severity: "error",
+      });
     }
   };
 
@@ -971,8 +1341,6 @@ const AdmissionPersonalInformation = () => {
       pwdId: checked ? prev.pwdId || "" : "",
     }));
   };
-
-
 
   // ✅ ADDRESS STATE
   const [regionList, setRegionList] = useState([]);
@@ -994,7 +1362,9 @@ const AdmissionPersonalInformation = () => {
   useEffect(() => {
     const region = regions.find((r) => r.region_name === selectedRegion);
     if (region) {
-      setProvinceList(provinces.filter((p) => p.region_code === region.region_code));
+      setProvinceList(
+        provinces.filter((p) => p.region_code === region.region_code),
+      );
     } else {
       setProvinceList([]);
     }
@@ -1002,9 +1372,13 @@ const AdmissionPersonalInformation = () => {
 
   // ✅ CITIES BASED ON SELECTED PROVINCE
   useEffect(() => {
-    const province = provinces.find((p) => p.province_name === selectedProvince);
+    const province = provinces.find(
+      (p) => p.province_name === selectedProvince,
+    );
     if (province) {
-      setCityList(cities.filter((c) => c.province_code === province.province_code));
+      setCityList(
+        cities.filter((c) => c.province_code === province.province_code),
+      );
     } else {
       setCityList([]);
     }
@@ -1024,16 +1398,22 @@ const AdmissionPersonalInformation = () => {
   useEffect(() => {
     const region = regions.find((r) => r.region_name === person.presentRegion);
     if (region) {
-      setProvinceList(provinces.filter((p) => p.region_code === region.region_code));
+      setProvinceList(
+        provinces.filter((p) => p.region_code === region.region_code),
+      );
     } else {
       setProvinceList([]);
     }
   }, [person.presentRegion]);
 
   useEffect(() => {
-    const province = provinces.find((p) => p.province_name === person.presentProvince);
+    const province = provinces.find(
+      (p) => p.province_name === person.presentProvince,
+    );
     if (province) {
-      setCityList(cities.filter((c) => c.province_code === province.province_code));
+      setCityList(
+        cities.filter((c) => c.province_code === province.province_code),
+      );
     } else {
       setCityList([]);
     }
@@ -1066,9 +1446,13 @@ const AdmissionPersonalInformation = () => {
 
   // Update provinces when permanent region changes
   useEffect(() => {
-    const region = regions.find((r) => r.region_name === person.permanentRegion);
+    const region = regions.find(
+      (r) => r.region_name === person.permanentRegion,
+    );
     if (region) {
-      setPermanentProvinceList(provinces.filter((p) => p.region_code === region.region_code));
+      setPermanentProvinceList(
+        provinces.filter((p) => p.region_code === region.region_code),
+      );
     } else {
       setPermanentProvinceList([]);
     }
@@ -1076,9 +1460,13 @@ const AdmissionPersonalInformation = () => {
 
   // Update cities when permanent province changes
   useEffect(() => {
-    const province = provinces.find((p) => p.province_name === person.permanentProvince);
+    const province = provinces.find(
+      (p) => p.province_name === person.permanentProvince,
+    );
     if (province) {
-      setPermanentCityList(cities.filter((c) => c.province_code === province.province_code));
+      setPermanentCityList(
+        cities.filter((c) => c.province_code === province.province_code),
+      );
     } else {
       setPermanentCityList([]);
     }
@@ -1086,14 +1474,17 @@ const AdmissionPersonalInformation = () => {
 
   // Update barangays when permanent city changes
   useEffect(() => {
-    const city = cities.find((c) => c.city_name === person.permanentMunicipality);
+    const city = cities.find(
+      (c) => c.city_name === person.permanentMunicipality,
+    );
     if (city) {
-      setPermanentBarangayList(barangays.filter((b) => b.city_code === city.city_code));
+      setPermanentBarangayList(
+        barangays.filter((b) => b.city_code === city.city_code),
+      );
     } else {
       setPermanentBarangayList([]);
     }
   }, [person.permanentMunicipality]);
-
 
   const [curriculumOptions, setCurriculumOptions] = useState([]);
 
@@ -1115,7 +1506,8 @@ const AdmissionPersonalInformation = () => {
 
     curriculumOptions.forEach((item) => {
       // ✅ STEP 1 — Campus filter: only show courses offered on the selected campus
-      if (person.campus && Number(item.components) !== Number(person.campus)) return;
+      if (person.campus && Number(item.components) !== Number(person.campus))
+        return;
 
       // Skip full/hidden programs (same logic as before)
       const isSelected =
@@ -1123,12 +1515,14 @@ const AdmissionPersonalInformation = () => {
         String(item.curriculum_id) === String(person.program2) ||
         String(item.curriculum_id) === String(person.program3);
       const eStatus =
-        availabilityMap[item.curriculum_id]?.e_status ?? Number(item.e_status ?? 0);
+        availabilityMap[item.curriculum_id]?.e_status ??
+        Number(item.e_status ?? 0);
       if (!isSelected && eStatus === 1) return;
 
       // ✅ STEP 2 — Academic Program filter
       if (person.academicProgram !== "" && person.academicProgram !== null) {
-        if (Number(item.academic_program) !== Number(person.academicProgram)) return;
+        if (Number(item.academic_program) !== Number(person.academicProgram))
+          return;
       }
 
       // ✅ STEP 3 — Dedupe by curriculum_id — keep the first occurrence
@@ -1157,8 +1551,9 @@ const AdmissionPersonalInformation = () => {
 
     if (!curriculum) return `Curriculum ${curriculumId}`;
 
-    return `(${curriculum.program_code}): ${curriculum.program_description}${curriculum.major ? ` (${curriculum.major})` : ""
-      } (${getBranchLabel(curriculum.components)})`;
+    return `(${curriculum.program_code}): ${curriculum.program_description}${
+      curriculum.major ? ` (${curriculum.major})` : ""
+    } (${getBranchLabel(curriculum.components)})`;
   };
 
   const getApplicantDisplayName = () => {
@@ -1204,9 +1599,6 @@ const AdmissionPersonalInformation = () => {
     setProgramConfirmOpen(false);
     setPendingProgramChange(null);
   };
-
-
-
 
   const [errors, setErrors] = useState({});
 
@@ -1326,8 +1718,6 @@ const AdmissionPersonalInformation = () => {
     return isValid;
   };
 
-
-
   const [searchQuery, setSearchQuery] = useState("");
   const [searchError, setSearchError] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -1354,8 +1744,6 @@ const AdmissionPersonalInformation = () => {
           .slice(0, 10)
       : [];
 
-
-
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       const query = searchQuery.trim();
@@ -1366,14 +1754,19 @@ const AdmissionPersonalInformation = () => {
 
       try {
         const res = await axios.get(`${API_BASE_URL}/api/search-person`, {
-          params: { query }
+          params: { query },
         });
 
         if (res.data && res.data.person_id) {
-          const details = await axios.get(`${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`);
+          const details = await axios.get(
+            `${API_BASE_URL}/api/person_with_applicant/${res.data.person_id}`,
+          );
           setPerson(details.data);
 
-          sessionStorage.setItem("admin_edit_person_id", details.data.person_id);
+          sessionStorage.setItem(
+            "admin_edit_person_id",
+            details.data.person_id,
+          );
           setUserID(details.data.person_id);
           setSearchError("");
         } else {
@@ -1388,7 +1781,6 @@ const AdmissionPersonalInformation = () => {
 
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
-
 
   const divToPrintRef = useRef();
   const [showPrintView, setShowPrintView] = useState(false);
@@ -1431,7 +1823,6 @@ const AdmissionPersonalInformation = () => {
     }
   };
 
-
   const [examPermitError, setExamPermitError] = useState("");
   const [examPermitModalOpen, setExamPermitModalOpen] = useState(false);
 
@@ -1439,7 +1830,6 @@ const AdmissionPersonalInformation = () => {
     setExamPermitModalOpen(false);
     setExamPermitError("");
   };
-
 
   const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices" | "examPermitDownload"
   const hiddenFormRef = useRef();
@@ -1472,15 +1862,20 @@ const AdmissionPersonalInformation = () => {
     },
   };
 
-
-  const buildClientFilename = (prefix, { lastName, firstName, applicantNumber }) => {
+  const buildClientFilename = (
+    prefix,
+    { lastName, firstName, applicantNumber },
+  ) => {
     const safeLast = (lastName || "Applicant").trim().replace(/\s+/g, "_");
     const safeFirst = (firstName || "").trim().replace(/\s+/g, "_");
     const suffix = applicantNumber ? `_${applicantNumber}` : "";
     return `${prefix}_${safeLast}${safeFirst ? "_" + safeFirst : ""}${suffix}.pdf`;
   };
 
-  const logPrintingApplicantDocs = async (documentLabel, { failed = false } = {}) => {
+  const logPrintingApplicantDocs = async (
+    documentLabel,
+    { failed = false } = {},
+  ) => {
     try {
       const middleInitial = person?.middle_name
         ? ` ${String(person.middle_name).trim().charAt(0).toUpperCase()}.`
@@ -1488,7 +1883,7 @@ const AdmissionPersonalInformation = () => {
       const applicantName = person?.last_name
         ? `${person.last_name}, ${person.first_name || ""}${middleInitial}`.trim()
         : [person?.first_name, person?.middle_name].filter(Boolean).join(" ") ||
-        "Unknown Applicant";
+          "Unknown Applicant";
 
       await postAuditEvent("PRINTING_APPLICANT_DOCS", {
         document_label: documentLabel,
@@ -1532,7 +1927,9 @@ const AdmissionPersonalInformation = () => {
       // boxes even when the database has values like gender/civilStatus set.
       const clonedNode = node.cloneNode(true);
       const liveCheckboxes = node.querySelectorAll('input[type="checkbox"]');
-      const clonedCheckboxes = clonedNode.querySelectorAll('input[type="checkbox"]');
+      const clonedCheckboxes = clonedNode.querySelectorAll(
+        'input[type="checkbox"]',
+      );
       liveCheckboxes.forEach((liveBox, i) => {
         const clonedBox = clonedCheckboxes[i];
         if (liveBox.checked) {
@@ -1551,7 +1948,8 @@ const AdmissionPersonalInformation = () => {
           first_name: person?.first_name || "",
           document_label: config.label,
           audit_print_action: "PRINTING_APPLICANT_DOCS",
-          audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
+          audit_actor_id:
+            employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
           ...getLoginMacPayload(),
         },
@@ -1564,10 +1962,10 @@ const AdmissionPersonalInformation = () => {
       const fileName = config.dateStamped
         ? `${config.filenamePrefix}_${new Date().toISOString().slice(0, 10)}.pdf`
         : buildClientFilename(config.filenamePrefix, {
-          lastName: person?.last_name,
-          firstName: person?.first_name,
-          applicantNumber: person?.applicant_number,
-        });
+            lastName: person?.last_name,
+            firstName: person?.first_name,
+            applicantNumber: person?.applicant_number,
+          });
 
       const link = document.createElement("a");
       link.href = url;
@@ -1590,7 +1988,6 @@ const AdmissionPersonalInformation = () => {
     }
   };
 
-
   const downloadExamPermitPDF = async () => {
     if (!userID || !person?.person_id) {
       setSnackbar({
@@ -1602,11 +1999,15 @@ const AdmissionPersonalInformation = () => {
     }
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/verified-exam-applicants`);
+      const res = await axios.get(
+        `${API_BASE_URL}/api/verified-exam-applicants`,
+      );
       const verified = res.data.some((a) => a.person_id === parseInt(userID));
 
       if (!verified) {
-        setExamPermitError("❌ This applicant's documents are not yet verified.");
+        setExamPermitError(
+          "❌ This applicant's documents are not yet verified.",
+        );
         setExamPermitModalOpen(true);
         return;
       }
@@ -1616,7 +2017,8 @@ const AdmissionPersonalInformation = () => {
       await new Promise((resolve) => setTimeout(resolve, 800));
 
       const divToPrint = divToPrintRef.current;
-      if (!divToPrint) throw new Error("Exam permit content did not render in time.");
+      if (!divToPrint)
+        throw new Error("Exam permit content did not render in time.");
 
       const response = await axios.post(
         `${API_BASE_URL}/api/generate-exam-permit-pdf`,
@@ -1627,7 +2029,8 @@ const AdmissionPersonalInformation = () => {
           first_name: person?.first_name || "",
           document_label: "Examination Permit",
           audit_print_action: "PRINTING_APPLICANT_DOCS",
-          audit_actor_id: employeeID || localStorage.getItem("employee_id") || "unknown",
+          audit_actor_id:
+            employeeID || localStorage.getItem("employee_id") || "unknown",
           audit_actor_role: userRole || "registrar",
           ...getLoginMacPayload(),
         },
@@ -1653,7 +2056,9 @@ const AdmissionPersonalInformation = () => {
       console.error("Error downloading exam permit PDF:", err);
       // Still audit when download fails (e.g. IDM intercept) so printing history is recorded.
       await logPrintingApplicantDocs("Examination Permit", { failed: true });
-      setExamPermitError("⚠️ Unable to generate the Exam Permit PDF right now.");
+      setExamPermitError(
+        "⚠️ Unable to generate the Exam Permit PDF right now.",
+      );
       setExamPermitModalOpen(true);
     } finally {
       setShowPrintView(false);
@@ -1662,40 +2067,50 @@ const AdmissionPersonalInformation = () => {
   };
 
   const links = [
-    { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
-    { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
+    {
+      key: "ecat",
+      label: "ECAT Application Form",
+      onClick: () => generateFormPdf("ecat"),
+    },
+    {
+      key: "personalData",
+      label: "Personal Data Form",
+      onClick: () => generateFormPdf("personalData"),
+    },
     {
       key: "registrar",
       label: `Application For ${shortTerm ? shortTerm.toUpperCase() : ""} College Admission`,
       onClick: () => generateFormPdf("registrar"),
     },
-    { key: "admissionServices", label: "Application/Student Satisfactory Survey", onClick: () => generateFormPdf("admissionServices") },
-    { key: "examPermitDownload", label: "Examination Permit", onClick: downloadExamPermitPDF },
+    {
+      key: "admissionServices",
+      label: "Application/Student Satisfactory Survey",
+      onClick: () => generateFormPdf("admissionServices"),
+    },
+    {
+      key: "examPermitDownload",
+      label: "Examination Permit",
+      onClick: downloadExamPermitPDF,
+    },
   ];
-
-
 
   const [canPrintPermit, setCanPrintPermit] = useState(false);
 
   useEffect(() => {
     if (!userID) return;
-    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`)
-      .then(res => {
-        const verified = res.data.some(a => a.person_id === parseInt(userID));
-        setCanPrintPermit(verified);
-      });
+    axios.get(`${API_BASE_URL}/api/verified-exam-applicants`).then((res) => {
+      const verified = res.data.some((a) => a.person_id === parseInt(userID));
+      setCanPrintPermit(verified);
+    });
   }, [userID]);
 
-
-  // Put this at the very bottom before the return 
+  // Put this at the very bottom before the return
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
   }
 
   if (!hasAccess) {
-    return (
-      <Unauthorized />
-    );
+    return <Unauthorized />;
   }
 
   // 🔒 Disable right-click
@@ -1720,7 +2135,16 @@ const AdmissionPersonalInformation = () => {
 
   // dot not alter
   return (
-    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+    <Box
+      sx={{
+        height: "calc(100vh - 150px)",
+        overflowY: "auto",
+        paddingRight: 1,
+        backgroundColor: "transparent",
+        mt: 1,
+        padding: 2,
+      }}
+    >
       {showPrintView && (
         <div
           ref={divToPrintRef}
@@ -1736,31 +2160,34 @@ const AdmissionPersonalInformation = () => {
         </div>
       )}
 
-
       {generatingKey && FORM_CONFIGS[generatingKey] && (
-        <div ref={hiddenFormRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
-          {React.createElement(FORM_CONFIGS[generatingKey].Component, { personId: userID })}
+        <div
+          ref={hiddenFormRef}
+          style={{ position: "absolute", left: "-9999px", top: 0 }}
+        >
+          {React.createElement(FORM_CONFIGS[generatingKey].Component, {
+            personId: userID,
+          })}
         </div>
       )}
 
       {/* Top header: DOCUMENTS SUBMITTED + Search */}
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
 
           mb: 2,
-
         }}
       >
         <Typography
           variant="h4"
           sx={{
-            fontWeight: 'bold',
+            fontWeight: "bold",
             color: titleColor,
-            fontSize: '36px',
+            fontSize: "36px",
           }}
         >
           PERSONAL INFORMATION
@@ -1875,35 +2302,64 @@ const AdmissionPersonalInformation = () => {
       <br />
       <br />
 
-      <TableContainer component={Paper} sx={{ width: '100%', mb: 1 }}>
+      <TableContainer component={Paper} sx={{ width: "100%", mb: 1 }}>
         <Table>
-          <TableHead sx={{ backgroundColor: headerColor, border: `1px solid ${borderColor}`, }}>
+          <TableHead
+            sx={{
+              backgroundColor: headerColor,
+              border: `1px solid ${borderColor}`,
+            }}
+          >
             <TableRow>
               {/* Left cell: Applicant ID */}
-              <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
+              <TableCell
+                sx={{
+                  color: "white",
+                  fontSize: "20px",
+                  fontFamily: "Poppins, sans-serif",
+                  border: "none",
+                }}
+              >
                 Applicant ID:&nbsp;
-                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
+                <span
+                  style={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "normal",
+                    textDecoration: "underline",
+                  }}
+                >
                   {person?.applicant_number || "N/A"}
-
                 </span>
               </TableCell>
 
               {/* Right cell: Applicant Name */}
               <TableCell
                 align="right"
-                sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}
+                sx={{
+                  color: "white",
+                  fontSize: "20px",
+                  fontFamily: "Poppins, sans-serif",
+                  border: "none",
+                }}
               >
                 Applicant Name:&nbsp;
-                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
-                  {person?.last_name?.toUpperCase()}, {person?.first_name?.toUpperCase()}{" "}
-                  {person?.middle_name?.toUpperCase()} {person?.extension?.toUpperCase() || ""}
+                <span
+                  style={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "normal",
+                    textDecoration: "underline",
+                  }}
+                >
+                  {person?.last_name?.toUpperCase()},{" "}
+                  {person?.first_name?.toUpperCase()}{" "}
+                  {person?.middle_name?.toUpperCase()}{" "}
+                  {person?.extension?.toUpperCase() || ""}
                 </span>
               </TableCell>
             </TableRow>
           </TableHead>
         </Table>
       </TableContainer>
-
 
       <Box
         sx={{
@@ -1956,22 +2412,20 @@ const AdmissionPersonalInformation = () => {
           >
             <strong style={{ color: "maroon" }}>Important Notice:</strong>
             <br />
-
-
-
             <span style={{ fontSize: "1.2em", margin: "0 15px" }}>➔</span>
-            Please indicate <strong>“NA”</strong> or <strong>“N/A”</strong> in fields where the
-            requested information is not applicable or no response can be provided.
+            Please indicate <strong>“NA”</strong> or <strong>“N/A”</strong> in
+            fields where the requested information is not applicable or no
+            response can be provided.
             <br />
-
             <span style={{ fontSize: "1.2em", margin: "0 15px" }}>➔</span>
-            To enter the letter <strong>“Ñ”</strong>, press and hold the ALT key while typing
-            <strong> 165</strong>. For <strong>“ñ”</strong>, press and hold the ALT key while
-            typing <strong> 164</strong>.
+            To enter the letter <strong>“Ñ”</strong>, press and hold the ALT key
+            while typing
+            <strong> 165</strong>. For <strong>“ñ”</strong>, press and hold the
+            ALT key while typing <strong> 164</strong>.
             <br />
-
             <span style={{ fontSize: "1.2em", margin: "0 15px" }}>➔</span>
-            Please complete all information from <strong>Personal Information</strong> up to
+            Please complete all information from{" "}
+            <strong>Personal Information</strong> up to
             <strong> Other Information</strong> before printing your documents.
             <br />
           </Typography>
@@ -2011,7 +2465,6 @@ const AdmissionPersonalInformation = () => {
 
             textTransform: "none",
             fontWeight: "bold",
-
           }}
         >
           {saving ? "Saving..." : "Save Changes"}
@@ -2060,9 +2513,7 @@ const AdmissionPersonalInformation = () => {
                   transition: "all 0.3s ease-in-out",
                   "&:hover": {
                     transform: disabled ? "none" : "scale(1.05)",
-                    backgroundColor: disabled
-                      ? "#fff"
-                      : headerColor,
+                    backgroundColor: disabled ? "#fff" : headerColor,
 
                     "& .card-text": {
                       color: disabled ? mainButtonColor : "#fff",
@@ -2113,18 +2564,7 @@ const AdmissionPersonalInformation = () => {
         })}
       </Box>
 
-
-
-
-
-
-
-
-
-
-
       <Container>
-
         <Container>
           <h1
             style={{
@@ -2138,7 +2578,8 @@ const AdmissionPersonalInformation = () => {
             APPLICANT FORM
           </h1>
           <div style={{ textAlign: "center" }}>
-            Complete the applicant form to secure your place for the upcoming academic year at{" "}
+            Complete the applicant form to secure your place for the upcoming
+            academic year at{" "}
             {shortTerm ? (
               <>
                 <strong>{shortTerm.toUpperCase()}</strong> <br />
@@ -2149,14 +2590,19 @@ const AdmissionPersonalInformation = () => {
             )}
             .
           </div>
-
-
         </Container>
 
         <br />
 
         {person.person_id && (
-          <Box sx={{ display: "flex", justifyContent: "center", width: "100%", px: 4 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              width: "100%",
+              px: 4,
+            }}
+          >
             {steps.map((step, index) => (
               <React.Fragment key={index}>
                 {/* Wrap the step with Link for routing */}
@@ -2177,7 +2623,8 @@ const AdmissionPersonalInformation = () => {
                         height: 50,
                         borderRadius: "50%",
                         border: `1px solid ${borderColor}`,
-                        backgroundColor: activeStep === index ? headerColor : "#E8C999",
+                        backgroundColor:
+                          activeStep === index ? headerColor : "#E8C999",
                         color: activeStep === index ? "#fff" : "#000",
                         display: "flex",
                         alignItems: "center",
@@ -2235,34 +2682,52 @@ const AdmissionPersonalInformation = () => {
             }}
           >
             <Box sx={{ width: "100%" }}>
-              <Typography style={{ fontSize: "20px", padding: "10px", fontFamily: "Arial Black" }}>Step 1: Personal Information</Typography>
+              <Typography
+                style={{
+                  fontSize: "20px",
+                  padding: "10px",
+                  fontFamily: "Arial Black",
+                }}
+              >
+                Step 1: Personal Information
+              </Typography>
             </Box>
           </Container>
 
-          <Container maxWidth="100%" sx={{ backgroundColor: "#f1f1f1", border: `1px solid ${borderColor}`, padding: 4, borderRadius: 2, boxShadow: 3 }}>
-            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Personal Information:</Typography>
+          <Container
+            maxWidth="100%"
+            sx={{
+              backgroundColor: "#f1f1f1",
+              border: `1px solid ${borderColor}`,
+              padding: 4,
+              borderRadius: 2,
+              boxShadow: 3,
+            }}
+          >
+            <Typography
+              style={{
+                fontSize: "20px",
+                color: mainButtonColor,
+                fontWeight: "bold",
+              }}
+            >
+              Personal Information:
+            </Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
             <br />
-
-
-
 
             <div className="flex items-center mb-4 gap-4">
               <label className="w-40 font-medium">Campus:</label>
 
               <FormControl
-
                 fullWidth
                 size="small"
                 required
                 error={!!errors.campus}
                 className="mb-4"
               >
-
-
                 <Select
-                  readOnly
                   id="campus-select"
                   name="campus"
                   value={person.campus || ""}
@@ -2275,8 +2740,12 @@ const AdmissionPersonalInformation = () => {
                   renderValue={(selected) => {
                     if (!selected) return <em>Select Campus</em>;
 
-                    const branch = branches.find(b => String(b.id) === String(selected));
-                    return branch ? branch.branch.toUpperCase() : "Select Campus";
+                    const branch = branches.find(
+                      (b) => String(b.id) === String(selected),
+                    );
+                    return branch
+                      ? branch.branch.toUpperCase()
+                      : "Select Campus";
                   }}
                 >
                   <MenuItem value="">
@@ -2296,14 +2765,19 @@ const AdmissionPersonalInformation = () => {
               </FormControl>
             </div>
 
-
-
             <div className="flex items-center mb-4 gap-4">
               <label className="w-40 font-medium">Academic Program:</label>
-              <FormControl fullWidth size="small" required error={!!errors.academicProgram} className="mb-4">
-                <InputLabel id="academic-program-label">Academic Program</InputLabel>
+              <FormControl
+                fullWidth
+                size="small"
+                required
+                error={!!errors.academicProgram}
+                className="mb-4"
+              >
+                <InputLabel id="academic-program-label">
+                  Academic Program
+                </InputLabel>
                 <Select
-                  readOnly
                   labelId="academic-program-label"
                   id="academic-program-select"
                   name="academicProgram"
@@ -2317,7 +2791,6 @@ const AdmissionPersonalInformation = () => {
                   <MenuItem value="0">Undergraduate</MenuItem>
                   <MenuItem value="1">Graduate</MenuItem>
                   <MenuItem value="2">Techvoc</MenuItem>
-
                 </Select>
                 {errors.academicProgram && (
                   <FormHelperText>This field is required.</FormHelperText>
@@ -2327,10 +2800,15 @@ const AdmissionPersonalInformation = () => {
 
             <div className="flex items-center mb-4 gap-4">
               <label className="w-40 font-medium">Classified As:</label>
-              <FormControl fullWidth size="small" required error={!!errors.classifiedAs} className="mb-4">
+              <FormControl
+                fullWidth
+                size="small"
+                required
+                error={!!errors.classifiedAs}
+                className="mb-4"
+              >
                 <InputLabel id="classified-as-label">Classified As</InputLabel>
                 <Select
-
                   labelId="classified-as-label"
                   id="classified-as-select"
                   name="classifiedAs"
@@ -2338,8 +2816,12 @@ const AdmissionPersonalInformation = () => {
                   label="Classified As"
                   onChange={handleChange}
                 >
-                  <MenuItem value=""><em>Select Classification</em></MenuItem>
-                  <MenuItem value="Freshman (First Year)">Freshman (First Year)</MenuItem>
+                  <MenuItem value="">
+                    <em>Select Classification</em>
+                  </MenuItem>
+                  <MenuItem value="Freshman (First Year)">
+                    Freshman (First Year)
+                  </MenuItem>
                   <MenuItem value="Transferee">Transferee</MenuItem>
                   <MenuItem value="Returnee">Returnee</MenuItem>
                   <MenuItem value="Shiftee">Shiftee</MenuItem>
@@ -2349,15 +2831,19 @@ const AdmissionPersonalInformation = () => {
                   <FormHelperText>This field is required.</FormHelperText>
                 )}
               </FormControl>
-
             </div>
 
             <div className="flex items-center mb-4 gap-4">
               <label className="w-40 font-medium">Applying As:</label>
-              <FormControl fullWidth size="small" required error={!!errors.applyingAs} className="mb-4">
+              <FormControl
+                fullWidth
+                size="small"
+                required
+                error={!!errors.applyingAs}
+                className="mb-4"
+              >
                 <InputLabel id="applying-as-label">Applying As</InputLabel>
                 <Select
-
                   labelId="applying-as-label"
                   id="applying-as-select"
                   name="applyingAs"
@@ -2368,9 +2854,7 @@ const AdmissionPersonalInformation = () => {
                   <MenuItem value="">
                     <em>Select Applying</em>
                   </MenuItem>
-                  <MenuItem value="1">
-                    Senior High School Graduate
-                  </MenuItem>
+                  <MenuItem value="1">Senior High School Graduate</MenuItem>
                   <MenuItem value="2">
                     Senior High School Graduating Student
                   </MenuItem>
@@ -2380,18 +2864,10 @@ const AdmissionPersonalInformation = () => {
                   <MenuItem value="4">
                     Transferee from other University/College
                   </MenuItem>
-                  <MenuItem value="5">
-                    Cross Enrolee Student
-                  </MenuItem>
-                  <MenuItem value="6">
-                    Foreign Applicant/Student
-                  </MenuItem>
-                  <MenuItem value="7">
-                    Baccalaureate Graduate
-                  </MenuItem>
-                  <MenuItem value="8">
-                    Master Degree Graduate
-                  </MenuItem>
+                  <MenuItem value="5">Cross Enrolee Student</MenuItem>
+                  <MenuItem value="6">Foreign Applicant/Student</MenuItem>
+                  <MenuItem value="7">Baccalaureate Graduate</MenuItem>
+                  <MenuItem value="8">Master Degree Graduate</MenuItem>
                 </Select>
                 {errors.applyingAs && (
                   <FormHelperText>This field is required.</FormHelperText>
@@ -2399,11 +2875,17 @@ const AdmissionPersonalInformation = () => {
               </FormControl>
             </div>
 
-
             <br />
 
-
-            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Course Program:</Typography>
+            <Typography
+              style={{
+                fontSize: "20px",
+                color: mainButtonColor,
+                fontWeight: "bold",
+              }}
+            >
+              Course Program:
+            </Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
 
@@ -2411,7 +2893,11 @@ const AdmissionPersonalInformation = () => {
               {/* Left Side: TextFields with label beside each input */}
               <Box display="flex" flexDirection="column" sx={{ width: "75%" }}>
                 {/* Program Fields */}
-                <Box display="flex" flexDirection="column" sx={{ width: "100%" }}>
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  sx={{ width: "100%" }}
+                >
                   {/* Program 1 */}
                   <div className="flex items-center mb-4 gap-2">
                     <label className="w-42 font-medium">
@@ -2429,22 +2915,29 @@ const AdmissionPersonalInformation = () => {
                         options={filteredCurriculum}
                         value={
                           filteredCurriculum.find(
-                            (item) => String(item.curriculum_id) === String(person.program)
+                            (item) =>
+                              String(item.curriculum_id) ===
+                              String(person.program),
                           ) || null
                         }
                         onChange={(event, newValue) => {
                           handleProgramChangeRequest(newValue);
                         }}
                         getOptionLabel={(item) =>
-                          `(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
+                          `(${item.program_code}): ${item.program_description}${
+                            item.major ? ` (${item.major})` : ""
                           } (${getBranchLabel(item.components)})`
                         }
                         isOptionEqualToValue={(option, value) =>
-                          String(option.curriculum_id) === String(value?.curriculum_id)
+                          String(option.curriculum_id) ===
+                          String(value?.curriculum_id)
                         }
-                        getOptionDisabled={(item) => !!availabilityMap[item.curriculum_id]?.isFull}
+                        getOptionDisabled={(item) =>
+                          !!availabilityMap[item.curriculum_id]?.isFull
+                        }
                         renderOption={(props, item) => {
-                          const availability = availabilityMap[item.curriculum_id];
+                          const availability =
+                            availabilityMap[item.curriculum_id];
                           const remaining = availability?.remaining ?? 0;
                           const isFull = availability?.isFull;
 
@@ -2457,12 +2950,17 @@ const AdmissionPersonalInformation = () => {
                                 fontWeight: isFull ? "bold" : "normal",
                               }}
                             >
-                              {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
-                                } (${getBranchLabel(item.components)})`}
+                              {`(${item.program_code}): ${item.program_description}${
+                                item.major ? ` (${item.major})` : ""
+                              } (${getBranchLabel(item.components)})`}
                               {isFull ? (
-                                <span style={{ marginLeft: 8 }}>— FULL (0 slots left)</span>
+                                <span style={{ marginLeft: 8 }}>
+                                  — FULL (0 slots left)
+                                </span>
                               ) : (
-                                <span style={{ marginLeft: 8, color: "#2e7d32" }}>
+                                <span
+                                  style={{ marginLeft: 8, color: "#2e7d32" }}
+                                >
                                   ({remaining} slots left)
                                 </span>
                               )}
@@ -2490,15 +2988,12 @@ const AdmissionPersonalInformation = () => {
                       )}
                       {person.program && !errors.program && (
                         <FormHelperText sx={{ color: "red" }}>
-                          Changing the selected curriculum requires confirmation.
+                          Changing the selected curriculum requires
+                          confirmation.
                         </FormHelperText>
                       )}
-
-
-
                     </FormControl>
                   </div>
-
 
                   {/* <Box display="flex" alignItems="center" gap={2} mb={1}>
                            <label className="w-40 font-medium">Course Applied:</label>
@@ -2555,8 +3050,15 @@ const AdmissionPersonalInformation = () => {
 
                   {/* Year Level */}
                   <div className="flex items-center mb-4 gap-2">
-                    <label className="w-40 mt:[2] font-medium ">Year Level:</label>
-                    <FormControl fullWidth size="small" required error={!!errors.yearLevel}>
+                    <label className="w-40 mt:[2] font-medium ">
+                      Year Level:
+                    </label>
+                    <FormControl
+                      fullWidth
+                      size="small"
+                      required
+                      error={!!errors.yearLevel}
+                    >
                       <InputLabel id="year-level-label">Year Level</InputLabel>
 
                       <Select
@@ -2566,7 +3068,6 @@ const AdmissionPersonalInformation = () => {
                         value={getYearLevelSelectValue()}
                         label="Year Level"
                         onChange={handleChange}
-
                       >
                         <MenuItem value="">
                           <em>Select Year Level</em>
@@ -2586,7 +3087,6 @@ const AdmissionPersonalInformation = () => {
                         <FormHelperText>This field is required.</FormHelperText>
                       )}
                     </FormControl>
-
                   </div>
                 </Box>
               </Box>
@@ -2597,7 +3097,9 @@ const AdmissionPersonalInformation = () => {
                   marginTop: "10px",
                   marginLeft: "35px",
                   marginBottom: "-10px",
-                  border: errors.profile_img ? "1px solid red" : "1px solid black",
+                  border: errors.profile_img
+                    ? "1px solid red"
+                    : "1px solid black",
                   width: "5.50cm",
                   height: "5.50cm",
                   display: "flex",
@@ -2617,10 +3119,12 @@ const AdmissionPersonalInformation = () => {
                       objectFit: "cover",
                     }}
                   />
-
                 ) : (
                   <>
-                    <Typography fontSize={12} color={errors.profile_img ? "error" : "textSecondary"}>
+                    <Typography
+                      fontSize={12}
+                      color={errors.profile_img ? "error" : "textSecondary"}
+                    >
                       No Profile Image Uploaded
                     </Typography>
                     {errors.profile_img && (
@@ -2631,21 +3135,27 @@ const AdmissionPersonalInformation = () => {
                   </>
                 )}
               </Box>
-
             </Box>
 
-
-            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Person Details:</Typography>
+            <Typography
+              style={{
+                fontSize: "20px",
+                color: mainButtonColor,
+                fontWeight: "bold",
+              }}
+            >
+              Person Details:
+            </Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
 
             <Box display="flex" gap={2} mb={2}>
               {/* Last Name */}
               <Box flex="1 1 20%">
-                <Typography mb={1} fontWeight="medium">Last Name</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Last Name
+                </Typography>
                 <TextField
-
-
                   fullWidth
                   size="small"
                   name="last_name"
@@ -2655,16 +3165,15 @@ const AdmissionPersonalInformation = () => {
                   placeholder="Enter your Last Name"
                   error={errors.last_name}
                   helperText={errors.last_name ? "This field is required." : ""}
-
                 />
               </Box>
 
               {/* First Name */}
               <Box flex="1 1 20%">
-                <Typography mb={1} fontWeight="medium">First Name</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  First Name
+                </Typography>
                 <TextField
-
-
                   fullWidth
                   size="small"
                   name="first_name"
@@ -2673,16 +3182,18 @@ const AdmissionPersonalInformation = () => {
                   onChange={handleChange}
                   placeholder="Enter your First Name"
                   error={errors.first_name}
-                  helperText={errors.first_name ? "This field is required." : ""}
+                  helperText={
+                    errors.first_name ? "This field is required." : ""
+                  }
                 />
               </Box>
 
               {/* Middle Name */}
               <Box flex="1 1 20%">
-                <Typography mb={1} fontWeight="medium">Middle Name</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Middle Name
+                </Typography>
                 <TextField
-
-
                   fullWidth
                   size="small"
                   name="middle_name"
@@ -2691,17 +3202,20 @@ const AdmissionPersonalInformation = () => {
                   onChange={handleChange}
                   placeholder="Enter your Middle Name"
                   error={errors.middle_name}
-                  helperText={errors.middle_name ? "This field is required." : ""}
+                  helperText={
+                    errors.middle_name ? "This field is required." : ""
+                  }
                 />
               </Box>
 
               {/* Extension */}
               <Box flex="1 1 20%">
-                <Typography mb={1} fontWeight="medium">Extension</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Extension
+                </Typography>
                 <FormControl fullWidth size="small" error={errors.extension}>
                   <InputLabel id="extension-label">Extension</InputLabel>
                   <Select
-
                     labelId="extension-label"
                     id="extension-select"
                     name="extension"
@@ -2709,7 +3223,9 @@ const AdmissionPersonalInformation = () => {
                     label="Extension"
                     onChange={handleChange}
                   >
-                    <MenuItem value=""><em>None</em></MenuItem>
+                    <MenuItem value="">
+                      <em>None</em>
+                    </MenuItem>
                     <MenuItem value="Jr.">Jr.</MenuItem>
                     <MenuItem value="Sr.">Sr.</MenuItem>
                     <MenuItem value="I">I</MenuItem>
@@ -2726,9 +3242,10 @@ const AdmissionPersonalInformation = () => {
 
               {/* Nickname */}
               <Box flex="1 1 20%">
-                <Typography mb={1} fontWeight="medium">Nickname</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Nickname
+                </Typography>
                 <TextField
-
                   fullWidth
                   size="small"
                   name="nickname"
@@ -2741,7 +3258,6 @@ const AdmissionPersonalInformation = () => {
                 />
               </Box>
             </Box>
-
 
             <Box display="flex" gap={4} mb={2}>
               {/* Height Field */}
@@ -2796,14 +3312,14 @@ const AdmissionPersonalInformation = () => {
               </Box>
             </Box>
 
-
-
-
-
-
-
-
-            <Box display="flex" alignItems="center" gap={2} flexWrap="nowrap" width="100%" mb={2}>
+            <Box
+              display="flex"
+              alignItems="center"
+              gap={2}
+              flexWrap="nowrap"
+              width="100%"
+              mb={2}
+            >
               {/* LRN Label */}
               <Typography fontWeight="medium" minWidth="180px">
                 Learning Reference Number:
@@ -2818,13 +3334,12 @@ const AdmissionPersonalInformation = () => {
                 value={
                   person.lrnNumber === "No LRN Number"
                     ? ""
-                    : person.lrnNumber ?? ""
+                    : (person.lrnNumber ?? "")
                 }
                 onChange={handleChange}
                 size="small"
                 sx={{ width: 220 }}
                 InputProps={{
-
                   sx: { height: 40 },
                 }}
                 inputProps={{
@@ -2848,7 +3363,7 @@ const AdmissionPersonalInformation = () => {
                       };
 
                       setPerson(updatedPerson);
-                      setIsLrnNA(checked);         // optional: if you're tracking this separately
+                      setIsLrnNA(checked); // optional: if you're tracking this separately
                       setLrnNAFlag(checked ? "1" : "0"); // optional: if you're sending this to backend
                     }}
                   />
@@ -2857,10 +3372,7 @@ const AdmissionPersonalInformation = () => {
                 sx={{ mr: 2 }}
               />
 
-
-              <Typography fontWeight="medium" >
-                Gender:
-              </Typography>
+              <Typography fontWeight="medium">Gender:</Typography>
               {/* Gender */}
               <TextField
                 select
@@ -2881,24 +3393,22 @@ const AdmissionPersonalInformation = () => {
                 error={Boolean(errors.gender)}
                 sx={{ width: 150 }}
                 InputProps={{
-
                   sx: { height: 40 },
                 }}
                 inputProps={{ style: { height: 40 } }}
               >
-                <MenuItem value=""><em>Select Gender</em></MenuItem>
+                <MenuItem value="">
+                  <em>Select Gender</em>
+                </MenuItem>
                 <MenuItem value="0">MALE</MenuItem>
                 <MenuItem value="1">FEMALE</MenuItem>
               </TextField>
-
-
 
               {errors.gender && (
                 <Typography color="error" variant="caption" ml={1}>
                   This field is required.
                 </Typography>
               )}
-
 
               {/* PWD Checkbox */}
               <FormControlLabel
@@ -2918,7 +3428,6 @@ const AdmissionPersonalInformation = () => {
                 <>
                   {/* PWD Type */}
                   <TextField
-
                     select
                     size="small"
                     label="PWD Type"
@@ -2936,26 +3445,52 @@ const AdmissionPersonalInformation = () => {
                     InputProps={{ sx: { height: 40 } }}
                     inputProps={{ style: { height: 40 } }}
                   >
-                    <MenuItem value=""><em>None</em></MenuItem>
+                    <MenuItem value="">
+                      <em>None</em>
+                    </MenuItem>
                     <MenuItem value="Blindness">Blindness</MenuItem>
                     <MenuItem value="Low-vision">Low-vision</MenuItem>
-                    <MenuItem value="Leprosy Cured persons">Leprosy Cured persons</MenuItem>
-                    <MenuItem value="Hearing Impairment">Hearing Impairment</MenuItem>
-                    <MenuItem value="Locomotor Disability">Locomotor Disability</MenuItem>
+                    <MenuItem value="Leprosy Cured persons">
+                      Leprosy Cured persons
+                    </MenuItem>
+                    <MenuItem value="Hearing Impairment">
+                      Hearing Impairment
+                    </MenuItem>
+                    <MenuItem value="Locomotor Disability">
+                      Locomotor Disability
+                    </MenuItem>
                     <MenuItem value="Dwarfism">Dwarfism</MenuItem>
-                    <MenuItem value="Intellectual Disability">Intellectual Disability</MenuItem>
+                    <MenuItem value="Intellectual Disability">
+                      Intellectual Disability
+                    </MenuItem>
                     <MenuItem value="Mental Illness">Mental Illness</MenuItem>
-                    <MenuItem value="Autism Spectrum Disorder">Autism Spectrum Disorder</MenuItem>
+                    <MenuItem value="Autism Spectrum Disorder">
+                      Autism Spectrum Disorder
+                    </MenuItem>
                     <MenuItem value="Cerebral Palsy">Cerebral Palsy</MenuItem>
-                    <MenuItem value="Muscular Dystrophy">Muscular Dystrophy</MenuItem>
-                    <MenuItem value="Chronic Neurological conditions">Chronic Neurological conditions</MenuItem>
-                    <MenuItem value="Specific Learning Disabilities">Specific Learning Disabilities</MenuItem>
-                    <MenuItem value="Multiple Sclerosis">Multiple Sclerosis</MenuItem>
-                    <MenuItem value="Speech and Language disability">Speech and Language disability</MenuItem>
+                    <MenuItem value="Muscular Dystrophy">
+                      Muscular Dystrophy
+                    </MenuItem>
+                    <MenuItem value="Chronic Neurological conditions">
+                      Chronic Neurological conditions
+                    </MenuItem>
+                    <MenuItem value="Specific Learning Disabilities">
+                      Specific Learning Disabilities
+                    </MenuItem>
+                    <MenuItem value="Multiple Sclerosis">
+                      Multiple Sclerosis
+                    </MenuItem>
+                    <MenuItem value="Speech and Language disability">
+                      Speech and Language disability
+                    </MenuItem>
                     <MenuItem value="Thalassemia">Thalassemia</MenuItem>
                     <MenuItem value="Hemophilia">Hemophilia</MenuItem>
-                    <MenuItem value="Sickle cell disease">Sickle cell disease</MenuItem>
-                    <MenuItem value="Multiple Disabilities including">Multiple Disabilities including</MenuItem>
+                    <MenuItem value="Sickle cell disease">
+                      Sickle cell disease
+                    </MenuItem>
+                    <MenuItem value="Multiple Disabilities including">
+                      Multiple Disabilities including
+                    </MenuItem>
                   </TextField>
 
                   {/* PWD ID */}
@@ -2979,12 +3514,9 @@ const AdmissionPersonalInformation = () => {
                   />
                 </>
               )}
-
-
             </Box>
 
             {/* Row 1: Birth Place + Citizenship */}
-
 
             <Box display="flex" gap={2} mb={2}>
               {/* 🎂 Birth Date */}
@@ -2993,7 +3525,6 @@ const AdmissionPersonalInformation = () => {
                   Birth of Date
                 </Typography>
                 <DateField
-
                   fullWidth
                   size="small"
                   name="birthOfDate"
@@ -3001,7 +3532,9 @@ const AdmissionPersonalInformation = () => {
                   value={person.birthOfDate || ""}
                   onChange={handleChange}
                   error={!!errors.birthOfDate}
-                  helperText={errors.birthOfDate ? "This field is required." : ""}
+                  helperText={
+                    errors.birthOfDate ? "This field is required." : ""
+                  }
                 />
               </Box>
 
@@ -3011,7 +3544,6 @@ const AdmissionPersonalInformation = () => {
                   Age
                 </Typography>
                 <TextField
-
                   fullWidth
                   size="small"
                   name="age"
@@ -3021,7 +3553,7 @@ const AdmissionPersonalInformation = () => {
                   onChange={handleChange}
                   error={!!errors.age}
                   helperText={errors.age ? "This field is required." : ""}
-                // read-only so user can’t manually change
+                  // read-only so user can’t manually change
                 />
               </Box>
               <Box flex={1}>
@@ -3029,20 +3561,40 @@ const AdmissionPersonalInformation = () => {
                   Birth Place
                 </Typography>
                 <TextField
-                  fullWidth size="small" name="birthPlace" placeholder="Enter your Birth Place" value={person.birthPlace ?? ""} required onChange={handleChange} error={!!errors.birthPlace}
-                  helperText={errors.birthPlace ? "This field is required." : ""} />
+                  fullWidth
+                  size="small"
+                  name="birthPlace"
+                  placeholder="Enter your Birth Place"
+                  value={person.birthPlace ?? ""}
+                  required
+                  onChange={handleChange}
+                  error={!!errors.birthPlace}
+                  helperText={
+                    errors.birthPlace ? "This field is required." : ""
+                  }
+                />
               </Box>
-              <Box flex={1} >
+              <Box flex={1}>
                 <Typography mb={1} fontWeight="medium">
                   Language/Dialect Spoken
                 </Typography>
                 <TextField
-                  fullWidth size="small" name="languageDialectSpoken" placeholder="Enter your Language Spoken" value={person.languageDialectSpoken ?? ""} required onChange={handleChange} error={!!errors.languageDialectSpoken}
-                  helperText={errors.languageDialectSpoken ? "This field is required." : ""}
+                  fullWidth
+                  size="small"
+                  name="languageDialectSpoken"
+                  placeholder="Enter your Language Spoken"
+                  value={person.languageDialectSpoken ?? ""}
+                  required
+                  onChange={handleChange}
+                  error={!!errors.languageDialectSpoken}
+                  helperText={
+                    errors.languageDialectSpoken
+                      ? "This field is required."
+                      : ""
+                  }
                 />
               </Box>
             </Box>
-
 
             <Box display="flex" gap={2}>
               <Box flex={1}>
@@ -3384,13 +3936,18 @@ const AdmissionPersonalInformation = () => {
               </Box>
             </Box>
 
-
             <br />
-            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Contact Information:</Typography>
+            <Typography
+              style={{
+                fontSize: "20px",
+                color: mainButtonColor,
+                fontWeight: "bold",
+              }}
+            >
+              Contact Information:
+            </Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
-
-
 
             <Box display="flex" gap={2} mb={2}>
               <Box flex={1}>
@@ -3440,7 +3997,6 @@ const AdmissionPersonalInformation = () => {
                   required
                   value={person.emailAddress || ""}
                   placeholder="Your registered email"
-
                   sx={{
                     backgroundColor: "#f0f0f0",
                   }}
@@ -3461,52 +4017,60 @@ const AdmissionPersonalInformation = () => {
                   onChange={handleChange}
                   onBlur={() => handleUpdate(person)}
                   error={!!errors.facebook_account}
-                  helperText={errors.facebook_account ? "This field is required." : ""}
+                  helperText={
+                    errors.facebook_account ? "This field is required." : ""
+                  }
                 />
               </Box>
             </Box>
 
-
-
-
-            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Present Address:</Typography>
+            <Typography
+              style={{
+                fontSize: "20px",
+                color: mainButtonColor,
+                fontWeight: "bold",
+              }}
+            >
+              Present Address:
+            </Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
             <Box
               sx={{
-                display: 'flex',
-                alignItems: 'center', // vertically center
-                justifyContent: 'center', // horizontally center
-                backgroundColor: '#FFF4E5',
-                border: '1px solid #FFA726',
+                display: "flex",
+                alignItems: "center", // vertically center
+                justifyContent: "center", // horizontally center
+                backgroundColor: "#FFF4E5",
+                border: "1px solid #FFA726",
                 borderRadius: 2,
                 p: 2,
                 height: "50px",
                 mb: 2,
-                textAlign: 'center' // ensures multiline text is centered
+                textAlign: "center", // ensures multiline text is centered
               }}
             >
-              <WarningAmberIcon sx={{ color: '#FF9800', mr: 1 }} />
+              <WarningAmberIcon sx={{ color: "#FF9800", mr: 1 }} />
               <Typography fontWeight="medium" color="#BF360C">
                 NOTICE: Fill up first the{" "}
                 <strong>
-                  REGION <span style={{ fontSize: '1.2em', margin: '0 15px' }}>➔</span>
-                  PERMANENT PROVINCE <span style={{ fontSize: '1.2em', margin: '0 15px' }}>➔</span>
-                  PERMANENT MUNICIPALITY <span style={{ fontSize: '1.2em', margin: '0 15px' }}>➔</span>
+                  REGION{" "}
+                  <span style={{ fontSize: "1.2em", margin: "0 15px" }}>➔</span>
+                  PERMANENT PROVINCE{" "}
+                  <span style={{ fontSize: "1.2em", margin: "0 15px" }}>➔</span>
+                  PERMANENT MUNICIPALITY{" "}
+                  <span style={{ fontSize: "1.2em", margin: "0 15px" }}>➔</span>
                   PERMANENT BARANGAY
                 </strong>
               </Typography>
             </Box>
 
-
-
             <Box display="flex" gap={2} mb={2}>
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Present Street</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Present Street
+                </Typography>
                 <TextField
                   fullWidth
-
-
                   size="small"
                   name="presentStreet"
                   value={person.presentStreet || ""}
@@ -3518,10 +4082,11 @@ const AdmissionPersonalInformation = () => {
               </Box>
 
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Present Zip Code</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Present Zip Code
+                </Typography>
                 <TextField
                   fullWidth
-
                   type="number"
                   size="small"
                   name="presentZipCode"
@@ -3529,23 +4094,28 @@ const AdmissionPersonalInformation = () => {
                   value={person.presentZipCode || ""}
                   onChange={handleChange}
                   error={!!errors.presentZipCode}
-                  helperText={errors.presentZipCode && "This field is required."}
+                  helperText={
+                    errors.presentZipCode && "This field is required."
+                  }
                 />
               </Box>
             </Box>
 
-
-
             <Box display="flex" gap={2} mb={2}>
-
               {/* REGION */}
-              <FormControl fullWidth size="small" required error={!!errors.presentRegion}>
-                <Typography mb={1} fontWeight="medium">Present Region</Typography>
+              <FormControl
+                fullWidth
+                size="small"
+                required
+                error={!!errors.presentRegion}
+              >
+                <Typography mb={1} fontWeight="medium">
+                  Present Region
+                </Typography>
 
                 <Select
                   name="presentRegion"
                   displayEmpty
-
                   value={person.presentRegion || ""}
                   onChange={(e) => {
                     handleChange(e);
@@ -3558,10 +4128,15 @@ const AdmissionPersonalInformation = () => {
                     setBarangayList([]);
                   }}
                 >
-                  <MenuItem value=""><em>Select Region</em></MenuItem>
+                  <MenuItem value="">
+                    <em>Select Region</em>
+                  </MenuItem>
 
-                  {regionList.map(region => (
-                    <MenuItem key={region.region_code} value={region.region_name}>
+                  {regionList.map((region) => (
+                    <MenuItem
+                      key={region.region_code}
+                      value={region.region_name}
+                    >
                       {region.region_name}
                     </MenuItem>
                   ))}
@@ -3573,11 +4148,17 @@ const AdmissionPersonalInformation = () => {
               </FormControl>
 
               {/* PROVINCE */}
-              <FormControl fullWidth size="small" required error={!!errors.presentProvince}>
-                <Typography mb={1} fontWeight="medium">Present Province</Typography>
+              <FormControl
+                fullWidth
+                size="small"
+                required
+                error={!!errors.presentProvince}
+              >
+                <Typography mb={1} fontWeight="medium">
+                  Present Province
+                </Typography>
 
                 <Select
-
                   name="presentProvince"
                   displayEmpty
                   value={person.presentProvince || ""}
@@ -3591,10 +4172,15 @@ const AdmissionPersonalInformation = () => {
                   }}
                   disabled={!person.presentRegion}
                 >
-                  <MenuItem value=""><em>Select Province</em></MenuItem>
+                  <MenuItem value="">
+                    <em>Select Province</em>
+                  </MenuItem>
 
-                  {provinceList.map(province => (
-                    <MenuItem key={province.province_code} value={province.province_name}>
+                  {provinceList.map((province) => (
+                    <MenuItem
+                      key={province.province_code}
+                      value={province.province_name}
+                    >
                       {province.province_name}
                     </MenuItem>
                   ))}
@@ -3604,18 +4190,22 @@ const AdmissionPersonalInformation = () => {
                   <FormHelperText>This field is required.</FormHelperText>
                 )}
               </FormControl>
-
             </Box>
 
             {/* MUNICIPALITY & BARANGAY */}
             <Box display="flex" gap={2} mb={2}>
-
               {/* MUNICIPALITY */}
-              <FormControl fullWidth size="small" required error={!!errors.presentMunicipality}>
-                <Typography mb={1} fontWeight="medium">Present Municipality</Typography>
+              <FormControl
+                fullWidth
+                size="small"
+                required
+                error={!!errors.presentMunicipality}
+              >
+                <Typography mb={1} fontWeight="medium">
+                  Present Municipality
+                </Typography>
 
                 <Select
-
                   name="presentMunicipality"
                   displayEmpty
                   value={person.presentMunicipality || ""}
@@ -3627,9 +4217,11 @@ const AdmissionPersonalInformation = () => {
                   }}
                   disabled={!person.presentProvince}
                 >
-                  <MenuItem value=""><em>Select Municipality</em></MenuItem>
+                  <MenuItem value="">
+                    <em>Select Municipality</em>
+                  </MenuItem>
 
-                  {cityList.map(city => (
+                  {cityList.map((city) => (
                     <MenuItem key={city.city_code} value={city.city_name}>
                       {city.city_name}
                     </MenuItem>
@@ -3642,11 +4234,17 @@ const AdmissionPersonalInformation = () => {
               </FormControl>
 
               {/* BARANGAY */}
-              <FormControl fullWidth size="small" required error={!!errors.presentBarangay}>
-                <Typography mb={1} fontWeight="medium">Present Barangay</Typography>
+              <FormControl
+                fullWidth
+                size="small"
+                required
+                error={!!errors.presentBarangay}
+              >
+                <Typography mb={1} fontWeight="medium">
+                  Present Barangay
+                </Typography>
 
                 <Select
-
                   name="presentBarangay"
                   displayEmpty
                   value={person.presentBarangay || ""}
@@ -3656,9 +4254,11 @@ const AdmissionPersonalInformation = () => {
                   }}
                   disabled={!person.presentMunicipality}
                 >
-                  <MenuItem value=""><em>Select Barangay</em></MenuItem>
+                  <MenuItem value="">
+                    <em>Select Barangay</em>
+                  </MenuItem>
 
-                  {barangayList.map(brgy => (
+                  {barangayList.map((brgy) => (
                     <MenuItem key={brgy.brgy_code} value={brgy.brgy_name}>
                       {brgy.brgy_name}
                     </MenuItem>
@@ -3669,18 +4269,14 @@ const AdmissionPersonalInformation = () => {
                   <FormHelperText>This field is required.</FormHelperText>
                 )}
               </FormControl>
-
             </Box>
-
-
-
 
             {/* DSWD Household Number */}
             <Box mb={2}>
-              <Typography mb={1} fontWeight="medium">Present DSWD Household Number</Typography>
+              <Typography mb={1} fontWeight="medium">
+                Present DSWD Household Number
+              </Typography>
               <TextField
-
-
                 fullWidth
                 size="small"
                 name="presentDswdHouseholdNumber"
@@ -3688,16 +4284,23 @@ const AdmissionPersonalInformation = () => {
                 onChange={handleChange}
                 placeholder="Enter your Present DSWD Household Number"
                 error={!!errors.presentDswdHouseholdNumber}
-                helperText={errors.presentDswdHouseholdNumber && "This field is required."}
+                helperText={
+                  errors.presentDswdHouseholdNumber && "This field is required."
+                }
               />
             </Box>
 
-
-
-            <Typography style={{ fontSize: "20px", color: mainButtonColor, fontWeight: "bold" }}>Permanent Address:</Typography>
+            <Typography
+              style={{
+                fontSize: "20px",
+                color: mainButtonColor,
+                fontWeight: "bold",
+              }}
+            >
+              Permanent Address:
+            </Typography>
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
-
 
             <FormControlLabel
               control={
@@ -3712,15 +4315,16 @@ const AdmissionPersonalInformation = () => {
                       sameAsPresentAddress: checked ? 1 : 0,
                     };
 
-
                     if (checked) {
                       updatedPerson.permanentStreet = person.presentStreet;
                       updatedPerson.permanentZipCode = person.presentZipCode;
                       updatedPerson.permanentRegion = person.presentRegion;
                       updatedPerson.permanentProvince = person.presentProvince;
-                      updatedPerson.permanentMunicipality = person.presentMunicipality;
+                      updatedPerson.permanentMunicipality =
+                        person.presentMunicipality;
                       updatedPerson.permanentBarangay = person.presentBarangay;
-                      updatedPerson.permanentDswdHouseholdNumber = person.presentDswdHouseholdNumber;
+                      updatedPerson.permanentDswdHouseholdNumber =
+                        person.presentDswdHouseholdNumber;
 
                       setPermanentRegion(person.presentRegion);
                       setPermanentProvince(person.presentProvince);
@@ -3735,16 +4339,19 @@ const AdmissionPersonalInformation = () => {
               label="Same as Present Address"
             />
 
-
-
-
             {/* Permanent Region & Province */}
             <Box display="flex" gap={2} mb={2}>
-
               {/* Permanent Region */}
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Region</Typography>
-                <FormControl fullWidth size="small" required error={!!errors.permanentRegion}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Region
+                </Typography>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.permanentRegion}
+                >
                   <Select
                     name="permanentRegion"
                     displayEmpty
@@ -3764,23 +4371,35 @@ const AdmissionPersonalInformation = () => {
                       <em>Select Region</em>
                     </MenuItem>
 
-                    {permanentRegionList.map(region => (
-                      <MenuItem key={region.region_code} value={region.region_name}>
+                    {permanentRegionList.map((region) => (
+                      <MenuItem
+                        key={region.region_code}
+                        value={region.region_name}
+                      >
                         {region.region_name}
                       </MenuItem>
                     ))}
                   </Select>
 
                   {errors.permanentRegion && (
-                    <FormHelperText error>This field is required.</FormHelperText>
+                    <FormHelperText error>
+                      This field is required.
+                    </FormHelperText>
                   )}
                 </FormControl>
               </Box>
 
               {/* Permanent Province */}
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Province</Typography>
-                <FormControl fullWidth size="small" required error={!!errors.permanentProvince}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Province
+                </Typography>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.permanentProvince}
+                >
                   <Select
                     name="permanentProvince"
                     displayEmpty
@@ -3799,28 +4418,38 @@ const AdmissionPersonalInformation = () => {
                       <em>Select Province</em>
                     </MenuItem>
 
-                    {permanentProvinceList.map(province => (
-                      <MenuItem key={province.province_code} value={province.province_name}>
+                    {permanentProvinceList.map((province) => (
+                      <MenuItem
+                        key={province.province_code}
+                        value={province.province_name}
+                      >
                         {province.province_name}
                       </MenuItem>
                     ))}
                   </Select>
 
                   {errors.permanentProvince && (
-                    <FormHelperText error>This field is required.</FormHelperText>
+                    <FormHelperText error>
+                      This field is required.
+                    </FormHelperText>
                   )}
                 </FormControl>
               </Box>
-
             </Box>
 
             {/* Permanent Municipality & Barangay */}
             <Box display="flex" gap={2} mb={2}>
-
               {/* Permanent Municipality */}
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Municipality</Typography>
-                <FormControl fullWidth size="small" required error={!!errors.permanentMunicipality}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Municipality
+                </Typography>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.permanentMunicipality}
+                >
                   <Select
                     name="permanentMunicipality"
                     displayEmpty
@@ -3837,7 +4466,7 @@ const AdmissionPersonalInformation = () => {
                       <em>Select Municipality</em>
                     </MenuItem>
 
-                    {permanentCityList.map(city => (
+                    {permanentCityList.map((city) => (
                       <MenuItem key={city.city_code} value={city.city_name}>
                         {city.city_name}
                       </MenuItem>
@@ -3845,15 +4474,24 @@ const AdmissionPersonalInformation = () => {
                   </Select>
 
                   {errors.permanentMunicipality && (
-                    <FormHelperText error>This field is required.</FormHelperText>
+                    <FormHelperText error>
+                      This field is required.
+                    </FormHelperText>
                   )}
                 </FormControl>
               </Box>
 
               {/* Permanent Barangay */}
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Barangay</Typography>
-                <FormControl fullWidth size="small" required error={!!errors.permanentBarangay}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Barangay
+                </Typography>
+                <FormControl
+                  fullWidth
+                  size="small"
+                  required
+                  error={!!errors.permanentBarangay}
+                >
                   <Select
                     name="permanentBarangay"
                     displayEmpty
@@ -3868,7 +4506,7 @@ const AdmissionPersonalInformation = () => {
                       <em>Select Barangay</em>
                     </MenuItem>
 
-                    {permanentBarangayList.map(brgy => (
+                    {permanentBarangayList.map((brgy) => (
                       <MenuItem key={brgy.brgy_code} value={brgy.brgy_name}>
                         {brgy.brgy_name}
                       </MenuItem>
@@ -3876,17 +4514,19 @@ const AdmissionPersonalInformation = () => {
                   </Select>
 
                   {errors.permanentBarangay && (
-                    <FormHelperText error>This field is required.</FormHelperText>
+                    <FormHelperText error>
+                      This field is required.
+                    </FormHelperText>
                   )}
                 </FormControl>
               </Box>
-
             </Box>
-
 
             <Box display="flex" gap={2} mb={2}>
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Street</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Street
+                </Typography>
                 <TextField
                   fullWidth
                   size="small"
@@ -3895,12 +4535,16 @@ const AdmissionPersonalInformation = () => {
                   value={person.permanentStreet || ""}
                   onChange={handleChange}
                   error={!!errors.permanentStreet}
-                  helperText={errors.permanentStreet && "This field is required."}
+                  helperText={
+                    errors.permanentStreet && "This field is required."
+                  }
                 />
               </Box>
 
               <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Zip Code</Typography>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Zip Code
+                </Typography>
                 <TextField
                   fullWidth
                   size="small"
@@ -3910,16 +4554,18 @@ const AdmissionPersonalInformation = () => {
                   value={person.permanentZipCode || ""}
                   onChange={handleChange}
                   error={!!errors.permanentZipCode}
-                  helperText={errors.permanentZipCode && "This field is required."}
+                  helperText={
+                    errors.permanentZipCode && "This field is required."
+                  }
                 />
               </Box>
             </Box>
 
-
-
             {/* DSWD Household Number */}
             <Box mb={2}>
-              <Typography mb={1} fontWeight="medium">Permanent DSWD Household Number</Typography>
+              <Typography mb={1} fontWeight="medium">
+                Permanent DSWD Household Number
+              </Typography>
               <TextField
                 fullWidth
                 size="small"
@@ -3929,7 +4575,10 @@ const AdmissionPersonalInformation = () => {
                 value={person.permanentDswdHouseholdNumber || ""}
                 onChange={handleChange}
                 error={!!errors.permanentDswdHouseholdNumber}
-                helperText={errors.permanentDswdHouseholdNumber && "This field is required."}
+                helperText={
+                  errors.permanentDswdHouseholdNumber &&
+                  "This field is required."
+                }
               />
             </Box>
 
@@ -3967,8 +4616,9 @@ const AdmissionPersonalInformation = () => {
                   Do you want to change the program of Applicant{" "}
                   <strong>{getApplicantDisplayName()}</strong> (
                   <strong>{person?.applicant_number || "N/A"}</strong>) from{" "}
-                  <strong>{pendingProgramChange?.fromLabel || "N/A"}</strong> into{" "}
-                  <strong>{pendingProgramChange?.toLabel || "N/A"}</strong>?
+                  <strong>{pendingProgramChange?.fromLabel || "N/A"}</strong>{" "}
+                  into <strong>{pendingProgramChange?.toLabel || "N/A"}</strong>
+                  ?
                 </Typography>
               </DialogContent>
 
@@ -3979,7 +4629,11 @@ const AdmissionPersonalInformation = () => {
                   borderTop: "1px solid #e0e0e0",
                 }}
               >
-                <Button onClick={cancelProgramChange} color="error" variant="outlined">
+                <Button
+                  onClick={cancelProgramChange}
+                  color="error"
+                  variant="outlined"
+                >
                   Cancel
                 </Button>
 
@@ -4060,10 +4714,23 @@ const AdmissionPersonalInformation = () => {
                       borderBottom: "1px solid #e0e0e0",
                     }}
                   >
-                    <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+                    <Box
+                      sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}
+                    >
                       {/* LEFT SIDE — Sample/Reference Photo */}
-                      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                        <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 2,
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          color="text.secondary"
+                          fontWeight={600}
+                        >
                           ✅ Sample Format (Follow this exactly)
                         </Typography>
 
@@ -4100,27 +4767,43 @@ const AdmissionPersonalInformation = () => {
                             <br />
                             - Background: White.
                             <br />
-                            - Head size and position: Look directly into the camera at a
-                            straight angle, face centered.
+                            - Head size and position: Look directly into the
+                            camera at a straight angle, face centered.
                             <br />
                             - File types: JPEG, JPG, PNG
                             <br />
                             - Attire must be formal.
-                            <br />
-                            - Required File Size: 2mb
+                            <br />- Required File Size: 2mb
                           </Box>
                         </Box>
                       </Box>
 
                       {/* RIGHT SIDE — Upload area */}
-                      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                        <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 2,
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          color="text.secondary"
+                          fontWeight={600}
+                        >
                           📤 Your Photo
                         </Typography>
 
                         {/* Preview */}
                         {(preview || person.profile_img) && (
-                          <Box sx={{ display: "flex", justifyContent: "center", position: "relative" }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "center",
+                              position: "relative",
+                            }}
+                          >
                             <Box
                               component="img"
                               src={
@@ -4144,14 +4827,16 @@ const AdmissionPersonalInformation = () => {
                                 setSelectedFile(null);
                                 setPreview(null);
 
-                                const updatedPerson = { ...person, profile_img: "" };
+                                const updatedPerson = {
+                                  ...person,
+                                  profile_img: "",
+                                };
                                 setPerson(updatedPerson);
-                                await
-                                  setSnackbar({
-                                    open: true,
-                                    message: "Image removed successfully.",
-                                    severity: "info",
-                                  });
+                                await setSnackbar({
+                                  open: true,
+                                  message: "Image removed successfully.",
+                                  severity: "info",
+                                });
                               }}
                               sx={{
                                 position: "absolute",
@@ -4188,12 +4873,17 @@ const AdmissionPersonalInformation = () => {
                               px: 2,
                             }}
                           >
-                            No photo selected yet — match the sample on the left.
+                            No photo selected yet — match the sample on the
+                            left.
                           </Box>
                         )}
 
                         <Typography
-                          sx={{ fontSize: "16px", color: mainButtonColor, fontWeight: "bold" }}
+                          sx={{
+                            fontSize: "16px",
+                            color: mainButtonColor,
+                            fontWeight: "bold",
+                          }}
                         >
                           Select Your Image:
                         </Typography>
@@ -4212,16 +4902,26 @@ const AdmissionPersonalInformation = () => {
                         />
 
                         <Typography variant="caption" color="text.secondary">
-                          Click the × on your preview to remove it, choose a new file, then
-                          press Upload.
+                          Click the × on your preview to remove it, choose a new
+                          file, then press Upload.
                         </Typography>
                       </Box>
                     </Box>
                   </Box>
 
                   {/* Footer — matches DialogActions */}
-                  <Box sx={{ p: 2, display: "flex", justifyContent: "space-between" }}>
-                    <Button onClick={handleClose} color="error" variant="outlined">
+                  <Box
+                    sx={{
+                      p: 2,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Button
+                      onClick={handleClose}
+                      color="error"
+                      variant="outlined"
+                    >
                       Cancel
                     </Button>
 
@@ -4238,7 +4938,6 @@ const AdmissionPersonalInformation = () => {
                 </Box>
               </Box>
             </Modal>
-
 
             <Modal
               open={examPermitModalOpen}
@@ -4295,7 +4994,11 @@ const AdmissionPersonalInformation = () => {
                     >
                       Exam Permit Notice
                     </Typography>
-                    <Typography fontSize={12} color="rgba(255,255,255,0.8)" lineHeight={1.2}>
+                    <Typography
+                      fontSize={12}
+                      color="rgba(255,255,255,0.8)"
+                      lineHeight={1.2}
+                    >
                       Please review the message below
                     </Typography>
                   </Box>
@@ -4303,7 +5006,9 @@ const AdmissionPersonalInformation = () => {
 
                 {/* Body */}
                 <Box sx={{ px: 3, pt: 3, pb: 1, textAlign: "center" }}>
-                  <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                  <Box
+                    sx={{ display: "flex", justifyContent: "center", mb: 2 }}
+                  >
                     <Box
                       sx={{
                         width: 64,
@@ -4316,7 +5021,9 @@ const AdmissionPersonalInformation = () => {
                         justifyContent: "center",
                       }}
                     >
-                      <ErrorIcon sx={{ color: mainButtonColor, fontSize: 30 }} />
+                      <ErrorIcon
+                        sx={{ color: mainButtonColor, fontSize: 30 }}
+                      />
                     </Box>
                   </Box>
 
@@ -4331,7 +5038,11 @@ const AdmissionPersonalInformation = () => {
                     <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
                       <Typography
                         id="exam-permit-error-description"
-                        sx={{ fontSize: "13.5px", color: "#333", lineHeight: 1.65 }}
+                        sx={{
+                          fontSize: "13.5px",
+                          color: "#333",
+                          lineHeight: 1.65,
+                        }}
                       >
                         {examPermitError}
                       </Typography>
@@ -4366,10 +5077,6 @@ const AdmissionPersonalInformation = () => {
               </Box>
             </Modal>
 
-
-
-
-
             <Box display="flex" justifyContent="right" mt={4}>
               {/* Previous Page Button */}
 
@@ -4389,7 +5096,8 @@ const AdmissionPersonalInformation = () => {
                   alignItems: "center", // Center the content vertically
                 }}
               >
-                <PhotoCameraIcon sx={{ marginRight: "8px" }} /> {/* Photo Icon */}
+                <PhotoCameraIcon sx={{ marginRight: "8px" }} />{" "}
+                {/* Photo Icon */}
                 Upload Photo <br /> Student Picture
               </Button>
               <Button
@@ -4409,12 +5117,15 @@ const AdmissionPersonalInformation = () => {
                     });
 
                     setTimeout(() => {
-                      navigate(`/admission_family_background?person_id=${userID}`);
+                      navigate(
+                        `/admission_family_background?person_id=${userID}`,
+                      );
                     }, 1500);
                   } else {
                     setSnackbar({
                       open: true,
-                      message: "Please complete all required fields before proceeding.",
+                      message:
+                        "Please complete all required fields before proceeding.",
                       severity: "error",
                     });
                   }
@@ -4422,20 +5133,20 @@ const AdmissionPersonalInformation = () => {
                 endIcon={
                   <ArrowForwardIcon
                     sx={{
-                      color: '#fff',
-                      transition: 'color 0.3s',
+                      color: "#fff",
+                      transition: "color 0.3s",
                     }}
                   />
                 }
                 sx={{
                   backgroundColor: mainButtonColor,
                   border: `1px solid ${borderColor}`,
-                  color: '#fff',
-                  '&:hover': {
+                  color: "#fff",
+                  "&:hover": {
                     backgroundColor: "#000000",
-                    color: '#fff',
-                    '& .MuiSvgIcon-root': {
-                      color: '#fff',
+                    color: "#fff",
+                    "& .MuiSvgIcon-root": {
+                      color: "#fff",
                     },
                   },
                 }}
@@ -4451,19 +5162,19 @@ const AdmissionPersonalInformation = () => {
               anchorOrigin={{ vertical: "top", horizontal: "center" }}
             >
               <Alert
-                onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+                onClose={() =>
+                  setSnackbar((prev) => ({ ...prev, open: false }))
+                }
                 severity={snackbar.severity}
-
                 sx={{ width: "100%" }}
               >
                 {snackbar.message}
               </Alert>
             </Snackbar>
-
           </Container>
         </form>
-      </Container >
-    </Box >
+      </Container>
+    </Box>
   );
 };
 

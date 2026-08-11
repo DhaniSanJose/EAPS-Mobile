@@ -454,9 +454,11 @@ const ExaminationPermitChangeCourse = () => {
 
   const getOrdinal = (n) => {
     if (!n) return "";
+    const numeric = Number(n);
+    if (!Number.isFinite(numeric)) return String(n);
     const s = ["th", "st", "nd", "rd"];
-    const v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    const v = numeric % 100;
+    return numeric + (s[(v - 20) % 10] || s[v] || s[0]);
   };
 
   const permitRef = useRef();
@@ -2255,7 +2257,7 @@ const ExaminationPermitChangeCourse = () => {
                   >
                     {examSchedule?.floor !== undefined &&
                     examSchedule?.floor !== null
-                      ? getOrdinal(Number(examSchedule.floor))
+                      ? getOrdinal(examSchedule.floor)
                       : ""}
                   </span>
                 </div>

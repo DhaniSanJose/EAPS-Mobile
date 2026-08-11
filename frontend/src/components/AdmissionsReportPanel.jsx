@@ -25,7 +25,11 @@ const formatDate = (value) => {
   if (!value) return "N/A";
   const d = new Date(value);
   if (isNaN(d)) return String(value);
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 };
 
 const formatFormType = (type) =>
@@ -34,11 +38,17 @@ const formatFormType = (type) =>
     changeCourse1: "Change Course (Campus Director)",
     newForm: "Empty Change Course (College Dean)",
     newForm1: "Empty Change Course (Campus Director)",
-  }[type] || type || "N/A");
+  })[type] ||
+  type ||
+  "N/A";
 
 const formatExamResultStatus = (status) => {
   if (status === null || status === undefined || status === "") return "N/A";
-  return Number(status) === 0 ? "PASSED" : Number(status) === 1 ? "FAILED" : "N/A";
+  return Number(status) === 0
+    ? "PASSED"
+    : Number(status) === 1
+      ? "FAILED"
+      : "N/A";
 };
 
 const fullName = (r) =>
@@ -63,7 +73,7 @@ const REPORT_DEFS = [
     columns: [
       { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
       { label: "Name", value: fullName },
-      { label: "Score", value: (r) => (r.total_score ?? "N/A") },
+      { label: "Score", value: (r) => r.total_score ?? "N/A" },
       { label: "Result", value: (r) => formatExamResultStatus(r.status) },
       { label: "Date Taken", value: (r) => formatDate(r.date_created) },
     ],
@@ -116,7 +126,7 @@ const REPORT_DEFS = [
     columns: [
       { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
       { label: "Name", value: fullName },
-      { label: "Score", value: (r) => (r.total_score ?? "N/A") },
+      { label: "Score", value: (r) => r.total_score ?? "N/A" },
       { label: "Result", value: (r) => formatExamResultStatus(r.status) },
       { label: "Date", value: (r) => formatDate(r.date_created) },
     ],
@@ -146,9 +156,12 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     setLoadingSummary(true);
     try {
       const params = selectedCampus !== "all" ? { campus: selectedCampus } : {};
-      const res = await axios.get(`${API_BASE_URL}/api/reports/admissions-summary`, {
-        params,
-      });
+      const res = await axios.get(
+        `${API_BASE_URL}/api/reports/admissions-summary`,
+        {
+          params,
+        },
+      );
       setSummary(res.data);
     } catch (err) {
       console.error("Error fetching admissions summary:", err);
@@ -161,10 +174,27 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     fetchSummary();
   }, [fetchSummary]);
 
+  const campusAddressFor = (campuses, campusId, fallback) => {
+    if (!campusId || campusId === "all") return fallback;
+    const match = campuses.find((c) => String(c.id) === String(campusId));
+    return match?.address || fallback;
+  };
+
   const buildTableHtml = (title, columns, rows) => {
-    const logoSrc = assets.logoUrl ? `${assets.logoUrl}` : EaristLogo;
-    const companyName = branding.companyName || "EARIST";
-    const address = branding.campusAddress || branding.campusAddress || "";
+    // ── Same letterhead build as handleExportApplicantListPdf ──
+    const logoSrc = assets.logoUrl || EaristLogo;
+    const companyName = (branding.companyName || "").trim();
+    const words = companyName.split(" ");
+    const middleIndex = Math.ceil(words.length / 2);
+    const firstLine = words.slice(0, middleIndex).join(" ");
+    const secondLine = words.slice(middleIndex).join(" ");
+
+    const resolvedCampusAddress = campusAddressFor(
+      campuses,
+      selectedCampus,
+      branding.campusAddress || "No address set in Settings",
+    );
+    const campusLabel = campusLabelFor(campuses, selectedCampus);
     const generatedAt = new Date().toLocaleString("en-US");
 
     const headerRow = `<tr>${columns.map((c) => `<th>${c.label}</th>`).join("")}</tr>`;
@@ -183,27 +213,48 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
       : `<tr><td colspan="${columns.length}" style="padding:14px;">No records found for this period.</td></tr>`;
 
     return `
-      <div class="print-header">
-        <div class="print-corner-label left">Office of Admission Services</div>
-        <div class="print-corner-label right">Generated: ${generatedAt}</div>
-        <div class="header-content">
-          <img src="${logoSrc}" alt="Logo" />
-          <div class="header-text">
-            <div style="font-size:12px;">Republic of the Philippines</div>
-            <div style="font-weight:bold;font-size:15px;text-transform:uppercase;">${companyName}</div>
-            ${address ? `<div style="font-size:11px;">${address}</div>` : ""}
-            <div style="font-weight:bold;font-size:14px;margin-top:6px;text-transform:uppercase;">${title}</div>
-            <div style="font-size:11px;">Total Records: ${rows.length}</div>
-          </div>
+    <div class="print-header">
+
+      <div class="header-content">
+        <img src="${logoSrc}" alt="School Logo" />
+
+        <div class="header-text">
+          <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+
+          ${
+            companyName
+              ? `
+              <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                ${firstLine}
+              </b>
+              ${
+                secondLine
+                  ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+                     <b>${secondLine}</b>
+                   </div>`
+                  : ""
+              }
+            `
+              : ""
+          }
+
+          <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
         </div>
       </div>
-      <div class="table-wrapper">
-        <table>
-          <thead>${headerRow}</thead>
-          <tbody>${bodyRows}</tbody>
-        </table>
+
+      <div style="margin-top: 20px; text-align: center;">
+        <b style="font-size: 20px; letter-spacing: 1px;">${title}</b>
       </div>
-    `;
+    
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>${headerRow}</thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `;
   };
 
   const handleDownload = async (def) => {
@@ -218,7 +269,9 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
         params.campus = selectedCampus;
       }
 
-      const listRes = await axios.get(`${API_BASE_URL}${def.listEndpoint}`, { params });
+      const listRes = await axios.get(`${API_BASE_URL}${def.listEndpoint}`, {
+        params,
+      });
       const rows = Array.isArray(listRes.data) ? listRes.data : [];
 
       const campusLabel = campusLabelFor(campuses, selectedCampus);
@@ -289,7 +342,9 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
         </Box>
         <Button
           size="small"
-          startIcon={loadingSummary ? <CircularProgress size={14} /> : <RefreshIcon />}
+          startIcon={
+            loadingSummary ? <CircularProgress size={14} /> : <RefreshIcon />
+          }
           onClick={fetchSummary}
           disabled={loadingSummary}
         >
@@ -311,11 +366,19 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
                 }}
               >
                 <CardContent>
-                  <Typography fontWeight="bold" fontSize={14} sx={{ color: def.color }}>
+                  <Typography
+                    fontWeight="bold"
+                    fontSize={14}
+                    sx={{ color: def.color }}
+                  >
                     {def.title}
                   </Typography>
                   {def.subtitle && (
-                    <Typography fontSize={11} color="text.secondary" sx={{ mb: 0.5 }}>
+                    <Typography
+                      fontSize={11}
+                      color="text.secondary"
+                      sx={{ mb: 0.5 }}
+                    >
                       {def.subtitle}
                     </Typography>
                   )}
@@ -347,12 +410,22 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
 
                   <Divider sx={{ my: 1 }} />
 
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 1,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <FormControl size="small" sx={{ minWidth: 100 }}>
                       <Select
                         value={periods[def.key]}
                         onChange={(e) =>
-                          setPeriods((p) => ({ ...p, [def.key]: e.target.value }))
+                          setPeriods((p) => ({
+                            ...p,
+                            [def.key]: e.target.value,
+                          }))
                         }
                       >
                         <MenuItem value="day">Day</MenuItem>
@@ -365,7 +438,9 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
                       <FormControl size="small" sx={{ minWidth: 100 }}>
                         <Select
                           value={resultsStatusFilter}
-                          onChange={(e) => setResultsStatusFilter(e.target.value)}
+                          onChange={(e) =>
+                            setResultsStatusFilter(e.target.value)
+                          }
                         >
                           <MenuItem value="all">All</MenuItem>
                           <MenuItem value="0">Passed</MenuItem>
