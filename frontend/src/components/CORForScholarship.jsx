@@ -670,8 +670,11 @@ const CertificateOfRegistration = forwardRef(
                 String(item?.student_number) === String(student_number) &&
                 Number(item?.status) === 1 &&
                 (!activeSchoolYear[0]?.id ||
-                  Number(item?.active_school_year_id ?? item?.activeSchoolYearId ?? 0) ===
-                    Number(activeSchoolYear[0].id)),
+                  Number(
+                    item?.active_school_year_id ??
+                      item?.activeSchoolYearId ??
+                      0,
+                  ) === Number(activeSchoolYear[0].id)),
             )
             .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
 
@@ -921,7 +924,8 @@ const CertificateOfRegistration = forwardRef(
 
       const resolveStudentFees = async () => {
         try {
-          const tuitionAmount = Number(totalLecFees || 0) + Number(totalLabFees || 0);
+          const tuitionAmount =
+            Number(totalLecFees || 0) + Number(totalLabFees || 0);
           const result = await fetchResolvedFees({
             tuitionAmount,
             branchId: person?.campus || "",
@@ -996,7 +1000,9 @@ const CertificateOfRegistration = forwardRef(
       const totalCombined = totalCourseUnits + totalLabUnits;
       const totalNstpUnits = enrolled.reduce((sum, item) => {
         const courseCode = String(item?.course_code || "").toUpperCase();
-        const courseDescription = String(item?.course_description || "").toUpperCase();
+        const courseDescription = String(
+          item?.course_description || "",
+        ).toUpperCase();
         const isNstpSubject =
           courseCode.includes("NSTP") || courseDescription.includes("NSTP");
         return isNstpSubject

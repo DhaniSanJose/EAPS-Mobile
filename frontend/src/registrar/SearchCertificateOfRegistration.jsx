@@ -1,6 +1,12 @@
 // Search COR
 
-import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  useCallback,
+} from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -24,8 +30,8 @@ import {
   DialogContent,
   LinearProgress,
 } from "@mui/material";
-import '../styles/Print.css'
-import CertificateOfRegistration from '../registrar/CertificateOfRegistrationForRegistrar';
+import "../styles/Print.css";
+import CertificateOfRegistration from "../registrar/CertificateOfRegistrationForRegistrar";
 import SearchIcon from "@mui/icons-material/Search";
 import { FcPrint } from "react-icons/fc";
 import { MdOutlinePayment } from "react-icons/md";
@@ -52,20 +58,27 @@ const formatStudentAuditName = (student) =>
     cleanAuditValue(student?.first_name),
     cleanAuditValue(student?.middle_name),
     cleanAuditValue(student?.last_name),
-  ].filter(Boolean).join(" ") || "Unknown Student";
+  ]
+    .filter(Boolean)
+    .join(" ") || "Unknown Student";
 
 const formatSuggestionName = (student) =>
   [
     cleanAuditValue(student?.first_name),
     cleanAuditValue(student?.middle_name),
     cleanAuditValue(student?.last_name),
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
 const logCorSearchAudit = async (student, fallbackStudentNumber) => {
   try {
     await postAuditEvent("student_cor_searched", {
       student_name: formatStudentAuditName(student),
-      student_number: cleanAuditValue(student?.student_number) || cleanAuditValue(fallbackStudentNumber) || "N/A",
+      student_number:
+        cleanAuditValue(student?.student_number) ||
+        cleanAuditValue(fallbackStudentNumber) ||
+        "N/A",
     });
   } catch (err) {
     console.error("COR search audit failed:", err);
@@ -96,8 +109,8 @@ const SearchCertificateOfRegistration = () => {
   const [subtitleColor, setSubtitleColor] = useState("#555555");
   const [borderColor, setBorderColor] = useState("#000000");
   const [mainButtonColor, setMainButtonColor] = useState("#1976d2");
-  const [subButtonColor, setSubButtonColor] = useState("#ffffff");   // ✅ NEW
-  const [stepperColor, setStepperColor] = useState("#000000");       // ✅ NEW
+  const [subButtonColor, setSubButtonColor] = useState("#ffffff"); // ✅ NEW
+  const [stepperColor, setStepperColor] = useState("#000000"); // ✅ NEW
 
   const [fetchedLogo, setFetchedLogo] = useState(null);
   const [companyName, setCompanyName] = useState("");
@@ -112,8 +125,8 @@ const SearchCertificateOfRegistration = () => {
     if (colors.subtitle) setSubtitleColor(colors.subtitle);
     if (colors.border) setBorderColor(colors.border);
     if (colors.mainButton) setMainButtonColor(colors.mainButton);
-    if (colors.subButton) setSubButtonColor(colors.subButton);   // ✅ NEW
-    if (colors.stepper) setStepperColor(colors.stepper);           // ✅ NEW
+    if (colors.subButton) setSubButtonColor(colors.subButton); // ✅ NEW
+    if (colors.stepper) setStepperColor(colors.stepper); // ✅ NEW
 
     // 🏫 Logo
     if (assets.logoUrl) {
@@ -126,7 +139,6 @@ const SearchCertificateOfRegistration = () => {
     if (branding.companyName) setCompanyName(branding.companyName);
     if (branding.shortTerm) setShortTerm(branding.shortTerm);
     if (branding.campusAddress) setCampusAddress(branding.campusAddress);
-
   }, [settings]);
 
   // Also put it at the very top
@@ -163,14 +175,16 @@ const SearchCertificateOfRegistration = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
       } else {
         setHasAccess(false);
       }
     } catch (error) {
-      console.error('Error checking access:', error);
+      console.error("Error checking access:", error);
       setHasAccess(false);
       if (error.response && error.response.data.message) {
         console.log(error.response.data.message);
@@ -180,8 +194,6 @@ const SearchCertificateOfRegistration = () => {
       setLoading(false);
     }
   };
-
-
 
   const location = useLocation();
   const REGISTRAR_COR_SEARCH_KEY = "registrar_cor_search_student_number";
@@ -230,7 +242,9 @@ const SearchCertificateOfRegistration = () => {
           Array.isArray(activeRes.data) && activeRes.data.length > 0
             ? activeRes.data[0]
             : null;
-        setSchoolYears(filterSchoolYearsFromActive(yearsRes.data || [], active));
+        setSchoolYears(
+          filterSchoolYearsFromActive(yearsRes.data || [], active),
+        );
         if (active) {
           setSelectedSchoolYear(active.year_id);
           setSelectedSchoolSemester(active.semester_id);
@@ -259,7 +273,10 @@ const SearchCertificateOfRegistration = () => {
           setSelectedActiveSchoolYear(res.data[0].school_year_id);
         } else {
           setSelectedActiveSchoolYear("");
-          showSnackbar("No academic term found for the selected year/semester.", "warning");
+          showSnackbar(
+            "No academic term found for the selected year/semester.",
+            "warning",
+          );
         }
       })
       .catch((err) => {
@@ -305,14 +322,23 @@ const SearchCertificateOfRegistration = () => {
           setStudentNumber(resolvedStudentNumber);
           sessionStorage.setItem("edit_person_id", personIdFromUrl);
           sessionStorage.setItem("edit_student_number", resolvedStudentNumber);
-          sessionStorage.setItem(REGISTRAR_COR_SEARCH_KEY, resolvedStudentNumber);
+          sessionStorage.setItem(
+            REGISTRAR_COR_SEARCH_KEY,
+            resolvedStudentNumber,
+          );
         } else {
-          showSnackbar("No student number found for the selected person.", "warning");
+          showSnackbar(
+            "No student number found for the selected person.",
+            "warning",
+          );
         }
       })
       .catch((err) => {
         console.error("Auto COR search failed:", err);
-        showSnackbar("Unable to load student number for the selected person.", "error");
+        showSnackbar(
+          "Unable to load student number for the selected person.",
+          "error",
+        );
       });
   }, [location.search]);
 
@@ -336,7 +362,9 @@ const SearchCertificateOfRegistration = () => {
         setCorPreloadLoading(true);
 
         const [res, preloadRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/program_evaluation/${debouncedStudentNumber}`),
+          fetch(
+            `${API_BASE_URL}/api/program_evaluation/${debouncedStudentNumber}`,
+          ),
           axios
             .post(
               `${API_BASE_URL}/api/student-tagging`,
@@ -344,14 +372,14 @@ const SearchCertificateOfRegistration = () => {
                 studentNumber: debouncedStudentNumber,
                 active_school_year_id: selectedActiveSchoolYear,
               },
-              { headers: { "Content-Type": "application/json" } }
+              { headers: { "Content-Type": "application/json" } },
             )
             .catch((err) => {
               console.error("COR preload failed:", err);
               showSnackbar(
                 err.response?.data?.message ||
-                "No COR found for the selected academic term.",
-                "warning"
+                  "No COR found for the selected academic term.",
+                "warning",
               );
               return null;
             }),
@@ -369,8 +397,8 @@ const SearchCertificateOfRegistration = () => {
 
           showSnackbar(
             errorBody?.message ||
-            "No enrolled-subject summary found. COR can still be generated from student record.",
-            "info"
+              "No enrolled-subject summary found. COR can still be generated from student record.",
+            "info",
           );
           return;
         }
@@ -389,7 +417,7 @@ const SearchCertificateOfRegistration = () => {
           showSnackbar("Student found successfully.", "success");
 
           const detailsRes = await fetch(
-            `${API_BASE_URL}/api/program_evaluation/details/${debouncedStudentNumber}`
+            `${API_BASE_URL}/api/program_evaluation/details/${debouncedStudentNumber}`,
           );
           const detailsData = await detailsRes.json();
 
@@ -397,7 +425,10 @@ const SearchCertificateOfRegistration = () => {
             setStudentDetails(detailsData);
           } else {
             setStudentDetails([]);
-            showSnackbar("No enrolled subjects found for this student.", "info");
+            showSnackbar(
+              "No enrolled subjects found for this student.",
+              "info",
+            );
           }
         } else {
           setSelectedStudent(null);
@@ -499,7 +530,7 @@ const SearchCertificateOfRegistration = () => {
       while (true) {
         await new Promise((resolve) => setTimeout(resolve, 500));
         const statusRes = await axios.get(
-          `${API_BASE_URL}/api/cor-export/jobs/${jobId}`
+          `${API_BASE_URL}/api/cor-export/jobs/${jobId}`,
         );
         job = statusRes.data;
 
@@ -516,13 +547,13 @@ const SearchCertificateOfRegistration = () => {
       setExportStatus("Downloading PDF...");
       const downloadRes = await axios.get(
         `${API_BASE_URL}/api/cor-export/jobs/${jobId}/download`,
-        { responseType: "blob" }
+        { responseType: "blob" },
       );
 
       downloadBlob(
         downloadRes.data,
         job?.file_name ||
-          `${debouncedStudentNumber}_Certificate_Of_Registration.pdf`
+          `${debouncedStudentNumber}_Certificate_Of_Registration.pdf`,
       );
 
       setExportProgress(100);
@@ -566,9 +597,12 @@ const SearchCertificateOfRegistration = () => {
 
     const delayDebounce = setTimeout(async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
-          params: { query, limit: 10 },
-        });
+        const res = await axios.get(
+          `${API_BASE_URL}/api/cor-student-suggestions`,
+          {
+            params: { query, limit: 10 },
+          },
+        );
 
         if (!cancelled) {
           setStudentSuggestions(res.data || []);
@@ -645,15 +679,13 @@ const SearchCertificateOfRegistration = () => {
     corPaymentActionsRef.current?.openScholarshipModal();
   };
 
-  // Put this at the very bottom before the return 
+  // Put this at the very bottom before the return
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
   }
 
   if (!hasAccess) {
-    return (
-      <Unauthorized />
-    );
+    return <Unauthorized />;
   }
 
   // 🔒 Disable right-click
@@ -677,7 +709,16 @@ const SearchCertificateOfRegistration = () => {
   });
 
   return (
-    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+    <Box
+      sx={{
+        height: "calc(100vh - 150px)",
+        overflowY: "auto",
+        paddingRight: 1,
+        backgroundColor: "transparent",
+        mt: 1,
+        padding: 2,
+      }}
+    >
       <Box
         sx={{
           display: "flex",
@@ -686,7 +727,6 @@ const SearchCertificateOfRegistration = () => {
           flexWrap: "wrap",
 
           mb: 2,
-
         }}
       >
         <Typography
@@ -700,7 +740,14 @@ const SearchCertificateOfRegistration = () => {
           SEARCH CERTIFICATE OF REGISTRATION
         </Typography>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            flexWrap: "wrap",
+          }}
+        >
           <Box sx={{ position: "relative", width: 450 }}>
             <TextField
               variant="outlined"
@@ -808,29 +855,55 @@ const SearchCertificateOfRegistration = () => {
 
       <br />
 
-
-
       <br />
-      <TableContainer component={Paper} sx={{ width: '100%' }}>
+      <TableContainer component={Paper} sx={{ width: "100%" }}>
         <Table>
-          <TableHead sx={{ backgroundColor: headerColor, border: `1px solid ${borderColor}`, }}>
+          <TableHead
+            sx={{
+              backgroundColor: headerColor,
+              border: `1px solid ${borderColor}`,
+            }}
+          >
             <TableRow>
               {/* Left cell: Student Number */}
-              <TableCell sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}>
+              <TableCell
+                sx={{
+                  color: "white",
+                  fontSize: "20px",
+                  fontFamily: "Poppins, sans-serif",
+                  border: "none",
+                }}
+              >
                 Student Number:&nbsp;
-                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
+                <span
+                  style={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "normal",
+                    textDecoration: "underline",
+                  }}
+                >
                   {studentData.student_number || "N/A"}
-
                 </span>
               </TableCell>
 
               {/* Right cell: Student Name */}
               <TableCell
                 align="right"
-                sx={{ color: 'white', fontSize: '20px', fontFamily: "Poppins, sans-serif", border: 'none' }}
+                sx={{
+                  color: "white",
+                  fontSize: "20px",
+                  fontFamily: "Poppins, sans-serif",
+                  border: "none",
+                }}
               >
                 Student Name:&nbsp;
-                <span style={{ fontFamily: "Poppins, sans-serif", fontWeight: "normal", textDecoration: "underline" }}>
+                <span
+                  style={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: "normal",
+                    textDecoration: "underline",
+                  }}
+                >
                   {studentData && studentData.last_name
                     ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()} ${studentData.middle_name?.toUpperCase() || ""}`
                     : "N/A"}
@@ -840,8 +913,19 @@ const SearchCertificateOfRegistration = () => {
           </TableHead>
         </Table>
       </TableContainer>
-      <TableContainer component={Paper} sx={{ width: "100%", border: `1px solid ${borderColor}`, mb: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 4, p: 2, flexWrap: "wrap" }}>
+      <TableContainer
+        component={Paper}
+        sx={{ width: "100%", border: `1px solid ${borderColor}`, mb: 2 }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            p: 2,
+            flexWrap: "wrap",
+          }}
+        >
           <Box display="flex" alignItems="center" gap={1}>
             <Typography fontSize={13} sx={{ minWidth: "90px" }}>
               School Year:
@@ -897,12 +981,16 @@ const SearchCertificateOfRegistration = () => {
           onClick={handleGeneratePdf}
           disabled={pdfLoading || !debouncedStudentNumber}
           style={actionButtonStyle(pdfLoading || !debouncedStudentNumber)}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#d3d3d3")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "#f0f0f0")
+          }
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <FcPrint size={20} />
             {pdfLoading ? "Generating..." : "Generate Certificate PDF"}
           </span>
@@ -912,12 +1000,16 @@ const SearchCertificateOfRegistration = () => {
           onClick={handleSaveToUnifastClick}
           disabled={paymentButtonsDisabled}
           style={actionButtonStyle(paymentButtonsDisabled)}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#d3d3d3")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "#f0f0f0")
+          }
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <MdOutlinePayment size={20} />
             {paymentActionsState.unifastLabel}
           </span>
@@ -927,12 +1019,16 @@ const SearchCertificateOfRegistration = () => {
           onClick={handleSaveToMatriculationClick}
           disabled={paymentButtonsDisabled}
           style={actionButtonStyle(paymentButtonsDisabled)}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#d3d3d3")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#d3d3d3")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "#f0f0f0")
+          }
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <IoMdSchool size={20} />
             {paymentActionsState.matriculationLabel}
           </span>
@@ -942,7 +1038,7 @@ const SearchCertificateOfRegistration = () => {
       <div
         ref={divToPrintRef}
         style={{
-          transform: "scale(0.9)",       // 👈 10% zoom out
+          transform: "scale(0.9)", // 👈 10% zoom out
           transformOrigin: "top center", // keeps it centered
         }}
       >
@@ -961,14 +1057,17 @@ const SearchCertificateOfRegistration = () => {
         />
       </div>
 
-
       <Snackbar
         open={openSnackbar}
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} variant="filled">
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbarSeverity}
+          variant="filled"
+        >
           {snackbarMessage}
         </Alert>
       </Snackbar>

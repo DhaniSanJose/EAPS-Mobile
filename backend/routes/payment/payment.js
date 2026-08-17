@@ -5,7 +5,9 @@ const {
   ensureUnifastUnitColumns,
   ensureMatriculationUnitColumns,
 } = require("../database/database");
-const { logStudentHistoryFromRequest } = require("../../utils/studentHistoryLogger");
+const {
+  logStudentHistoryFromRequest,
+} = require("../../utils/studentHistoryLogger");
 const { createUnifastPaymentLine } = require("../../utils/unifastPaymentLines");
 const {
   upsertMatriculationAssessmentPaymentLine,
@@ -27,7 +29,9 @@ const normalizeFeeLines = (feeLines = []) =>
           fee_rate_id: Number(line?.fee_rate_id),
           amount: Number(line?.amount) || 0,
         }))
-        .filter((line) => Number.isFinite(line.fee_rate_id) && line.fee_rate_id > 0)
+        .filter(
+          (line) => Number.isFinite(line.fee_rate_id) && line.fee_rate_id > 0,
+        )
     : [];
 
 const round2 = (value) =>
@@ -65,10 +69,7 @@ const resolveBranchLabel = (branches, rawValue) => {
   );
 
   return String(
-    matched?.branch ||
-      matched?.branch_name ||
-      matched?.name ||
-      fallback,
+    matched?.branch || matched?.branch_name || matched?.name || fallback,
   ).trim();
 };
 
@@ -161,14 +162,26 @@ const getScholarshipFeeRules = async (
          ELSE 2
        END,
        sf.id DESC`,
-    [scholarshipId, schoolYearId, semesterId, normalizedYearLevelId, normalizedYearLevelId],
+    [
+      scholarshipId,
+      schoolYearId,
+      semesterId,
+      normalizedYearLevelId,
+      normalizedYearLevelId,
+    ],
   );
 
   return rows;
 };
 
 const getFeeRateMetaByIds = async (connection, feeRateIds = []) => {
-  const uniqueIds = [...new Set(feeRateIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
+  const uniqueIds = [
+    ...new Set(
+      feeRateIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0),
+    ),
+  ];
   if (!uniqueIds.length) return new Map();
 
   const placeholders = uniqueIds.map(() => "?").join(",");
@@ -213,9 +226,15 @@ const getScholarshipRuleForFeeRate = (scholarshipRules, feeRateId) =>
 
 const isTuitionMeta = (meta) => Number(meta?.fee_category) === 2;
 const isNstpMeta = (meta) =>
-  String(meta?.fee_code || "").toUpperCase().includes("NSTP");
+  String(meta?.fee_code || "")
+    .toUpperCase()
+    .includes("NSTP");
 
-const applyScholarshipRulesToFeeLines = (feeLines, feeMetaMap, scholarshipRules) => {
+const applyScholarshipRulesToFeeLines = (
+  feeLines,
+  feeMetaMap,
+  scholarshipRules,
+) => {
   const ruleByFeeRate = new Map();
   for (const rule of scholarshipRules) {
     const key = String(rule.fee_rate_id);
@@ -283,7 +302,7 @@ const insertFeeLines = async (
 
   await connection.query(
     `INSERT INTO ${tableName} (${idColumn}, fee_rate_id, amount) VALUES ?`,
-    [lines.map((line) => [ownerId, line.fee_rate_id, line.amount])]
+    [lines.map((line) => [ownerId, line.fee_rate_id, line.amount])],
   );
 
   return lines.length;
@@ -359,7 +378,7 @@ router.post("/save_to_unifast", async (req, res) => {
     fee_lines,
     require_fee_lines,
   } = req.body;
-  
+
   try {
     if (!student_number || !String(student_number).trim()) {
       return res.status(400).json({
@@ -368,7 +387,8 @@ router.post("/save_to_unifast", async (req, res) => {
     }
 
     const statusValue = Number.isFinite(Number(status)) ? Number(status) : 1;
-    const strictFeeLines = Number(require_fee_lines) === 1 || require_fee_lines === true;
+    const strictFeeLines =
+      Number(require_fee_lines) === 1 || require_fee_lines === true;
     const [unifastScholarships] = await db3.query(
       `SELECT id
        FROM scholarship_type
@@ -523,9 +543,13 @@ router.post("/save_to_matriculation", async (req, res) => {
     }
 
     const statusValue = Number.isFinite(Number(status)) ? Number(status) : 1;
-    const strictFeeLines = Number(require_fee_lines) === 1 || require_fee_lines === true;
+    const strictFeeLines =
+      Number(require_fee_lines) === 1 || require_fee_lines === true;
     const normalizedScholarshipId = Number(scholarship_id);
-    if (!Number.isFinite(normalizedScholarshipId) || normalizedScholarshipId <= 0) {
+    if (
+      !Number.isFinite(normalizedScholarshipId) ||
+      normalizedScholarshipId <= 0
+    ) {
       return res.status(400).json({
         message: "scholarship_id is required before saving to MATRICULATION.",
       });
@@ -569,7 +593,9 @@ router.post("/save_to_matriculation", async (req, res) => {
       const normalizedFeeLines = normalizeFeeLines(fee_lines);
       if (strictFeeLines && !normalizedFeeLines.length) {
         throw Object.assign(
-          new Error("Matriculation fee lines were not generated. Save cancelled."),
+          new Error(
+            "Matriculation fee lines were not generated. Save cancelled.",
+          ),
           { statusCode: 400 },
         );
       }
@@ -582,12 +608,15 @@ router.post("/save_to_matriculation", async (req, res) => {
               normalizedFeeLines.map((line) => line.fee_rate_id),
             );
             return feeMetaMapPromise.then(async (feeMetaMap) => {
-              const scholarshipRules = await getScholarshipFeeRules(connection, {
-                scholarshipId: normalizedScholarshipId,
-                schoolYearId: activeScope.year_id,
-                semesterId: activeScope.semester_id,
-                yearLevelId: year_level_id || year_level,
-              });
+              const scholarshipRules = await getScholarshipFeeRules(
+                connection,
+                {
+                  scholarshipId: normalizedScholarshipId,
+                  schoolYearId: activeScope.year_id,
+                  semesterId: activeScope.semester_id,
+                  yearLevelId: year_level_id || year_level,
+                },
+              );
 
               const applied = applyScholarshipRulesToFeeLines(
                 normalizedFeeLines,
@@ -597,7 +626,9 @@ router.post("/save_to_matriculation", async (req, res) => {
 
               if (strictFeeLines && !applied.adjustedLines.length) {
                 throw Object.assign(
-                  new Error("Matriculation fee lines were not generated. Save cancelled."),
+                  new Error(
+                    "Matriculation fee lines were not generated. Save cancelled.",
+                  ),
                   { statusCode: 400 },
                 );
               }
@@ -638,7 +669,10 @@ router.post("/save_to_matriculation", async (req, res) => {
       };
 
       scholarshipRemark =
-        matriculation_remark || scholarship.scholarship_name || remark || "Matriculation";
+        matriculation_remark ||
+        scholarship.scholarship_name ||
+        remark ||
+        "Matriculation";
 
       await connection.beginTransaction();
 
@@ -735,11 +769,9 @@ router.post("/save_to_matriculation", async (req, res) => {
     console.error("Error saving to MATRICULATION:", error);
     const statusCode = Number(error?.statusCode) || 500;
     res.status(statusCode).json({
-      message:
-        error?.message ||
-        "Server error while saving data",
+      message: error?.message || "Server error while saving data",
     });
   }
 });
 
-module.exports = router
+module.exports = router;

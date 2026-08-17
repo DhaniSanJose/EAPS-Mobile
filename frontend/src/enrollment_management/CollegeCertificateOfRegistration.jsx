@@ -67,8 +67,8 @@ const CertificateOfRegistrationForCollege = forwardRef(
   ) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
-  const branding = settings?.branding || {};
-  const assets = settings?.assets || {};
+    const branding = settings?.branding || {};
+    const assets = settings?.assets || {};
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
     const [branches, setBranches] = useState([]);
@@ -586,8 +586,8 @@ const CertificateOfRegistrationForCollege = forwardRef(
       }
     }, [selectedDepartment, scopeReady, adminData, scopeRevision]);
     useEffect(() => {
-          setQrCodeMissing(false);
-        }, [student_number]);
+      setQrCodeMissing(false);
+    }, [student_number]);
 
     const [gender, setGender] = useState(null);
     const [age, setAge] = useState(null);
@@ -834,8 +834,11 @@ const CertificateOfRegistrationForCollege = forwardRef(
                 String(item?.student_number) === String(student_number) &&
                 Number(item?.status) === 1 &&
                 (!activeSchoolYearId ||
-                  Number(item?.active_school_year_id ?? item?.activeSchoolYearId ?? 0) ===
-                    Number(activeSchoolYearId)),
+                  Number(
+                    item?.active_school_year_id ??
+                      item?.activeSchoolYearId ??
+                      0,
+                  ) === Number(activeSchoolYearId)),
             )
             .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
 
@@ -917,8 +920,9 @@ const CertificateOfRegistrationForCollege = forwardRef(
       selectedPaymentData?.matriculation_remark ||
       data[0]?.scholarship_code ||
       data[0]?.scholarship_name ||
-      scholarshipTypes.find((item) => Number(item.id) === Number(selectedScholarshipId))
-        ?.scholarship_code ||
+      scholarshipTypes.find(
+        (item) => Number(item.id) === Number(selectedScholarshipId),
+      )?.scholarship_code ||
       "";
     const showFreeTuitionStamp =
       savedUnifast && /UNIFAST/i.test(String(selectedScholarshipCode));
@@ -1053,7 +1057,8 @@ const CertificateOfRegistrationForCollege = forwardRef(
 
       const resolveStudentFees = async () => {
         try {
-          const tuitionAmount = Number(totalLecFees || 0) + Number(totalLabFees || 0);
+          const tuitionAmount =
+            Number(totalLecFees || 0) + Number(totalLabFees || 0);
           const result = await fetchResolvedFees({
             tuitionAmount,
             branchId: person?.campus || "",
@@ -1127,7 +1132,9 @@ const CertificateOfRegistrationForCollege = forwardRef(
       const totalCombined = totalCourseUnits + totalLabUnits;
       const totalNstpUnits = enrolled.reduce((sum, item) => {
         const courseCode = String(item?.course_code || "").toUpperCase();
-        const courseDescription = String(item?.course_description || "").toUpperCase();
+        const courseDescription = String(
+          item?.course_description || "",
+        ).toUpperCase();
         const isNstpSubject =
           courseCode.includes("NSTP") || courseDescription.includes("NSTP");
         return isNstpSubject
@@ -1470,7 +1477,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
       : "Save Matriculation";
     const isPaymentReady = Boolean(
       student_number?.trim() &&
-        (requestedData.student_number || data[0]?.student_number),
+      (requestedData.student_number || data[0]?.student_number),
     );
 
     useImperativeHandle(paymentActionsRef, () => ({
@@ -2121,7 +2128,8 @@ const CertificateOfRegistrationForCollege = forwardRef(
                       >
                         {renderDetailField(
                           "Scholarship/Discount",
-                          selectedScholarshipCode || (savedUnifast ? "UNIFAST-FHE" : ""),
+                          selectedScholarshipCode ||
+                            (savedUnifast ? "UNIFAST-FHE" : ""),
                           RIGHT_LABEL_WIDTH,
                         )}
                       </td>

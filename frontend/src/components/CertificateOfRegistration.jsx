@@ -10,16 +10,17 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { MdOutlinePayment } from "react-icons/md";
 import { IoMdSchool } from "react-icons/io";
 import API_BASE_URL from "../apiConfig";
+
 const CertificateOfRegistration = forwardRef(
   (
     { student_number, person_id, preload, containerId, onReady },
     divToPrintRef,
   ) => {
     const settings = useContext(SettingsContext);
-  const colors = settings?.colors || {};
-  const branding = settings?.branding || {};
-  const assets = settings?.assets || {};
-  const headerColor = colors.header || "#1976d2";
+    const colors = settings?.colors || {};
+    const branding = settings?.branding || {};
+    const assets = settings?.assets || {};
+    const headerColor = colors.header || "#1976d2";
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
     const [branches, setBranches] = useState([]);
@@ -225,7 +226,9 @@ const CertificateOfRegistration = forwardRef(
       try {
         const res = await axios.get(`${API_BASE_URL}/api/user/${person_id}`);
         if (res.data && res.data.profile_img) {
-          setProfilePicture(`${API_BASE_URL}/uploads/Student1by1/${res.data.profile_img}`);
+          setProfilePicture(
+            `${API_BASE_URL}/uploads/Student1by1/${res.data.profile_img}`,
+          );
         }
       } catch (error) {
         console.error("Error fetching profile picture:", error);
@@ -358,7 +361,9 @@ const CertificateOfRegistration = forwardRef(
       }
       let cancelled = false;
       axios
-        .get(`${API_BASE_URL}/api/payment-status/${encodeURIComponent(student_number)}`)
+        .get(
+          `${API_BASE_URL}/api/payment-status/${encodeURIComponent(student_number)}`,
+        )
         .then((res) => {
           if (!cancelled) {
             setSavedUnifast(!!res.data?.saved_unifast);
@@ -397,8 +402,11 @@ const CertificateOfRegistration = forwardRef(
                 String(item?.student_number) === String(student_number) &&
                 Number(item?.status) === 1 &&
                 (!corActiveSchoolYearId ||
-                  Number(item?.active_school_year_id ?? item?.activeSchoolYearId ?? 0) ===
-                    Number(corActiveSchoolYearId)),
+                  Number(
+                    item?.active_school_year_id ??
+                      item?.activeSchoolYearId ??
+                      0,
+                  ) === Number(corActiveSchoolYearId)),
             )
             .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
 
@@ -418,7 +426,12 @@ const CertificateOfRegistration = forwardRef(
       return () => {
         cancelled = true;
       };
-    }, [student_number, corActiveSchoolYearId, savedUnifast, savedMatriculation]);
+    }, [
+      student_number,
+      corActiveSchoolYearId,
+      savedUnifast,
+      savedMatriculation,
+    ]);
 
     useEffect(() => {
       const fetchScholarship = async () => {
@@ -578,9 +591,9 @@ const CertificateOfRegistration = forwardRef(
       setPersonID(personId);
       setCorActiveSchoolYearId(
         tagged.active_school_year_id ??
-        tagged.activeSchoolYearId ??
-        tagged.corData?.active_school_year_id ??
-        "",
+          tagged.activeSchoolYearId ??
+          tagged.corData?.active_school_year_id ??
+          "",
       );
       setYearLevelDescription(
         tagged.year_level_description ?? tagged.yearLevelDescription ?? "",
@@ -624,9 +637,21 @@ const CertificateOfRegistration = forwardRef(
           const fullData = {
             ...(tagged.corData || {}),
             student_number: studentNum,
-            first_name: tagged.first_name ?? tagged.firstName ?? tagged.corData?.first_name ?? "",
-            middle_name: tagged.middle_name ?? tagged.middleName ?? tagged.corData?.middle_name ?? "",
-            last_name: tagged.last_name ?? tagged.lastName ?? tagged.corData?.last_name ?? "",
+            first_name:
+              tagged.first_name ??
+              tagged.firstName ??
+              tagged.corData?.first_name ??
+              "",
+            middle_name:
+              tagged.middle_name ??
+              tagged.middleName ??
+              tagged.corData?.middle_name ??
+              "",
+            last_name:
+              tagged.last_name ??
+              tagged.lastName ??
+              tagged.corData?.last_name ??
+              "",
             extension: tagged.extension || tagged.corData?.extension || "",
             major: tagged.major || tagged.corData?.major || "",
             year_level_description:
@@ -635,14 +660,21 @@ const CertificateOfRegistration = forwardRef(
               tagged.corData?.year_level_description ??
               "",
             year_description:
-              tagged.year_description ?? tagged.yearDesc ?? tagged.corData?.year_description ?? "",
+              tagged.year_description ??
+              tagged.yearDesc ??
+              tagged.corData?.year_description ??
+              "",
             curriculum_id: activeCurriculum,
             active_school_year_id:
               tagged.active_school_year_id ??
               tagged.activeSchoolYearId ??
               tagged.corData?.active_school_year_id ??
               "",
-            program: activeCurriculum || tagged.program || tagged.corData?.program || "",
+            program:
+              activeCurriculum ||
+              tagged.program ||
+              tagged.corData?.program ||
+              "",
             departmentName:
               tagged.dprtmnt_name ??
               tagged.departmentName ??
@@ -660,9 +692,16 @@ const CertificateOfRegistration = forwardRef(
               "",
             age: tagged.age ?? tagged.corData?.age ?? "",
             gender: tagged.gender ?? tagged.corData?.gender ?? "",
-            email: tagged.email ?? tagged.corData?.email ?? tagged.emailAddress ?? "",
+            email:
+              tagged.email ??
+              tagged.corData?.email ??
+              tagged.emailAddress ??
+              "",
             emailAddress:
-              tagged.emailAddress ?? tagged.email ?? tagged.corData?.emailAddress ?? "",
+              tagged.emailAddress ??
+              tagged.email ??
+              tagged.corData?.emailAddress ??
+              "",
           };
 
           setData([fullData]);
@@ -709,9 +748,8 @@ const CertificateOfRegistration = forwardRef(
                 const filledInputs = Array.from(inputs).filter(
                   (inp) => inp.value && inp.value.trim() !== "",
                 );
-                const subjectRows = container.querySelectorAll(
-                  "tbody tr, table tr",
-                );
+                const subjectRows =
+                  container.querySelectorAll("tbody tr, table tr");
 
                 // Prefer waiting until subject rows exist when enrolled data is present.
                 const hasSubjectRows =
@@ -783,7 +821,9 @@ const CertificateOfRegistration = forwardRef(
         >
           {label}
         </span>
-        <span style={{ width: "12px", flexShrink: 0, textAlign: "left" }}>:</span>
+        <span style={{ width: "12px", flexShrink: 0, textAlign: "left" }}>
+          :
+        </span>
         <span style={{ flex: 1, minWidth: 0 }}>{value}</span>
       </div>
     );
@@ -798,7 +838,9 @@ const CertificateOfRegistration = forwardRef(
       data[0]?.scholarship_code ||
       data[0]?.scholarship_name ||
       scholarshipTypes.find((item) => {
-        const label = String(item?.scholarship_code || item?.scholarship_name || "");
+        const label = String(
+          item?.scholarship_code || item?.scholarship_name || "",
+        );
         return label.toUpperCase().includes("UNIFAST");
       })?.scholarship_code ||
       (savedUnifast ? "UNIFAST-FHE" : "");
@@ -879,8 +921,6 @@ const CertificateOfRegistration = forwardRef(
         setDataLoaded((prev) => ({ ...prev, tosf: true })); // Mark as loaded even on error
       }
     };
-
-
 
     useEffect(() => {
       fetchTosf();
@@ -963,7 +1003,8 @@ const CertificateOfRegistration = forwardRef(
                     width: 100% !important;
                   }
                 }
-              `}</style>
+              `}
+              </style>
 
               <div className="section">
                 <table
@@ -1089,7 +1130,12 @@ const CertificateOfRegistration = forwardRef(
                                   fontFamily: "Arial",
                                 }}
                               >
-                                <div style={{ fontFamily: "Arial", fontSize: "13px" }}>
+                                <div
+                                  style={{
+                                    fontFamily: "Arial",
+                                    fontSize: "13px",
+                                  }}
+                                >
                                   Republic of the Philippines
                                 </div>
                                 <div
@@ -1097,7 +1143,7 @@ const CertificateOfRegistration = forwardRef(
                                     fontWeight: "bold",
                                     fontFamily: "Arial",
                                     fontSize: "16px",
-                                    textTransform: "Uppercase"
+                                    textTransform: "Uppercase",
                                   }}
                                 >
                                   {firstLine}
@@ -1108,7 +1154,7 @@ const CertificateOfRegistration = forwardRef(
                                       fontWeight: "bold",
                                       fontFamily: "Arial",
                                       fontSize: "16px",
-                                      textTransform: "Uppercase"
+                                      textTransform: "Uppercase",
                                     }}
                                   >
                                     {secondLine}
@@ -1233,8 +1279,7 @@ const CertificateOfRegistration = forwardRef(
                               const nextYear = Number.isFinite(year)
                                 ? year + 1
                                 : "";
-                              const semester =
-                                term.semester_description || "";
+                              const semester = term.semester_description || "";
                               if (!semester && !year) return "";
                               return `${semester} AY ${year || ""} - ${nextYear}`.trim();
                             })()}
@@ -1292,7 +1337,11 @@ const CertificateOfRegistration = forwardRef(
                     <tr>
                       <td
                         colSpan={15}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px",
+                        }}
                       >
                         {renderDetailField(
                           "Student No",
@@ -1302,7 +1351,11 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                       <td
                         colSpan={29}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px 1px calc(4px + 3rem)" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px 1px calc(4px + 3rem)",
+                        }}
                       >
                         {renderDetailField(
                           "College",
@@ -1315,7 +1368,11 @@ const CertificateOfRegistration = forwardRef(
                     <tr>
                       <td
                         colSpan={15}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px",
+                        }}
                       >
                         {renderDetailField(
                           "Name",
@@ -1333,7 +1390,11 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                       <td
                         colSpan={29}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px 1px calc(4px + 3rem)" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px 1px calc(4px + 3rem)",
+                        }}
                       >
                         {renderDetailField(
                           "Program",
@@ -1355,13 +1416,19 @@ const CertificateOfRegistration = forwardRef(
                     <tr>
                       <td
                         colSpan={15}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px",
+                        }}
                       >
                         {renderDetailField(
                           "Gender",
-                          data[0]?.gender === 0 || String(data[0]?.gender) === "0"
+                          data[0]?.gender === 0 ||
+                            String(data[0]?.gender) === "0"
                             ? "Male"
-                            : data[0]?.gender === 1 || String(data[0]?.gender) === "1"
+                            : data[0]?.gender === 1 ||
+                                String(data[0]?.gender) === "1"
                               ? "Female"
                               : "",
                           LEFT_LABEL_WIDTH,
@@ -1369,20 +1436,28 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                       <td
                         colSpan={13}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px 1px calc(4px + 3rem)" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px 1px calc(4px + 3rem)",
+                        }}
                       >
                         {renderDetailField(
                           "Major",
                           major
                             ? major.charAt(0).toUpperCase() +
-                              major.slice(1).toLowerCase()
+                                major.slice(1).toLowerCase()
                             : "",
                           MID_LABEL_WIDTH,
                         )}
                       </td>
                       <td
                         colSpan={16}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px",
+                        }}
                       >
                         {renderDetailField(
                           "Curriculum",
@@ -1395,7 +1470,11 @@ const CertificateOfRegistration = forwardRef(
                     <tr>
                       <td
                         colSpan={15}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px",
+                        }}
                       >
                         {renderDetailField(
                           "Age",
@@ -1405,7 +1484,11 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                       <td
                         colSpan={13}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px 1px calc(4px + 3rem)" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px 1px calc(4px + 3rem)",
+                        }}
                       >
                         {renderDetailField(
                           "Year Level",
@@ -1415,7 +1498,11 @@ const CertificateOfRegistration = forwardRef(
                       </td>
                       <td
                         colSpan={16}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px",
+                        }}
                       >
                         {renderDetailField(
                           "Scholarship/Discount",
@@ -1428,7 +1515,11 @@ const CertificateOfRegistration = forwardRef(
                     <tr>
                       <td
                         colSpan={44}
-                        style={{ fontSize: "12px", textAlign: "left", padding: "1px 4px" }}
+                        style={{
+                          fontSize: "12px",
+                          textAlign: "left",
+                          padding: "1px 4px",
+                        }}
                       >
                         {renderDetailField(
                           "Email Address",
@@ -2109,14 +2200,24 @@ const CertificateOfRegistration = forwardRef(
                           </td>
                         </tr>
 
-                        <tr style={{ borderLeft: "1px solid black", height: "2px", borderRight: "1px solid black" }}>
-                          <td colSpan={20}>
-
-                          </td>
+                        <tr
+                          style={{
+                            borderLeft: "1px solid black",
+                            height: "2px",
+                            borderRight: "1px solid black",
+                          }}
+                        >
+                          <td colSpan={20}></td>
                         </tr>
 
-                        <tr style={{ height: "2px", }}>
-                          <td colSpan={15} style={{ padding: 0, borderLeft: "1px solid black" }}>
+                        <tr style={{ height: "2px" }}>
+                          <td
+                            colSpan={15}
+                            style={{
+                              padding: 0,
+                              borderLeft: "1px solid black",
+                            }}
+                          >
                             <input
                               type="text"
                               value={`Tuition (${totalCourseUnits} unit(s))`}
@@ -2688,7 +2789,8 @@ const CertificateOfRegistration = forwardRef(
                               value={"Laboratory Fee"}
                               readOnly
                               style={{
-                                display: isHaveLaboratory === 0 ? "none" : "block",
+                                display:
+                                  isHaveLaboratory === 0 ? "none" : "block",
                                 color: "black",
                                 width: "98%",
                                 border: "none",
@@ -2712,7 +2814,8 @@ const CertificateOfRegistration = forwardRef(
                               value={tosf[0]?.laboratory_fees || "0"}
                               readOnly
                               style={{
-                                display: isHaveLaboratory === 0 ? "none" : "block",
+                                display:
+                                  isHaveLaboratory === 0 ? "none" : "block",
                                 textAlign: "center",
                                 fontFamily: "Arial",
                                 fontSize: "12px",
@@ -3020,7 +3123,6 @@ const CertificateOfRegistration = forwardRef(
                               }}
                             />
                           </td>
-
                         </tr>
 
                         <tr>
@@ -3170,10 +3272,14 @@ const CertificateOfRegistration = forwardRef(
                           </td>
                         </tr>
 
-                        <tr style={{ borderLeft: "1px solid black", height: "5px", borderRight: "1px solid black" }}>
-                          <td>
-
-                          </td>
+                        <tr
+                          style={{
+                            borderLeft: "1px solid black",
+                            height: "5px",
+                            borderRight: "1px solid black",
+                          }}
+                        >
+                          <td></td>
                         </tr>
 
                         <tr>
@@ -3473,7 +3579,13 @@ const CertificateOfRegistration = forwardRef(
                       <tbody>
                         <br />
                         <tr>
-                          <td style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "5px" }}>
+                          <td
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: "bold",
+                              marginBottom: "5px",
+                            }}
+                          >
                             <input
                               type="text"
                               value={"RULES OF REFUND"}
@@ -3551,7 +3663,7 @@ const CertificateOfRegistration = forwardRef(
                             <input
                               type="text"
                               value={
-                                "\"As a student of EARIST, I do solemnly promise that I will"
+                                '"As a student of EARIST, I do solemnly promise that I will'
                               }
                               readOnly
                               style={{
@@ -3573,7 +3685,9 @@ const CertificateOfRegistration = forwardRef(
                           <td style={{ fontSize: "10px", fontWeight: "bold" }}>
                             <input
                               type="text"
-                              value={"comply with the rules and regulations of the Institution.\""}
+                              value={
+                                'comply with the rules and regulations of the Institution."'
+                              }
                               readOnly
                               style={{
                                 textAlign: "center",
@@ -3630,7 +3744,9 @@ const CertificateOfRegistration = forwardRef(
                         </tr>
 
                         <tr>
-                          <td style={{ textAlign: "left", paddingLeft: "20px" }}>
+                          <td
+                            style={{ textAlign: "left", paddingLeft: "20px" }}
+                          >
                             <input
                               type="text"
                               value={"APPROVED BY : "}
@@ -3643,13 +3759,19 @@ const CertificateOfRegistration = forwardRef(
                                 border: "none",
                                 outline: "none",
                                 background: "none",
-                                fontSize: "12px"
+                                fontSize: "12px",
                               }}
                             />
                           </td>
                         </tr>
                         <tr>
-                          <td style={{ textAlign: "center", fontSize: "12px", padding: 0 }}>
+                          <td
+                            style={{
+                              textAlign: "center",
+                              fontSize: "12px",
+                              padding: 0,
+                            }}
+                          >
                             {showApprovedBySignature ? (
                               <img
                                 src={approvedBySignatureUrl}
@@ -3835,15 +3957,14 @@ const CertificateOfRegistration = forwardRef(
                               display: "block",
                             }}
                           >
-                            KEEP THIS CERTIFICATE. YOU WILL BE REQUIRED TO PRESENT THIS IN ALL
-                            YOUR DEALINGS WITH THE COLLEGE.
+                            KEEP THIS CERTIFICATE. YOU WILL BE REQUIRED TO
+                            PRESENT THIS IN ALL YOUR DEALINGS WITH THE COLLEGE.
                           </i>
                         </b>
                       </td>
                     </tr>
                   </tbody>
                 </table>
-
               </div>
             </div>
           </div>
