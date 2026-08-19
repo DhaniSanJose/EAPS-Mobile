@@ -9,7 +9,6 @@ import ScoreIcon from "@mui/icons-material/Score";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SettingsContext } from "../App";
 
-
 export const ADMISSION_PROCESS_TABS = [
   {
     label: "Applicant List",

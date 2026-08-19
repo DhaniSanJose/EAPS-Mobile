@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useCallback } from "react";
+import React, { useState, useContext, useEffect, useCallback, useMemo } from "react";
 import { SettingsContext } from "../App";
 import axios from "axios";
 import {
@@ -32,6 +32,20 @@ const formatDate = (value) => {
   });
 };
 
+// NEW — module scope, so buildReportDefs (also module scope) can see it
+const formatDateTime = (value) => {
+  if (!value) return "N/A";
+  const d = new Date(value);
+  if (isNaN(d)) return String(value);
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 const formatFormType = (type) =>
   ({
     changeCourse: "Change Course (College Dean)",
@@ -62,20 +76,36 @@ const campusLabelFor = (campuses, campusId) => {
   return match ? match.branch || match.branch_name || "Unnamed Branch" : null;
 };
 
+// Resolves a person_table.program (curriculum_id) to a readable label,
+// same pairing logic used in ExaminationPermitChangeCourse.jsx's ProgramRow.
+const resolveProgramLabel = (curriculums, curriculumId) => {
+  if (!curriculumId) return "N/A";
+  const match = curriculums.find(
+    (c) => String(c.curriculum_id) === String(curriculumId),
+  );
+  if (!match) return "N/A";
+  const label = `${match.program_code || ""}${match.major ? " - " + match.major : ""}`.trim();
+  return label || match.program_description || "N/A";
+};
+
 // ── Report definitions: one entry per box ──────────────────────────────
-const REPORT_DEFS = [
+// Built as a function of `curriculums` so the Program column can resolve
+// curriculum_id -> program_code/major without a backend join.
+const buildReportDefs = (curriculums) => [
   {
     key: "ecat_takers",
     title: "ECAT Exam Takers",
+    subtitle: "Marked Present — QR scan or manual override",
     color: "#1565c0",
     listEndpoint: "/api/reports/ecat-takers/list",
     fileNamePrefix: "ECAT_Exam_Takers",
     columns: [
       { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
       { label: "Name", value: fullName },
-      { label: "Score", value: (r) => r.total_score ?? "N/A" },
-      { label: "Result", value: (r) => formatExamResultStatus(r.status) },
-      { label: "Date Taken", value: (r) => formatDate(r.date_created) },
+      { label: "Program", value: (r) => resolveProgramLabel(curriculums, r.program) },
+      { label: "Room", value: (r) => r.room_description || "N/A" },
+      { label: "Time Scanned/Marked", value: (r) => formatDateTime(r.scanned_at) },
+      { label: "Status", value: () => "PRESENT" },
     ],
   },
   {
@@ -88,9 +118,10 @@ const REPORT_DEFS = [
     columns: [
       { label: "Applicant No.", value: (r) => r.applicant_id || "N/A" },
       { label: "Name", value: fullName },
+      { label: "Program", value: (r) => resolveProgramLabel(curriculums, r.program) },
       { label: "Exam Date", value: (r) => formatDate(r.exam_date) },
       { label: "Room", value: (r) => r.room_description || "N/A" },
-      { label: "Status", value: () => "DID NOT APPEAR" },
+      { label: "Status", value: () => "ABSENT" },
     ],
   },
   {
@@ -103,15 +134,15 @@ const REPORT_DEFS = [
     columns: [
       { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
       { label: "Name", value: (r) => r.applicant_name || "N/A" },
+      {
+        label: "Current Program",
+        value: (r) => resolveProgramLabel(curriculums, r.current_curriculum_id),
+      },
       { label: "Form Type", value: (r) => formatFormType(r.form_type) },
       { label: "Control No.", value: (r) => r.control_number || "N/A" },
       {
-        label: "Changed Program?",
-        value: (r) =>
-          r.from_curriculum_id != null &&
-          String(r.from_curriculum_id) !== String(r.current_curriculum_id)
-            ? "YES"
-            : "NO",
+        label: "Change Course Requested",
+        value: () => "YES",
       },
       { label: "Date Issued", value: (r) => formatDate(r.created_at) },
     ],
@@ -126,6 +157,7 @@ const REPORT_DEFS = [
     columns: [
       { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
       { label: "Name", value: fullName },
+      { label: "Program", value: (r) => resolveProgramLabel(curriculums, r.program) },
       { label: "Score", value: (r) => r.total_score ?? "N/A" },
       { label: "Result", value: (r) => formatExamResultStatus(r.status) },
       { label: "Date", value: (r) => formatDate(r.date_created) },
@@ -143,6 +175,7 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
   const headerColor = colors.header || "#1976d2";
   const [summary, setSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [curriculums, setCurriculums] = useState([]);
   const [periods, setPeriods] = useState({
     ecat_takers: "month",
     non_appearance: "month",
@@ -151,6 +184,18 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
   });
   const [resultsStatusFilter, setResultsStatusFilter] = useState("all");
   const [downloadingKey, setDownloadingKey] = useState(null);
+
+  // Fetched independently of AdmissionOfficerDashboard's own curriculum
+  // state (which is deduped by program_code and can drop curriculum_ids),
+  // so lookups here always resolve by the raw curriculum_id.
+  useEffect(() => {
+    axios
+      .get(`${API_BASE_URL}/api/applied_program`)
+      .then((res) => setCurriculums(Array.isArray(res.data) ? res.data : []))
+      .catch((err) => console.error("Error fetching curriculums:", err));
+  }, []);
+
+  const REPORT_DEFS = useMemo(() => buildReportDefs(curriculums), [curriculums]);
 
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true);
@@ -180,6 +225,7 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     return match?.address || fallback;
   };
 
+
   const buildTableHtml = (title, columns, rows) => {
     // ── Same letterhead build as handleExportApplicantListPdf ──
     const logoSrc = assets.logoUrl || EaristLogo;
@@ -200,16 +246,16 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     const headerRow = `<tr>${columns.map((c) => `<th>${c.label}</th>`).join("")}</tr>`;
     const bodyRows = rows.length
       ? rows
-          .map(
-            (r) =>
-              `<tr>${columns
-                .map(
-                  (c) =>
-                    `<td${c.label === "Name" ? ' class="applicant-name"' : ""}>${c.value(r)}</td>`,
-                )
-                .join("")}</tr>`,
-          )
-          .join("")
+        .map(
+          (r) =>
+            `<tr>${columns
+              .map(
+                (c) =>
+                  `<td${c.label === "Name" ? ' class="applicant-name"' : ""}>${c.value(r)}</td>`,
+              )
+              .join("")}</tr>`,
+        )
+        .join("")
       : `<tr><td colspan="${columns.length}" style="padding:14px;">No records found for this period.</td></tr>`;
 
     return `
@@ -221,22 +267,20 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
         <div class="header-text">
           <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
 
-          ${
-            companyName
-              ? `
+          ${companyName
+        ? `
               <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
                 ${firstLine}
               </b>
-              ${
-                secondLine
-                  ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
+              ${secondLine
+          ? `<div style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
                      <b>${secondLine}</b>
                    </div>`
-                  : ""
-              }
+          : ""
+        }
             `
-              : ""
-          }
+        : ""
+      }
 
           <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
         </div>

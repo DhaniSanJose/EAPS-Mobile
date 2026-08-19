@@ -54,6 +54,7 @@ import EmptyAdmissionFormProcess from "./EmptyAdmissionFormProcess";
 // ✅ Reused directly (not duplicated) so the "Admission Form (Process)"
 // option below renders/downloads exactly like its standalone page.
 import AdminAdmissionFormProcess from "./AdmissionFormProcess";
+import PrintConfirmDialog from "../components/PrintConfirmDialog"
 
 const FORM_OPTIONS = [
   {
@@ -184,6 +185,7 @@ const ExaminationPermitChangeCourse = () => {
         },
       );
       const number = res.data.control_number;
+      const campusId = res.data.campus_id;
       setControlNumbers((prev) => ({ ...prev, [formType]: number }));
 
       // Track this issuance for the Admissions Report "Realignment" box.
@@ -194,6 +196,7 @@ const ExaminationPermitChangeCourse = () => {
         axios
           .post(`${API_BASE_URL}/api/reports/realignment/log`, {
             person_id: selectedPerson.person_id,
+            campus_id: campusId,
             applicant_number: selectedPerson.applicant_number,
             form_type: formType,
             action_type: actionType,
@@ -518,6 +521,9 @@ const ExaminationPermitChangeCourse = () => {
   // form options via FORM_ENDPOINTS + refMap.
   const [downloadingKey, setDownloadingKey] = useState(null);
 
+  const [pendingAction, setPendingAction] = useState(null); // { mode: "print" | "download" } | null
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
   const logDownloadExamPdf = async (documentLabel, { failed = false } = {}) => {
     try {
       const source = selectedPerson || person;
@@ -527,7 +533,7 @@ const ExaminationPermitChangeCourse = () => {
       const applicantName = source?.last_name
         ? `${source.last_name}, ${source.first_name || ""}${middleInitial}`.trim()
         : [source?.first_name, source?.middle_name].filter(Boolean).join(" ") ||
-          "Unknown Applicant";
+        "Unknown Applicant";
 
       await postAuditEvent(DOWNLOAD_EXAM_PDF_ACTION, {
         document_label: documentLabel,
@@ -1247,10 +1253,10 @@ const ExaminationPermitChangeCourse = () => {
                   return isNaN(d)
                     ? person.created_at.split("T")[0]
                     : d.toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      });
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    });
                 })()}
               </span>
             </div>
@@ -1279,12 +1285,12 @@ const ExaminationPermitChangeCourse = () => {
               >
                 {examSchedule?.schedule_created_at
                   ? new Date(
-                      examSchedule.schedule_created_at,
-                    ).toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })
+                    examSchedule.schedule_created_at,
+                  ).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })
                   : ""}
               </span>
             </div>
@@ -1524,12 +1530,11 @@ const ExaminationPermitChangeCourse = () => {
   const ProgramRow = ({ filled }) => {
     const programText =
       filled && curriculumOptions.length > 0
-        ? `${curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.program_code || person?.program || ""} ${
-            curriculumOptions.find(
-              (c) =>
-                c.curriculum_id?.toString() ===
-                (person?.program ?? "").toString(),
-            )?.major || ""
+        ? `${curriculumOptions.find((i) => i?.curriculum_id?.toString() === (person?.program ?? "").toString())?.program_code || person?.program || ""} ${curriculumOptions.find(
+          (c) =>
+            c.curriculum_id?.toString() ===
+            (person?.program ?? "").toString(),
+        )?.major || ""
           }`.toUpperCase()
         : "";
     return (
@@ -2097,10 +2102,10 @@ const ExaminationPermitChangeCourse = () => {
                   >
                     {curriculumOptions.length > 0
                       ? curriculumOptions.find(
-                          (c) =>
-                            c.curriculum_id?.toString() ===
-                            (person?.program ?? "").toString(),
-                        )?.program_description || ""
+                        (c) =>
+                          c.curriculum_id?.toString() ===
+                          (person?.program ?? "").toString(),
+                      )?.program_description || ""
                       : "Loading..."}
                   </span>
                 </div>
@@ -2127,10 +2132,10 @@ const ExaminationPermitChangeCourse = () => {
                   >
                     {curriculumOptions.length > 0
                       ? curriculumOptions.find(
-                          (c) =>
-                            c.curriculum_id?.toString() ===
-                            (person?.program ?? "").toString(),
-                        )?.major || ""
+                        (c) =>
+                          c.curriculum_id?.toString() ===
+                          (person?.program ?? "").toString(),
+                      )?.major || ""
                       : "Loading..."}
                   </span>
                 </div>
@@ -2167,12 +2172,12 @@ const ExaminationPermitChangeCourse = () => {
                   >
                     {examSchedule?.schedule_created_at
                       ? new Date(
-                          examSchedule.schedule_created_at,
-                        ).toLocaleDateString("en-US", {
-                          month: "long",
-                          day: "numeric",
-                          year: "numeric",
-                        })
+                        examSchedule.schedule_created_at,
+                      ).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })
                       : ""}
                   </span>
                 </div>
@@ -2205,12 +2210,12 @@ const ExaminationPermitChangeCourse = () => {
                   >
                     {examSchedule
                       ? new Date(
-                          `1970-01-01T${examSchedule.start_time}`,
-                        ).toLocaleTimeString("en-US", {
-                          hour: "numeric",
-                          minute: "2-digit",
-                          hour12: true,
-                        })
+                        `1970-01-01T${examSchedule.start_time}`,
+                      ).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
                       : ""}
                   </span>
                 </div>
@@ -2256,7 +2261,7 @@ const ExaminationPermitChangeCourse = () => {
                     }}
                   >
                     {examSchedule?.floor !== undefined &&
-                    examSchedule?.floor !== null
+                      examSchedule?.floor !== null
                       ? getOrdinal(examSchedule.floor)
                       : ""}
                   </span>
@@ -2314,10 +2319,10 @@ const ExaminationPermitChangeCourse = () => {
                   >
                     {verifiedAt
                       ? new Date(verifiedAt).toLocaleDateString("en-US", {
-                          month: "long",
-                          day: "numeric",
-                          year: "numeric",
-                        })
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })
                       : ""}
                   </span>
                 </div>
@@ -2831,6 +2836,27 @@ const ExaminationPermitChangeCourse = () => {
             buttonLabel="View Download History"
             title="My Exam PDF Download History"
           />
+
+          <PrintConfirmDialog
+            open={Boolean(pendingAction)}
+            mode={pendingAction?.mode}
+            formLabel={FORM_OPTIONS.find((o) => o.key === selectedForm)?.label}
+            applicantName={`${selectedPerson?.last_name || ""}, ${selectedPerson?.first_name || ""}`}
+            applicantNumber={selectedPerson?.applicant_number}
+            loading={confirmLoading}
+            onCancel={() => setPendingAction(null)}
+            onConfirm={async () => {
+              setConfirmLoading(true);
+              try {
+                if (pendingAction.mode === "print") await handlePrint();
+                else await handleDownloadPdf();
+              } finally {
+                setConfirmLoading(false);
+                setPendingAction(null);
+              }
+            }}
+          />
+
         </Box>
       </Box>
 
@@ -3454,7 +3480,7 @@ const ExaminationPermitChangeCourse = () => {
                 startIcon={
                   downloadingKey === selectedForm ? null : <DownloadIcon />
                 }
-                onClick={handleDownloadPdf}
+                onClick={() => setPendingAction({ mode: "download" })}
                 disabled={downloadingKey !== null}
                 sx={{
                   backgroundColor: FORM_OPTIONS.find(

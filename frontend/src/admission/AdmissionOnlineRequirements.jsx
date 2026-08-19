@@ -41,6 +41,8 @@ import KeyIcon from "@mui/icons-material/Key";
 import CampaignIcon from '@mui/icons-material/Campaign';
 import CloseIcon from "@mui/icons-material/Close";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import FormalExample from "../assets/FormalExample.png";
+
 
 const cleanApplicantValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -635,12 +637,12 @@ const AdmissionOnlineRequirements = () => {
   const applicantSuggestions =
     searchQuery.trim().length >= 2
       ? persons
-          .filter((applicant) =>
-            getApplicantSuggestionText(applicant).includes(
-              searchQuery.trim().toLowerCase(),
-            ),
-          )
-          .slice(0, 10)
+        .filter((applicant) =>
+          getApplicantSuggestionText(applicant).includes(
+            searchQuery.trim().toLowerCase(),
+          ),
+        )
+        .slice(0, 10)
       : [];
 
   const handleApplicantSuggestionSelect = (applicant) => {
@@ -1916,10 +1918,10 @@ const AdmissionOnlineRequirements = () => {
               py: 2,
             }}
           >
-            { 
-              confirmAction === "upload" ? "📤 Confirm Upload" : 
-              confirmAction === "documentStatus" ? "Confirm Document Status Change" : 
-              "🗑️ Confirm Deletion"
+            {
+              confirmAction === "upload" ? "📤 Confirm Upload" :
+                confirmAction === "documentStatus" ? "Confirm Document Status Change" :
+                  "🗑️ Confirm Deletion"
             }
           </DialogTitle>
 
@@ -1986,8 +1988,7 @@ const AdmissionOnlineRequirements = () => {
             </Button>
           </DialogActions>
         </Dialog>
-        {/* Photo Upload Modal */}
-        {/* Photo Upload Modal - matches AdminDashboard1 style */}
+        {/* Photo Upload Modal — matches the "Upload Your Photo" two-column UI/UX */}
         <Modal
           open={photoModalOpen}
           onClose={() => {
@@ -2007,220 +2008,270 @@ const AdmissionOnlineRequirements = () => {
             <Box
               sx={{
                 position: "relative",
-                width: 600,
+                width: 900,
+                maxWidth: "95vw",
                 bgcolor: "background.paper",
                 borderRadius: 3,
                 boxShadow: 24,
-                p: 4,
                 maxHeight: "90vh",
-                overflowY: "auto",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
-              {/* Close (X) Button in top-right */}
-              <IconButton
-                aria-label="close"
-                onClick={() => {
-                  setPhotoModalOpen(false);
-                  setPhotoFile(null);
-                  setPhotoPreview(null);
-                }}
-                sx={{
-                  position: "absolute",
-                  top: 8,
-                  right: 8,
-                  color: "#fff",
-                  backgroundColor: headerColor,
-                  border: `1px solid ${borderColor}`,
-                  "&:hover": { bgcolor: "black" },
-                }}
-              >
-                <CloseIcon />
-              </IconButton>
-
               {/* Header */}
               <Box
                 sx={{
-                  backgroundColor: headerColor,
-                  border: `1px solid ${borderColor}`,
+                  bgcolor: headerColor,
                   color: "white",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                   py: 2,
                   px: 3,
-                  borderRadius: 2,
-                  textAlign: "center",
-                  mb: 3,
                 }}
               >
                 <Typography variant="h6" fontWeight="bold">
-                  Upload Student 2×2 Photo
+                  Upload Your Photo
                 </Typography>
+                <IconButton
+                  onClick={() => {
+                    setPhotoModalOpen(false);
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
+                  }}
+                  sx={{
+                    color: "white",
+                    border: "2px solid rgba(255,255,255,0.6)",
+                    borderRadius: "50%",
+                    width: 40,
+                    height: 40,
+                    padding: 0,
+                    "&:hover": {
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      border: "2px solid white",
+                    },
+                  }}
+                >
+                  <CloseIcon sx={{ fontSize: 18 }} />
+                </IconButton>
               </Box>
 
-              {/* Preview Image */}
-              {(photoPreview || person.profile_img) && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    my: 2,
-                    position: "relative",
-                  }}
-                >
+              {/* Body */}
+              <Box
+                sx={{
+                  p: 3,
+                  overflowY: "auto",
+                  borderTop: "1px solid #e0e0e0",
+                  borderBottom: "1px solid #e0e0e0",
+                }}
+              >
+                <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+                  {/* LEFT SIDE — Sample/Reference Photo */}
                   <Box
-                    component="img"
-                    src={
-                      photoPreview
-                        ? photoPreview
-                        : `${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`
-                    }
-                    alt="Preview"
-                    sx={{
-                      width: "192px",
-                      height: "192px",
-                      objectFit: "cover",
-                      border: `1px solid ${borderColor}`,
-                      borderRadius: 2,
-                    }}
-                  />
-
-                  {/* ❌ REMOVE BUTTON */}
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      if (photoPreview) {
-                        // Clear newly selected file only
-                        setPhotoFile(null);
-                        setPhotoPreview(null);
-                      } else {
-                        // Delete existing saved photo from DB
-                        handleDeleteExistingPhoto();
-                      }
-                    }}
-                    sx={{
-                      position: "absolute",
-                      top: -8,
-                      right: "calc(50% - 96px)",
-                      minWidth: 0,
-                      width: 28,
-                      height: 28,
-                      fontSize: "18px",
-                      p: 0,
-                      color: "#fff",
-                      bgcolor: "#d32f2f",
-                      borderRadius: "50%",
-                      "&:hover": { bgcolor: "#b71c1c" },
-                    }}
+                    sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}
                   >
-                    ×
-                  </Button>
-                </Box>
-              )}
+                    <Typography
+                      variant="subtitle2"
+                      color="text.secondary"
+                      fontWeight={600}
+                    >
+                      ✅ Sample Format (Follow this exactly)
+                    </Typography>
 
-              {/* No photo placeholder */}
-              {!photoPreview && !person.profile_img && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    my: 2,
-                  }}
-                >
+                    <Box
+                      component="img"
+                      src={FormalExample}
+                      alt="Formal Photo Example"
+                      sx={{
+                        width: "100%",
+                        maxWidth: 420,
+                        height: 260,
+                        mx: "auto",
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: 2,
+                        backgroundColor: "#fff",
+                      }}
+                    />
+
+                    <Box
+                      sx={{
+                        border: "2px dashed #ccc",
+                        p: 2,
+                        borderRadius: 2,
+                        backgroundColor: "#f9f9f9",
+                      }}
+                    >
+                      <Typography variant="body1" fontWeight="bold" mb={1}>
+                        Guidelines:
+                      </Typography>
+                      <Box sx={{ ml: 1, fontSize: "14px" }}>
+                        - Size: 2" x 2"
+                        <br />
+                        - Color: Your photo must be in colored.
+                        <br />
+                        - Background: White.
+                        <br />
+                        - Head size and position: Look directly into the camera at a
+                        straight angle, face centered.
+                        <br />
+                        - File types: JPEG, JPG, PNG
+                        <br />
+                        - Attire must be formal.
+                        <br />- Required File Size: 2mb
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  {/* RIGHT SIDE — Upload area */}
                   <Box
-                    sx={{
-                      width: 192,
-                      height: 192,
-                      border: "2px dashed #ccc",
-                      borderRadius: 2,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: "#f5f5f5",
-                    }}
+                    sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}
                   >
-                    <Typography fontSize={12} color="textSecondary" textAlign="center" px={2}>
-                      No photo yet
+                    <Typography
+                      variant="subtitle2"
+                      color="text.secondary"
+                      fontWeight={600}
+                    >
+                      📤 Your Photo
+                    </Typography>
+
+                    {/* Preview */}
+                    {(photoPreview || person.profile_img) && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          position: "relative",
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={
+                            photoPreview
+                              ? photoPreview
+                              : `${API_BASE_URL}/uploads/Applicant1by1/${person.profile_img}`
+                          }
+                          alt="Preview"
+                          sx={{
+                            width: "192px",
+                            height: "192px",
+                            objectFit: "cover",
+                            border: `1px solid ${borderColor}`,
+                            borderRadius: 2,
+                          }}
+                        />
+
+                        <Button
+                          size="small"
+                          onClick={async () => {
+                            if (photoPreview) {
+                              // Newly selected file, not saved yet — clear it locally
+                              setPhotoFile(null);
+                              setPhotoPreview(null);
+                            } else {
+                              // Persisted photo — actually delete it from the record
+                              await handleDeleteExistingPhoto();
+                            }
+                          }}
+                          sx={{
+                            position: "absolute",
+                            top: -8,
+                            right: "calc(50% - 103px)",
+                            minWidth: 0,
+                            width: 28,
+                            height: 28,
+                            fontSize: "18px",
+                            p: 0,
+                            color: "#fff",
+                            bgcolor: "#d32f2f",
+                            borderRadius: "50%",
+                            "&:hover": { bgcolor: "#b71c1c" },
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </Box>
+                    )}
+
+                    {!photoPreview && !person.profile_img && (
+                      <Box
+                        sx={{
+                          height: 192,
+                          border: "1px dashed #ccc",
+                          borderRadius: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "text.secondary",
+                          fontSize: 13,
+                          textAlign: "center",
+                          px: 2,
+                        }}
+                      >
+                        No photo selected yet — match the sample on the left.
+                      </Box>
+                    )}
+
+                    <Typography
+                      sx={{
+                        fontSize: "16px",
+                        color: mainButtonColor,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Select Your Image:
+                    </Typography>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png"
+                      onClick={(e) => (e.target.value = null)}
+                      onChange={handlePhotoFileChange}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "10px",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                      }}
+                    />
+
+                    <Typography variant="caption" color="text.secondary">
+                      Click the × on your preview to remove it, choose a new file,
+                      then press Upload.
                     </Typography>
                   </Box>
                 </Box>
-              )}
-
-              {/* Guidelines Section */}
-              <Box
-                sx={{
-                  border: "2px dashed #ccc",
-                  p: 2,
-                  borderRadius: 2,
-                  mb: 3,
-                  backgroundColor: "#f9f9f9",
-                }}
-              >
-                <Typography variant="body1" fontWeight="bold" mb={1}>
-                  Guidelines:
-                </Typography>
-                <Box sx={{ ml: 2, fontSize: "15px" }}>
-                  - Size: 2" x 2"<br />
-                  - Color: Your photo must be in colored.<br />
-                  - Background: White.<br />
-                  - Head size and position: Look directly into the camera at a straight angle, face centered.<br />
-                  - File types: JPEG, JPG, PNG<br />
-                  - Attire must be formal.<br />
-                  - Required File Size: 2mb
-                </Box>
-
-                <Typography variant="body1" fontWeight="bold" mt={2}>
-                  How to Change the Photo?
-                </Typography>
-                <Box sx={{ ml: 2, fontSize: "15px" }}>
-                  - Click the X Button<br />
-                  - Choose a new file<br />
-                  - Click the Upload button
-                </Box>
               </Box>
 
-              {/* File Input */}
-              <Typography
-                sx={{
-                  fontSize: "18px",
-                  color: mainButtonColor,
-                  fontWeight: "bold",
-                  mb: 1,
-                }}
-              >
-                Select Your Image:
-              </Typography>
-              <input
-                type="file"
-                accept=".jpg,.jpeg,.png"
-                onClick={(e) => (e.target.value = null)}
-                onChange={handlePhotoFileChange}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  marginBottom: "16px",
-                }}
-              />
+              {/* Footer */}
+              <Box sx={{ p: 2, display: "flex", justifyContent: "space-between" }}>
+                <Button
+                  onClick={() => {
+                    setPhotoModalOpen(false);
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
+                  }}
+                  color="error"
+                  variant="outlined"
+                >
+                  Cancel
+                </Button>
 
-              {/* Upload Button */}
-              <Button
-                variant="contained"
-                fullWidth
-                disabled={!photoFile}
-                onClick={handlePhotoUpload}
-                sx={{
-                  backgroundColor: headerColor,
-                  border: `1px solid ${borderColor}`,
-                  color: "white",
-                  fontWeight: "bold",
-                  "&:hover": { backgroundColor: "#000000" },
-                }}
-              >
-                Upload
-              </Button>
+                <Button
+                  onClick={handlePhotoUpload}
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  disabled={!photoFile}
+                  sx={{ minWidth: "140px", height: "40px" }}
+                >
+                  Upload
+                </Button>
+              </Box>
             </Box>
           </Box>
         </Modal>
+
       </>
     </Box >
   );
