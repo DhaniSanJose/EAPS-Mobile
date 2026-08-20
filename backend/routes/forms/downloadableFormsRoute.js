@@ -2177,6 +2177,10 @@ router.post("/generate-student-list-pdf", async (req, res) => {
     // Mirrors the corner-label header style used by the Applicant List /
     // Entrance Examination Scores export (Department left / Program right,
     // centered logo + school name block), applied to the Student List.
+    //
+    // font-size is now HARDCODED at 12px (was 9px) so it never needs to
+    // be manually bumped up per export — cells wrap to a second line
+    // instead of shrinking or truncating.
     const wrappedHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -2261,10 +2265,11 @@ router.post("/generate-student-list-pdf", async (req, res) => {
 
     th, td {
       border: 1.5px solid black;
-      padding: 4px 3px;
-      font-size: 9px;
+      padding: 6px 5px;
+      font-size: 12px;
       text-align: center;
       word-wrap: break-word;
+      overflow-wrap: break-word;
       white-space: normal;
     }
 
@@ -2938,8 +2943,7 @@ router.post("/generate-class-program-pdf", async (req, res) => {
       documentLabel: "Class Program",
       legacyAction: "CLASS_PROGRAM_PDF_EXPORT",
       legacyMessage: ({ roleLabel, actorId }) =>
-        `${roleLabel} (${actorId}) exported the Class Program PDF${
-          section_label ? ` for ${section_label}` : ""
+        `${roleLabel} (${actorId}) exported the Class Program PDF${section_label ? ` for ${section_label}` : ""
         }.`,
     });
 
@@ -4756,15 +4760,17 @@ router.post("/generate-attendance-report-pdf", async (req, res) => {
       table-layout: fixed;
     }
 
-    th, td {
+         th, td {
       border: 1.5px solid black;
-      padding: 4px 3px;
-      font-size: 9px;
+      padding: 3px 4px;
+      font-size: 12px;
       text-align: center;
-      word-wrap: break-word;
       white-space: normal;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
 
+    
     th {
       background-color: lightgray;
       -webkit-print-color-adjust: exact;

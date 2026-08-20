@@ -32,7 +32,6 @@ const formatDate = (value) => {
   });
 };
 
-// NEW — module scope, so buildReportDefs (also module scope) can see it
 const formatDateTime = (value) => {
   if (!value) return "N/A";
   const d = new Date(value);
@@ -68,16 +67,12 @@ const formatExamResultStatus = (status) => {
 const fullName = (r) =>
   `${r.last_name || ""}, ${r.first_name || ""} ${r.middle_name ? r.middle_name.charAt(0) + "." : ""}${r.extension ? " " + r.extension : ""}`.trim();
 
-// Resolves a branch/campus id to its display label. Handles the
-// `branch` (canonical) vs `branch_name` (legacy fallback) field split.
 const campusLabelFor = (campuses, campusId) => {
   if (!campusId || campusId === "all") return null;
   const match = campuses.find((c) => String(c.id) === String(campusId));
   return match ? match.branch || match.branch_name || "Unnamed Branch" : null;
 };
 
-// Resolves a person_table.program (curriculum_id) to a readable label,
-// same pairing logic used in ExaminationPermitChangeCourse.jsx's ProgramRow.
 const resolveProgramLabel = (curriculums, curriculumId) => {
   if (!curriculumId) return "N/A";
   const match = curriculums.find(
@@ -88,9 +83,6 @@ const resolveProgramLabel = (curriculums, curriculumId) => {
   return label || match.program_description || "N/A";
 };
 
-// ── Report definitions: one entry per box ──────────────────────────────
-// Built as a function of `curriculums` so the Program column can resolve
-// curriculum_id -> program_code/major without a backend join.
 const buildReportDefs = (curriculums) => [
   {
     key: "ecat_takers",
@@ -100,12 +92,12 @@ const buildReportDefs = (curriculums) => [
     listEndpoint: "/api/reports/ecat-takers/list",
     fileNamePrefix: "ECAT_Exam_Takers",
     columns: [
-      { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
-      { label: "Name", value: fullName },
-      { label: "Program", value: (r) => resolveProgramLabel(curriculums, r.program) },
-      { label: "Room", value: (r) => r.room_description || "N/A" },
-      { label: "Time Scanned/Marked", value: (r) => formatDateTime(r.scanned_at) },
-      { label: "Status", value: () => "PRESENT" },
+      { label: "Applicant No.", width: 15, value: (r) => r.applicant_number || "N/A" },
+      { label: "Name", width: 30, value: fullName },
+      { label: "Program", width: 20, value: (r) => resolveProgramLabel(curriculums, r.program) },
+      { label: "Room", width: 12, value: (r) => r.room_description || "N/A" },
+      { label: "Time Scanned/Marked", width: 22, value: (r) => formatDateTime(r.scanned_at) },
+      { label: "Status", width: 13, value: () => "PRESENT" },
     ],
   },
   {
@@ -116,12 +108,12 @@ const buildReportDefs = (curriculums) => [
     listEndpoint: "/api/reports/non-appearance/list",
     fileNamePrefix: "Exam_Non_Appearance",
     columns: [
-      { label: "Applicant No.", value: (r) => r.applicant_id || "N/A" },
-      { label: "Name", value: fullName },
-      { label: "Program", value: (r) => resolveProgramLabel(curriculums, r.program) },
-      { label: "Exam Date", value: (r) => formatDate(r.exam_date) },
-      { label: "Room", value: (r) => r.room_description || "N/A" },
-      { label: "Status", value: () => "ABSENT" },
+      { label: "Applicant No.", width: 15, value: (r) => r.applicant_id || "N/A" },
+      { label: "Name", width: 28, value: fullName },
+      { label: "Program", width: 20, value: (r) => resolveProgramLabel(curriculums, r.program) },
+      { label: "Exam Date", width: 12, value: (r) => formatDate(r.exam_date) },
+      { label: "Room", width: 12, value: (r) => r.room_description || "N/A" },
+      { label: "Status", width: 13, value: () => "ABSENT" },
     ],
   },
   {
@@ -132,19 +124,17 @@ const buildReportDefs = (curriculums) => [
     listEndpoint: "/api/reports/realignment/list",
     fileNamePrefix: "Applicant_Realignment",
     columns: [
-      { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
-      { label: "Name", value: (r) => r.applicant_name || "N/A" },
+      { label: "Applicant No.", width: 15, value: (r) => r.applicant_number || "N/A" },
+      { label: "Name", width: 28, value: (r) => r.applicant_name || "N/A" },
       {
         label: "Current Program",
+        width: 20,
         value: (r) => resolveProgramLabel(curriculums, r.current_curriculum_id),
       },
-      { label: "Form Type", value: (r) => formatFormType(r.form_type) },
-      { label: "Control No.", value: (r) => r.control_number || "N/A" },
-      {
-        label: "Change Course Requested",
-        value: () => "YES",
-      },
-      { label: "Date Issued", value: (r) => formatDate(r.created_at) },
+      { label: "Form Type", width: 20, value: (r) => formatFormType(r.form_type) },
+      { label: "Document No.", width: 13, value: (r) => r.control_number || "N/A" },
+      { label: "Change Course Requested", width: 15, value: () => "YES" },
+      { label: "Date Issued", width: 10, value: (r) => formatDate(r.created_at) },
     ],
   },
   {
@@ -155,24 +145,29 @@ const buildReportDefs = (curriculums) => [
     fileNamePrefix: "ECAT_Passers_Failers",
     hasStatusFilter: true,
     columns: [
-      { label: "Applicant No.", value: (r) => r.applicant_number || "N/A" },
-      { label: "Name", value: fullName },
-      { label: "Program", value: (r) => resolveProgramLabel(curriculums, r.program) },
-      { label: "Score", value: (r) => r.total_score ?? "N/A" },
-      { label: "Result", value: (r) => formatExamResultStatus(r.status) },
-      { label: "Date", value: (r) => formatDate(r.date_created) },
+      { label: "Applicant No.", width: 13, value: (r) => r.applicant_number || "N/A" },
+      { label: "Name", width: 28, value: fullName },
+      { label: "Program", width: 25, value: (r) => resolveProgramLabel(curriculums, r.program) },
+      { label: "Score", width: 10, value: (r) => r.total_score ?? "N/A" },
+      { label: "Result", width: 10, value: (r) => formatExamResultStatus(r.status) },
+      { label: "Date", width: 13, value: (r) => formatDate(r.date_created) },
     ],
   },
 ];
 
-// ── campuses / selectedCampus are passed down from AdmissionOfficerDashboard
-// so the campus filter stays in sync with the rest of the dashboard. ──────
-const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
+// ── campuses / selectedCampus / schoolYear / semester are passed down
+// from AdmissionOfficerDashboard so this panel stays in sync with the
+// active-school-year filter selected up top. ──────────────────────────
+const AdmissionsReportPanel = ({
+  campuses = [],
+  selectedCampus = "all",
+  schoolYear = "",
+  semester = "",
+}) => {
   const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
   const branding = settings?.branding || {};
   const assets = settings?.assets || {};
-  const headerColor = colors.header || "#1976d2";
   const [summary, setSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [curriculums, setCurriculums] = useState([]);
@@ -185,9 +180,6 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
   const [resultsStatusFilter, setResultsStatusFilter] = useState("all");
   const [downloadingKey, setDownloadingKey] = useState(null);
 
-  // Fetched independently of AdmissionOfficerDashboard's own curriculum
-  // state (which is deduped by program_code and can drop curriculum_ids),
-  // so lookups here always resolve by the raw curriculum_id.
   useEffect(() => {
     axios
       .get(`${API_BASE_URL}/api/applied_program`)
@@ -197,15 +189,24 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
 
   const REPORT_DEFS = useMemo(() => buildReportDefs(curriculums), [curriculums]);
 
+  // ── Build the shared query params for both the summary and the
+  // downloadable list endpoints, so the two never drift out of sync. ──
+  const scopeParams = useMemo(() => {
+    const p = {};
+    if (selectedCampus !== "all" && selectedCampus !== "") p.campus = selectedCampus;
+    if (schoolYear !== "" && schoolYear !== undefined && schoolYear !== null)
+      p.school_year = schoolYear;
+    if (semester !== "" && semester !== undefined && semester !== null)
+      p.semester = semester;
+    return p;
+  }, [selectedCampus, schoolYear, semester]);
+
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true);
     try {
-      const params = selectedCampus !== "all" ? { campus: selectedCampus } : {};
       const res = await axios.get(
         `${API_BASE_URL}/api/reports/admissions-summary`,
-        {
-          params,
-        },
+        { params: scopeParams },
       );
       setSummary(res.data);
     } catch (err) {
@@ -213,7 +214,7 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     } finally {
       setLoadingSummary(false);
     }
-  }, [selectedCampus]);
+  }, [scopeParams]);
 
   useEffect(() => {
     fetchSummary();
@@ -225,9 +226,9 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     return match?.address || fallback;
   };
 
+  const campusLabelFor2 = (campuses, campusId) => campusLabelFor(campuses, campusId);
 
   const buildTableHtml = (title, columns, rows) => {
-    // ── Same letterhead build as handleExportApplicantListPdf ──
     const logoSrc = assets.logoUrl || EaristLogo;
     const companyName = (branding.companyName || "").trim();
     const words = companyName.split(" ");
@@ -240,8 +241,11 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
       selectedCampus,
       branding.campusAddress || "No address set in Settings",
     );
-    const campusLabel = campusLabelFor(campuses, selectedCampus);
-    const generatedAt = new Date().toLocaleString("en-US");
+
+    const fallbackWidth = (100 / columns.length).toFixed(2);
+    const colgroup = `<colgroup>${columns
+      .map((c) => `<col style="width:${c.width ?? fallbackWidth}%" />`)
+      .join("")}</colgroup>`;
 
     const headerRow = `<tr>${columns.map((c) => `<th>${c.label}</th>`).join("")}</tr>`;
     const bodyRows = rows.length
@@ -260,13 +264,10 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
 
     return `
     <div class="print-header">
-
       <div class="header-content">
         <img src="${logoSrc}" alt="School Logo" />
-
         <div class="header-text">
           <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
-
           ${companyName
         ? `
               <b style="letter-spacing: 1px; font-size: 18px; font-family: Arial, sans-serif;">
@@ -281,19 +282,16 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
             `
         : ""
       }
-
           <div style="font-size: 12px; font-family: Arial">${resolvedCampusAddress}</div>
         </div>
       </div>
-
       <div style="margin-top: 20px; text-align: center;">
         <b style="font-size: 20px; letter-spacing: 1px;">${title}</b>
       </div>
-    
     </div>
-
     <div class="table-wrapper">
       <table>
+        ${colgroup}
         <thead>${headerRow}</thead>
         <tbody>${bodyRows}</tbody>
       </table>
@@ -305,12 +303,9 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     const period = periods[def.key];
     setDownloadingKey(def.key);
     try {
-      const params = { period };
+      const params = { period, ...scopeParams };
       if (def.hasStatusFilter && resultsStatusFilter !== "all") {
         params.status = resultsStatusFilter;
-      }
-      if (selectedCampus !== "all") {
-        params.campus = selectedCampus;
       }
 
       const listRes = await axios.get(`${API_BASE_URL}${def.listEndpoint}`, {
@@ -318,14 +313,14 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
       });
       const rows = Array.isArray(listRes.data) ? listRes.data : [];
 
-      const campusLabel = campusLabelFor(campuses, selectedCampus);
-      const title = `${def.title} \u2014 ${PERIOD_LABELS[period]}${campusLabel ? ` (${campusLabel})` : ""}`;
+      const campusLabel = campusLabelFor2(campuses, selectedCampus);
+      const scopeBits = [
+        campusLabel,
+        schoolYear ? `SY ${schoolYear}` : null,
+      ].filter(Boolean);
+      const title = `${def.title} \u2014 ${PERIOD_LABELS[period]}${scopeBits.length ? ` (${scopeBits.join(", ")})` : ""}`;
       const html = buildTableHtml(title, def.columns, rows);
 
-      // Reuses the existing generic report PDF route (see
-      // routes/forms/downloadableFormsRoute.js ->
-      // POST /generate-attendance-report-pdf) instead of adding a new
-      // puppeteer route per report.
       const pdfRes = await axios.post(
         `${API_BASE_URL}/api/generate-attendance-report-pdf`,
         { html, title, fileNamePrefix: `${def.fileNamePrefix}_${period}` },
@@ -360,7 +355,7 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
     </Box>
   );
 
-  const activeCampusLabel = campusLabelFor(campuses, selectedCampus);
+  const activeCampusLabel = campusLabelFor2(campuses, selectedCampus);
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -374,13 +369,15 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
           gap: 1,
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "baseline", gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, flexWrap: "wrap" }}>
           <Typography variant="h6" fontWeight="bold">
             Admissions Report
           </Typography>
-          {activeCampusLabel && (
+          {(activeCampusLabel || schoolYear) && (
             <Typography fontSize={13} color="text.secondary">
-              — {activeCampusLabel}
+              — {[activeCampusLabel, schoolYear ? `SY ${schoolYear}` : null]
+                .filter(Boolean)
+                .join(" · ")}
             </Typography>
           )}
         </Box>
@@ -448,6 +445,7 @@ const AdmissionsReportPanel = ({ campuses = [], selectedCampus = "all" }) => {
                         {renderCountRow("Today", counts?.today)}
                         {renderCountRow("This Week", counts?.this_week)}
                         {renderCountRow("This Month", counts?.this_month)}
+                        {renderCountRow("All Time", counts?.all_time)}
                       </>
                     )}
                   </Box>

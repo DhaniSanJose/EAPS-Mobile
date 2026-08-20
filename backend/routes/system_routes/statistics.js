@@ -3,6 +3,174 @@ const { db, db3 } = require("../database/database");
 
 const router = express.Router();
 
+
+// ====================================================================
+// ACTIVE SCHOOL YEAR — only rows where astatus = 1, joined so the
+// frontend gets real labels (year_description / semester_description)
+// instead of raw ids. This is the single source of truth for the
+// "active school year" filter dropdowns.
+// ====================================================================
+router.get("/active_school_year", async (req, res) => {
+  try {
+    const [rows] = await db3.query(`
+      SELECT
+        asy.id,
+        asy.year_id,
+        yt.year_description,
+        asy.semester_id,
+        st.semester_description,
+        st.semester_code,
+        asy.astatus,
+        asy.active
+      FROM active_school_year_table asy
+      INNER JOIN year_table yt ON yt.year_id = asy.year_id
+      INNER JOIN semester_table st ON st.semester_id = asy.semester_id
+      WHERE asy.astatus = 1
+      ORDER BY yt.year_description DESC, asy.semester_id ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching active school year:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/ecat-summary", async (req, res) => {
+  try {
+    const { campus, school_year, semester } = req.query;
+    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
+    const hasYear = school_year !== undefined && school_year !== "" && school_year !== "all";
+    const hasSemester = semester !== undefined && semester !== "" && semester !== "all";
+
+    // ── total_applied / total_pending — both read straight off
+    // person_table, which has no semester link of its own (no
+    // active_school_year_id, no semester_code column). Only campus/year
+    // apply here; `semester` can't filter these two until person_table
+    // itself carries that association.
+    let totalAppliedFilter = "WHERE termsOfAgreement = 1";
+    const totalAppliedParams = [];
+    if (hasCampus) { totalAppliedFilter += " AND campus = ?"; totalAppliedParams.push(campus); }
+    if (hasYear) { totalAppliedFilter += " AND YEAR(created_at) = ?"; totalAppliedParams.push(school_year); }
+
+    let pendingFilter = "";
+    const pendingParams = [];
+    if (hasCampus) { pendingFilter += " AND p.campus = ?"; pendingParams.push(campus); }
+    if (hasYear) { pendingFilter += " AND YEAR(p.created_at) = ?"; pendingParams.push(school_year); }
+
+    // ── total_scheduled — exam_applicants → entrance_exam_schedule
+    // carries active_school_year_id, so semester CAN be applied here via
+    // a join to enrollment.active_school_year_table.
+    const needsScheduledJoin = hasCampus || hasYear;
+    let scheduledJoin = "";
+    let scheduledFilter = "";
+    const scheduledParams = [];
+    if (needsScheduledJoin) {
+      scheduledJoin += `
+         INNER JOIN applicant_numbering_table ant3 ON ant3.applicant_number = ea3.applicant_id
+         INNER JOIN person_table pt3 ON pt3.person_id = ant3.person_id
+      `;
+      if (hasCampus) { scheduledFilter += " AND pt3.campus = ?"; scheduledParams.push(campus); }
+      if (hasYear) { scheduledFilter += " AND YEAR(pt3.created_at) = ?"; scheduledParams.push(school_year); }
+    }
+    if (hasSemester) {
+      scheduledJoin += `
+         INNER JOIN entrance_exam_schedule s3 ON s3.schedule_id = ea3.schedule_id
+         INNER JOIN enrollment.active_school_year_table asy3 ON asy3.id = s3.active_school_year_id
+      `;
+      scheduledFilter += " AND asy3.semester_id = ?";
+      scheduledParams.push(semester);
+    }
+
+    // ── total_finished — exam_results now carries active_school_year_id
+    // directly (stamped at save time by /exam/save), so semester CAN be
+    // applied here too, without needing the person_table join at all.
+    const needsFinishedJoin = hasCampus || hasYear;
+    let finishedJoin = "";
+    let finishedFilter = "";
+    const finishedParams = [];
+    if (needsFinishedJoin) {
+      finishedJoin += " INNER JOIN person_table pt4 ON pt4.person_id = er.person_id";
+      if (hasCampus) { finishedFilter += " AND pt4.campus = ?"; finishedParams.push(campus); }
+      if (hasYear) { finishedFilter += " AND YEAR(pt4.created_at) = ?"; finishedParams.push(school_year); }
+    }
+    if (hasSemester) {
+      finishedJoin += " LEFT JOIN enrollment.active_school_year_table asy4 ON asy4.id = er.active_school_year_id";
+      finishedFilter += " AND asy4.semester_id = ?";
+      finishedParams.push(semester);
+    }
+
+    const [rows] = await db.execute(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM person_table ${totalAppliedFilter}) AS total_applied,
+
+        (SELECT COUNT(*)
+         FROM person_table p
+         LEFT JOIN applicant_numbering_table ant ON ant.person_id = p.person_id
+         LEFT JOIN exam_applicants ea ON ea.applicant_id = ant.applicant_number
+         LEFT JOIN (
+           SELECT ru.person_id, COUNT(DISTINCT ru.requirements_id) AS verified_count
+           FROM requirement_uploads ru
+           INNER JOIN requirements_table rt ON ru.requirements_id = rt.id
+           WHERE ru.document_status = 'Documents Verified & ECAT'
+             AND rt.category = 'Main'
+             AND rt.is_verifiable = 1
+           GROUP BY ru.person_id
+         ) AS vdocs ON vdocs.person_id = p.person_id
+         LEFT JOIN (
+           SELECT p3.person_id, COUNT(rt2.id) AS total_required
+           FROM person_table p3
+           LEFT JOIN requirements_table rt2
+             ON (rt2.applicant_type = p3.applyingAs OR rt2.applicant_type = 0)
+            AND rt2.category = 'Main'
+            AND rt2.is_verifiable = 1
+           GROUP BY p3.person_id
+         ) AS rtot ON rtot.person_id = p.person_id
+         WHERE COALESCE(rtot.total_required, 0) > 0
+           AND COALESCE(vdocs.verified_count, 0) >= rtot.total_required
+           AND (ea.email_sent IS NULL OR ea.email_sent = 0)
+           ${pendingFilter}
+        ) AS total_pending,
+
+        (SELECT COUNT(DISTINCT ea3.applicant_id)
+         FROM exam_applicants ea3
+         ${scheduledJoin}
+         WHERE ea3.email_sent = 1
+         ${scheduledFilter}
+        ) AS total_scheduled,
+
+        (SELECT COUNT(DISTINCT er.person_id)
+         FROM exam_results er
+         ${finishedJoin}
+         WHERE 1=1 ${finishedFilter}
+        ) AS total_finished
+    `,
+      [...totalAppliedParams, ...pendingParams, ...scheduledParams, ...finishedParams],
+    );
+
+    const overallParams = [];
+    let overallFilter = "";
+    if (hasCampus) { overallFilter = " AND pt5.campus = ?"; overallParams.push(campus); }
+    const [[overallRow]] = await db.query(
+      `
+      SELECT COUNT(DISTINCT er5.person_id) AS overall_accommodated
+      FROM exam_results er5
+      INNER JOIN person_table pt5 ON pt5.person_id = er5.person_id
+      WHERE 1=1 ${overallFilter}
+    `,
+      overallParams,
+    );
+
+    res.json({
+      ...rows[0],
+      overall_accommodated: Number(overallRow.overall_accommodated || 0),
+    });
+  } catch (err) {
+    console.error("Error fetching ECAT summary:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 router.get("/applicant-stats", async (req, res) => {
   try {
     const { gender, department_id, program_id, school_year, semester, campus } =
@@ -415,105 +583,6 @@ router.get("/exam/completed-count", async (req, res) => {
   }
 });
 
-// ====================================================================
-// ECAT SUMMARY (pie chart) — now campus-aware.
-// Pass ?campus=<company_settings.branches[].id> to scope every number
-// in the pie to applicants whose person_table.campus matches that id.
-// Omit campus (or pass "all") to see every campus combined.
-// ====================================================================
-router.get("/ecat-summary", async (req, res) => {
-  try {
-    const { campus } = req.query;
-    const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
-    const params = [];
-
-    let totalAppliedFilter = "WHERE termsOfAgreement = 1";
-    if (hasCampus) {
-      totalAppliedFilter += " AND campus = ?";
-      params.push(campus);
-    }
-
-    let pendingCampusFilter = "";
-    if (hasCampus) {
-      pendingCampusFilter = " AND p.campus = ?";
-      params.push(campus);
-    }
-
-    let scheduledCampusJoin = "";
-    let scheduledCampusFilter = "";
-    if (hasCampus) {
-      scheduledCampusJoin = `
-         INNER JOIN applicant_numbering_table ant3 ON ant3.applicant_number = ea3.applicant_id
-         INNER JOIN person_table pt3 ON pt3.person_id = ant3.person_id
-      `;
-      scheduledCampusFilter = " AND pt3.campus = ?";
-      params.push(campus);
-    }
-
-    let finishedCampusJoin = "";
-    let finishedCampusFilter = "";
-    if (hasCampus) {
-      finishedCampusJoin =
-        " INNER JOIN person_table pt4 ON pt4.person_id = er.person_id";
-      finishedCampusFilter = " AND pt4.campus = ?";
-      params.push(campus);
-    }
-
-    const [rows] = await db.execute(
-      `
-      SELECT
-        (SELECT COUNT(*) FROM person_table ${totalAppliedFilter}) AS total_applied,
-
-        (SELECT COUNT(*)
-         FROM person_table p
-         LEFT JOIN applicant_numbering_table ant ON ant.person_id = p.person_id
-         LEFT JOIN exam_applicants ea ON ea.applicant_id = ant.applicant_number
-         LEFT JOIN (
-           SELECT ru.person_id, COUNT(DISTINCT ru.requirements_id) AS verified_count
-           FROM requirement_uploads ru
-           INNER JOIN requirements_table rt ON ru.requirements_id = rt.id
-           WHERE ru.document_status = 'Documents Verified & ECAT'
-             AND rt.category = 'Main'
-             AND rt.is_verifiable = 1
-           GROUP BY ru.person_id
-         ) AS vdocs ON vdocs.person_id = p.person_id
-         LEFT JOIN (
-           SELECT p3.person_id, COUNT(rt2.id) AS total_required
-           FROM person_table p3
-           LEFT JOIN requirements_table rt2
-             ON (rt2.applicant_type = p3.applyingAs OR rt2.applicant_type = 0)
-            AND rt2.category = 'Main'
-            AND rt2.is_verifiable = 1
-           GROUP BY p3.person_id
-         ) AS rtot ON rtot.person_id = p.person_id
-         WHERE COALESCE(rtot.total_required, 0) > 0
-           AND COALESCE(vdocs.verified_count, 0) >= rtot.total_required
-           AND (ea.email_sent IS NULL OR ea.email_sent = 0)
-           ${pendingCampusFilter}
-        ) AS total_pending,
-
-        (SELECT COUNT(DISTINCT ea3.applicant_id)
-         FROM exam_applicants ea3
-         ${scheduledCampusJoin}
-         WHERE ea3.email_sent = 1
-         ${scheduledCampusFilter}
-        ) AS total_scheduled,
-
-        (SELECT COUNT(DISTINCT er.person_id)
-         FROM exam_results er
-         ${finishedCampusJoin}
-         WHERE 1=1 ${finishedCampusFilter}
-        ) AS total_finished
-    `,
-      params,
-    );
-
-    res.json(rows[0]);
-  } catch (err) {
-    console.error("Error fetching ECAT summary:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
 
 router.get("/get_enrollment_statistic", async (req, res) => {
   try {

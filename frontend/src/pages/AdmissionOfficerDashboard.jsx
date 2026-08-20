@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { SettingsContext } from "../App";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -354,6 +354,15 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
     return filtered;
   };
 
+  const resolvedSchoolYear = useMemo(() => {
+    const sy = schoolYears.find(
+      (s) => String(s.year_id) === String(selectedSchoolYear),
+    );
+    return sy ? Number(sy.current_year) : "";
+  }, [schoolYears, selectedSchoolYear]);
+
+  const resolvedSemester = useMemo(() => selectedSchoolSemester, [selectedSchoolSemester]); // ✅ send semester_id directly
+
   // ── Stats ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!allApplicants.length) return;
@@ -432,7 +441,10 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
   }, [selectedCampus]);
 
   useEffect(() => {
-    const params = selectedCampus !== "all" ? { campus: selectedCampus } : {};
+    const params = {};
+    if (selectedCampus !== "all") params.campus = selectedCampus;
+    if (resolvedSchoolYear) params.school_year = resolvedSchoolYear;
+    if (resolvedSemester) params.semester = resolvedSemester;
 
     axios
       .get(`${API_BASE_URL}/api/ecat-summary`, { params })
@@ -446,7 +458,7 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
         ]);
       })
       .catch(console.error);
-  }, [selectedCampus]);
+  }, [selectedCampus, resolvedSchoolYear, resolvedSemester]);
   // ── Department change ───────────────────────────────────────────
   const handleDepartmentChange = (selectedDept) => {
     setSelectedDepartmentFilter(selectedDept);
@@ -560,6 +572,8 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
         fontFamily: "Poppins, sans-serif",
       }}
     >
+
+
       {/* Scrollable content */}
       <Box
         sx={{
@@ -691,9 +705,8 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
                 >
                   Welcome Back!{" "}
                   {personData
-                    ? `${personData.lname}, ${personData.fname} ${
-                        personData.mname || ""
-                      }`
+                    ? `${personData.lname}, ${personData.fname} ${personData.mname || ""
+                    }`
                     : ""}
                 </Typography>
 
@@ -1320,6 +1333,8 @@ const AdmissionOfficerDashboard = ({ profileImage, setProfileImage }) => {
         <AdmissionsReportPanel
           campuses={campuses}
           selectedCampus={selectedCampus}
+          schoolYear={resolvedSchoolYear}
+          semester={resolvedSemester}
         />
       </Box>
     </Box>

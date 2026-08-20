@@ -45,27 +45,83 @@ const FORM_TYPE_LABELS = {
     newForm1: "Empty Change Course (Campus Director)",
 };
 
-// ── ALL FOUR REPORT BOXES NOW DEDUPE PER PERSON ─────────────────────────
-// Every summary count below uses COUNT(DISTINCT person_id) instead of
-// SUM(CASE...), and every /list endpoint uses a ROW_NUMBER() PARTITION BY
-// person_id subquery keeping only each person's most recent row in the
-// selected period. So if an applicant is scanned present twice, marked
-// absent then present, retakes the exam, or prints/downloads a Change
-// Course form multiple times, they still only ever show up ONCE in the
-// counts and ONCE in the downloadable PDF list.
-//
-// NOTE: ROW_NUMBER() requires MySQL 8.0+. If you're on 5.7, swap each
-// subquery for a correlated `WHERE x.id = (SELECT MAX(id) FROM ... WHERE
-// person_id = x.person_id AND <same period/status filters>)` instead.
+// ── year-only filter, kept for anywhere still resolving year off
+// person_table.created_at (nothing currently uses this anymore now that
+// Realignment/ECAT Results have moved to asyJoin/asyWhere below, but left
+// in place in case you need a plain year filter elsewhere).
+const yearSemWhere = (alias, schoolYear, semester, column = "created_at") => {
+    let clause = "";
+    const params = [];
+    if (schoolYear !== undefined && schoolYear !== "" && schoolYear !== "all") {
+        clause += ` AND YEAR(${alias}.${column}) = ?`;
+        params.push(schoolYear);
+    }
+    return { clause, params };
+};
+
+// ── exam_attendance rows are tied to a specific school-year/semester
+// context via entrance_exam_schedule.active_school_year_id. `s` must
+// already be joined as `entrance_exam_schedule s` in the query this is
+// used in. enrollment holds active_school_year_table/year_table, the
+// default db holds everything else — both live on the same server, so a
+// cross-database qualified join works here just like elsewhere in this app.
+const examSemesterJoin = () => `
+  LEFT JOIN enrollment.active_school_year_table asy ON asy.id = s.active_school_year_id
+  LEFT JOIN enrollment.year_table yt ON yt.year_id = asy.year_id
+`;
+
+const examSemesterWhere = (schoolYear, semester) => {
+    let clause = "";
+    const params = [];
+    if (schoolYear !== undefined && schoolYear !== "" && schoolYear !== "all") {
+        clause += " AND yt.year_description = ?";
+        params.push(schoolYear);
+    }
+    if (semester !== undefined && semester !== "" && semester !== "all") {
+        clause += " AND asy.semester_id = ?";
+        params.push(semester);
+    }
+    return { clause, params };
+};
+
+// ── same pattern as examSemesterJoin/examSemesterWhere above, but for
+// tables that carry active_school_year_id directly on themselves instead
+// of through a schedule join (applicant_realignment_log, exam_results).
+// REQUIRES the migration:
+//   ALTER TABLE applicant_realignment_log ADD COLUMN active_school_year_id INT NULL;
+//   ALTER TABLE exam_results ADD COLUMN active_school_year_id INT NULL;
+// and that whatever route inserts into these tables stamps that column
+// with the currently-active row's id at creation time. Rows created
+// before the migration will have active_school_year_id = NULL and will
+// never match a specific semester filter (they just won't appear once a
+// semester other than "All" is selected).
+const asyJoin = (alias) => `
+  LEFT JOIN enrollment.active_school_year_table asy ON asy.id = ${alias}.active_school_year_id
+  LEFT JOIN enrollment.year_table yt ON yt.year_id = asy.year_id
+`;
+
+const asyWhere = (schoolYear, semester) => {
+    let clause = "";
+    const params = [];
+    if (schoolYear !== undefined && schoolYear !== "" && schoolYear !== "all") {
+        clause += " AND yt.year_description = ?";
+        params.push(schoolYear);
+    }
+    if (semester !== undefined && semester !== "" && semester !== "all") {
+        clause += " AND asy.semester_id = ?";
+        params.push(semester);
+    }
+    return { clause, params };
+};
 
 router.get("/reports/admissions-summary", async (req, res) => {
     try {
-        const { campus } = req.query;
+        const { campus, school_year, semester } = req.query;
         const hasCampus = campus !== undefined && campus !== "" && campus !== "all";
 
-        // ── ECAT TAKERS — dedupe by person_id. Join to person_table is now
-        // unconditional (not just when hasCampus) because COUNT(DISTINCT)
-        // needs pt.person_id regardless of whether a campus filter is applied.
+        // ── ECAT TAKERS — dedupe by person_id. Semester/year resolved
+        // through entrance_exam_schedule.active_school_year_id.
+        const esTakers = examSemesterWhere(school_year, semester);
         const [[takers]] = await db.query(
             `
       SELECT
@@ -76,12 +132,15 @@ router.get("/reports/admissions-summary", async (req, res) => {
       FROM exam_attendance ea
       INNER JOIN applicant_numbering_table ant ON ant.applicant_number = ea.applicant_id
       INNER JOIN person_table pt ON pt.person_id = ant.person_id
-      WHERE ea.status = 'present' ${hasCampus ? "AND pt.campus = ?" : ""}
+      INNER JOIN entrance_exam_schedule s ON s.schedule_id = ea.schedule_id
+      ${examSemesterJoin()}
+      WHERE ea.status = 'present' ${hasCampus ? "AND pt.campus = ?" : ""} ${esTakers.clause}
     `,
-            hasCampus ? [campus] : [],
+            [...(hasCampus ? [campus] : []), ...esTakers.params],
         );
 
-        // ── NON-APPEARANCE — dedupe by person_id.
+        // ── NON-APPEARANCE — dedupe by person_id. Same schedule-based join.
+        const esNonAppearance = examSemesterWhere(school_year, semester);
         const [[nonAppearance]] = await db.query(
             `
       SELECT
@@ -92,14 +151,18 @@ router.get("/reports/admissions-summary", async (req, res) => {
       FROM exam_attendance ea
       INNER JOIN applicant_numbering_table ant ON ant.applicant_number = ea.applicant_id
       INNER JOIN person_table pt ON pt.person_id = ant.person_id
-      WHERE ea.status = 'absent' ${hasCampus ? "AND pt.campus = ?" : ""}
+      INNER JOIN entrance_exam_schedule s ON s.schedule_id = ea.schedule_id
+      ${examSemesterJoin()}
+      WHERE ea.status = 'absent' ${hasCampus ? "AND pt.campus = ?" : ""} ${esNonAppearance.clause}
     `,
-            hasCampus ? [campus] : [],
+            [...(hasCampus ? [campus] : []), ...esNonAppearance.params],
         );
 
         // ── REALIGNMENT — campus resolved from applicant_realignment_log.campus_id
-        // (set from the Document No. at generation time), dedupe by person_id.
+        // (set from the Document No. at issuance). Semester now resolved via
+        // arl.active_school_year_id (requires the migration above).
         const cwRealign = campusWhere("arl", campus, "campus_id");
+        const asyRealign = asyWhere(school_year, semester);
         const [[realignment]] = await db.query(
             `
       SELECT
@@ -108,13 +171,18 @@ router.get("/reports/admissions-summary", async (req, res) => {
         COUNT(DISTINCT CASE WHEN DATE_FORMAT(arl.created_at,'%Y-%m') = DATE_FORMAT(CURDATE(),'%Y-%m') THEN arl.person_id END) AS this_month,
         COUNT(DISTINCT arl.person_id) AS all_time
       FROM applicant_realignment_log arl
-      WHERE 1=1 ${cwRealign.clause}
+      LEFT JOIN person_table pt ON pt.person_id = arl.person_id
+      ${asyJoin("arl")}
+      WHERE 1=1 ${cwRealign.clause} ${asyRealign.clause}
     `,
-            cwRealign.params,
+            [...cwRealign.params, ...asyRealign.params],
         );
 
-        // ── ECAT RESULTS — dedupe by person_id (in case someone retakes the exam).
+        // ── ECAT RESULTS — dedupe by person_id (in case someone retakes the
+        // exam). Semester now resolved via er.active_school_year_id (requires
+        // the migration above AND the insert route being updated to stamp it).
         const cwResults = campusWhere("pt", campus);
+        const asyResults = asyWhere(school_year, semester);
         const [[results]] = await db.query(
             `
       SELECT
@@ -128,9 +196,10 @@ router.get("/reports/admissions-summary", async (req, res) => {
         COUNT(DISTINCT CASE WHEN er.status=1 THEN er.person_id END) AS all_time_failed
       FROM exam_results er
       INNER JOIN person_table pt ON pt.person_id = er.person_id
-      WHERE 1=1 ${cwResults.clause}
+      ${asyJoin("er")}
+      WHERE 1=1 ${cwResults.clause} ${asyResults.clause}
     `,
-            cwResults.params,
+            [...cwResults.params, ...asyResults.params],
         );
 
         const n = (v) => Number(v || 0);
@@ -156,9 +225,10 @@ router.get("/reports/admissions-summary", async (req, res) => {
 // 1. ECAT TAKERS — list for the downloadable PDF (deduped per person)
 // ====================================================================
 router.get("/reports/ecat-takers/list", async (req, res) => {
-    const { period = "month", value, campus } = req.query;
+    const { period = "month", value, campus, school_year, semester } = req.query;
     const { clause, params } = periodWhere("ea2.scanned_at", period, value);
     const cw = campusWhere("pt", campus);
+    const es = examSemesterWhere(school_year, semester);
 
     try {
         const [rows] = await db.query(
@@ -178,10 +248,11 @@ router.get("/reports/ecat-takers/list", async (req, res) => {
       ) ea
       JOIN entrance_exam_schedule s ON ea.schedule_id = s.schedule_id
       JOIN person_table pt ON pt.person_id = ea.resolved_person_id
-      WHERE ea.rn = 1 ${cw.clause}
+      ${examSemesterJoin()}
+      WHERE ea.rn = 1 ${cw.clause} ${es.clause}
       ORDER BY ea.scanned_at DESC
       `,
-            [...params, ...cw.params],
+            [...params, ...cw.params, ...es.params],
         );
         res.json(rows);
     } catch (err) {
@@ -194,9 +265,10 @@ router.get("/reports/ecat-takers/list", async (req, res) => {
 // 2. NON-APPEARANCE — list for the downloadable PDF (deduped per person)
 // ====================================================================
 router.get("/reports/non-appearance/list", async (req, res) => {
-    const { period = "month", value, campus } = req.query;
+    const { period = "month", value, campus, school_year, semester } = req.query;
     const { clause, params } = periodWhere("ea2.absent_at", period, value);
     const cw = campusWhere("pt", campus);
+    const es = examSemesterWhere(school_year, semester);
 
     try {
         const [rows] = await db.query(
@@ -216,10 +288,11 @@ router.get("/reports/non-appearance/list", async (req, res) => {
       ) ea
       JOIN entrance_exam_schedule s ON ea.schedule_id = s.schedule_id
       JOIN person_table pt ON pt.person_id = ea.resolved_person_id
-      WHERE ea.rn = 1 ${cw.clause}
+      ${examSemesterJoin()}
+      WHERE ea.rn = 1 ${cw.clause} ${es.clause}
       ORDER BY ea.absent_at DESC
       `,
-            [...params, ...cw.params],
+            [...params, ...cw.params, ...es.params],
         );
         res.json(rows);
     } catch (err) {
@@ -232,11 +305,13 @@ router.get("/reports/non-appearance/list", async (req, res) => {
 // 3. REALIGNMENT — list for the downloadable PDF (deduped per person)
 // ====================================================================
 // Filters on arl.campus_id (resolved from the Document No. at issuance,
-// not the applicant's current person_table.campus).
+// not the applicant's current person_table.campus). Semester now
+// resolved via arl.active_school_year_id (requires the migration above).
 router.get("/reports/realignment/list", async (req, res) => {
-    const { period = "month", value, campus } = req.query;
+    const { period = "month", value, campus, school_year, semester } = req.query;
     const { clause, params } = periodWhere("arl2.created_at", period, value);
     const cw = campusWhere("arl2", campus, "campus_id");
+    const asy = asyWhere(school_year, semester);
 
     try {
         const [rows] = await db.query(
@@ -253,10 +328,11 @@ router.get("/reports/realignment/list", async (req, res) => {
         WHERE ${clause}${cw.clause}
       ) arl
       LEFT JOIN person_table pt ON pt.person_id = arl.person_id
-      WHERE arl.rn = 1
+      ${asyJoin("arl")}
+      WHERE arl.rn = 1 ${asy.clause}
       ORDER BY arl.created_at DESC
       `,
-            [...params, ...cw.params],
+            [...params, ...cw.params, ...asy.params],
         );
         res.json(rows);
     } catch (err) {
@@ -265,26 +341,15 @@ router.get("/reports/realignment/list", async (req, res) => {
     }
 });
 
-// Accepts + stores campus_id (resolved from the Document No. at the moment
-// it was generated via generateFormControlNumber). Falls back to the
-// applicant's current person_table.campus only if the caller didn't pass
-// one (legacy calls that haven't been updated yet).
 router.post("/reports/realignment/log", async (req, res) => {
     const {
-        person_id,
-        applicant_number,
-        form_type,
-        action_type,
-        control_number,
-        campus_id,
-        audit_actor_id,
-        audit_actor_role,
+        person_id, applicant_number, form_type, action_type,
+        control_number, campus_id, audit_actor_id, audit_actor_role,
     } = req.body;
 
     if (!person_id || !form_type) {
         return res.status(400).json({ error: "person_id and form_type are required" });
     }
-
     if (!REALIGNMENT_FORM_TYPES.includes(form_type)) {
         return res.json({ logged: false, reason: "form_type is not a change-course form" });
     }
@@ -295,27 +360,26 @@ router.post("/reports/realignment/log", async (req, res) => {
             [person_id],
         );
 
+        // ── capture the currently-active school year/semester
+        const [[activeYear]] = await db.query(
+            `SELECT id FROM enrollment.active_school_year_table WHERE astatus = 1 LIMIT 1`,
+        );
+        const activeSchoolYearId = activeYear?.id ?? null;
+
         const applicantName = person
             ? [person.last_name, person.first_name, person.middle_name].filter(Boolean).join(", ")
             : "";
-
         const resolvedCampusId = campus_id ?? person?.campus ?? null;
 
         await db.query(
             `INSERT INTO applicant_realignment_log
-        (person_id, applicant_number, applicant_name, from_curriculum_id, form_type, action_type, control_number, campus_id, actor_id, actor_role)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (person_id, applicant_number, applicant_name, from_curriculum_id, form_type, action_type, control_number, campus_id, active_school_year_id, actor_id, actor_role)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                person_id,
-                applicant_number || null,
-                applicantName,
-                person?.program || null,
-                form_type,
-                action_type || "download",
-                control_number || null,
-                resolvedCampusId,
-                audit_actor_id || "unknown",
-                audit_actor_role || "registrar",
+                person_id, applicant_number || null, applicantName,
+                person?.program || null, form_type, action_type || "download",
+                control_number || null, resolvedCampusId, activeSchoolYearId,
+                audit_actor_id || "unknown", audit_actor_role || "registrar",
             ],
         );
 
@@ -329,10 +393,14 @@ router.post("/reports/realignment/log", async (req, res) => {
 // ====================================================================
 // 4. ECAT PASSERS / FAILERS — list for the downloadable PDF (deduped per person)
 // ====================================================================
+// Semester now resolved via er.active_school_year_id (requires the
+// migration above AND the insert route being updated to stamp it — send
+// me that route so I can patch it the same way realignment/log was patched).
 router.get("/reports/ecat-results/list", async (req, res) => {
-    const { period = "month", value, status, campus } = req.query;
+    const { period = "month", value, status, campus, school_year, semester } = req.query;
     const { clause, params } = periodWhere("er2.date_created", period, value);
     const cw = campusWhere("pt", campus);
+    const asy = asyWhere(school_year, semester);
 
     let statusClause = "";
     const statusParams = [];
@@ -357,10 +425,11 @@ router.get("/reports/ecat-results/list", async (req, res) => {
       ) er
       JOIN person_table pt ON er.person_id = pt.person_id
       LEFT JOIN applicant_numbering_table ant ON ant.person_id = pt.person_id
-      WHERE er.rn = 1 ${cw.clause}
+      ${asyJoin("er")}
+      WHERE er.rn = 1 ${cw.clause} ${asy.clause}
       ORDER BY er.date_created DESC
       `,
-            [...params, ...statusParams, ...cw.params],
+            [...params, ...statusParams, ...cw.params, ...asy.params],
         );
         res.json(rows);
     } catch (err) {

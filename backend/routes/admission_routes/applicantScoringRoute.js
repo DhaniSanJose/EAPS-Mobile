@@ -91,9 +91,6 @@ router.get("/subjects", async (req, res) => {
 //////////////////////////////////////////////////////////////
 // GET APPLICANT SCORING
 //////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////
-// GET APPLICANT SCORING
-//////////////////////////////////////////////////////////////
 router.get("/api-applicant-scoring", async (req, res) => {
   try {
 
@@ -124,6 +121,7 @@ router.get("/api-applicant-scoring", async (req, res) => {
         er.percentage,
         er.final_rating,
         er.status,
+        er.active_school_year_id,
 
         COALESCE(ps.exam_result, 0) AS total_ave,
         COALESCE(ps.qualifying_result, 0) AS qualifying_exam_score,
@@ -275,6 +273,23 @@ router.post("/exam/save", verifyToken, async (req, res) => {
     }
 
     //--------------------------------------
+    // GET CURRENTLY-ACTIVE SCHOOL YEAR/SEMESTER
+    //--------------------------------------
+    // db3 already connects straight to the enrollment database (see
+    // user_accounts lookup above with no schema prefix), so no cross-db
+    // qualifier is needed here. Requires:
+    //   ALTER TABLE exam_results ADD COLUMN active_school_year_id INT NULL;
+    let activeSchoolYearId = null;
+    try {
+      const [[activeYear]] = await db3.query(
+        `SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1`
+      );
+      activeSchoolYearId = activeYear?.id ?? null;
+    } catch (asyErr) {
+      console.error("Error resolving active school year for exam save:", asyErr);
+    }
+
+    //--------------------------------------
     // GET PERSON
     //--------------------------------------
     const [personRows] = await db.query(
@@ -314,9 +329,6 @@ router.post("/exam/save", verifyToken, async (req, res) => {
       totalScore += Number(item.score || 0);
     });
 
-    //--------------------------------------
-    // GET MAX TOTAL
-    //--------------------------------------
     //--------------------------------------
     // GET MAX TOTAL
     //--------------------------------------
@@ -378,6 +390,7 @@ router.post("/exam/save", verifyToken, async (req, res) => {
           percentage = ?,
           final_rating = ?,
           status = ?,
+          active_school_year_id = ?,
           date_created = NOW()
         WHERE id = ?
       `, [
@@ -385,6 +398,7 @@ router.post("/exam/save", verifyToken, async (req, res) => {
         percentage,
         finalRating,
         status,
+        activeSchoolYearId,
         examResultId
       ]);
 
@@ -402,15 +416,17 @@ router.post("/exam/save", verifyToken, async (req, res) => {
           percentage,
           final_rating,
           status,
+          active_school_year_id,
           date_created
         )
-        VALUES (?, ?, ?, ?, ?, NOW())
+        VALUES (?, ?, ?, ?, ?, ?, NOW())
       `, [
         personId,
         totalScore,
         percentage,
         finalRating,
-        status
+        status,
+        activeSchoolYearId
       ]);
 
       examResultId = insertResult.insertId;
