@@ -723,8 +723,8 @@ const CollegeCourseTagging = () => {
         axios.get(`${API_BASE_URL}/api/courses/${curriculumId}`),
         deptId
           ? axios.get(`${API_BASE_URL}/api/department-sections`, {
-              params: { departmentId: deptId },
-            })
+            params: { departmentId: deptId },
+          })
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -1528,13 +1528,13 @@ const CollegeCourseTagging = () => {
     if (isOrangeCategory) {
       return isOtherDept
         ? {
-            backgroundColor: TOKEN.otherDeptOrange,
-            "&:hover": { backgroundColor: TOKEN.otherDeptOrangeHover },
-          }
+          backgroundColor: TOKEN.otherDeptOrange,
+          "&:hover": { backgroundColor: TOKEN.otherDeptOrangeHover },
+        }
         : {
-            backgroundColor: TOKEN.orangeSoft,
-            "&:hover": { backgroundColor: "#fed7aa" },
-          };
+          backgroundColor: TOKEN.orangeSoft,
+          "&:hover": { backgroundColor: "#fed7aa" },
+        };
     }
 
     if (isOtherDept) {
@@ -1903,13 +1903,13 @@ const CollegeCourseTagging = () => {
             Available Courses
           </SectionHeader>
 
-          <Box sx={{display: "flex", alignItems: "center", justifyContent: "flex-start"}}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
             <Checkbox
               checked={showOtherDepartmentList}
               onChange={handleShowDepartmentList}
               sx={{ ml: 2, mt: 1 }}
             />
-            <Typography sx={{mt: 1 }}>Show Other Department</Typography>
+            <Typography sx={{ mt: 1 }}>Show Other Department</Typography>
           </Box>
 
           {showOtherDepartmentList && (
@@ -2102,8 +2102,8 @@ const CollegeCourseTagging = () => {
                 <TableRow>
                   {[
                     "Code",
-                    "Component",
                     "Description",
+                    "Subject Type",
                     "Credit Unit",
                     "Prerequisites",
                     "Enrolled",
@@ -2141,9 +2141,7 @@ const CollegeCourseTagging = () => {
                       >
                         {c.course_code}
                       </StyledTd>
-                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                        {c.components}
-                      </StyledTd>
+
                       <StyledTd
                         sx={{
                           textAlign: "left",
@@ -2153,6 +2151,9 @@ const CollegeCourseTagging = () => {
                         }}
                       >
                         {c.course_description}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {c.subject_type_name || "—"}
                       </StyledTd>
                       <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
                         {c.course_unit}
@@ -2166,9 +2167,9 @@ const CollegeCourseTagging = () => {
                       >
                         {c.prereq
                           ? c.prereq
-                              .split(",")
-                              .map((p) => p.trim())
-                              .join(", ")
+                            .split(",")
+                            .map((p) => p.trim())
+                            .join(", ")
                           : "None"}
                       </StyledTd>
                       <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
@@ -2220,7 +2221,7 @@ const CollegeCourseTagging = () => {
                 {availableCourses.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       sx={{
                         textAlign: "center",
                         color: TOKEN.textLight,
@@ -2360,17 +2361,17 @@ const CollegeCourseTagging = () => {
                         fontSize: "13px",
                         ...(isOtherDeptSection
                           ? {
-                              backgroundColor: TOKEN.otherDeptSectionGray,
-                              "&:hover": {
-                                backgroundColor: TOKEN.otherDeptSectionGrayHover,
-                              },
-                              "&.Mui-selected": {
-                                backgroundColor: TOKEN.otherDeptSectionGrayHover,
-                              },
-                              "&.Mui-selected:hover": {
-                                backgroundColor: TOKEN.otherDeptSectionGrayHover,
-                              },
-                            }
+                            backgroundColor: TOKEN.otherDeptSectionGray,
+                            "&:hover": {
+                              backgroundColor: TOKEN.otherDeptSectionGrayHover,
+                            },
+                            "&.Mui-selected": {
+                              backgroundColor: TOKEN.otherDeptSectionGrayHover,
+                            },
+                            "&.Mui-selected:hover": {
+                              backgroundColor: TOKEN.otherDeptSectionGrayHover,
+                            },
+                          }
                           : {}),
                       }}
                     >
@@ -2418,46 +2419,46 @@ const CollegeCourseTagging = () => {
                   specialYearLevel &&
                   isSpecialYearFullyEnrolled(year_level.year_level_id);
                 return (
-                <Button
-                  key={index}
-                  variant="contained"
-                  title={
-                    specialFullyEnrolled
-                      ? "All special year subjects for this semester are already enrolled."
-                      : undefined
-                  }
-                  disabled={
-                    isBulkEnrollDisabled ||
-                    (specialYearLevel
-                      ? specialFullyEnrolled
-                      : disableYearButtons || hasNonSpecialEnrollment)
-                  }
-                  onClick={() =>
-                    handleBulkEnrollClick(
-                      year_level.year_level_id,
-                      formatSemester(activeSemester),
-                    )
-                  }
-                  sx={{
-                    backgroundColor: specialYearLevel ? "#0f766e" : "green",
-                    color: "#fff",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    textTransform: "none",
-                    height: 40,
-                    px: 2.5,
-                    lineHeight: 1.2,
-                    boxShadow: "none",
-                    "&.Mui-disabled": {
-                      backgroundColor: TOKEN.borderStrong,
-                      color: TOKEN.textLight,
-                    },
-                  }}
-                >
-                  {formatYear(year_level.year_level_description)} ·{" "}
-                  {formatSemester(activeSemester)}
-                </Button>
-              );
+                  <Button
+                    key={index}
+                    variant="contained"
+                    title={
+                      specialFullyEnrolled
+                        ? "All special year subjects for this semester are already enrolled."
+                        : undefined
+                    }
+                    disabled={
+                      isBulkEnrollDisabled ||
+                      (specialYearLevel
+                        ? specialFullyEnrolled
+                        : disableYearButtons || hasNonSpecialEnrollment)
+                    }
+                    onClick={() =>
+                      handleBulkEnrollClick(
+                        year_level.year_level_id,
+                        formatSemester(activeSemester),
+                      )
+                    }
+                    sx={{
+                      backgroundColor: specialYearLevel ? "#0f766e" : "green",
+                      color: "#fff",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      textTransform: "none",
+                      height: 40,
+                      px: 2.5,
+                      lineHeight: 1.2,
+                      boxShadow: "none",
+                      "&.Mui-disabled": {
+                        backgroundColor: TOKEN.borderStrong,
+                        color: TOKEN.textLight,
+                      },
+                    }}
+                  >
+                    {formatYear(year_level.year_level_description)} ·{" "}
+                    {formatSemester(activeSemester)}
+                  </Button>
+                );
               })}
               <Button
                 variant="contained"
@@ -2508,83 +2509,83 @@ const CollegeCourseTagging = () => {
                     String(e.curriculum_id) !== String(currId);
 
                   return (
-                  <TableRow
-                    key={e.id ?? idx}
-                    sx={{
-                      backgroundColor: isOtherDeptEnrolled
-                        ? TOKEN.otherDeptSectionGray
-                        : TOKEN.surface,
-                      "&:hover": {
+                    <TableRow
+                      key={e.id ?? idx}
+                      sx={{
                         backgroundColor: isOtherDeptEnrolled
-                          ? TOKEN.otherDeptSectionGrayHover
-                          : TOKEN.accentSoft,
-                      },
-                      transition: "background-color .1s",
-                    }}
-                  >
-                    <StyledTd
-                      sx={{
-                        fontWeight: 700,
-                        whiteSpace: "nowrap",
-                        color: headerColor,
-                        border: `1px solid ${borderColor}`,
+                          ? TOKEN.otherDeptSectionGray
+                          : TOKEN.surface,
+                        "&:hover": {
+                          backgroundColor: isOtherDeptEnrolled
+                            ? TOKEN.otherDeptSectionGrayHover
+                            : TOKEN.accentSoft,
+                        },
+                        transition: "background-color .1s",
                       }}
                     >
-                      {e.course_code}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      {e.lec_unit}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      {e.lab_unit}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      {e.course_unit}
-                    </StyledTd>
-                    <StyledTd
-                      sx={{
-                        whiteSpace: "nowrap",
-                        border: `1px solid ${borderColor}`,
-                      }}
-                    >
-                      {formatSection(e.program_code, e.description) || "—"}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      {cleanDisplayValue(e.day_description, "—")}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      {formatTimeRange(
-                        e.school_time_start,
-                        e.school_time_end,
-                      ) || "—"}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      {cleanDisplayValue(e.room_description, "—")}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      {cleanDisplayValue(e.lname)
-                        ? `Prof. ${cleanDisplayValue(e.lname)}`
-                        : "—"}
-                    </StyledTd>
-                    <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
-                      <Button
-                        variant="contained"
-                        onClick={() => deleteFromCart(e.id)}
+                      <StyledTd
                         sx={{
-                          backgroundColor: "#b91c1c",
-                          color: "#fff",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          textTransform: "none",
-                          height: 36,
-                          px: 2,
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                          color: headerColor,
+                          border: `1px solid ${borderColor}`,
                         }}
                       >
-                        <DeleteIcon sx={{ fontSize: 18, mr: 0.5 }} />
-                        Delete
-                      </Button>
-                    </StyledTd>
-                  </TableRow>
+                        {e.course_code}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {e.lec_unit}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {e.lab_unit}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {e.course_unit}
+                      </StyledTd>
+                      <StyledTd
+                        sx={{
+                          whiteSpace: "nowrap",
+                          border: `1px solid ${borderColor}`,
+                        }}
+                      >
+                        {formatSection(e.program_code, e.description) || "—"}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {cleanDisplayValue(e.day_description, "—")}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {formatTimeRange(
+                          e.school_time_start,
+                          e.school_time_end,
+                        ) || "—"}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {cleanDisplayValue(e.room_description, "—")}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {cleanDisplayValue(e.lname)
+                          ? `Prof. ${cleanDisplayValue(e.lname)}`
+                          : "—"}
+                      </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        <Button
+                          variant="contained"
+                          onClick={() => deleteFromCart(e.id)}
+                          sx={{
+                            backgroundColor: "#b91c1c",
+                            color: "#fff",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            textTransform: "none",
+                            height: 36,
+                            px: 2,
+                          }}
+                        >
+                          <DeleteIcon sx={{ fontSize: 18, mr: 0.5 }} />
+                          Delete
+                        </Button>
+                      </StyledTd>
+                    </TableRow>
                   );
                 })}
                 {enrolled.length === 0 && (
@@ -2784,7 +2785,7 @@ const CollegeCourseTagging = () => {
               textTransform: "none",
               "&:hover": { backgroundColor: TOKEN.redSoft },
             }}
-          onClick={() => setOpenOtherDeptDialog(false)}>
+            onClick={() => setOpenOtherDeptDialog(false)}>
             Cancel
           </Button>
           <Button
@@ -2849,7 +2850,7 @@ const CollegeCourseTagging = () => {
               textTransform: "none",
               "&:hover": { backgroundColor: TOKEN.redSoft },
             }}
-          onClick={() => setGrantAccessDialogOpen(false)}>
+            onClick={() => setGrantAccessDialogOpen(false)}>
             Cancel
           </Button>
           <Button
@@ -2913,7 +2914,7 @@ const CollegeCourseTagging = () => {
               textTransform: "none",
               "&:hover": { backgroundColor: TOKEN.redSoft },
             }}
-          onClick={() => setOtherDeptDataConfirmation(false)}>
+            onClick={() => setOtherDeptDataConfirmation(false)}>
             Cancel
           </Button>
           <Button

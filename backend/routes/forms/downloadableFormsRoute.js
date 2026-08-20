@@ -4840,4 +4840,404 @@ router.post("/generate-attendance-report-pdf", async (req, res) => {
   }
 });
 
+router.post("/generate-program-evaluation-pdf", async (req, res) => {
+  let browser;
+
+  try {
+    const { html, student_number, last_name, first_name } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({ message: "No HTML received" });
+    }
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+
+    // Long bond paper: 8.5in x 13in (215.9mm x 330.2mm).
+    await page.setViewport({
+      width: 816, // 215.9mm @ 96dpi
+      height: 1248, // 330.2mm @ 96dpi
+      deviceScaleFactor: 2,
+    });
+
+    page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+    page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+    page.on("requestfailed", (request) =>
+      console.log(
+        "REQUEST FAILED:",
+        request.url(),
+        request.failure()?.errorText,
+      ),
+    );
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "media") {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Reproduces the ORIGINAL on-screen/print layout (letterhead, OFFICE OF
+    // THE REGISTRAR / ACADEMIC PROGRAM EVALUATION titles, student info
+    // strip, 2-column set of per-semester GRADE / COURSE CODE-TITLE /
+    // UNIT(LEC,LAB) tables — 1st sem left, 2nd sem right, Summer
+    // full-width below). Block header rows now use the same lightgray +
+    // bordered-table treatment as the Applicant List PDF export, and
+    // Important Reminders sits directly below the last course block
+    // (no forced bottom-of-page push).
+    const wrappedHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    @page {
+      size: 215.9mm 330.2mm;
+      margin: 0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: "Poppins", Arial, sans-serif;
+      color: #000;
+    }
+
+    body {
+      padding: 6mm 6mm 4mm;
+    }
+
+    .pe-print-layout {
+      width: 82rem;
+      margin: 0 auto;
+      zoom: 0.60;
+    }
+
+    .pe-print-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 70rem;
+      margin: 0 auto;
+    }
+
+    .pe-print-logo-wrap {
+      padding-top: 1.5rem;
+      padding-right: 3rem;
+    }
+
+    .pe-print-logo {
+      width: 8rem;
+      height: 8rem;
+      display: block;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .pe-print-header-text {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .pe-print-republic {
+      font-family: Arial;
+      font-size: 13px;
+    }
+
+    .pe-print-school-name {
+      text-align: center;
+      margin-top: 0;
+      line-height: 1;
+      font-size: 1.6rem;
+      letter-spacing: -1px;
+      font-weight: 600;
+    }
+
+    .pe-print-address {
+      margin-top: 0.5rem;
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    .pe-print-office-title {
+      margin-left: 1rem;
+      text-align: center;
+      width: 80rem;
+      font-size: 1.6rem;
+      letter-spacing: -1px;
+      font-weight: 500;
+    }
+
+    .pe-print-main-title {
+      margin-left: 1rem;
+      margin-top: -0.2rem;
+      width: 80rem;
+      text-align: center;
+      font-size: 1.8rem;
+      letter-spacing: -1px;
+      font-weight: 600;
+    }
+
+    .pe-print-student-info {
+      padding: 0.7rem 1rem;
+      margin-left: 1rem;
+      border-bottom: solid #000 1px;
+      width: 80rem;
+    }
+
+    .pe-print-student-info .row {
+      display: flex;
+      line-height: 1.14;
+      margin-top: 0.28rem;
+    }
+    .pe-print-student-info .row:first-child { margin-top: 0; }
+
+    .pe-print-student-info .col-wide {
+      display: flex;
+      width: 38rem;
+    }
+    .pe-print-student-info .col {
+      display: flex;
+    }
+
+    .pe-print-student-info .label {
+      font-size: 1rem;
+      letter-spacing: -1px;
+      width: 9rem;
+      display: inline-block;
+    }
+    .pe-print-student-info .label-narrow {
+      width: 6rem;
+    }
+    .pe-print-student-info .value {
+      font-size: 1.06rem;
+      font-weight: 500;
+    }
+
+    .pe-print-semester-row {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .pe-print-semester-column {
+      flex: 1 1 50%;
+      width: 50%;
+      max-width: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.35rem;
+      padding-left: 1rem;
+    }
+
+    .pe-print-summer-row {
+      width: 100%;
+      margin-top: 0.35rem;
+      padding-left: 1rem;
+    }
+
+    .pe-print-block {
+      width: 100%;
+      align-self: flex-start;
+      height: fit-content;
+      margin-bottom: 0.35rem;
+    }
+
+    /* ── Bordered table, matching the Applicant List PDF's table style ── */
+    .pe-print-block table {
+      border-collapse: collapse;
+      width: auto;
+      border: 1.5px solid #000;
+    }
+
+    .pe-print-block td {
+      border: 1.5px solid #000;
+    }
+
+
+    .pe-print-header-row1 td,
+    .pe-print-header-row2 td {
+      background-color: lightgray;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .pe-print-block-title {
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 3px 0;
+    }
+
+    .pe-print-header-row2 td {
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-align: center;
+      padding: 3px 2px;
+    }
+
+    .pe-col-grade {
+      width: 6rem;
+      text-align: center;
+    }
+    .pe-col-course {
+      width: 28rem;
+    }
+    .pe-col-unit {
+      width: 5rem;
+      text-align: center;
+    }
+
+    .pe-unit-label {
+      font-weight: 700;
+      text-align: center;
+      font-size: 0.8rem;
+    }
+    .pe-unit-sub {
+      display: flex;
+    }
+    .pe-unit-sub span {
+      width: 50%;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+
+    .pe-print-row td {
+      font-size: 0.8rem;
+      line-height: 1.12;
+      vertical-align: top;
+      padding: 4px 3px;
+    }
+
+    .pe-course-code {
+      display: inline-block;
+      width: 6.4rem;
+      vertical-align: top;
+    }
+    .pe-course-title {
+      display: inline-block;
+      vertical-align: top;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      line-height: 1.15;
+    }
+
+    .pe-unit-values {
+      display: flex;
+    }
+    .pe-unit-values span {
+      width: 50%;
+      text-align: center;
+      font-size: 0.8rem;
+    }
+
+    .pe-print-totals-row td {
+      font-weight: 700;
+      padding: 4px 3px;
+    }
+    .pe-totals-label {
+      text-align: right;
+      padding-right: 0.5rem !important;
+    }
+
+    /* ── Sits directly below the last block, no forced bottom push ── */
+    .pe-print-reminders {
+      margin-top: 1rem;
+      padding-left: 1rem;
+      padding-top: 0.5rem;
+      border-top: solid 1px #000;
+      width: 80rem;
+      font-size: 0.8rem;
+    }
+
+    .pe-print-reminders-title {
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .pe-print-reminders ol {
+      margin: 0;
+      padding-left: 1.25rem;
+    }
+
+    .pe-print-reminders li {
+      margin-bottom: 0.15rem;
+      line-height: 1.3;
+    }
+
+    button { display: none; }
+    img { max-width: 100%; }
+  </style>
+</head>
+<body>
+  ${html}
+</body>
+</html>
+    `.trim();
+
+    await page.setContent(wrappedHtml, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
+
+    await waitForImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const pdfBuffer = await page.pdf({
+      width: "215.9mm",
+      height: "330.2mm",
+      printBackground: true,
+      preferCSSPageSize: false,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
+    });
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Generated PDF buffer is empty");
+    }
+
+    const safeLastName = String(last_name || "Student")
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeFirstName = String(first_name || "")
+      .trim()
+      .replace(/\s+/g, "_");
+    const numberSuffix = student_number ? `_${student_number}` : "";
+    const fileName = `Program_Evaluation_${safeLastName}${safeFirstName ? "_" + safeFirstName : ""}${numberSuffix}.pdf`;
+
+    await insertPdfExportAudit(req, {
+      documentLabel: "Academic Program Evaluation",
+      legacyAction: "PROGRAM_EVALUATION_PDF_EXPORT",
+      legacyMessage: ({ roleLabel, actorId }) =>
+        `${roleLabel} (${actorId}) exported Academic Program Evaluation PDF${student_number ? ` for Student (${student_number})` : ""}.`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("Program Evaluation PDF ERROR:", err);
+    return res.status(500).json({
+      message: "PDF generation failed",
+      error: err.message,
+      stack: err.stack,
+    });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 module.exports = router;

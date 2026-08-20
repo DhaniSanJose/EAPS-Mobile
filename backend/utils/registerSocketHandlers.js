@@ -7862,6 +7862,7 @@ Click the link below to log in:
           ct.lab_unit,
           smt.semester_description,
           smt.semester_id,
+          smt.ordinal_label, 
           sy.id as school_year,
           ct.course_id,
           yt.year_description as current_year,
@@ -7870,6 +7871,7 @@ Click the link below to log in:
           pgt.major,
           pgt.program_description,
           es.en_remarks,
+          yrlt.year_level_id,
           yt.year_description + 1 as next_year
         FROM enrolled_subject AS es
           LEFT JOIN course_table AS ct ON es.course_id = ct.course_id
@@ -7880,6 +7882,11 @@ Click the link below to log in:
           LEFT JOIN program_table AS pgt ON cct.program_id = pgt.program_id
           LEFT JOIN semester_table AS smt ON sy.semester_id = smt.semester_id
           LEFT JOIN year_table AS yt ON sy.year_id = yt.year_id
+          LEFT JOIN program_tagging_table AS ptt
+            ON es.curriculum_id = ptt.curriculum_id
+           AND es.course_id = ptt.course_id
+          LEFT JOIN year_level_table AS yrlt
+            ON ptt.year_level_id = yrlt.year_level_id
         WHERE es.student_number= ?;
     `,
           [student_number],
@@ -7895,7 +7902,6 @@ Click the link below to log in:
       }
     },
   );
-
   //  Upload and update registrar profile picture
   app.put(
     "/update_profile_image/:person_id",

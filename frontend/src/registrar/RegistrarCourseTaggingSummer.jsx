@@ -1422,11 +1422,7 @@ const RegistrarCourseTaggingSummer = () => {
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
-      <br />
-
-      <RegistrarEnrollmentTabs />
-
+   
       <br />
       <br />
 
@@ -1466,22 +1462,22 @@ const RegistrarCourseTaggingSummer = () => {
                   transition: "all .15s",
                   ...(active
                     ? {
-                        backgroundColor: headerColor,
-                        color: "#fff",
-                        border: "none",
-                        boxShadow: "0 2px 8px rgba(15,31,61,.25)",
-                        "&:hover": { backgroundColor: TOKEN.navyLight },
-                      }
+                      backgroundColor: headerColor,
+                      color: "#fff",
+                      border: "none",
+                      boxShadow: "0 2px 8px rgba(15,31,61,.25)",
+                      "&:hover": { backgroundColor: TOKEN.navyLight },
+                    }
                     : {
-                        backgroundColor: "#fff",
-                        color: headerColor,
-                        border: `1px solid ${TOKEN.borderStrong}`,
-                        "&:hover": {
-                          backgroundColor: TOKEN.accentSoft,
-                          borderColor: TOKEN.accent,
-                          color: TOKEN.accent,
-                        },
-                      }),
+                      backgroundColor: "#fff",
+                      color: headerColor,
+                      border: `1px solid ${TOKEN.borderStrong}`,
+                      "&:hover": {
+                        backgroundColor: TOKEN.accentSoft,
+                        borderColor: TOKEN.accent,
+                        color: TOKEN.accent,
+                      },
+                    }),
                 }}
               >
                 {dept.dprtmnt_code}
@@ -1653,6 +1649,7 @@ const RegistrarCourseTaggingSummer = () => {
                   {[
                     "Code",
                     "Description",
+                    "Subject Type",
                     "Units",
                     "Prerequisites",
                     "Enrolled",
@@ -1701,6 +1698,9 @@ const RegistrarCourseTaggingSummer = () => {
                       >
                         {c.course_description}
                       </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {c.subject_type_name || "—"}
+                      </StyledTd>
                       <StyledTd
                         sx={{
                           border: `1px solid ${borderColor}`,
@@ -1719,9 +1719,9 @@ const RegistrarCourseTaggingSummer = () => {
                       >
                         {c.prereq
                           ? c.prereq
-                              .split(",")
-                              .map((p) => p.trim())
-                              .join(", ")
+                            .split(",")
+                            .map((p) => p.trim())
+                            .join(", ")
                           : "—"}
                       </StyledTd>
                       <StyledTd
@@ -1783,7 +1783,7 @@ const RegistrarCourseTaggingSummer = () => {
                 {courses.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       sx={{
                         textAlign: "center",
                         color: TOKEN.textLight,

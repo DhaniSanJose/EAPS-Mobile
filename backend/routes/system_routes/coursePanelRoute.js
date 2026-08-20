@@ -36,8 +36,20 @@ const insertCoursePanelAuditLog = async ({ req, action, message }) => {
 };
 
 /* ===================== GET COURSE LIST ===================== */
+// ✅ FIXED: now LEFT JOINs subject_type_table / category_type_table so
+// subject_type_name and category_type_name actually come back — without
+// this, the frontend table has nothing to render in those two columns.
 router.get("/course_list", async (req, res) => {
-  const query = "SELECT * FROM course_table ORDER BY course_code ASC";
+  const query = `
+    SELECT
+      c.*,
+      st.subject_type_name,
+      ct.category_type_name
+    FROM course_table c
+    LEFT JOIN subject_type_table st ON c.subject_type_id = st.subject_type_id
+    LEFT JOIN category_type_table ct ON c.category_type_id = ct.category_type_id
+    ORDER BY c.course_code ASC
+  `;
 
   try {
     const [result] = await db3.query(query);
@@ -60,6 +72,8 @@ router.post("/adding_course", CanCreate, async (req, res) => {
     lab_unit,
     prereq,
     corequisite,
+    subject_type_id,   // ✅ NEW
+    category_type_id,  // ✅ NEW
     is_academic_achiever,
     is_latin,
     is_gwa_included
@@ -81,6 +95,10 @@ router.post("/adding_course", CanCreate, async (req, res) => {
     const unit = parseFloat(course_unit) || 0;
     const lec = parseFloat(lec_unit) || 0;
     const lab = parseFloat(lab_unit) || 0;
+
+    // ✅ Falls back to Regular (1) / ACADEMIC (1) if the picker was left empty
+    const subjectTypeId = subject_type_id ? Number(subject_type_id) : 1;
+    const categoryTypeId = category_type_id ? Number(category_type_id) : 1;
 
     if (!normalized_code) {
       return res.status(400).json({ message: "Course code is required" });
@@ -112,7 +130,7 @@ router.post("/adding_course", CanCreate, async (req, res) => {
         corequisite || null,
         is_academic_achiever ?? 1,
         is_latin ?? 1,
-        is_gwa_included ?? 1,   // ✅ new
+        is_gwa_included ?? 1,
       ]
     );
 
@@ -133,11 +151,13 @@ router.post("/adding_course", CanCreate, async (req, res) => {
       lab_unit,
       prereq,
       corequisite,
+      subject_type_id,
+      category_type_id,
       is_academic_achiever,
       is_latin,
       is_gwa_included
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         normalized_code,
         normalized_desc,
@@ -146,9 +166,11 @@ router.post("/adding_course", CanCreate, async (req, res) => {
         lab,
         prereq || null,
         corequisite || null,
+        subjectTypeId,
+        categoryTypeId,
         is_academic_achiever ?? 1,
         is_latin ?? 1,
-        is_gwa_included ?? 1   // ✅ new
+        is_gwa_included ?? 1
       ]
     );
 
@@ -179,6 +201,8 @@ router.put("/update_course/:id", CanEdit, async (req, res) => {
     lab_unit,
     prereq,
     corequisite,
+    subject_type_id,   // ✅ NEW
+    category_type_id,  // ✅ NEW
     is_academic_achiever,
     is_latin,
     is_gwa_included
@@ -213,6 +237,17 @@ router.put("/update_course/:id", CanEdit, async (req, res) => {
     const final_course_desc = course_description
       ? normalizeDescription(course_description)
       : normalizeDescription(current.course_description);
+
+    // ✅ Keep existing value when the picker wasn't touched, don't blank it out
+    const final_subject_type_id =
+      subject_type_id !== undefined && subject_type_id !== ""
+        ? Number(subject_type_id)
+        : current.subject_type_id;
+
+    const final_category_type_id =
+      category_type_id !== undefined && category_type_id !== ""
+        ? Number(category_type_id)
+        : current.category_type_id;
 
 const [rows] = await db3.query(
   `SELECT course_id FROM course_table 
@@ -263,6 +298,8 @@ const [rows] = await db3.query(
     lab_unit = ?,
     prereq = ?,
     corequisite = ?,
+    subject_type_id = ?,
+    category_type_id = ?,
     is_academic_achiever = ?,
     is_latin = ?,
     is_gwa_included = ?
@@ -277,6 +314,8 @@ const [rows] = await db3.query(
     lab_unit !== undefined ? parseFloat(lab_unit) : current.lab_unit,
     prereq !== undefined ? prereq : current.prereq,
     corequisite !== undefined ? corequisite : current.corequisite,
+    final_subject_type_id,
+    final_category_type_id,
     is_academic_achiever ?? current.is_academic_achiever,
     is_latin ?? current.is_latin,
     is_gwa_included ?? current.is_gwa_included,

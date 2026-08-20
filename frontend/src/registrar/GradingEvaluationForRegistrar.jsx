@@ -1,8 +1,25 @@
-import { Box, Typography, TextField, Snackbar, Alert, Autocomplete } from "@mui/material";
+import {
+  Box,
+  Typography,
+  TextField,
+  Snackbar,
+  Alert,
+  Autocomplete,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Button,
+} from "@mui/material";
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import EaristLogo from "../assets/EaristLogo.png";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import EditNoteIcon from "@mui/icons-material/EditNote";
 import axios from "axios";
 import { FcPrint } from "react-icons/fc";
 import Unauthorized from "../components/Unauthorized";
@@ -11,6 +28,7 @@ import API_BASE_URL from "../apiConfig";
 import { postAuditEvent } from "../utils/auditEvents";
 import { getLoginMacPayload } from "../utils/userMacAddress";
 import useAuditMac from "../utils/useAuditMac";
+import RegistrarEnrollmentTabs from "../components/RegistrarEnrollmentTabs";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -24,6 +42,50 @@ const formatSuggestionName = (student) =>
     cleanSuggestionValue(student?.middle_name),
     cleanSuggestionValue(student?.last_name),
   ].filter(Boolean).join(" ");
+
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+const getOrdinalSuffix = (n) => {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return "th";
+  switch (n % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
+};
+
+const formatYearLevelLabel = (yearLevelId) => {
+  const n = Number(yearLevelId);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return `${n}${getOrdinalSuffix(n)} Year`;
+};
+
+const formatSemesterLabel = (semesterId) => {
+  const n = Number(semesterId);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  if (n === 3) return "Summer";
+  return `${n}${getOrdinalSuffix(n)} Semester`;
+};
+
+// ── Default reminders shown the first time the page loads. These are now
+//    editable at runtime via the "Edit Reminders" button/dialog below, so
+//    this is only the initial seed value, not a hardcoded final list. ──────
+const DEFAULT_IMPORTANT_REMINDERS = [
+  "Please retain a copy of the Academic Program Evaluation. An additional copy will cost \u20B120 and will be released after 7 working days.",
+  "If the 1st Semester subject grades are not yet included and there are any failing grades in the 1st Semester, it will be considered \u201Clacking\u201D and the subject must be retaken in the 2nd Semester.",
+  "The last day for INC compliance for the 1st Semester is February 7, 2026. Failure to comply within the deadline will be considered as \u201Clacking\u201D.",
+  "Failure to comply will result in the retake of the subject in the following semester.",
+  "NSTP 1 & 2 components will be the same as CWTS 1 & CWTS 2.",
+];
+
+const REMINDERS_STORAGE_KEY = "program_evaluation_important_reminders";
 
 const GradingEvaluationForRegistrar = () => {
   useAuditMac();
@@ -55,6 +117,58 @@ const GradingEvaluationForRegistrar = () => {
         setGradeConversion([]);
       });
   }, []);
+
+  // ── Important Reminders — editable via dialog, persisted in localStorage ─
+  const [reminders, setReminders] = useState(() => {
+    try {
+      const stored = localStorage.getItem(REMINDERS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (err) {
+      console.error("Failed to load saved reminders:", err);
+    }
+    return DEFAULT_IMPORTANT_REMINDERS;
+  });
+  const [remindersDialogOpen, setRemindersDialogOpen] = useState(false);
+  const [remindersDraft, setRemindersDraft] = useState([]);
+
+  const openRemindersDialog = () => {
+    setRemindersDraft(reminders.length > 0 ? [...reminders] : [""]);
+    setRemindersDialogOpen(true);
+  };
+
+  const closeRemindersDialog = () => {
+    setRemindersDialogOpen(false);
+  };
+
+  const handleReminderDraftChange = (index, value) => {
+    setRemindersDraft((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const handleAddReminderDraft = () => {
+    setRemindersDraft((prev) => [...prev, ""]);
+  };
+
+  const handleRemoveReminderDraft = (index) => {
+    setRemindersDraft((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveReminders = () => {
+    const cleaned = remindersDraft.map((r) => r.trim()).filter(Boolean);
+    setReminders(cleaned);
+    try {
+      localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(cleaned));
+    } catch (err) {
+      console.error("Failed to save reminders:", err);
+    }
+    setRemindersDialogOpen(false);
+  };
 
   // ── Convert a stored final_grade value to its display equivalent ─────────
   // Returns "" for null / undefined / 0 / "0" / "0.00"
@@ -259,8 +373,10 @@ const GradingEvaluationForRegistrar = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("warning");
   const [gradeEdits, setGradeEdits] = useState({});
   const [isEditing, setIsEditing] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -333,6 +449,7 @@ const GradingEvaluationForRegistrar = () => {
             setStudentDetails(detailsData);
           } else {
             setStudentDetails([]);
+            setSnackbarSeverity("warning");
             setSnackbarMessage("No enrolled subjects found for this student.");
             setOpenSnackbar(true);
           }
@@ -340,11 +457,13 @@ const GradingEvaluationForRegistrar = () => {
           setSelectedStudent(null);
           setStudentData([]);
           setStudentDetails([]);
+          setSnackbarSeverity("warning");
           setSnackbarMessage("No student data found.");
           setOpenSnackbar(true);
         }
       } catch (err) {
         console.error("Error fetching student", err);
+        setSnackbarSeverity("error");
         setSnackbarMessage("Server error. Please try again.");
         setOpenSnackbar(true);
       }
@@ -598,7 +717,256 @@ const GradingEvaluationForRegistrar = () => {
   };
 
   const divToPrintRef = useRef();
-  const printDiv = async () => { window.print(); };
+
+   const buildProgramEvaluationInnerHtml = () => {
+    const logoSrc = fetchedLogo || EaristLogo;
+    const name = companyName?.trim() || "";
+    const nameWords = name.split(" ");
+    const nameMiddle = Math.ceil(nameWords.length / 2);
+    const fl = nameWords.slice(0, nameMiddle).join(" ");
+    const sl = nameWords.slice(nameMiddle).join(" ");
+    const resolvedCampusAddress = campusAddress || "No address set in Settings";
+
+    const getSemesterBucketById = (semesterId) => {
+      const n = Number(semesterId);
+      if (n === 2) return "second";
+      if (n === 3) return "summer";
+      if (n === 1) return "first";
+      return "other";
+    };
+
+    const semesterGroups = Object.entries(groupedDetails)
+      .map(([key, courses]) => ({
+        key,
+        courses,
+        bucket: getSemesterBucketById(courses[0]?.semester_id),
+        yearOrder: Number(courses[0]?.year_level_id) || 99,
+        semesterOrder: Number(courses[0]?.semester_id) || 99,
+      }))
+      .sort(
+        (a, b) =>
+          a.yearOrder - b.yearOrder ||
+          a.semesterOrder - b.semesterOrder ||
+          a.key.localeCompare(b.key),
+      );
+
+    const leftGroups = semesterGroups.filter(
+      (g) => g.bucket === "first" || g.bucket === "other",
+    );
+    const rightGroups = semesterGroups.filter((g) => g.bucket === "second");
+    const summerGroups = semesterGroups.filter((g) => g.bucket === "summer");
+
+    const renderBlockHtml = (group) => {
+      const { key, courses } = group;
+      const first = courses[0] || {};
+      const yearLabel =
+        formatYearLevelLabel(first.year_level_id) ||
+        first.year_level_description ||
+        "";
+      const semesterLabel =
+        formatSemesterLabel(first.semester_id) ||
+        first.semester_description ||
+        "";
+      const titleParts = [yearLabel, semesterLabel].filter(Boolean).join(" - ");
+
+      const rowsHtml = courses
+        .map((p) => {
+          const rawGrade = gradeEdits[p.course_id] ?? p.final_grade ?? "";
+          const printableGrade = handleGradeConversion(rawGrade);
+          return `
+            <tr class="pe-print-row">
+              <td class="pe-col-grade">${escapeHtml(printableGrade)}</td>
+              <td class="pe-col-course">
+                <span class="pe-course-code">${escapeHtml(p.course_code)}</span>
+                <span class="pe-course-title">${escapeHtml(p.course_description)}</span>
+              </td>
+              <td class="pe-col-unit">
+                <div class="pe-unit-values">
+                  <span>${toWholeUnit(p.course_unit)}</span>
+                  <span>${toWholeUnit(p.lab_unit)}</span>
+                </div>
+              </td>
+            </tr>`;
+        })
+        .join("");
+
+      const totalLecUnits = courses.reduce(
+        (sum, p) => sum + totalLec(p.course_unit),
+        0,
+      );
+      const totalLabUnits = courses.reduce(
+        (sum, p) => sum + totalLab(p.lab_unit),
+        0,
+      );
+
+      return `
+        <div class="pe-print-block" key="${escapeHtml(key)}">
+          <table>
+            <thead>
+              <tr class="pe-print-header-row1">
+                <td colspan="3" class="pe-print-block-title">${escapeHtml(titleParts)}</td>
+              </tr>
+              <tr class="pe-print-header-row2">
+                <td class="pe-col-grade">GRADE</td>
+                <td class="pe-col-course">COURSE CODE / TITLE</td>
+                <td class="pe-col-unit">
+                  <div class="pe-unit-label">UNIT</div>
+                  <div class="pe-unit-sub"><span>LEC</span><span>LAB</span></div>
+                </td>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="pe-print-totals-row">
+                <td></td>
+                <td class="pe-totals-label">Total</td>
+                <td>
+                  <div class="pe-unit-values">
+                    <span>${totalLecUnits}</span>
+                    <span>${totalLabUnits}</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`;
+    };
+
+    const leftBlocksHtml = leftGroups.map(renderBlockHtml).join("");
+    const rightBlocksHtml = rightGroups.map(renderBlockHtml).join("");
+    const summerBlocksHtml = summerGroups.map(renderBlockHtml).join("");
+
+    // ── Reminders are now sourced from editable state instead of the old
+    //    hardcoded IMPORTANT_REMINDERS constant. ────────────────────────────
+    const remindersHtml = reminders
+      .map((line) => `<li>${escapeHtml(line)}</li>`)
+      .join("");
+
+    return `
+      <div class="pe-print-layout">
+        <div class="pe-print-header-row">
+          <div class="pe-print-logo-wrap">
+            <img src="${logoSrc}" alt="School Logo" class="pe-print-logo" />
+          </div>
+          <div class="pe-print-header-text">
+            <div style="font-size: 12px; font-family: Arial">Republic of the Philippines</div>
+            ${
+              companyName
+                ? `<div class="pe-print-school-name">${escapeHtml(fl)}${sl ? `<br/>${escapeHtml(sl)}` : ""}</div>`
+                : `<div style="height:24px;"></div>`
+            }
+            <div style="font-size: 12px; font-family: Arial">${escapeHtml(resolvedCampusAddress)}</div>
+          </div>
+        </div>
+
+        <div class="pe-print-office-title">OFFICE OF THE REGISTRAR</div>
+        <div class="pe-print-main-title">ACADEMIC PROGRAM EVALUATION</div>
+
+        <div class="pe-print-student-info">
+          <div class="row">
+            <div class="col-wide">
+              <span class="label">Student Name:</span>
+              <span class="value">${escapeHtml(formatStudentName(studentData))}</span>
+            </div>
+            <div class="col">
+              <span class="label label-narrow">College:</span>
+              <span class="value">${escapeHtml(studentData.dprtmnt_name)}</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-wide">
+              <span class="label">Student No. :</span>
+              <span class="value">${escapeHtml(studentData.student_number)}</span>
+            </div>
+            <div class="col">
+              <span class="label label-narrow">Program:</span>
+              <span class="value">${escapeHtml(studentData.program_description)} ${escapeHtml(studentData.major || "")}</span>
+            </div>
+          </div>
+          <div class="row">
+            <span class="label">Curriculum:</span>
+            <span class="value">${escapeHtml(formatCurriculumLabel(studentData))}</span>
+          </div>
+        </div>
+
+        <div class="pe-print-semester-row">
+          <div class="pe-print-semester-column">
+            ${leftBlocksHtml}
+          </div>
+          <div class="pe-print-semester-column">
+            ${rightBlocksHtml}
+          </div>
+        </div>
+
+        ${summerBlocksHtml ? `<div class="pe-print-summer-row">${summerBlocksHtml}</div>` : ""}
+
+        <div class="pe-print-reminders">
+          <div class="pe-print-reminders-title">Important Reminders:</div>
+          <ol>
+            ${remindersHtml}
+          </ol>
+        </div>
+      </div>
+    `;
+  };
+
+  // ── Generate + download the Program Evaluation PDF ───────────────────────
+  // Same pattern as handleExportApplicantListPdf: axios POST the inner HTML,
+  // get back a blob, trigger a download link.
+  const handleGeneratePdf = async () => {
+    if (pdfLoading) return;
+
+    if (!studentData?.student_number) {
+      setSnackbarSeverity("warning");
+      setSnackbarMessage("Please search for a student first.");
+      setOpenSnackbar(true);
+      return;
+    }
+
+    setPdfLoading(true);
+
+    try {
+      const innerHtml = buildProgramEvaluationInnerHtml();
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/generate-program-evaluation-pdf`,
+        {
+          html: innerHtml,
+          student_number: studentData.student_number,
+          last_name: studentData.last_name,
+          first_name: studentData.first_name,
+          audit_actor_id:
+            employeeID ||
+            localStorage.getItem("employee_id") ||
+            localStorage.getItem("email") ||
+            "unknown",
+          audit_actor_role: userRole || localStorage.getItem("role") || "registrar",
+        },
+        { responseType: "blob" },
+      );
+
+      const blobUrl = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute(
+        "download",
+        `Program_Evaluation_${studentData.student_number}.pdf`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to generate Program Evaluation PDF:", err);
+      setSnackbarSeverity("error");
+      setSnackbarMessage("Failed to generate Program Evaluation PDF.");
+      setOpenSnackbar(true);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Loading..." />;
@@ -607,25 +975,25 @@ const GradingEvaluationForRegistrar = () => {
     return <Unauthorized />;
   }
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   return (
     <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
@@ -731,258 +1099,87 @@ const GradingEvaluationForRegistrar = () => {
             )}
           </Box>
           <button
-            onClick={printDiv}
+            onClick={handleGeneratePdf}
+            disabled={pdfLoading}
             style={{
-              width: "300px", padding: "10px 20px", border: "2px solid black",
-              backgroundColor: "#f0f0f0", color: "black", borderRadius: "5px",
-              cursor: "pointer", fontSize: "16px", fontWeight: "bold",
+              padding: "5px 20px",
+              border: "2px solid black",
+              backgroundColor: "#f0f0f0",
+              color: "black",
+              borderRadius: "5px",
+              cursor: pdfLoading ? "not-allowed" : "pointer",
+              fontSize: "14px",
+              fontWeight: "bold",
+              opacity: pdfLoading ? 0.6 : 1,
               transition: "background-color 0.3s, transform 0.2s",
-              display: "flex", alignItems: "center", justifyContent: "center",
+              height: "40px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              userSelect: "none",
             }}
-            onMouseEnter={(e) => (e.target.style.backgroundColor = "#d3d3d3")}
-            onMouseLeave={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-            onMouseDown={(e) => (e.target.style.transform = "scale(0.95)")}
-            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#d3d3d3")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "#f0f0f0")
+            }
+            onMouseDown={(e) =>
+              (e.currentTarget.style.transform = "scale(0.95)")
+            }
+            onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            type="button"
           >
-            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <FcPrint size={20} />
-              Print Evaluation
-            </span>
+            <FcPrint size={20} />
+            {pdfLoading ? "Generating..." : "Download Program Evaluation"}
           </button>
         </Box>
 
-        <hr style={{ border: "1px solid #ccc", width: "100%", margin: "0" }} />
-        <br />
       </Box>
 
-      <button
-        onClick={() => setIsEditing(!isEditing)}
 
-        style={{
-          padding: "8px 12px", marginBottom: "1rem", cursor: "pointer",
-          fontWeight: "bold", backgroundColor: "#1976d2", color: "white",
-          border: "none", borderRadius: "5px",
-        }}
-      >
-        {isEditing ? "Cancel Editing" : "Edit Student Grade"}
-      </button>
-
+      <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
+      <br />
+      <RegistrarEnrollmentTabs />
+      <br />
+      <br />
+      <Box sx={{ display: "flex", gap: 1.5, mb: 2 }}>
+        <button
+          onClick={() => setIsEditing(!isEditing)}
+          style={{
+            padding: "8px 12px", cursor: "pointer",
+            fontWeight: "bold", backgroundColor: "#1976d2", color: "white",
+            border: "none", borderRadius: "5px",
+          }}
+        >
+          {isEditing ? "Cancel Editing" : "Edit Student Grade"}
+        </button>
+
+        <button
+          onClick={openRemindersDialog}
+          style={{
+            padding: "8px 12px", cursor: "pointer",
+            fontWeight: "bold", backgroundColor: "#ffffff", color: "#1976d2",
+            border: "2px solid #1976d2", borderRadius: "5px",
+            display: "flex", alignItems: "center", gap: "6px",
+          }}
+          type="button"
+        >
+          <EditNoteIcon fontSize="small" />
+          Edit Reminders
+        </button>
+      </Box>
+
       <br />
       <style>
         {`
-          /* Both columns visible on screen */
           .col-raw-grade { display: flex; }
           .col-raw-grade-header { display: flex; }
           .col-equivalent-grade { display: flex; }
           .col-equivalent-grade-header { display: flex; }
-
-          /* Screen: show EQUIVALENT label, hide GRADE label */
           .screen-only-label { display: inline; }
           .print-only-label { display: none; }
-          .program-evaluation-print-layout { display: none; }
-
-          @media print {
-            @page {
-              size: A4 portrait;
-              margin: 0;
-            }
-
-            html,
-            body {
-              width: 210mm !important;
-              height: 297mm !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: hidden !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-
-            body * {
-              visibility: hidden !important;
-            }
-
-            .body {
-              margin: 0 !important;
-              overflow: hidden !important;
-              height: 0 !important;
-              max-height: 0 !important;
-            }
-
-            .screen-evaluation-container,
-            .screen-evaluation-container * {
-              display: none !important;
-            }
-
-            .program-evaluation-print-layout {
-              display: block !important;
-              visibility: visible !important;
-            }
-
-            .program-evaluation-print-layout,
-            .program-evaluation-print-layout * {
-              visibility: visible !important;
-            }
-
-            .program-evaluation-print-layout {
-              position: fixed !important;
-              left: 3mm !important;
-              top: 3mm !important;
-              width: 82rem !important;
-              height: auto !important;
-              font-family: "Poppins", sans-serif;
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: visible !important;
-              zoom: 0.60 !important;
-              transform: none !important;
-            }
-
-            .program-evaluation-print-layout table {
-              border-collapse: collapse !important;
-            }
-
-            .program-evaluation-print-layout tr {
-              line-height: 1 !important;
-              min-height: 0 !important;
-              align-items: center !important;
-            }
-
-            .program-evaluation-print-layout td {
-              font-size: 0.8rem !important;
-              line-height: 1.12 !important;
-              min-height: 0 !important;
-              align-items: center !important;
-              vertical-align: middle !important;
-            }
-
-            .program-evaluation-print-layout tbody td {
-              box-sizing: border-box !important;
-              min-height: 16px !important;
-              padding: 4px 2px !important;
-            }
-
-            .program-evaluation-print-layout td span,
-            .program-evaluation-print-layout td div {
-              font-size: 0.8rem !important;
-              line-height: 1.12 !important;
-            }
-
-            .program-evaluation-print-layout tbody tr {
-              border-bottom: solid 1px rgba(0,0,0,0.08) !important;
-              align-items: flex-start !important;
-            }
-
-            .program-evaluation-print-layout tbody td > div {
-              align-items: center !important;
-            }
-
-            .program-evaluation-print-layout .print-course-title {
-              display: -webkit-box !important;
-              -webkit-box-orient: vertical !important;
-              -webkit-line-clamp: 2 !important;
-              align-items: flex-start !important;
-              flex: 1 1 auto !important;
-              min-width: 0 !important;
-              max-width: 100% !important;
-              max-height: none !important;
-              padding-top: 1px !important;
-              padding-bottom: 1px !important;
-              white-space: normal !important;
-              overflow-wrap: anywhere !important;
-              word-break: break-word !important;
-              line-height: 1.15 !important;
-              text-overflow: clip !important;
-              overflow: hidden !important;
-            }
-
-            .program-evaluation-print-layout .print-course-code {
-              display: flex !important;
-              align-items: flex-start !important;
-              flex: 0 0 6.4rem !important;
-              width: 6.4rem !important;
-              padding-top: 1px !important;
-              padding-bottom: 1px !important;
-              white-space: nowrap !important;
-            }
-
-            .program-evaluation-print-layout .print-course-cell {
-              align-items: flex-start !important;
-              min-width: 0 !important;
-            }
-
-            .program-evaluation-print-layout .print-student-info {
-              padding: 0.7rem 1rem !important;
-            }
-
-            .program-evaluation-print-layout .print-student-info > div {
-              line-height: 1.14 !important;
-              margin-top: 0.28rem !important;
-            }
-
-            .program-evaluation-print-layout .print-student-info > div:first-child {
-              margin-top: 0 !important;
-            }
-
-            .program-evaluation-print-layout .print-student-info p {
-              font-size: 1rem !important;
-              line-height: 1.14 !important;
-              margin-top: 0 !important;
-              margin-bottom: 0 !important;
-            }
-
-            .program-evaluation-print-layout .print-semester-row {
-              display: flex !important;
-              flex-wrap: nowrap !important;
-              align-items: flex-start !important;
-              gap: 0.5rem !important;
-            }
-
-            .program-evaluation-print-layout .print-semester-column {
-              flex: 1 1 50% !important;
-              width: 50% !important;
-              max-width: 50% !important;
-              display: flex !important;
-              flex-direction: column !important;
-              align-items: stretch !important;
-              gap: 0.35rem !important;
-            }
-
-            .program-evaluation-print-layout .print-semester-block {
-              width: 100% !important;
-              align-self: flex-start !important;
-              height: fit-content !important;
-              max-height: none !important;
-              margin-bottom: 0.35rem !important;
-            }
-
-            .program-evaluation-print-layout .print-semester-block table {
-              height: auto !important;
-              width: auto !important;
-            }
-
-            .program-evaluation-print-layout .print-semester-block tbody {
-              height: auto !important;
-            }
-
-            .program-evaluation-print-layout .print-summer-row {
-              width: 100% !important;
-              margin-top: 0.35rem !important;
-            }
-
-            button { display: none !important; }
-
-            /* Print: hide raw grade input column, show only equivalent grade column */
-            .col-raw-grade { display: none !important; }
-            .col-raw-grade-header { display: none !important; }
-            .col-equivalent-grade { display: flex !important; }
-            .col-equivalent-grade-header { display: flex !important; }
-
-            /* Print: swap label — hide EQUIVALENT, show GRADE */
-            .screen-only-label { display: none !important; }
-            .print-only-label { display: inline !important; }
-          }
         `}
       </style>
 
@@ -1024,7 +1221,7 @@ const GradingEvaluationForRegistrar = () => {
             </Box>
 
             <Box style={{ marginTop: "1.5rem" }}>
-              <div colSpan={15} style={{ textAlign: "center", fontFamily: "Poppins, sans-serif", fontSize: "10px", lineHeight: "1.5" }}>
+              <div colSpan={15} style={{ textAlign: "center", fontSize: "10px", lineHeight: "1.5" }}>
                 <div style={{ fontFamily: "Arial", fontSize: "13px" }}>Republic of the Philippines</div>
 
                 {companyName ? (() => {
@@ -1039,7 +1236,7 @@ const GradingEvaluationForRegistrar = () => {
                         {fl} <br /> {sl}
                       </Typography>
                       {campusAddress && (
-                        <Typography style={{ mt: 1, textAlign: "center", fontSize: "12px", letterSpacing: "1px" }}>
+                        <Typography style={{ fontFamily: "Arial", fontSize: "13px" }}>
                           {campusAddress}
                         </Typography>
                       )}
@@ -1299,7 +1496,7 @@ const GradingEvaluationForRegistrar = () => {
                 onClose={() => setOpenSnackbar(false)}
                 anchorOrigin={{ vertical: "top", horizontal: "center" }}
               >
-                <Alert onClose={() => setOpenSnackbar(false)} severity="warning" sx={{ width: "100%" }}>
+                <Alert onClose={() => setOpenSnackbar(false)} severity={snackbarSeverity} sx={{ width: "100%" }}>
                   {snackbarMessage}
                 </Alert>
               </Snackbar>
@@ -1308,129 +1505,95 @@ const GradingEvaluationForRegistrar = () => {
         </Box>
       </Box>
 
-      <Box
-        className="program-evaluation-print-layout"
-        style={{ paddingRight: "1.5rem", marginTop: "3rem", paddingBottom: "1.5rem", maxWidth: "600px" }}
+      {/* ── Edit Important Reminders Dialog ─────────────────────────────── */}
+      <Dialog
+        open={remindersDialogOpen}
+        onClose={closeRemindersDialog}
+        maxWidth="sm"
+        fullWidth
       >
-        <Box style={{ display: "flex", alignItems: "center", width: "70rem", justifyContent: "center" }}>
-          <Box style={{ paddingTop: "1.5rem", paddingRight: "3rem" }}>
-            <img
-              src={fetchedLogo || EaristLogo}
-              alt="School Logo"
-              style={{
-                width: "8rem",
-                height: "8rem",
-                display: "block",
-                objectFit: "cover",
-                borderRadius: "50%",
-              }}
-            />
-          </Box>
+        <DialogTitle
+          sx={{
+            bgcolor: mainButtonColor || "#1976d2",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          📝 Edit Important Reminders
+          <IconButton
+            onClick={closeRemindersDialog}
+            sx={{
+              color: "white",
+              border: "2px solid rgba(255,255,255,0.6)",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              padding: 0,
+              "&:hover": {
+                backgroundColor: "rgba(255,255,255,0.2)",
+                border: "2px solid white",
+              },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
 
-          <Box style={{ marginTop: "1.5rem" }}>
-            <div
-              colSpan={15}
-              style={{
-                textAlign: "center",
-                fontFamily: "Poppins, sans-serif",
-                fontSize: "10px",
-                lineHeight: "1.5",
-              }}
-            >
-              <div style={{ fontFamily: "Arial", fontSize: "13px" }}>
-                Republic of the Philippines
-              </div>
-              {companyName ? (
-                <Typography
-                  style={{
-                    textAlign: "center",
-                    marginTop: "0rem",
-                    lineHeight: "1",
-                    fontSize: "1.6rem",
-                    letterSpacing: "-1px",
-                    fontWeight: "600",
-                  }}
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            These reminders appear at the bottom of every generated Academic
+            Program Evaluation. Edit, remove, or add new ones below.
+          </Typography>
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {remindersDraft.map((reminder, index) => (
+              <Box key={index} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  size="small"
+                  label={`Reminder ${index + 1}`}
+                  value={reminder}
+                  onChange={(e) =>
+                    handleReminderDraftChange(index, e.target.value)
+                  }
+                />
+                <IconButton
+                  onClick={() => handleRemoveReminderDraft(index)}
+                  color="error"
+                  sx={{ mt: 0.5 }}
+                  disabled={remindersDraft.length <= 1}
+                  title="Remove reminder"
                 >
-                  {firstLine} <br />
-                  {secondLine}
-                </Typography>
-              ) : (
-                <div style={{ height: "24px" }}></div>
-              )}
-              {campusAddress && (
-                <Typography
-                  style={{
-                    mt: 1,
-                    textAlign: "center",
-                    fontSize: "12px",
-                    letterSpacing: "1px",
-                  }}
-                >
-                  {campusAddress}
-                </Typography>
-              )}
-            </div>
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
           </Box>
-        </Box>
 
-        <Typography style={{ marginLeft: "1rem", textAlign: "center", width: "80rem", fontSize: "1.6rem", letterSpacing: "-1px", fontWeight: "500" }}>
-          OFFICE OF THE REGISTRAR
-        </Typography>
-        <Typography style={{ marginLeft: "1rem", marginTop: "-0.2rem", width: "80rem", textAlign: "center", fontSize: "1.8rem", letterSpacing: "-1px", fontWeight: "600" }}>
-          ACADEMIC PROGRAM EVALUATION
-        </Typography>
+          <Button
+            onClick={handleAddReminderDraft}
+            startIcon={<AddIcon />}
+            variant="outlined"
+            size="small"
+            sx={{ mt: 2 }}
+          >
+            Add Reminder
+          </Button>
+        </DialogContent>
 
-        <Box style={{ display: "flex" }}>
-          <Box>
-            <Box className="print-student-info" sx={{ padding: "1rem", marginLeft: "1rem", borderBottom: "solid black 1px", width: "80rem" }}>
-              <Box style={{ display: "flex" }}>
-                <Box style={{ display: "flex", width: "38rem" }}>
-                  <Typography style={{ width: "9rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Student Name:</Typography>
-                  <Typography style={{ fontSize: "1.06rem", fontWeight: "500" }}>
-                    {formatStudentName(studentData)}
-                  </Typography>
-                </Box>
-                <Box style={{ display: "flex" }}>
-                  <Typography style={{ width: "6rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>College:</Typography>
-                  <Typography style={{ fontSize: "1.06rem", fontWeight: "500" }}>{studentData.dprtmnt_name}</Typography>
-                </Box>
-              </Box>
-              <Box style={{ display: "flex" }}>
-                <Box style={{ display: "flex", width: "38rem" }}>
-                  <Typography style={{ width: "9rem", marginTop: "0.7rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Student No. :</Typography>
-                  <Typography style={{ fontSize: "1.06rem", fontWeight: "500", marginTop: "0.7rem" }}>{studentData.student_number}</Typography>
-                </Box>
-                <Box style={{ display: "flex" }}>
-                  <Typography style={{ width: "6rem", marginTop: "0.7rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Program:</Typography>
-                  <Typography style={{ fontSize: "1.06rem", fontWeight: "500", marginTop: "0.7rem" }}>
-                    {studentData.program_description} {studentData.major || ""}
-                  </Typography>
-                </Box>
-              </Box>
-              <Box style={{ display: "flex" }}>
-                <Typography style={{ width: "9rem", marginTop: "0.7rem", fontSize: "1.05rem", letterSpacing: "-1px" }}>Curriculum:</Typography>
-                <Typography style={{ fontSize: "1.06rem", fontWeight: "500", marginTop: "0.7rem" }}>
-                  {formatCurriculumLabel(studentData)}
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box className="print-semester-row" style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
-              <Box className="print-semester-column" style={{ flex: "1 1 50%", width: "50%", display: "flex", flexDirection: "column" }}>
-                {printLeftGroups.map(renderPrintSemesterBlock)}
-              </Box>
-              <Box className="print-semester-column" style={{ flex: "1 1 50%", width: "50%", display: "flex", flexDirection: "column" }}>
-                {printRightGroups.map(renderPrintSemesterBlock)}
-              </Box>
-            </Box>
-            {printSummerGroups.length > 0 && (
-              <Box className="print-summer-row" style={{ width: "100%" }}>
-                {printSummerGroups.map(renderPrintSemesterBlock)}
-              </Box>
-            )}
-          </Box>
-        </Box>
-      </Box>
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button onClick={closeRemindersDialog} color="error" variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveReminders} variant="contained" color="success">
+            Save Reminders
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -3,6 +3,8 @@ import { Box, Card, Typography } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import PersonIcon from "@mui/icons-material/Person";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
+
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import GradeIcon from "@mui/icons-material/Grade";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
@@ -42,6 +44,11 @@ export const REGISTRAR_ENROLLMENT_TABS = [
     iconKey: "grade",
   },
   {
+    label: "Grading Evaluation",
+    to: "/grading_evaluation_for_registrar",
+    iconKey: "factCheck",
+  },
+  {
     label: "Transcript of Records",
     to: "/transcript_of_records",
     iconKey: "receipt",
@@ -76,6 +83,7 @@ const TAB_ICONS = {
   listAlt: <ListAltIcon fontSize="large" />,
   grading: <GradingIcon fontSize="large" />,
   grade: <GradeIcon fontSize="large" />,
+  factCheck: <FactCheckIcon fontSize="large" />,
   receipt: <ReceiptLongIcon fontSize="large" />,
 };
 

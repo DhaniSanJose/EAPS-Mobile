@@ -1629,6 +1629,7 @@ const CollegeCourseTaggingSummer = () => {
                   {[
                     "Code",
                     "Description",
+                    "Subject Type",
                     "Units",
                     "Prerequisites",
                     "Enrolled",
@@ -1683,6 +1684,14 @@ const CollegeCourseTaggingSummer = () => {
                           textAlign: "center",
                         }}
                       >
+                        {c.subject_type_name || "—"}
+                      </StyledTd>
+                      <StyledTd
+                        sx={{
+                          border: `1px solid ${borderColor}`,
+                          textAlign: "center",
+                        }}
+                      >
                         {c.course_unit}
                       </StyledTd>
                       <StyledTd
@@ -1695,9 +1704,9 @@ const CollegeCourseTaggingSummer = () => {
                       >
                         {c.prereq
                           ? c.prereq
-                              .split(",")
-                              .map((p) => p.trim())
-                              .join(", ")
+                            .split(",")
+                            .map((p) => p.trim())
+                            .join(", ")
                           : "—"}
                       </StyledTd>
                       <StyledTd
@@ -1759,7 +1768,7 @@ const CollegeCourseTaggingSummer = () => {
                 {courses.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       sx={{
                         textAlign: "center",
                         color: TOKEN.textLight,

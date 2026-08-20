@@ -137,6 +137,7 @@ const YearLevelPanel = () => {
   }, []);
 
   const [openYearLevelDialog, setOpenYearLevelDialog] = useState(false);
+  const [ordinalLabel, setOrdinalLabel] = useState("");
 
   const handleAddYearLevel = async () => {
     if (!yearLevelDescription.trim()) {
@@ -148,8 +149,10 @@ const YearLevelPanel = () => {
       await axios.post(`${API_BASE_URL}/api/years_level`, {
         year_level_description: yearLevelDescription,
         level_type: levelType,
+        ordinal_label: ordinalLabel,
       }, permissionHeaders);
       setYearLevelDescription("");
+      setOrdinalLabel("");
       fetchYearLevelList();
       setSnackbar({ open: true, message: "Year level added successfully!", severity: "success" });
     } catch (err) {
@@ -175,8 +178,10 @@ const YearLevelPanel = () => {
     setSelectedId(level.year_level_id);
     setYearLevelDescription(level.year_level_description);
     setLevelType(level.level_type);
+    setOrdinalLabel(level.ordinal_label || "");
     setOpenYearLevelDialog(true);
   };
+
 
   const handleSave = async () => {
     if (!yearLevelDescription.trim()) {
@@ -196,18 +201,18 @@ const YearLevelPanel = () => {
 
     try {
       if (editMode) {
-        // UPDATE
         await axios.put(`${API_BASE_URL}/api/years_level/${selectedId}`, {
           year_level_description: yearLevelDescription,
           level_type: levelType,
+          ordinal_label: ordinalLabel,
         }, permissionHeaders);
 
         setSnackbar({ open: true, message: "Updated successfully!", severity: "success" });
       } else {
-        // ADD
         await axios.post(`${API_BASE_URL}/api/years_level`, {
           year_level_description: yearLevelDescription,
           level_type: levelType,
+          ordinal_label: ordinalLabel,
         }, permissionHeaders);
 
         setSnackbar({ open: true, message: "Added successfully!", severity: "success" });
@@ -224,10 +229,12 @@ const YearLevelPanel = () => {
   const resetForm = () => {
     setYearLevelDescription("");
     setLevelType("year");
+    setOrdinalLabel("");
     setEditMode(false);
     setSelectedId(null);
     setOpenYearLevelDialog(false);
   };
+
 
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [yearLevelToDelete, setYearLevelToDelete] = useState(null);
@@ -349,6 +356,7 @@ const YearLevelPanel = () => {
                           setSelectedId(null);
                           setYearLevelDescription("");
                           setLevelType("year");
+                          setOrdinalLabel("");
                           setOpenYearLevelDialog(true);
                         }}
                         sx={{
@@ -384,6 +392,7 @@ const YearLevelPanel = () => {
               <th style={styles.tableCell}>Year Level ID</th>
               <th style={styles.tableCell}>Year Level Description</th>
               <th style={styles.tableCell}>Type</th>
+              <th style={styles.tableCell}>Ordinal Label</th>
               {showActionColumn && <th style={styles.tableCell}>Actions</th>}
             </tr>
           </thead>
@@ -395,6 +404,7 @@ const YearLevelPanel = () => {
                 <td style={styles.tableCell}>{level.year_level_id}</td>
                 <td style={styles.tableCell}>{level.year_level_description}</td>
                 <td style={styles.tableCell}>{level.level_type}</td>
+                <td style={styles.tableCell}>{level.ordinal_label}</td>
                 {showActionColumn && (
                   <td style={styles.tableCell}>
                     <Box sx={{
@@ -500,7 +510,7 @@ const YearLevelPanel = () => {
                     Total Year Level Records: {yearLevelList.length}
                   </Typography>
 
-             
+
                 </Box>
               </TableCell>
             </TableRow>
@@ -566,6 +576,18 @@ const YearLevelPanel = () => {
             <option value="special">Special Program</option>
             <option value="graduate">Graduate Level</option>
           </TextField>
+
+
+          <Typography fontWeight="bold" mt={2}>
+            Ordinal Label
+          </Typography>
+
+          <TextField
+            fullWidth
+            placeholder="e.g., 1st Year"
+            value={ordinalLabel}
+            onChange={(e) => setOrdinalLabel(e.target.value)}
+          />
         </DialogContent>
 
         {/* ===== ACTIONS ===== */}

@@ -32,6 +32,7 @@ import {
 
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
+import TypeManagerSelect from "../components/TypeManagerSelect";
 import API_BASE_URL from "../apiConfig";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
@@ -51,8 +52,7 @@ const getCourseSearchText = (course) =>
   [
     course?.course_code,
     course?.course_description,
-    course?.prereq,
-    course?.corequisite,
+
     course?.course_unit,
   ]
     .map(cleanSearchValue)
@@ -102,12 +102,16 @@ const CoursePanel = () => {
     course_unit: "",
     lec_unit: "",
     lab_unit: "",
-    prereq: "",
-    corequisite: "",
+    subject_type_id: "",
+    subject_type_name: "",
+    category_type_id: "",
+    category_type_name: "",
     is_academic_achiever: 1,
     is_latin: 1,
     is_gwa_included: 1,
   });
+
+
   const [courseList, setCourseList] = useState([]);
   const [honorRules, setHonorRules] = useState([]);
 
@@ -219,7 +223,7 @@ const CoursePanel = () => {
       const response = await axios.get(`${API_BASE_URL}/api/course_list`);
       const data = response.data.map((item) => ({
         ...item,
-        prerequisite: item.prereq || "",
+
         is_academic_achiever: item.is_academic_achiever ?? 1,
         is_latin: item.is_latin ?? 1,
         is_gwa_included: item.is_gwa_included ?? 1, // ✅ new
@@ -268,7 +272,7 @@ const CoursePanel = () => {
     .reduce((sum, fee) => sum + Number(fee.amount), 0);
 
   const filteredCourses = courseList.filter((c) =>
-    [c.course_description, c.course_code, c.prereq, c.course_unit?.toString()]
+    [c.course_description, c.course_code, c.course_unit?.toString()]
       .join(" ")
       .toLowerCase()
       .includes(searchQuery.toLowerCase()),
@@ -276,10 +280,10 @@ const CoursePanel = () => {
   const courseSuggestions =
     searchQuery.trim().length >= 2
       ? courseList
-          .filter((course) =>
-            getCourseSearchText(course).includes(searchQuery.trim().toLowerCase()),
-          )
-          .slice(0, 10)
+        .filter((course) =>
+          getCourseSearchText(course).includes(searchQuery.trim().toLowerCase()),
+        )
+        .slice(0, 10)
       : [];
 
   const totalPages = Math.min(
@@ -348,8 +352,6 @@ const CoursePanel = () => {
           course_unit: parseFloat(course.course_unit) || 0,
           lec_unit: parseFloat(course.lec_unit) || 0,
           lab_unit: parseFloat(course.lab_unit) || 0,
-          prereq: course.prereq || null,
-          corequisite: course.corequisite || null,
           is_academic_achiever: Number(course.is_academic_achiever) ?? 1,
           is_latin: Number(course.is_latin) ?? 1,
           is_gwa_included: Number(course.is_gwa_included) ?? 1,
@@ -362,8 +364,10 @@ const CoursePanel = () => {
         course_unit: "",
         lec_unit: "",
         lab_unit: "",
-        prereq: "",
-        corequisite: "",
+        subject_type_id: "",
+        subject_type_name: "",
+        category_type_id: "",
+        category_type_name: "",
         is_academic_achiever: 1,
         is_latin: 1,
       });
@@ -392,8 +396,10 @@ const CoursePanel = () => {
       course_unit: Number(item.course_unit) || 0,
       lec_unit: Number(item.lec_unit) || 0,
       lab_unit: Number(item.lab_unit) || 0,
-      prereq: item.prereq ?? "",
-      corequisite: item.corequisite ?? "",
+      subject_type_id: item.subject_type_id ?? "",
+      subject_type_name: item.subject_type_name ?? "",
+      category_type_id: item.category_type_id ?? "",
+      category_type_name: item.category_type_name ?? "",
       is_academic_achiever: item.is_academic_achiever ?? 1,
       is_latin: item.is_latin ?? 1,
       is_gwa_included: item.is_gwa_included ?? 1,
@@ -424,8 +430,6 @@ const CoursePanel = () => {
           course_unit: parseFloat(course.course_unit) || 0,
           lec_unit: parseFloat(course.lec_unit) || 0,
           lab_unit: parseFloat(course.lab_unit) || 0,
-          prereq: course.prereq || null,
-          corequisite: course.corequisite || null,
           is_gwa_included: Number(course.is_gwa_included) ?? 1,
         },
         { headers: getPermissionHeaders() },
@@ -446,8 +450,10 @@ const CoursePanel = () => {
         course_unit: "",
         lec_unit: "",
         lab_unit: "",
-        prereq: "",
-        corequisite: "",
+        subject_type_id: "",
+        subject_type_name: "",
+        category_type_id: "",
+        category_type_name: "",
         is_academic_achiever: 1,
         is_latin: 1,
       });
@@ -631,7 +637,7 @@ const CoursePanel = () => {
           <Box sx={{ position: "relative", width: 450, maxWidth: "100%", mb: 2 }}>
             <TextField
               variant="outlined"
-              placeholder="Search Course Code / Description / Prereq"
+              placeholder="Search Course Code / Description"
               size="small"
               value={searchQuery}
               onChange={(e) => {
@@ -943,8 +949,10 @@ const CoursePanel = () => {
                             course_unit: "",
                             lec_unit: "",
                             lab_unit: "",
-                            prereq: "",
-                            corequisite: "",
+                            subject_type_id: "",
+                            subject_type_name: "",
+                            category_type_id: "",
+                            category_type_name: "",
                             is_academic_achiever: 1,
                             is_latin: 1,
                           });
@@ -980,16 +988,14 @@ const CoursePanel = () => {
           <thead>
             <tr>
               {[
-                "ID",
+                "#",
                 "Code",
                 "Description",
                 "Lec Unit",
                 "Lab Unit",
                 "Credit Unit",
-                "Prerequisite",
-                "Corequisite",
-                "Lab",
-                "Lecture",
+                "Subject Type",
+                "Category",
                 "Academic Achiever",
                 "Latin Honor",
                 "Include in GWA Calculation",
@@ -1040,14 +1046,11 @@ const CoursePanel = () => {
                   <td style={styles.tableCell}>{c.lec_unit}</td>
                   <td style={styles.tableCell}>{c.lab_unit}</td>
                   <td style={styles.tableCell}>{c.course_unit}</td>
-                  <td style={styles.tableCell}>{c.prereq}</td>
-                  <td style={styles.tableCell}>{c.corequisite}</td>
-                  <td style={styles.tableCell}>
-                    {c.iscomputer_lab ? "YES" : "NO"}
-                  </td>
-                  <td style={styles.tableCell}>
-                    {c.isnon_computer_lab ? "YES" : "NO"}
-                  </td>
+                  <td style={styles.tableCell}>{c.subject_type_name}</td>
+                  <td style={styles.tableCell}>{c.category_type_name}</td>
+
+
+
                   <td style={styles.tableCell}>
                     {Number(c.is_academic_achiever) === 1 ? "YES" : "NO"}
                   </td>
@@ -1446,31 +1449,6 @@ const CoursePanel = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={4}>
-              <Typography fontWeight="bold">Lecture Unit</Typography>
-              <TextField
-                fullWidth
-                label="Lecture Unit"
-                name="lec_unit"
-                type="number"
-                value={course.lec_unit}
-                onChange={handleChangesForEverything}
-                inputProps={{ step: "0.01", min: "0" }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <Typography fontWeight="bold">Laboratory Unit</Typography>
-              <TextField
-                fullWidth
-                label="Laboratory Unit"
-                name="lab_unit"
-                type="number"
-                value={course.lab_unit}
-                onChange={handleChangesForEverything}
-                inputProps={{ step: "0.01", min: "0" }}
-              />
-            </Grid>
 
             <Grid item xs={12} md={4}>
               <Typography fontWeight="bold">Course Unit</Typography>
@@ -1485,26 +1463,43 @@ const CoursePanel = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Typography fontWeight="bold">Prerequisite</Typography>
-              <TextField
-                fullWidth
-                label="Prerequisite"
-                name="prereq"
-                value={course.prereq}
-                onChange={handleChangesForEverything}
+              <Typography fontWeight="bold">Subject Type</Typography>
+              <TypeManagerSelect
+                label="Subject Type"
+                apiUrl={`${API_BASE_URL}/api/subject-types`}
+                idKey="subject_type_id"
+                nameKey="subject_type_name"
+                value={course.subject_type_id}
+                onChange={(id, name) =>
+                  setCourse((prev) => ({ ...prev, subject_type_id: id, subject_type_name: name }))
+                }
+                headers={getPermissionHeaders()}
+                canCreate={canCreate}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                onSnack={showSnack}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Typography fontWeight="bold">Corequisite</Typography>
-              <TextField
-                fullWidth
-                label="Corequisite"
-                name="corequisite"
-                value={course.corequisite}
-                onChange={handleChangesForEverything}
+              <Typography fontWeight="bold">Category</Typography>
+              <TypeManagerSelect
+                label="Category"
+                apiUrl={`${API_BASE_URL}/api/category-types`}
+                idKey="category_type_id"
+                nameKey="category_type_name"
+                value={course.category_type_id}
+                onChange={(id, name) =>
+                  setCourse((prev) => ({ ...prev, category_type_id: id, category_type_name: name }))
+                }
+                headers={getPermissionHeaders()}
+                canCreate={canCreate}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                onSnack={showSnack}
               />
             </Grid>
+
 
             <Grid item xs={12} md={6}>
               <Typography fontWeight="bold">Academic Achiever</Typography>

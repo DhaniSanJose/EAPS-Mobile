@@ -114,6 +114,7 @@ const SemesterPanel = () => {
   // ── Delete dialog ─────────────────────────────────────────────────────────────
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [semesterToDelete, setSemesterToDelete] = useState(null);
+  const [editOrdinalLabel, setEditOrdinalLabel] = useState("");
 
   // ── Auth effect ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -186,11 +187,11 @@ const SemesterPanel = () => {
   // Reset to page 1 when search changes
   useEffect(() => { setCurrentPage(1); }, [searchQuery]);
 
-  // ── Open edit/add dialog ──────────────────────────────────────────────────────
   const handleEdit = (sem) => {
     setEditingSemester(sem);
     setEditDescription(sem.semester_description || "");
     setEditCode(sem.semester_code || "");
+    setEditOrdinalLabel(sem.ordinal_label || "");
     setOpenEditDialog(true);
   };
 
@@ -198,6 +199,7 @@ const SemesterPanel = () => {
     setEditingSemester(null);
     setEditDescription("");
     setEditCode("");
+    setEditOrdinalLabel("");
     setOpenEditDialog(true);
   };
 
@@ -210,17 +212,17 @@ const SemesterPanel = () => {
 
     try {
       if (editingSemester) {
-        // Edit existing
         await axios.put(`${API_BASE_URL}/api/semesters/${editingSemester.semester_id}`, {
           semester_description: editDescription,
           semester_code: editCode,
+          ordinal_label: editOrdinalLabel,
         }, getAuditHeaders());
         setSnackbar({ open: true, message: "Semester updated successfully!", severity: "success" });
       } else {
-        // Add new
         await axios.post(`${API_BASE_URL}/api/semesters`, {
           semester_description: editDescription,
           semester_code: editCode,
+          ordinal_label: editOrdinalLabel,
         }, getAuditHeaders());
         setSnackbar({ open: true, message: "Semester added successfully!", severity: "success" });
       }
@@ -258,25 +260,25 @@ const SemesterPanel = () => {
     return <Unauthorized />;
   }
 
-     // 🔒 Disable right-click
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // 🔒 Disable right-click
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    // 🔒 Block DevTools shortcuts + Ctrl+P silently
-    document.addEventListener("keydown", (e) => {
-        const isBlockedKey =
-            e.key === "F12" ||
-            e.key === "F11" ||
-            (e.ctrlKey &&
-                e.shiftKey &&
-                (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-            (e.ctrlKey && e.key.toLowerCase() === "u") ||
-            (e.ctrlKey && e.key.toLowerCase() === "p");
+  // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  document.addEventListener("keydown", (e) => {
+    const isBlockedKey =
+      e.key === "F12" ||
+      e.key === "F11" ||
+      (e.ctrlKey &&
+        e.shiftKey &&
+        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "p");
 
-        if (isBlockedKey) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
+    if (isBlockedKey) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
@@ -443,6 +445,7 @@ const SemesterPanel = () => {
               <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>#</TableCell>
               <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>Semester Description</TableCell>
               <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>Code</TableCell>
+              <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>Ordinal Label</TableCell>
               <TableCell sx={{ fontWeight: "bold", textAlign: "center", border: `1px solid ${borderColor}`, backgroundColor: "#f5f5f5", color: "#000" }}>Action</TableCell>
             </TableRow>
           </TableHead>
@@ -463,6 +466,7 @@ const SemesterPanel = () => {
                 <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{startIndex + i + 1}</TableCell>
                 <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{sem.semester_description}</TableCell>
                 <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{sem.semester_code}</TableCell>
+                <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{sem.ordinal_label}</TableCell>
                 <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                   <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
                     {canEdit && (
@@ -631,6 +635,18 @@ const SemesterPanel = () => {
             value={editCode}
             onChange={(e) => setEditCode(e.target.value)}
           />
+
+          <Typography fontWeight="bold" mb={1} mt={2}>
+            Ordinal Label
+          </Typography>
+
+          <TextField
+            label="Ordinal Label"
+            fullWidth
+            placeholder="e.g., 1st Semester"
+            value={editOrdinalLabel}
+            onChange={(e) => setEditOrdinalLabel(e.target.value)}
+          />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setOpenEditDialog(false)} variant="outlined"
@@ -688,7 +704,7 @@ const SemesterPanel = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* ── SNACKBAR ──────────────────────────────────────────────────────────── */}
       <Snackbar
         open={snackbar.open}

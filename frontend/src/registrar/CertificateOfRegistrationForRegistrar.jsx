@@ -717,8 +717,8 @@ const CertificateOfRegistration = forwardRef(
                 (!activeSchoolYearId ||
                   Number(
                     item?.active_school_year_id ??
-                      item?.activeSchoolYearId ??
-                      0,
+                    item?.activeSchoolYearId ??
+                    0,
                   ) === Number(activeSchoolYearId)),
             )
             .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
@@ -853,7 +853,9 @@ const CertificateOfRegistration = forwardRef(
         console.log(res.data);
       } catch (error) {
         console.error("Error fetching data:", error);
-        showSnackbar("Error fetching data", "error");
+        if (student_number?.trim()) {
+          showSnackbar("Error fetching data", "error");
+        }
       }
     };
 
@@ -865,17 +867,21 @@ const CertificateOfRegistration = forwardRef(
           : [];
         setScholarshipTypes(activeTypes);
       } catch (error) {
-        showSnackbar("Error fetching scholarship types", "error");
+        if (student_number?.trim()) {
+          showSnackbar("Error fetching scholarship types", "error");
+        }
       }
     };
 
     useEffect(() => {
+      if (!student_number?.trim()) return;
       fetchTosf();
-    }, []);
+    }, [student_number]);
 
     useEffect(() => {
+      if (!student_number?.trim()) return;
       fetchScholarship();
-    }, []);
+    }, [student_number]);
 
     useEffect(() => {
       setQrCodeMissing(false);
@@ -937,17 +943,17 @@ const CertificateOfRegistration = forwardRef(
     const baseTotalAssessment = shouldUseDynamicFees
       ? computedTotalAssessment
       : totalLecFees +
-        totalLabFees +
-        Number(tosf[0]?.cultural_fee || 0) +
-        Number(tosf[0]?.athletic_fee || 0) +
-        (isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0) +
-        Number(tosf[0]?.developmental_fee || 0) +
-        Number(tosf[0]?.guidance_fee || 0) +
-        Number(tosf[0]?.library_fee || 0) +
-        Number(tosf[0]?.medical_and_dental_fee || 0) +
-        Number(tosf[0]?.registration_fee || 0) +
-        (isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0) +
-        (isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0);
+      totalLabFees +
+      Number(tosf[0]?.cultural_fee || 0) +
+      Number(tosf[0]?.athletic_fee || 0) +
+      (isHaveNSTP !== 0 ? Number(tosf[0]?.nstp_fees || 0) : 0) +
+      Number(tosf[0]?.developmental_fee || 0) +
+      Number(tosf[0]?.guidance_fee || 0) +
+      Number(tosf[0]?.library_fee || 0) +
+      Number(tosf[0]?.medical_and_dental_fee || 0) +
+      Number(tosf[0]?.registration_fee || 0) +
+      (isHaveComputerFees !== 0 ? Number(tosf[0]?.computer_fees || 0) : 0) +
+      (isHaveLaboratory !== 0 ? Number(tosf[0]?.laboratory_fees || 0) : 0);
     const savedNetAssessment = savedUnifast
       ? 0
       : toFeeNumber(selectedPaymentData?.total_tosf);
@@ -1980,7 +1986,7 @@ const CertificateOfRegistration = forwardRef(
                             String(data[0]?.gender) === "0"
                             ? "Male"
                             : data[0]?.gender === 1 ||
-                                String(data[0]?.gender) === "1"
+                              String(data[0]?.gender) === "1"
                               ? "Female"
                               : "",
                           LEFT_LABEL_WIDTH,
@@ -1998,7 +2004,7 @@ const CertificateOfRegistration = forwardRef(
                           "Major",
                           major
                             ? major.charAt(0).toUpperCase() +
-                                major.slice(1).toLowerCase()
+                            major.slice(1).toLowerCase()
                             : "",
                           MID_LABEL_WIDTH,
                         )}
@@ -2059,7 +2065,7 @@ const CertificateOfRegistration = forwardRef(
                         {renderDetailField(
                           "Scholarship/Discount",
                           selectedScholarshipCode ||
-                            (savedUnifast ? "UNIFAST-FHE" : ""),
+                          (savedUnifast ? "UNIFAST-FHE" : ""),
                           RIGHT_LABEL_WIDTH,
                         )}
                       </td>

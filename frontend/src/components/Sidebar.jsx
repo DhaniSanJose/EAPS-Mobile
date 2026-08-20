@@ -694,7 +694,7 @@ const SideBar = ({
     axios
       .get(`${API_BASE_URL}/api/access_level/${employeeID}`)
       .then((r) => setAccessDescription(r.data?.access_description || ""))
-      .catch(() => {});
+      .catch(() => { });
   }, [employeeID, userRole]);
 
   useEffect(() => {
@@ -728,7 +728,7 @@ const SideBar = ({
       }
       const res = await axios.get(`${API_BASE_URL}/api/person_data/${id}/${r}`);
       setPersonData(res.data);
-    } catch {}
+    } catch { }
   };
 
   const fetchUserAccessList = async (eid) => {
@@ -742,7 +742,7 @@ const SideBar = ({
           return a;
         }, {}),
       );
-    } catch {}
+    } catch { }
   };
 
   const Logout = () => {
@@ -772,8 +772,8 @@ const SideBar = ({
       const upd =
         r === "faculty"
           ? await axios.get(
-              `${API_BASE_URL}/api/get_prof_data_by_employee/${employeeID}`,
-            )
+            `${API_BASE_URL}/api/get_prof_data_by_employee/${employeeID}`,
+          )
           : await axios.get(`${API_BASE_URL}/api/person_data/${pid}/${r}`);
       const updatedData = r === "faculty" ? upd.data[0] : upd.data;
       setPersonData(updatedData);
@@ -1178,18 +1178,7 @@ const SideBar = ({
           icon: FolderCopy,
           page_id: 106,
         },
-        {
-          title: "Registrar Course Tagging",
-          link: "/registrar_course_tagging",
-          icon: Class,
-          page_id: 17,
-        },
-        {
-          title: "Registrar Course Tagging Summer",
-          link: "/registrar_course_tagging_summer",
-          icon: Class,
-          page_id: 140,
-        },
+
         {
           title: "Registrar Search Certificate of Registration",
           link: "/registrar_search_certificate_of_registration",
@@ -1209,6 +1198,12 @@ const SideBar = ({
           page_id: 50,
         },
         {
+          title: "Grading Evaluation",
+          link: "/grading_evaluation_for_registrar",
+          icon: FactCheck,
+          page_id: 105, 
+        },
+        {
           title: "Transcript of Records",
           link: "/transcript_of_records",
           icon: HistoryEdu,
@@ -1220,11 +1215,18 @@ const SideBar = ({
           icon: Class,
           page_id: 15,
         },
+
         {
-          title: "Grading Evaluation",
-          link: "/grading_evaluation_for_registrar",
-          icon: FactCheck,
-          page_id: 105,
+          title: "Registrar Course Tagging",
+          link: "/registrar_course_tagging",
+          icon: Class,
+          page_id: 17,
+        },
+        {
+          title: "Registrar Course Tagging Summer",
+          link: "/registrar_course_tagging_summer",
+          icon: Class,
+          page_id: 140,
         },
         {
           title: "COR Exporting Module",
@@ -1877,20 +1879,20 @@ const SideBar = ({
     const groups = sectionMenus[item.key];
     const hasVisible = groups
       ? groups.some((g) =>
-          g.items.some(
-            (si) => si.page_id === undefined || userAccessList[si.page_id],
-          ),
-        )
+        g.items.some(
+          (si) => si.page_id === undefined || userAccessList[si.page_id],
+        ),
+      )
       : true;
     if (!hasVisible) return null;
 
     const isAcct = item.key === "account";
     const visGroups = groups
       ? groups.filter((g) =>
-          g.items.some(
-            (si) => si.page_id === undefined || userAccessList[si.page_id],
-          ),
-        )
+        g.items.some(
+          (si) => si.page_id === undefined || userAccessList[si.page_id],
+        ),
+      )
       : [];
     const onlySettings =
       isAcct &&
@@ -1985,7 +1987,7 @@ const SideBar = ({
             title={
               effectiveCollapsed
                 ? `${personData?.fname || ""} ${personData?.lname || ""}`.trim() ||
-                  role
+                role
                 : ""
             }
             placement="right"

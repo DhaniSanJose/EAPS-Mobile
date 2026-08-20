@@ -1435,64 +1435,7 @@ const RegistrarCourseTagging = () => {
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
 
-      <br />
-      <br />
-
-      {/* Navigation tabs */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "nowrap",
-          width: "100%",
-          gap: 2,
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <Card
-            key={tab.to}
-            onClick={() => handleStepClick(index, tab.to)}
-            sx={{
-              flex: `1 1 ${100 / tabs.length}%`,
-              height: 135,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              borderRadius: 2,
-              border: `1px solid ${borderColor}`,
-              backgroundColor:
-                activeStep === index
-                  ? headerColor
-                  : "#E8C999",
-              color: activeStep === index ? "#fff" : "#000",
-              boxShadow:
-                activeStep === index
-                  ? "0px 4px 10px rgba(0,0,0,0.3)"
-                  : "0px 2px 6px rgba(0,0,0,0.15)",
-              transition: "0.3s ease",
-              "&:hover": {
-                backgroundColor: activeStep === index ? "#000000" : "#f5d98f",
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <Box sx={{ fontSize: 40, mb: 1 }}>{tab.icon}</Box>
-              <Typography
-                sx={{ fontSize: 14, fontWeight: "bold", textAlign: "center" }}
-              >
-                {tab.label}
-              </Typography>
-            </Box>
-          </Card>
-        ))}
-      </Box>
+  
 
       <br />
       <br />
@@ -1534,22 +1477,22 @@ const RegistrarCourseTagging = () => {
                   transition: "all .15s",
                   ...(active
                     ? {
-                        backgroundColor: headerColor,
-                        color: "#fff",
-                        border: "none",
-                        boxShadow: "0 2px 8px rgba(15,31,61,.25)",
-                        "&:hover": { backgroundColor: TOKEN.navyLight },
-                      }
+                      backgroundColor: headerColor,
+                      color: "#fff",
+                      border: "none",
+                      boxShadow: "0 2px 8px rgba(15,31,61,.25)",
+                      "&:hover": { backgroundColor: TOKEN.navyLight },
+                    }
                     : {
-                        backgroundColor: "#fff",
-                        color: headerColor,
-                        border: `1px solid ${TOKEN.borderStrong}`,
-                        "&:hover": {
-                          backgroundColor: TOKEN.accentSoft,
-                          borderColor: TOKEN.accent,
-                          color: TOKEN.accent,
-                        },
-                      }),
+                      backgroundColor: "#fff",
+                      color: headerColor,
+                      border: `1px solid ${TOKEN.borderStrong}`,
+                      "&:hover": {
+                        backgroundColor: TOKEN.accentSoft,
+                        borderColor: TOKEN.accent,
+                        color: TOKEN.accent,
+                      },
+                    }),
                 }}
               >
                 {dept.dprtmnt_code}
@@ -1721,6 +1664,7 @@ const RegistrarCourseTagging = () => {
                   {[
                     "Code",
                     "Description",
+                    "Subject Type",
                     "Units",
                     "Prerequisites",
                     "Enrolled",
@@ -1769,6 +1713,9 @@ const RegistrarCourseTagging = () => {
                       >
                         {c.course_description}
                       </StyledTd>
+                      <StyledTd sx={{ border: `1px solid ${borderColor}` }}>
+                        {c.subject_type_name || "—"}
+                      </StyledTd>
                       <StyledTd
                         sx={{
                           border: `1px solid ${borderColor}`,
@@ -1787,9 +1734,9 @@ const RegistrarCourseTagging = () => {
                       >
                         {c.prereq
                           ? c.prereq
-                              .split(",")
-                              .map((p) => p.trim())
-                              .join(", ")
+                            .split(",")
+                            .map((p) => p.trim())
+                            .join(", ")
                           : "—"}
                       </StyledTd>
                       <StyledTd
@@ -1851,7 +1798,7 @@ const RegistrarCourseTagging = () => {
                 {courses.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       sx={{
                         textAlign: "center",
                         color: TOKEN.textLight,
@@ -2010,48 +1957,48 @@ const RegistrarCourseTagging = () => {
                   specialYearLevel &&
                   isSpecialYearFullyEnrolled(year_level.year_level_id);
                 return (
-                <Button
-                  key={index}
-                  variant="contained"
-                  title={
-                    specialFullyEnrolled
-                      ? "All special year subjects for this semester are already enrolled."
-                      : undefined
-                  }
-                  disabled={
-                    isBulkEnrollDisabled ||
-                    (specialYearLevel
-                      ? specialFullyEnrolled
-                      : disableYearButtons || hasNonSpecialEnrollment)
-                  }
-                  onClick={() =>
-                    handleBulkEnrollClick(
-                      year_level.year_level_id,
-                      formatSemester(activeSemester),
-                    )
-                  }
-                  sx={{
-                    backgroundColor: specialYearLevel ? "#0f766e" : "green",
-                    color: "#fff",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    textTransform: "none",
-                    height: 40,
-                    px: 2.5,
+                  <Button
+                    key={index}
+                    variant="contained"
+                    title={
+                      specialFullyEnrolled
+                        ? "All special year subjects for this semester are already enrolled."
+                        : undefined
+                    }
+                    disabled={
+                      isBulkEnrollDisabled ||
+                      (specialYearLevel
+                        ? specialFullyEnrolled
+                        : disableYearButtons || hasNonSpecialEnrollment)
+                    }
+                    onClick={() =>
+                      handleBulkEnrollClick(
+                        year_level.year_level_id,
+                        formatSemester(activeSemester),
+                      )
+                    }
+                    sx={{
+                      backgroundColor: specialYearLevel ? "#0f766e" : "green",
+                      color: "#fff",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      textTransform: "none",
+                      height: 40,
+                      px: 2.5,
 
-                    lineHeight: 1.2,
-                    boxShadow: "none",
+                      lineHeight: 1.2,
+                      boxShadow: "none",
 
-                    "&.Mui-disabled": {
-                      backgroundColor: TOKEN.borderStrong,
-                      color: TOKEN.textLight,
-                    },
-                  }}
-                >
-                  {formatYear(year_level.year_level_description)} ·{" "}
-                  {formatSemester(activeSemester)}
-                </Button>
-              );
+                      "&.Mui-disabled": {
+                        backgroundColor: TOKEN.borderStrong,
+                        color: TOKEN.textLight,
+                      },
+                    }}
+                  >
+                    {formatYear(year_level.year_level_description)} ·{" "}
+                    {formatSemester(activeSemester)}
+                  </Button>
+                );
               })}
 
               <Button
@@ -2081,7 +2028,7 @@ const RegistrarCourseTagging = () => {
                 <TableRow>
                   {[
                     "Code",
-                    "Comp",
+
                     "Lec",
                     "Lab",
                     "Units",
@@ -2118,14 +2065,7 @@ const RegistrarCourseTagging = () => {
                     >
                       {e.course_code}
                     </StyledTd>
-                    <StyledTd
-                      sx={{
-                        border: `1px solid ${borderColor}`,
-                        textAlign: "center",
-                      }}
-                    >
-                      {e.components}
-                    </StyledTd>
+
                     <StyledTd
                       sx={{
                         border: `1px solid ${borderColor}`,

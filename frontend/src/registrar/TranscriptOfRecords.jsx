@@ -17,7 +17,17 @@ import {
   FormControl,
   Select,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import EditNoteIcon from "@mui/icons-material/EditNote";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import DateField from "../components/DateField";
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { SettingsContext } from "../App";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -31,6 +41,9 @@ import SearchIcon from "@mui/icons-material/Search";
 import { FcPrint } from "react-icons/fc";
 import API_BASE_URL from "../apiConfig";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import RuleIcon from "@mui/icons-material/Rule";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -180,6 +193,196 @@ const TranscriptOfRecords = () => {
 
   const [campusAddress, setCampusAddress] = useState("");
   const [gradeConversion, setGradeConversions] = useState([]);
+  const REMARKS_STORAGE_KEY = "tor_remarks_note";
+  const DEFAULT_REMARKS = "COPY FOR EMPLOYMENT PURPOSES ONLY.";
+  const GRADUATION_DATE_STORAGE_KEY = "tor_graduation_date";
+  const GRADING_SYSTEM_STORAGE_KEY = "tor_grading_system_rows";
+
+  const DEFAULT_GRADING_SYSTEM_ROWS = [
+    { grade: "1.00", score: "97-100", description: "Marked Excellence" },
+    { grade: "1.25", score: "94-96", description: "Excellent" },
+    { grade: "1.50", score: "91-93", description: "Very Superior" },
+    { grade: "1.75", score: "88-90", description: "Superior" },
+    { grade: "2.00", score: "85-87", description: "Very Good" },
+    { grade: "2.25", score: "82-84", description: "Good" },
+    { grade: "2.50", score: "79-81", description: "Satisfactory" },
+    { grade: "2.75", score: "76-78", description: "Fair" },
+    { grade: "3.00", score: "75", description: "Passed" },
+    { grade: "5.00", score: "Below 75", description: "Failed" },
+    { grade: "INC", score: "Incomplete", description: "Incomplete" },
+    { grade: "DRP", score: "Dropped Officially/Unofficially", description: "Dropped" },
+  ];
+
+  const [remarks, setRemarks] = useState(() => {
+    try {
+      const stored = localStorage.getItem(REMARKS_STORAGE_KEY);
+      if (stored) return stored;
+    } catch (err) {
+      console.error("Failed to load saved remarks:", err);
+    }
+    return DEFAULT_REMARKS;
+  });
+
+
+  const formatStudentFullName = (student) => {
+    if (!student || !student.last_name) return "";
+    const last = (student.last_name || "").toUpperCase();
+    const first = (student.first_name || "").toUpperCase();
+    const middle = (student.middle_name || "").toUpperCase();
+    const ext = (student.extension || "").toUpperCase();
+    const givenPart = [first, middle].filter(Boolean).join(" ");
+    return ext ? `${last}, ${givenPart} ${ext}` : `${last}, ${givenPart}`;
+  };
+
+  const formatYearGraduatedRange = (year) => {
+    if (!year) return "";
+    const startYear = parseInt(year, 10);
+    if (Number.isNaN(startYear)) return year;
+    return `${startYear} - ${startYear + 1}`;
+  };
+
+  const repeatShortTermWithSpaces = (term, count = 13) => {
+    const safeTerm = (term || "").toLowerCase();
+    if (!safeTerm) return "";
+    return Array(count).fill(safeTerm).join(" ");
+  };
+
+  const [remarksDialogOpen, setRemarksDialogOpen] = useState(false);
+  const [remarksDraft, setRemarksDraft] = useState("");
+
+  const [graduationDate, setGraduationDate] = useState(() => {
+    try {
+      return localStorage.getItem(GRADUATION_DATE_STORAGE_KEY) || "";
+    } catch (err) {
+      return "";
+    }
+  });
+
+  const [gradingSystemRows, setGradingSystemRows] = useState(() => {
+    try {
+      const stored = localStorage.getItem(GRADING_SYSTEM_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (err) {
+      console.error("Failed to load saved grading system:", err);
+    }
+    return DEFAULT_GRADING_SYSTEM_ROWS;
+  });
+  const [gradingSystemDialogOpen, setGradingSystemDialogOpen] = useState(false);
+  const [gradingSystemDraft, setGradingSystemDraft] = useState([]);
+
+  const openRemarksDialog = () => {
+    setRemarksDraft(remarks);
+    setRemarksDialogOpen(true);
+  };
+  const closeRemarksDialog = () => setRemarksDialogOpen(false);
+  const handleSaveRemarks = () => {
+    const cleaned = remarksDraft.trim() || DEFAULT_REMARKS;
+    setRemarks(cleaned);
+    try {
+      localStorage.setItem(REMARKS_STORAGE_KEY, cleaned);
+    } catch (err) {
+      console.error("Failed to save remarks:", err);
+    }
+    setRemarksDialogOpen(false);
+  };
+
+  const handleGraduationDateChange = (e) => {
+    const value = e.target.value;
+    setGraduationDate(value);
+    try {
+      localStorage.setItem(GRADUATION_DATE_STORAGE_KEY, value);
+    } catch (err) {
+      console.error("Failed to save graduation date:", err);
+    }
+  };
+
+  const openGradingSystemDialog = () => {
+    setGradingSystemDraft(gradingSystemRows.map((row) => ({ ...row })));
+    setGradingSystemDialogOpen(true);
+  };
+  const closeGradingSystemDialog = () => setGradingSystemDialogOpen(false);
+
+  const handleGradingSystemDraftChange = (index, field, value) => {
+    setGradingSystemDraft((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    );
+  };
+
+  const handleAddGradingSystemRow = () => {
+    setGradingSystemDraft((prev) => [
+      ...prev,
+      { grade: "", score: "", description: "" },
+    ]);
+  };
+
+  const handleRemoveGradingSystemRow = (index) => {
+    setGradingSystemDraft((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveGradingSystem = () => {
+    const cleaned = gradingSystemDraft.filter(
+      (row) =>
+        row.grade.trim() || row.score.trim() || row.description.trim(),
+    );
+    const finalRows = cleaned.length > 0 ? cleaned : DEFAULT_GRADING_SYSTEM_ROWS;
+    setGradingSystemRows(finalRows);
+    try {
+      localStorage.setItem(
+        GRADING_SYSTEM_STORAGE_KEY,
+        JSON.stringify(finalRows),
+      );
+    } catch (err) {
+      console.error("Failed to save grading system:", err);
+    }
+    setGradingSystemDialogOpen(false);
+  };
+
+  const handleResetGradingSystem = () => {
+    setGradingSystemDraft(DEFAULT_GRADING_SYSTEM_ROWS.map((row) => ({ ...row })));
+  };
+
+  // Split the (editable) grading system rows into two visual columns of labels,
+  // matching the original two-block layout (left block / right block).
+  const gradingSystemRowsSafe =
+    gradingSystemRows.length > 0 ? gradingSystemRows : DEFAULT_GRADING_SYSTEM_ROWS;
+  const gradingSystemHalf = Math.ceil(gradingSystemRowsSafe.length / 2);
+  const gradingSystemFirstHalf = gradingSystemRowsSafe.slice(0, gradingSystemHalf);
+  const gradingSystemSecondHalf = gradingSystemRowsSafe.slice(gradingSystemHalf);
+
+  const formattedDate = (dateString) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const todayDate = new Date().toLocaleDateString("en-US", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const formattedGraduationDate = graduationDate
+    ? formattedDate(graduationDate) // reuses your existing formattedDate() helper
+    : "____________________";
+
+  // DATE ISSUED should track the Date of Graduation once it's set; falls back
+  // to today's date until a graduation date has been chosen.
+  const dateIssuedDisplay = graduationDate ? formattedDate(graduationDate) : todayDate;
+
+  // Text shown in the REMARKS field for a given page
+  const getPageRemarksText = (isLastPage, degree) => {
+    if (isLastPage) {
+      const degreeLabel = degree || "____________________";
+      return `GRADUATED with the Degree of ${degreeLabel} from this Institute on ${formattedGraduationDate}`;
+    }
+    return remarks;
+  };
 
   // ✅ Fetch person data from backend
   const fetchPersonData = async (id) => {
@@ -579,24 +782,15 @@ const TranscriptOfRecords = () => {
     });
   }
 
-  function convertSemester(semester) {
-    if (!semester) return "";
+  const convertSemester = (p) => {
+    if (!p) return "";
 
-    const normalized = semester?.replace(/\s+/g, "").toUpperCase();
+    // ✅ Single source of truth — comes straight from semester_table.ordinal_label
+    if (p.ordinal_label) return p.ordinal_label;
 
-    switch (normalized) {
-      case "FIRSTSEMESTER":
-        return "1st Semester";
-      case "SECONDSEMESTER":
-        return "2nd Semester";
-      case "THIRDSEMESTER":
-        return "3rd Semester";
-      case "FOURTHSEMESTER":
-        return "4th Semester";
-      default:
-        return semester;
-    }
-  }
+    // Fallback: no hardcoded mapping, just show whatever the DB already has
+    return p.semester_description || "";
+  };
 
   const groupedSubjects = Object.entries(groupedDetails).map(
     ([key, courses]) => ({
@@ -671,21 +865,6 @@ const TranscriptOfRecords = () => {
 
   const paginatedSubjects = chunkArray(groupedSubjects, MAX_SUBJECTS_PER_PAGE);
 
-  const formattedDate = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const todayDate = new Date().toLocaleDateString("en-US", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-
   const divToPrintRef = useRef();
 
   const printDiv = () => {
@@ -700,9 +879,7 @@ const TranscriptOfRecords = () => {
     const firstLine = words.slice(0, middle).join(" ");
     const secondLine = words.slice(middle).join(" ");
 
-    const studentName = studentData && studentData.last_name
-      ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()}`
-      : "";
+    const studentName = formatStudentFullName(studentData);
 
     const admissionCredentials = Array.isArray(studentData?.requirements)
       ? studentData.requirements
@@ -715,6 +892,12 @@ const TranscriptOfRecords = () => {
         )
         .join("/")
       : "";
+
+    const dateIssuedDisplay = new Date().toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
 
     const degreeTitle = studentData?.program_description
       ? studentData.program_description.toUpperCase()
@@ -734,8 +917,8 @@ const TranscriptOfRecords = () => {
       <div style="text-align:center;">
         <div style="font-family:Arial, sans-serif; font-size:13px;">Republic of the Philippines</div>
         ${name ? `
-          <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Times New Roman', serif;">${firstLine}</div>
-          ${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Times New Roman', serif;">${secondLine}</div>` : ""}
+          <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:'uppercase'; ">${firstLine}</div>
+          ${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial; text-transform:'uppercase';">${secondLine}</div>` : ""}
         ` : ""}
         <div style="font-family:Arial, sans-serif; font-size:13px;">${campusAddress || ""}</div>
       </div>
@@ -768,11 +951,11 @@ const TranscriptOfRecords = () => {
         ${infoRow("DATE OF BIRTH", formattedDate(studentData.birthOfDate))}
         ${infoRow("ADMISSION CREDENTIALS", admissionCredentials)}
         ${infoRow("LAST SCHOOL ATTENDED", studentData.schoolLastAttended1)}
-        ${infoRow("DATE GRADUATED", studentData.yearGraduated1)}
+        ${infoRow("DATE GRADUATED", formatYearGraduatedRange(studentData.yearGraduated1))}
         ${infoRow("STUDENT NUMBER", studentData.student_number)}
         ${infoRow("DEGREE/TITLE EARNED", degreeTitle)}
         ${infoRow("MAJOR", major)}
-        ${infoRow("DATE OF GRADUATION", "")}
+     ${infoRow("DATE OF GRADUATION", dateIssuedDisplay)}
       </div>
       <div style="flex:0 0 225px; margin-left:1rem;">
         ${photoSrc
@@ -829,8 +1012,7 @@ const TranscriptOfRecords = () => {
         <div style="display:flex; align-items:flex-start; line-height:22px;">
           <div style="width:13rem; display:flex; flex-direction:column; align-items:flex-start;">
             ${!group.isContinuation && index === 0 ? `
-              <span style="font-size:18px; text-align:center; width:13rem; font-weight:500;">${convertSemester(p.semester_description)}</span>
-              <span style="font-size:17px; text-align:center; width:13rem; font-weight:500;">${p.current_year} - ${p.next_year}</span>
+              <span style="font-size:18px; text-align:center; width:13rem; font-weight:500;">${convertSemester(p)}</span>              <span style="font-size:17px; text-align:center; width:13rem; font-weight:500;">${p.current_year} - ${p.next_year}</span>
             ` : ""}
           </div>
           <div style="display:flex; width:38rem; line-height:22px;">
@@ -852,14 +1034,14 @@ const TranscriptOfRecords = () => {
     const nothingFollowsHtml = isLastPage
       ? `
       <div style="text-align:center; font-size:17px; font-weight:600; white-space:nowrap; overflow:hidden;">
-        <span style="font-size:14px;">${(shortTerm || "").toLowerCase().repeat(13)} xxx</span>
-        &nbsp;NOTHING FOLLOWS&nbsp;
-        <span style="font-size:14px;">xxx ${(shortTerm || "").toLowerCase().repeat(13)}</span>
+      <span style="font-size:14px;">${repeatShortTermWithSpaces(shortTerm)} xxx</span>
+&nbsp;NOTHING FOLLOWS&nbsp;
+<span style="font-size:14px;">xxx ${repeatShortTermWithSpaces(shortTerm)}</span>
       </div>
     `
       : `
       <div style="text-align:center; border-top:dashed 1px black; font-size:17px; font-weight:600;">
-        - continue on next page -
+        - continued on next page -
       </div>
     `;
 
@@ -872,24 +1054,25 @@ const TranscriptOfRecords = () => {
     </div>
   `;
 
-    // ── Footer: grading system + credits note + remarks + signatures ──
-    const gradeCol = (rows) => `
-    <div style="display:flex; flex-direction:column; align-items:flex-start;">
-      ${rows.map((r) => `<div style="font-size:16px; letter-spacing:-1px;">${r}</div>`).join("")}
-    </div>
-  `;
+    const gradeCol = (rows, width) => `
+  <div style="display:flex; flex-direction:column; align-items:flex-start; width:${width};">
+    ${rows.map((r) => `<div style="font-size:16px; letter-spacing:-1px;">${r}</div>`).join("")}
+  </div>
+`;
 
     const gradingSystemHtml = `
-    <div style="display:flex; height:145px; border-top:solid 1px black; font-size:18px; align-items:flex-start; padding-top:3px;">
-      <div style="width:13rem;">GRADING SYSTEM</div>
-      ${gradeCol(["1.00", "1.25", "1.50", "1.75", "2.00", "2.25"])}
-      ${gradeCol(["(97-100)", "(94-96)", "(91-93)", "(88-90)", "(85-87)", "(82-84)"])}
-      ${gradeCol(["Marked Excellence", "Excellent", "Very Superior", "Superior", "Very Good", "Good"])}
-      ${gradeCol(["2.50", "2.75", "3.00", "5.00", "INC", "DRP"])}
-      ${gradeCol(["(79-81)", "(76-78)", "(75)", "(Below 75)", "(Incomplete)", "(Dropped Officially/Unofficially)"])}
-      ${gradeCol(["Satisfactory", "Fair", "Passed", "Failed", "Incomplete", "Dropped"])}
-    </div>
-  `;
+  <div style="display:flex; height:145px; border-top:solid 1px black; font-size:18px; align-items:flex-start; padding-top:3px;">
+    <div style="width:13rem;">GRADING SYSTEM</div>
+    ${gradeCol(gradingSystemFirstHalf.map((r) => r.grade), "4.5rem")}
+    ${gradeCol(gradingSystemFirstHalf.map((r) => (r.score ? `(${r.score})` : "")), "6.5rem")}
+    ${gradeCol(gradingSystemFirstHalf.map((r) => r.description), "15.5rem")}
+    ${gradeCol(gradingSystemSecondHalf.map((r) => r.grade), "4.5rem")}
+    ${gradeCol(gradingSystemSecondHalf.map((r) => (r.score ? `(${r.score})` : "")), "14rem")}
+    ${gradeCol(gradingSystemSecondHalf.map((r) => r.description), "22rem")}
+  </div>
+`;
+
+    const pageRemarksText = getPageRemarksText(isLastPage, degreeTitle);
 
     const creditsNoteHtml = `
     <div style="padding-left:2rem; height:35px; border-bottom:solid 1px black; font-size:18px; display:flex; align-items:center;">
@@ -899,11 +1082,12 @@ const TranscriptOfRecords = () => {
       <span style="font-size:18px; letter-spacing:-0.8px;">${(companyName || "").toUpperCase()}</span>
       <span style="letter-spacing:-0.8px;"> is a State College; hence, a SPECIAL ORDER is not issued to its graduates. The issuance of the Official Transcript of Records and Diploma is a sufficient proof for Graduation.</span>
     </div>
-    <div style="padding-left:1rem; height:65px; border-top:solid 1px black; border-bottom:solid 1px black; font-size:18px; font-weight:600; padding-top:8px;">
-      REMARKS:
+    <div style="padding-left:1rem; height:65px; border-top:solid 1px black; border-bottom:solid 1px black; font-size:18px; padding-top:8px;">
+      <span style="font-weight:600;">REMARKS: </span>
+      <span style="font-weight:400;">${pageRemarksText}</span>
     </div>
     <div style="padding-left:1rem; height:35px; font-size:18px; padding-top:3px;">
-      <span>DATE ISSUED: </span><span>${todayDate}</span>
+      <span>DATE ISSUED: </span><span>${dateIssuedDisplay}</span>
     </div>
   `;
 
@@ -1088,24 +1272,24 @@ const TranscriptOfRecords = () => {
   }
 
   // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
 
   return (
     <Box
@@ -1280,6 +1464,8 @@ const TranscriptOfRecords = () => {
         </Box>
       </Box>
 
+
+
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
 
@@ -1351,7 +1537,7 @@ const TranscriptOfRecords = () => {
                     padding: 0 !important;
                     min-height: 13.5in;
                     margin-left: -23.5%;
-                    font-family: "Poppins", sans-serif;
+                    font-family: "Arial";
                 }
                 .print-container:first-child {
                     page-break-after: auto;
@@ -1422,14 +1608,14 @@ const TranscriptOfRecords = () => {
                 sx={{
                   color: "white",
                   fontSize: "20px",
-                  fontFamily: "Poppins, sans-serif",
+                  fontFamily: "Arial",
                   border: "none",
                 }}
               >
                 Student Number:&nbsp;
                 <span
                   style={{
-                    fontFamily: "Poppins, sans-serif",
+                    fontFamily: "Arial",
                     fontWeight: "normal",
                     textDecoration: "underline",
                   }}
@@ -1444,21 +1630,19 @@ const TranscriptOfRecords = () => {
                 sx={{
                   color: "white",
                   fontSize: "20px",
-                  fontFamily: "Poppins, sans-serif",
+                  fontFamily: "Arial",
                   border: "none",
                 }}
               >
                 Student Name:&nbsp;
                 <span
                   style={{
-                    fontFamily: "Poppins, sans-serif",
+                    fontFamily: "Arial",
                     fontWeight: "normal",
                     textDecoration: "underline",
                   }}
                 >
-                  {studentData && studentData.last_name
-                    ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()} ${studentData.middle_name?.toUpperCase() || ""}`
-                    : "N/A"}
+                  {formatStudentFullName(studentData)}
                 </span>
               </TableCell>
             </TableRow>
@@ -1668,7 +1852,7 @@ const TranscriptOfRecords = () => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  {["#", "Full Name", "Designation", "Prepared By", "Checked By", "Registrar"].map((header) => (
+                  {["#", "Full Name", "Designation", "Prepared By", "Checked By", "Registrar", "Date of Graduation", "Actions"].map((header) => (
                     <TableCell
                       key={header}
                       sx={{
@@ -1685,7 +1869,6 @@ const TranscriptOfRecords = () => {
                   ))}
                 </TableRow>
               </TableHead>
-
               <TableBody>
                 {paginatedSignatures.map((signature, index) => (
                   <TableRow key={signature.id}>
@@ -1716,6 +1899,7 @@ const TranscriptOfRecords = () => {
                     <TableCell
                       sx={{
                         border: `1px solid ${borderColor}`,
+                        textAlign: "center",
                         color: titleColor,
                         fontSize: "12px",
                         padding: "4px 8px",
@@ -1774,13 +1958,117 @@ const TranscriptOfRecords = () => {
                         disabled={isSignatureSelectedForAnotherRole(signature, "registrar")}
                       />
                     </TableCell>
+
+                    {/* Global, page-level control — rendered once and vertically
+                        centered across every row via rowSpan, not per signature */}
+                    {index === 0 && (
+                      <TableCell
+                        rowSpan={paginatedSignatures.length}
+                        sx={{
+                          border: `1px solid ${borderColor}`,
+                          textAlign: "center",
+                          verticalAlign: "middle",
+                          color: titleColor,
+                          padding: "4px 6px",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            width: "100%",
+                          }}
+                        >
+                          <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <Box sx={{ width: 190 }}>
+                              <DateField
+                                label="Date of Graduation"
+                                value={graduationDate}
+                                onChange={handleGraduationDateChange}
+                                slotProps={{ textField: { size: "small", fullWidth: true } }}
+                              />
+                            </Box>
+                          </LocalizationProvider>
+                        </Box>
+                      </TableCell>
+                    )}
+
+                    {index === 0 && (
+                      <TableCell
+                        rowSpan={paginatedSignatures.length}
+                        sx={{
+                          border: `1px solid ${borderColor}`,
+                          textAlign: "center",
+                          verticalAlign: "middle",
+                          color: titleColor,
+                          padding: "4px 6px",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 1,
+                            width: "100%",
+                          }}
+                        >
+                          <button
+                            onClick={openRemarksDialog}
+                            style={{
+                              padding: "8px 16px",
+                              cursor: "pointer",
+                              fontWeight: "bold",
+                              backgroundColor: "#ffffff",
+                              color: "#1976d2",
+                              border: "2px solid #1976d2",
+                              borderRadius: "5px",
+                              height: "40px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              margin: "0 auto",
+                              width: "100%",
+                            }}
+                            type="button"
+                          >
+                            <EditNoteIcon fontSize="small" />
+                            Edit Remarks
+                          </button>
+                          <button
+                            onClick={openGradingSystemDialog}
+                            style={{
+                              padding: "8px 16px",
+                              cursor: "pointer",
+                              fontWeight: "bold",
+                              backgroundColor: "#ffffff",
+                              color: "#2e7d32",
+                              border: "2px solid #2e7d32",
+                              borderRadius: "5px",
+                              height: "40px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              margin: "0 auto",
+                              width: "100%",
+                            }}
+                            type="button"
+                          >
+                            <RuleIcon fontSize="small" />
+                            Edit Grading System
+                          </button>
+                        </Box>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
 
                 {paginatedSignatures.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={8}
                       align="center"
                       sx={{
                         border: `1px solid ${borderColor}`,
@@ -2014,8 +2302,8 @@ const TranscriptOfRecords = () => {
                     src={fetchedLogo || EaristLogo} // use dynamic logo if available
                     alt="Logo"
                     style={{
-                      width: "8rem",
-                      height: "8rem",
+                      width: "120px",
+                      height: "120px",
                       borderRadius: "50%",
                     }}
                   />
@@ -2040,7 +2328,8 @@ const TranscriptOfRecords = () => {
                               fontSize: "1.6rem",
                               letterSpacing: "-1px",
                               fontWeight: "600",
-                              fontFamily: "Times new roman",
+                              fontFamily: "Arial",
+                              textTransform: "uppercase"
                             }}
                           >
                             {firstLine}
@@ -2052,7 +2341,8 @@ const TranscriptOfRecords = () => {
                                 fontSize: "1.6rem",
                                 letterSpacing: "-1px",
                                 fontWeight: "600",
-                                fontFamily: "Times new roman",
+                                fontFamily: "Arial",
+                                  textTransform: "uppercase"
                               }}
                             >
                               {secondLine}
@@ -2112,7 +2402,7 @@ const TranscriptOfRecords = () => {
                       }}
                     >
                       <Box>
-                        <Box style={{ display: "flex", width: "40rem" }}>
+                        <Box style={{ display: "flex", width: "70rem" }}>
                           <Typography
                             style={{
                               width: "20rem",
@@ -2135,9 +2425,7 @@ const TranscriptOfRecords = () => {
                               height: "36px",
                             }}
                           >
-                            {studentData && studentData.last_name
-                              ? `${studentData.last_name?.toUpperCase()}, ${studentData.first_name?.toUpperCase()}`
-                              : ""}
+                            {formatStudentFullName(studentData)}
                           </Typography>
                         </Box>
                         <Box style={{ display: "flex", marginTop: "-6px" }}>
@@ -2203,21 +2491,7 @@ const TranscriptOfRecords = () => {
                                 wordSpacing: "1px",
                               }}
                             >
-                              {studentData.requirements
-                                .map((reqId) =>
-                                  reqId === 0
-                                    ? "No Document"
-                                    : reqId === 1
-                                      ? "F138"
-                                      : reqId === 2
-                                        ? "Certificate Of Good Moral Character"
-                                        : reqId === 3
-                                          ? "NSO Birth Certificate"
-                                          : reqId === 4
-                                            ? "F137"
-                                            : "",
-                                )
-                                .join("/")}
+                              CERT. OF GOOD MORAL CHARACTER / F138 / F137 / PSA BIRTH CERT.
                             </Typography>
                           )}
                         </Box>
@@ -2278,8 +2552,8 @@ const TranscriptOfRecords = () => {
                               wordSpacing: "5px",
                             }}
                           >
-                            
-                            {studentData.yearGraduated1}
+
+                            {formatYearGraduatedRange(studentData.yearGraduated1)}
                           </Typography>
                         </Box>
                       </Box>
@@ -2407,7 +2681,9 @@ const TranscriptOfRecords = () => {
                               letterSpacing: "-1.5px",
                               wordSpacing: "5px",
                             }}
-                          ></Typography>
+                          >
+                            {formattedGraduationDate}
+                          </Typography>
                         </Box>
                       </Box>
                     </Box>
@@ -2671,9 +2947,7 @@ const TranscriptOfRecords = () => {
                                                 lineHeight: compactTermLabel ? "18px" : "22px",
                                               }}
                                             >
-                                              {convertSemester(
-                                                p.semester_description,
-                                              )}
+                                              {convertSemester(p)}
                                             </span>
                                             <span
                                               style={{
@@ -2864,23 +3138,13 @@ const TranscriptOfRecords = () => {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  <span
-                                    style={{
-                                      fontSize: "14px",
-                                      marginRight: "2px",
-                                    }}
-                                  >
-                                    {shortTerm?.toLowerCase().repeat(13)} xxx{" "}
+                                  <span style={{ fontSize: "14px", marginRight: "2px" }}>
+                                    {repeatShortTermWithSpaces(shortTerm)} xxx{" "}
                                   </span>
                                   NOTHING FOLLOWS
-                                  <span
-                                    style={{
-                                      fontSize: "14px",
-                                      marginLeft: "2px",
-                                    }}
-                                  >
+                                  <span style={{ fontSize: "14px", marginLeft: "2px" }}>
                                     {" "}
-                                    xxx {shortTerm?.toLowerCase().repeat(13)}
+                                    xxx {repeatShortTermWithSpaces(shortTerm)}
                                   </span>
                                 </span>
                               </td>
@@ -2900,7 +3164,7 @@ const TranscriptOfRecords = () => {
                                     fontWeight: "600",
                                   }}
                                 >
-                                  - continue on next page -
+                                  - continued on next page -
                                 </span>
                               </td>
                             )}
@@ -2958,67 +3222,20 @@ const TranscriptOfRecords = () => {
                                 width: "4.5rem",
                               }}
                             >
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "0px",
-                                  paddingTop: "3px",
-                                }}
-                              >
-                                1.00
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "0px",
-                                }}
-                              >
-                                1.25
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "0px",
-                                }}
-                              >
-                                1.50
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "0px",
-                                }}
-                              >
-                                1.75
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                2.00
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                2.25
-                              </div>
+                              {gradingSystemFirstHalf.map((row, i) => (
+                                <div
+                                  key={`gs-grade-1-${i}`}
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "0px",
+                                    paddingTop: i === 0 ? "3px" : 0,
+                                  }}
+                                >
+                                  {row.grade}
+                                </div>
+                              ))}
                             </td>
                             <td
                               style={{
@@ -3028,67 +3245,20 @@ const TranscriptOfRecords = () => {
                                 width: "6.5rem",
                               }}
                             >
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                  paddingTop: "3px",
-                                }}
-                              >
-                                (97-100)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                (94-96)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                (91-93)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                (88-90)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                (85-87)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                (82-84)
-                              </div>
+                              {gradingSystemFirstHalf.map((row, i) => (
+                                <div
+                                  key={`gs-score-1-${i}`}
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                    paddingTop: i === 0 ? "3px" : 0,
+                                  }}
+                                >
+                                  {row.score ? `(${row.score})` : ""}
+                                </div>
+                              ))}
                             </td>
                             <td
                               style={{
@@ -3098,67 +3268,20 @@ const TranscriptOfRecords = () => {
                                 width: "15.5rem",
                               }}
                             >
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                  paddingTop: "3px",
-                                }}
-                              >
-                                Marked Excellence
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Excellent
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Very Superior
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Superior
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Very Good
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Good
-                              </div>
+                              {gradingSystemFirstHalf.map((row, i) => (
+                                <div
+                                  key={`gs-desc-1-${i}`}
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                    paddingTop: i === 0 ? "3px" : 0,
+                                  }}
+                                >
+                                  {row.description}
+                                </div>
+                              ))}
                             </td>
                             <td
                               style={{
@@ -3168,67 +3291,20 @@ const TranscriptOfRecords = () => {
                                 width: "4.5rem",
                               }}
                             >
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                  paddingTop: "3px",
-                                }}
-                              >
-                                2.50
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                2.75
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                3.00
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                5.00
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                INC
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                DRP
-                              </div>
+                              {gradingSystemSecondHalf.map((row, i) => (
+                                <div
+                                  key={`gs-grade-2-${i}`}
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                    paddingTop: i === 0 ? "3px" : 0,
+                                  }}
+                                >
+                                  {row.grade}
+                                </div>
+                              ))}
                             </td>
                             <td
                               style={{
@@ -3238,67 +3314,20 @@ const TranscriptOfRecords = () => {
                                 width: "14rem",
                               }}
                             >
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                  paddingTop: "3px",
-                                }}
-                              >
-                                (79-81)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                (76-78)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-2px",
-                                }}
-                              >
-                                (75)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1.5px",
-                                }}
-                              >
-                                (Below 75)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1.5px",
-                                }}
-                              >
-                                (Incomplete)
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1.5px",
-                                }}
-                              >
-                                (Dropped Officially/Unofficialy)
-                              </div>
+                              {gradingSystemSecondHalf.map((row, i) => (
+                                <div
+                                  key={`gs-score-2-${i}`}
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-2px",
+                                    paddingTop: i === 0 ? "3px" : 0,
+                                  }}
+                                >
+                                  {row.score ? `(${row.score})` : ""}
+                                </div>
+                              ))}
                             </td>
                             <td
                               style={{
@@ -3308,67 +3337,20 @@ const TranscriptOfRecords = () => {
                                 width: "22rem",
                               }}
                             >
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                  paddingTop: "3px",
-                                }}
-                              >
-                                Satisfactory
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Fair
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Passed
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Failed
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Incomplete
-                              </div>
-                              <div
-                                style={{
-                                  margin: "-1px",
-                                  fontWeight: "400",
-                                  fontSize: "16px",
-                                  letterSpacing: "-1px",
-                                }}
-                              >
-                                Dropped
-                              </div>
+                              {gradingSystemSecondHalf.map((row, i) => (
+                                <div
+                                  key={`gs-desc-2-${i}`}
+                                  style={{
+                                    margin: "-1px",
+                                    fontWeight: "400",
+                                    fontSize: "16px",
+                                    letterSpacing: "-1px",
+                                    paddingTop: i === 0 ? "3px" : 0,
+                                  }}
+                                >
+                                  {row.description}
+                                </div>
+                              ))}
                             </td>
                           </tr>
                           <tr
@@ -3432,6 +3414,7 @@ const TranscriptOfRecords = () => {
                               height: "65px",
                               borderTop: "solid 1px black",
                               borderBottom: "solid 1px black",
+                              alignItems: "center",
                             }}
                           >
                             <td style={{ marginTop: "8px" }}>
@@ -3445,6 +3428,14 @@ const TranscriptOfRecords = () => {
                                 }}
                               >
                                 REMARKS:
+                              </span>
+                              <span style={{ fontSize: "18px", fontWeight: "400", letterSpacing: "-0.5px" }}>
+                                {getPageRemarksText(
+                                  pageIndex === paginatedSubjects.length - 1,
+                                  studentData?.program_description
+                                    ? studentData.program_description.toUpperCase()
+                                    : "",
+                                )}
                               </span>
                             </td>
                           </tr>
@@ -3475,7 +3466,7 @@ const TranscriptOfRecords = () => {
                                   wordSpacing: "3px",
                                 }}
                               >
-                                {todayDate}
+                                {dateIssuedDisplay}
                               </span>
                             </td>
                           </tr>
@@ -3641,6 +3632,192 @@ const TranscriptOfRecords = () => {
           ))}
         </Box>
       </Box>
+
+      <Dialog open={remarksDialogOpen} onClose={closeRemarksDialog} maxWidth="sm" fullWidth>
+        <DialogTitle
+          sx={{
+            bgcolor: mainButtonColor || "#1976d2",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          📝 Edit Remarks
+          <IconButton
+            onClick={closeRemarksDialog}
+            sx={{
+              color: "white",
+              border: "2px solid rgba(255,255,255,0.6)",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              padding: 0,
+              "&:hover": { backgroundColor: "rgba(255,255,255,0.2)", border: "2px solid white" },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This text appears in the REMARKS field on every page of the Transcript
+            of Records, except the last page — which automatically shows the
+            graduation remark based on the Date of Graduation you set above.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            label="Remarks"
+            value={remarksDraft}
+            onChange={(e) => setRemarksDraft(e.target.value)}
+          />
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button onClick={closeRemarksDialog} color="error" variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveRemarks} variant="contained" color="success">
+            Save Remarks
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={gradingSystemDialogOpen}
+        onClose={closeGradingSystemDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: "#2e7d32",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          📊 Edit Grading System
+          <IconButton
+            onClick={closeGradingSystemDialog}
+            sx={{
+              color: "white",
+              border: "2px solid rgba(255,255,255,0.6)",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              padding: 0,
+              "&:hover": { backgroundColor: "rgba(255,255,255,0.2)", border: "2px solid white" },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            These rows populate the GRADING SYSTEM block printed on every page of
+            the Transcript of Records. "Score Range" is shown in parentheses next
+            to each grade (e.g. entering 97-100 prints as (97-100)).
+          </Typography>
+
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600, width: "18%" }}>Grade</TableCell>
+                  <TableCell sx={{ fontWeight: 600, width: "27%" }}>Score Range</TableCell>
+                  <TableCell sx={{ fontWeight: 600, width: "45%" }}>Description</TableCell>
+                  <TableCell sx={{ fontWeight: 600, width: "10%" }} align="center">
+                    Remove
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {gradingSystemDraft.map((row, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.grade}
+                        onChange={(e) =>
+                          handleGradingSystemDraftChange(index, "grade", e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        placeholder="e.g. 97-100"
+                        value={row.score}
+                        onChange={(e) =>
+                          handleGradingSystemDraftChange(index, "score", e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.description}
+                        onChange={(e) =>
+                          handleGradingSystemDraftChange(index, "description", e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleRemoveGradingSystemRow(index)}
+                      >
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {gradingSystemDraft.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ color: "text.secondary" }}>
+                      No grading system rows yet. Click "Add Row" to start.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
+            <Button
+              onClick={handleAddGradingSystemRow}
+              startIcon={<AddIcon />}
+              variant="outlined"
+              size="small"
+            >
+              Add Row
+            </Button>
+            <Button onClick={handleResetGradingSystem} variant="text" size="small">
+              Reset to Default
+            </Button>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button onClick={closeGradingSystemDialog} color="error" variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveGradingSystem} variant="contained" color="success">
+            Save Grading System
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={openSnackbar}
         autoHideDuration={4000}

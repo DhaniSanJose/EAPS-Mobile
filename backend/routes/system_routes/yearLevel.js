@@ -58,7 +58,7 @@ router.get("/year-levels", async (req, res) => {
 });
 
 router.post("/years_level", CanCreate, async (req, res) => {
-  const { year_level_description, level_type } = req.body;
+  const { year_level_description, level_type, ordinal_label } = req.body;
 
   if (!year_level_description) {
     return res
@@ -67,12 +67,13 @@ router.post("/years_level", CanCreate, async (req, res) => {
   }
 
   const query =
-    "INSERT INTO year_level_table (year_level_description, level_type) VALUES (?, ?)";
+    "INSERT INTO year_level_table (year_level_description, level_type, ordinal_label) VALUES (?, ?, ?)";
 
   try {
     const [result] = await db3.query(query, [
       year_level_description,
       level_type || "year",
+      ordinal_label || null,
     ]);
 
     const { actorId, roleLabel } = getActorLabel(req);
@@ -86,6 +87,7 @@ router.post("/years_level", CanCreate, async (req, res) => {
       year_level_id: result.insertId,
       year_level_description,
       level_type,
+      ordinal_label,
     });
   } catch (err) {
     console.error("Insert error:", err);
@@ -95,7 +97,7 @@ router.post("/years_level", CanCreate, async (req, res) => {
 
 router.put("/years_level/:id", CanEdit, async (req, res) => {
   const { id } = req.params;
-  const { year_level_description, level_type } = req.body;
+  const { year_level_description, level_type, ordinal_label } = req.body;
 
   if (!year_level_description) {
     return res.status(400).json({ error: "Description is required" });
@@ -104,9 +106,9 @@ router.put("/years_level/:id", CanEdit, async (req, res) => {
   try {
     const [result] = await db3.query(
       `UPDATE year_level_table 
-       SET year_level_description = ?, level_type = ? 
+       SET year_level_description = ?, level_type = ?, ordinal_label = ? 
        WHERE year_level_id = ?`,
-      [year_level_description, level_type, id]
+      [year_level_description, level_type, ordinal_label || null, id]
     );
 
     if (result.affectedRows === 0) {

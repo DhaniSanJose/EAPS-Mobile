@@ -282,10 +282,18 @@ router.get("/courses/:currId", async (req, res) => {
       c.lec_unit,
       c.lab_unit,
       c.prereq,
-      c.corequisite
+      c.corequisite,
+      c.subject_type_id,
+      st.subject_type_name,
+      c.category_type_id,
+      cat.category_type_name
     FROM program_tagging_table ctt
     INNER JOIN course_table c
       ON c.course_id = ctt.course_id
+    LEFT JOIN subject_type_table st
+      ON st.subject_type_id = c.subject_type_id
+    LEFT JOIN category_type_table cat
+      ON cat.category_type_id = c.category_type_id
     WHERE ctt.curriculum_id = ?
     ORDER BY c.course_code
   `;
@@ -1814,7 +1822,7 @@ router.get("/search-student/:sectionId", async (req, res) => {
 
     const { curriculum_id } = programResult[0];
 
-    const [courses] = await db3.query(
+      const [courses] = await db3.query(
       `
   SELECT
     c.course_id,
@@ -1823,11 +1831,17 @@ router.get("/search-student/:sectionId", async (req, res) => {
     c.course_unit,
     c.lab_unit,
     c.prereq,
-    c.corequisite
+    c.corequisite,
+    c.subject_type_id,
+    st.subject_type_name,
+    c.category_type_id,
+    cat.category_type_name
   FROM curriculum_table ct
   INNER JOIN program_tagging_table ptt ON ct.curriculum_id = ptt.curriculum_id
   INNER JOIN program_table pt ON ct.program_id = pt.program_id
   INNER JOIN course_table c ON ptt.course_id = c.course_id
+  LEFT JOIN subject_type_table st ON st.subject_type_id = c.subject_type_id
+  LEFT JOIN category_type_table cat ON cat.category_type_id = c.category_type_id
   WHERE ct.curriculum_id = ?
   ORDER BY c.course_code
   `,

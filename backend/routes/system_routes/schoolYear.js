@@ -558,17 +558,18 @@ router.put("/year_table/:id", async (req, res) => {
   }
 });
 
+
 router.post("/semesters", async (req, res) => {
-  const { semester_description, semester_code } = req.body;
+  const { semester_description, semester_code, ordinal_label } = req.body;
 
   if (!semester_description || !semester_code) {
     return res.status(400).json({ error: "missing fields is required" });
   }
 
-  const query = "INSERT INTO semester_table (semester_description, semester_code) VALUES (?, ?)";
+  const query = "INSERT INTO semester_table (semester_description, semester_code, ordinal_label) VALUES (?, ?, ?)";
 
   try {
-    const [result] = await db3.query(query, [semester_description, semester_code]);
+    const [result] = await db3.query(query, [semester_description, semester_code, ordinal_label || null]);
     const { actorId, roleLabel } = getActorLabel(req);
     await insertSchoolYearAuditLog({
       req,
@@ -580,6 +581,7 @@ router.post("/semesters", async (req, res) => {
       semester_id: result.insertId,
       semester_description,
       semester_code,
+      ordinal_label,
     });
   } catch (err) {
     console.error("Insert error:", err);
@@ -588,7 +590,7 @@ router.post("/semesters", async (req, res) => {
 });
 
 router.put("/semesters/:id", async (req, res) => {
-  const { semester_description, semester_code } = req.body;
+  const { semester_description, semester_code, ordinal_label } = req.body;
   const { id } = req.params;
 
   if (!semester_description || !semester_code) {
@@ -597,7 +599,7 @@ router.put("/semesters/:id", async (req, res) => {
 
   const query = `
     UPDATE semester_table
-    SET semester_description = ?, semester_code = ?
+    SET semester_description = ?, semester_code = ?, ordinal_label = ?
     WHERE semester_id = ?
   `;
 
@@ -605,6 +607,7 @@ router.put("/semesters/:id", async (req, res) => {
     const [result] = await db3.query(query, [
       semester_description,
       semester_code,
+      ordinal_label || null,
       id,
     ]);
 
@@ -624,12 +627,14 @@ router.put("/semesters/:id", async (req, res) => {
       semester_id: Number(id),
       semester_description,
       semester_code,
+      ordinal_label,
     });
   } catch (err) {
     console.error("Update semester error:", err);
     res.status(500).json({ error: "Update failed", details: err.message });
   }
 });
+
 
 router.get("/get_semester", async (req, res) => {
   const query = "SELECT * FROM semester_table";

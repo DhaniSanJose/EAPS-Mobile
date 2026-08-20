@@ -171,7 +171,9 @@ const controlNumberRoute = require("./routes/forms/controlNumberRoute");
 const admissionContact = require("./routes/system_routes/admissionContact");
 const examAttendanceRoute = require("./routes/admission_routes/examAttendanceRoute");
 const admissionReportRoute = require("./routes/admission_routes/admissionReportRoute");
+const courseTypeRoutes = require("./routes/system_routes/courseTypeRoutes");
 
+app.use("/api", courseTypeRoutes);
 app.use("/api", admissionReportRoute);
 app.use("/api", examAttendanceRoute);
 app.use("/api", admissionContact);
