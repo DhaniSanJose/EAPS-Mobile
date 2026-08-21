@@ -2527,7 +2527,7 @@ router.post("/generate-tor-pdf", async (req, res) => {
     // @page { size: 215.9mm 330.2mm; } print rule.
     await page.setViewport({
       width: 816, // 215.9mm @ 96dpi
-      height: 1248, // 330.2mm @ 96dpi
+      height: 1344,
       deviceScaleFactor: 2,
     });
 
@@ -2557,7 +2557,7 @@ router.post("/generate-tor-pdf", async (req, res) => {
   <meta charset="UTF-8" />
   <style>
     @page {
-      size: 215.9mm 330.2mm;
+  size: 215.9mm 355.6mm;
       margin: 0;
     }
 
@@ -2576,7 +2576,7 @@ router.post("/generate-tor-pdf", async (req, res) => {
 
     .tor-page {
       width: 215.9mm;
-      height: 330.2mm;
+      height: 342.9mm;
       padding: 10mm 12mm;
       overflow: hidden;
       position: relative;
@@ -2634,10 +2634,15 @@ router.post("/generate-tor-pdf", async (req, res) => {
 
     const pdfBuffer = await page.pdf({
       width: "215.9mm",
-      height: "330.2mm",
+      height: "355.6mm",
       printBackground: true,
       preferCSSPageSize: false,
-      margin: { top: "0", bottom: "0", left: "0", right: "0" },
+      margin: {
+        top: "0.20in",
+        bottom: "0.20in",
+        left: "0",
+        right: "0"
+      },
     });
 
     if (!pdfBuffer || pdfBuffer.length === 0) {

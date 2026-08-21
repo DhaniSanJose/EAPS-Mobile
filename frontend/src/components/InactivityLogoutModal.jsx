@@ -36,9 +36,11 @@ export default function InactivityLogoutModal({
   isAuthenticatedPage,
   onLogout,
   accentColor = "#1976d2",
+  mainButtonColor,
   idleWarningTime = 20 * 60 * 1000, // time of silence before the warning dialog appears
   autoLogoutTime = 30 * 60 * 1000,  // total idle time before hard logout
 }) {
+  const primaryColor = mainButtonColor || accentColor;
   const [idleWarningOpen, setIdleWarningOpen] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -218,6 +220,7 @@ export default function InactivityLogoutModal({
           <Button
             fullWidth
             variant="outlined"
+            color="error"
             onClick={handleLogoutNow}
             sx={{
               height: 44,
@@ -225,8 +228,7 @@ export default function InactivityLogoutModal({
               textTransform: "none",
               fontWeight: 700,
               fontSize: 14,
-              borderColor: accentColor,
-              color: accentColor,
+
             }}
           >
             Logout Now
@@ -241,13 +243,13 @@ export default function InactivityLogoutModal({
             sx={{
               height: 44,
               borderRadius: "10px",
-              backgroundColor: accentColor,
+              backgroundColor: primaryColor,
               color: "#fff",
               fontWeight: 700,
               fontSize: 14,
               textTransform: "none",
               boxShadow: "none",
-              "&:hover": { backgroundColor: accentColor, opacity: 0.9, boxShadow: "none" },
+
             }}
           >
             Stay Logged In
@@ -336,13 +338,13 @@ export default function InactivityLogoutModal({
             sx={{
               height: 44,
               borderRadius: "10px",
-              backgroundColor: accentColor,
+              backgroundColor: primaryColor,
               color: "#fff",
               fontWeight: 700,
               fontSize: 14,
               textTransform: "none",
               boxShadow: "none",
-              "&:hover": { backgroundColor: accentColor, opacity: 0.9, boxShadow: "none" },
+
             }}
           >
             Back to Sign In

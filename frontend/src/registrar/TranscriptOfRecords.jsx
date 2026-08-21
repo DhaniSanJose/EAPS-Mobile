@@ -44,6 +44,12 @@ import { getFlatAuditHeaders } from "../utils/auditEvents";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RuleIcon from "@mui/icons-material/Rule";
+import BagongPilipinasLogo from "../assets/bagongpilipinas.png";
+import Ukas from "../assets/ukas.png";
+import Act from "../assets/act.png";
+import Iaf from "../assets/iaf.png";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import PhotoCaptureDialog from "../components/PhotoCaptureDialog";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -57,6 +63,50 @@ const formatSuggestionName = (student) =>
     cleanSuggestionValue(student?.middle_name),
     cleanSuggestionValue(student?.last_name),
   ].filter(Boolean).join(" ");
+
+
+const TOR_EDIT_OPTIONS = [
+  {
+    key: "capturePhoto",
+    label: "Capture Photo",
+    description: "Take a photo and save it as the student's profile image",
+    icon: <CameraAltIcon sx={{ fontSize: 32 }} />,
+    color: "#0277bd",
+    bg: "#e1f5fe",
+  },
+  {
+    key: "remarks",
+    label: "Edit Remarks",
+    description: "Note shown in the REMARKS field on every page",
+    icon: <EditNoteIcon sx={{ fontSize: 32 }} />,
+    color: "#1976d2",
+    bg: "#e3f2fd",
+  },
+  {
+    key: "admissionCredentials",
+    label: "Edit Admission Credentials",
+    description: "Text shown in the ADMISSION CREDENTIALS field",
+    icon: <EditNoteIcon sx={{ fontSize: 32 }} />,
+    color: "#c2410c",
+    bg: "#fff3e0",
+  },
+  {
+    key: "footerNotes",
+    label: "Edit Credits / Institution Note",
+    description: "Credits line and institution note in the footer",
+    icon: <EditNoteIcon sx={{ fontSize: 32 }} />,
+    color: "#6a1b9a",
+    bg: "#f3e5f5",
+  },
+  {
+    key: "gradingSystem",
+    label: "Edit Grading System",
+    description: "Grade, score range, and description rows",
+    icon: <RuleIcon sx={{ fontSize: 32 }} />,
+    color: "#2e7d32",
+    bg: "#e8f5e9",
+  },
+];
 
 const TranscriptOfRecords = () => {
   const settings = useContext(SettingsContext);
@@ -101,6 +151,58 @@ const TranscriptOfRecords = () => {
     if (branding.shortTerm) setShortTerm(branding.shortTerm);
     setBranches(settings?.branches || []);
   }, [settings]);
+
+
+
+  const [logoDataUris, setLogoDataUris] = useState({
+    bagongPilipinas: null,
+    school: null,
+    act: null,
+    ukas: null,
+    iaf: null,
+  });
+  const toDataUri = async (url) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.error("Failed to convert logo to data URI:", url, err);
+      return null;
+    }
+  };
+
+  // Bagong Pilipinas logo — bundled asset, only needs to run once
+  useEffect(() => {
+    (async () => {
+      const bp = await toDataUri(BagongPilipinasLogo);
+      setLogoDataUris((prev) => ({ ...prev, bagongPilipinas: bp }));
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const [actUri, ukasUri, iafUri] = await Promise.all([
+        toDataUri(Act),
+        toDataUri(Ukas),
+        toDataUri(Iaf),
+      ]);
+      setLogoDataUris((prev) => ({ ...prev, act: actUri, ukas: ukasUri, iaf: iafUri }));
+    })();
+  }, []);
+
+  // School logo — re-run if the dynamic settings logo changes
+  useEffect(() => {
+    (async () => {
+      const sl = await toDataUri(fetchedLogo || EaristLogo);
+      setLogoDataUris((prev) => ({ ...prev, school: sl }));
+    })();
+  }, [fetchedLogo]);
 
   const [person, setPerson] = useState({
     profile_img: "",
@@ -193,63 +295,198 @@ const TranscriptOfRecords = () => {
 
   const [campusAddress, setCampusAddress] = useState("");
   const [gradeConversion, setGradeConversions] = useState([]);
-  const REMARKS_STORAGE_KEY = "tor_remarks_note";
+
+  // ---- TOR settings (remarks / admission credentials / footer notes) ----
   const DEFAULT_REMARKS = "COPY FOR EMPLOYMENT PURPOSES ONLY.";
-  const GRADUATION_DATE_STORAGE_KEY = "tor_graduation_date";
-  const GRADING_SYSTEM_STORAGE_KEY = "tor_grading_system_rows";
+  const DEFAULT_ADMISSION_CREDENTIALS =
+    "CERT. OF GOOD MORAL CHARACTER / F138 / F137 / PSA BIRTH CERT.";
+  const DEFAULT_CREDITS_NOTE =
+    "CREDITS, One college units is at least (17) full hours of instruction in academic or professional subject within a semester.";
+  const DEFAULT_INSTITUTION_NOTE =
+    "is a State College; hence, a SPECIAL ORDER is not issued to its graduates. The issuance of the Official Transcript of Records and Diploma is a sufficient proof for Graduation.";
 
-  const DEFAULT_GRADING_SYSTEM_ROWS = [
-    { grade: "1.00", score: "97-100", description: "Marked Excellence" },
-    { grade: "1.25", score: "94-96", description: "Excellent" },
-    { grade: "1.50", score: "91-93", description: "Very Superior" },
-    { grade: "1.75", score: "88-90", description: "Superior" },
-    { grade: "2.00", score: "85-87", description: "Very Good" },
-    { grade: "2.25", score: "82-84", description: "Good" },
-    { grade: "2.50", score: "79-81", description: "Satisfactory" },
-    { grade: "2.75", score: "76-78", description: "Fair" },
-    { grade: "3.00", score: "75", description: "Passed" },
-    { grade: "5.00", score: "Below 75", description: "Failed" },
-    { grade: "INC", score: "Incomplete", description: "Incomplete" },
-    { grade: "DRP", score: "Dropped Officially/Unofficially", description: "Dropped" },
-  ];
-
-  const [remarks, setRemarks] = useState(() => {
-    try {
-      const stored = localStorage.getItem(REMARKS_STORAGE_KEY);
-      if (stored) return stored;
-    } catch (err) {
-      console.error("Failed to load saved remarks:", err);
-    }
-    return DEFAULT_REMARKS;
-  });
-
-
-  const formatStudentFullName = (student) => {
-    if (!student || !student.last_name) return "";
-    const last = (student.last_name || "").toUpperCase();
-    const first = (student.first_name || "").toUpperCase();
-    const middle = (student.middle_name || "").toUpperCase();
-    const ext = (student.extension || "").toUpperCase();
-    const givenPart = [first, middle].filter(Boolean).join(" ");
-    return ext ? `${last}, ${givenPart} ${ext}` : `${last}, ${givenPart}`;
-  };
-
-  const formatYearGraduatedRange = (year) => {
-    if (!year) return "";
-    const startYear = parseInt(year, 10);
-    if (Number.isNaN(startYear)) return year;
-    return `${startYear} - ${startYear + 1}`;
-  };
-
-  const repeatShortTermWithSpaces = (term, count = 13) => {
-    const safeTerm = (term || "").toLowerCase();
-    if (!safeTerm) return "";
-    return Array(count).fill(safeTerm).join(" ");
-  };
+  const [remarks, setRemarks] = useState(DEFAULT_REMARKS);
+  const [admissionCredentialsNote, setAdmissionCredentialsNote] = useState(DEFAULT_ADMISSION_CREDENTIALS);
+  const [creditsNote, setCreditsNote] = useState(DEFAULT_CREDITS_NOTE);
+  const [institutionNote, setInstitutionNote] = useState(DEFAULT_INSTITUTION_NOTE);
+  const [institutionWebsite, setInstitutionWebsite] = useState("");
 
   const [remarksDialogOpen, setRemarksDialogOpen] = useState(false);
   const [remarksDraft, setRemarksDraft] = useState("");
+  const [admissionCredentialsDialogOpen, setAdmissionCredentialsDialogOpen] = useState(false);
+  const [admissionCredentialsDraft, setAdmissionCredentialsDraft] = useState("");
+  const [footerNotesDialogOpen, setFooterNotesDialogOpen] = useState(false);
+  const [creditsNoteDraft, setCreditsNoteDraft] = useState("");
+  const [institutionNoteDraft, setInstitutionNoteDraft] = useState("");
 
+  const fetchTorSettings = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/tor-settings`);
+      const data = res.data?.data;
+      if (data) {
+        setRemarks(data.remarks || DEFAULT_REMARKS);
+        setAdmissionCredentialsNote(data.admission_credentials || DEFAULT_ADMISSION_CREDENTIALS);
+        setCreditsNote(data.credits_note || DEFAULT_CREDITS_NOTE);
+        setInstitutionNote(data.institution_note || DEFAULT_INSTITUTION_NOTE);
+        setInstitutionWebsite(data.institution_website || "");
+      }
+    } catch (err) {
+      console.error("Failed to fetch TOR settings:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTorSettings();
+  }, []);
+
+  // Shared saver — always sends the full row so a save from one dialog
+  // never blanks out the fields owned by the other two dialogs.
+  const saveTorSettings = async (overrides) => {
+    const payload = {
+      remarks,
+      admission_credentials: admissionCredentialsNote,
+      credits_note: creditsNote,
+      institution_note: institutionNote,
+      institution_website: institutionWebsite,
+      ...overrides,
+    };
+    await axios.put(`${API_BASE_URL}/api/tor-settings`, payload);
+  };
+
+  const openRemarksDialog = () => {
+    setRemarksDraft(remarks);
+    setRemarksDialogOpen(true);
+  };
+  const closeRemarksDialog = () => setRemarksDialogOpen(false);
+  const handleSaveRemarks = async () => {
+    const cleaned = remarksDraft.trim() || DEFAULT_REMARKS;
+    try {
+      await saveTorSettings({ remarks: cleaned });
+      setRemarks(cleaned);
+    } catch (err) {
+      console.error("Failed to save remarks:", err);
+      setSnackbarMessage("Failed to save remarks.");
+      setOpenSnackbar(true);
+      return;
+    }
+    setRemarksDialogOpen(false);
+  };
+
+  const openAdmissionCredentialsDialog = () => {
+    setAdmissionCredentialsDraft(admissionCredentialsNote);
+    setAdmissionCredentialsDialogOpen(true);
+  };
+  const closeAdmissionCredentialsDialog = () => setAdmissionCredentialsDialogOpen(false);
+  const handleSaveAdmissionCredentials = async () => {
+    const cleaned = admissionCredentialsDraft.trim() || DEFAULT_ADMISSION_CREDENTIALS;
+    try {
+      await saveTorSettings({ admission_credentials: cleaned });
+      setAdmissionCredentialsNote(cleaned);
+    } catch (err) {
+      console.error("Failed to save admission credentials:", err);
+      setSnackbarMessage("Failed to save admission credentials.");
+      setOpenSnackbar(true);
+      return;
+    }
+    setAdmissionCredentialsDialogOpen(false);
+  };
+
+  const openFooterNotesDialog = () => {
+    setCreditsNoteDraft(creditsNote);
+    setInstitutionNoteDraft(institutionNote);
+    setFooterNotesDialogOpen(true);
+  };
+  const closeFooterNotesDialog = () => setFooterNotesDialogOpen(false);
+  const handleSaveFooterNotes = async () => {
+    const cleanedCredits = creditsNoteDraft.trim() || DEFAULT_CREDITS_NOTE;
+    const cleanedInstitution = institutionNoteDraft.trim() || DEFAULT_INSTITUTION_NOTE;
+    try {
+      await saveTorSettings({
+        credits_note: cleanedCredits,
+        institution_note: cleanedInstitution,
+      });
+      setCreditsNote(cleanedCredits);
+      setInstitutionNote(cleanedInstitution);
+    } catch (err) {
+      console.error("Failed to save footer notes:", err);
+      setSnackbarMessage("Failed to save footer notes.");
+      setOpenSnackbar(true);
+      return;
+    }
+    setFooterNotesDialogOpen(false);
+  };
+
+  // ---- Grading system: toggle visibility of existing grade_conversion rows ----
+  const [gradingSystemRows, setGradingSystemRows] = useState([]); // rows currently shown on the TOR
+  const [gradingSystemDialogOpen, setGradingSystemDialogOpen] = useState(false);
+  const [gradingSystemDraft, setGradingSystemDraft] = useState([]); // full list + checked state, dialog-only
+
+  const fetchTorGradingSystem = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/tor-grading-system`);
+      setGradingSystemRows(res.data?.data || []);
+    } catch (err) {
+      console.error("Failed to fetch TOR grading system:", err);
+      setGradingSystemRows([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchTorGradingSystem();
+  }, []);
+
+  const openGradingSystemDialog = () => {
+    const shownIds = new Set(gradingSystemRows.map((r) => r.id));
+    setGradingSystemDraft(
+      gradeConversion.map((row) => ({ ...row, show_on_tor: shownIds.has(row.id) })),
+    );
+    setGradingSystemDialogOpen(true);
+  };
+  const closeGradingSystemDialog = () => setGradingSystemDialogOpen(false);
+
+  const handleToggleGradingSystemRow = (id) => {
+    setGradingSystemDraft((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, show_on_tor: !row.show_on_tor } : row)),
+    );
+  };
+
+  const handleSaveGradingSystem = async () => {
+    const shownIds = new Set(gradingSystemRows.map((r) => r.id));
+    const changedRows = gradingSystemDraft.filter(
+      (row) => Boolean(row.show_on_tor) !== shownIds.has(row.id),
+    );
+
+    if (changedRows.length === 0) {
+      setGradingSystemDialogOpen(false);
+      return;
+    }
+
+    try {
+      await Promise.all(
+        changedRows.map((row) =>
+          axios.put(`${API_BASE_URL}/api/tor-grading-system/${row.id}/toggle`, {
+            show_on_tor: row.show_on_tor,
+          }),
+        ),
+      );
+      await fetchTorGradingSystem();
+    } catch (err) {
+      console.error("Failed to save grading system:", err);
+      setSnackbarMessage("Failed to save grading system changes.");
+      setOpenSnackbar(true);
+      return;
+    }
+    setGradingSystemDialogOpen(false);
+  };
+
+  // Split rows currently shown on the TOR into two visual columns,
+  // matching the original two-block layout (left block / right block).
+  const gradingSystemHalf = Math.ceil(gradingSystemRows.length / 2);
+  const gradingSystemFirstHalf = gradingSystemRows.slice(0, gradingSystemHalf);
+  const gradingSystemSecondHalf = gradingSystemRows.slice(gradingSystemHalf);
+
+  // ---- Graduation date (not covered by torRoute.txt — kept local for now) ----
+  const GRADUATION_DATE_STORAGE_KEY = "tor_graduation_date";
   const [graduationDate, setGraduationDate] = useState(() => {
     try {
       return localStorage.getItem(GRADUATION_DATE_STORAGE_KEY) || "";
@@ -257,38 +494,6 @@ const TranscriptOfRecords = () => {
       return "";
     }
   });
-
-  const [gradingSystemRows, setGradingSystemRows] = useState(() => {
-    try {
-      const stored = localStorage.getItem(GRADING_SYSTEM_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (err) {
-      console.error("Failed to load saved grading system:", err);
-    }
-    return DEFAULT_GRADING_SYSTEM_ROWS;
-  });
-  const [gradingSystemDialogOpen, setGradingSystemDialogOpen] = useState(false);
-  const [gradingSystemDraft, setGradingSystemDraft] = useState([]);
-
-  const openRemarksDialog = () => {
-    setRemarksDraft(remarks);
-    setRemarksDialogOpen(true);
-  };
-  const closeRemarksDialog = () => setRemarksDialogOpen(false);
-  const handleSaveRemarks = () => {
-    const cleaned = remarksDraft.trim() || DEFAULT_REMARKS;
-    setRemarks(cleaned);
-    try {
-      localStorage.setItem(REMARKS_STORAGE_KEY, cleaned);
-    } catch (err) {
-      console.error("Failed to save remarks:", err);
-    }
-    setRemarksDialogOpen(false);
-  };
-
   const handleGraduationDateChange = (e) => {
     const value = e.target.value;
     setGraduationDate(value);
@@ -298,59 +503,6 @@ const TranscriptOfRecords = () => {
       console.error("Failed to save graduation date:", err);
     }
   };
-
-  const openGradingSystemDialog = () => {
-    setGradingSystemDraft(gradingSystemRows.map((row) => ({ ...row })));
-    setGradingSystemDialogOpen(true);
-  };
-  const closeGradingSystemDialog = () => setGradingSystemDialogOpen(false);
-
-  const handleGradingSystemDraftChange = (index, field, value) => {
-    setGradingSystemDraft((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-    );
-  };
-
-  const handleAddGradingSystemRow = () => {
-    setGradingSystemDraft((prev) => [
-      ...prev,
-      { grade: "", score: "", description: "" },
-    ]);
-  };
-
-  const handleRemoveGradingSystemRow = (index) => {
-    setGradingSystemDraft((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSaveGradingSystem = () => {
-    const cleaned = gradingSystemDraft.filter(
-      (row) =>
-        row.grade.trim() || row.score.trim() || row.description.trim(),
-    );
-    const finalRows = cleaned.length > 0 ? cleaned : DEFAULT_GRADING_SYSTEM_ROWS;
-    setGradingSystemRows(finalRows);
-    try {
-      localStorage.setItem(
-        GRADING_SYSTEM_STORAGE_KEY,
-        JSON.stringify(finalRows),
-      );
-    } catch (err) {
-      console.error("Failed to save grading system:", err);
-    }
-    setGradingSystemDialogOpen(false);
-  };
-
-  const handleResetGradingSystem = () => {
-    setGradingSystemDraft(DEFAULT_GRADING_SYSTEM_ROWS.map((row) => ({ ...row })));
-  };
-
-  // Split the (editable) grading system rows into two visual columns of labels,
-  // matching the original two-block layout (left block / right block).
-  const gradingSystemRowsSafe =
-    gradingSystemRows.length > 0 ? gradingSystemRows : DEFAULT_GRADING_SYSTEM_ROWS;
-  const gradingSystemHalf = Math.ceil(gradingSystemRowsSafe.length / 2);
-  const gradingSystemFirstHalf = gradingSystemRowsSafe.slice(0, gradingSystemHalf);
-  const gradingSystemSecondHalf = gradingSystemRowsSafe.slice(gradingSystemHalf);
 
   const formattedDate = (dateString) => {
     if (!dateString) return "";
@@ -368,20 +520,83 @@ const TranscriptOfRecords = () => {
   });
 
   const formattedGraduationDate = graduationDate
-    ? formattedDate(graduationDate) // reuses your existing formattedDate() helper
+    ? formattedDate(graduationDate)
     : "____________________";
 
-  // DATE ISSUED should track the Date of Graduation once it's set; falls back
-  // to today's date until a graduation date has been chosen.
   const dateIssuedDisplay = graduationDate ? formattedDate(graduationDate) : todayDate;
 
-  // Text shown in the REMARKS field for a given page
   const getPageRemarksText = (isLastPage, degree) => {
     if (isLastPage) {
       const degreeLabel = degree || "____________________";
       return `GRADUATED with the Degree of ${degreeLabel} from this Institute on ${formattedGraduationDate}`;
     }
     return remarks;
+  };
+
+
+  const [admissionCredentialsNote, setAdmissionCredentialsNote] = useState(() => {
+    try {
+      const stored = localStorage.getItem(ADMISSION_CREDENTIALS_STORAGE_KEY);
+      if (stored) return stored;
+    } catch (err) {
+      console.error("Failed to load admission credentials note:", err);
+    }
+    return DEFAULT_ADMISSION_CREDENTIALS;
+  });
+  const [admissionCredentialsDialogOpen, setAdmissionCredentialsDialogOpen] = useState(false);
+  const [admissionCredentialsDraft, setAdmissionCredentialsDraft] = useState("");
+
+
+  const openAdmissionCredentialsDialog = () => {
+    setAdmissionCredentialsDraft(admissionCredentialsNote);
+    setAdmissionCredentialsDialogOpen(true);
+  };
+  const closeAdmissionCredentialsDialog = () => setAdmissionCredentialsDialogOpen(false);
+  const handleSaveAdmissionCredentials = () => {
+    const cleaned = admissionCredentialsDraft.trim() || DEFAULT_ADMISSION_CREDENTIALS;
+    setAdmissionCredentialsNote(cleaned);
+    try {
+      localStorage.setItem(ADMISSION_CREDENTIALS_STORAGE_KEY, cleaned);
+    } catch (err) {
+      console.error("Failed to save admission credentials note:", err);
+    }
+    setAdmissionCredentialsDialogOpen(false);
+  };
+
+  const [creditsNote, setCreditsNote] = useState(() => {
+    try {
+      const stored = localStorage.getItem(CREDITS_NOTE_STORAGE_KEY);
+      if (stored) return stored;
+    } catch (err) { console.error("Failed to load credits note:", err); }
+    return DEFAULT_CREDITS_NOTE;
+  });
+  const [institutionNote, setInstitutionNote] = useState(() => {
+    try {
+      const stored = localStorage.getItem(INSTITUTION_NOTE_STORAGE_KEY);
+      if (stored) return stored;
+    } catch (err) { console.error("Failed to load institution note:", err); }
+    return DEFAULT_INSTITUTION_NOTE;
+  });
+  const [footerNotesDialogOpen, setFooterNotesDialogOpen] = useState(false);
+  const [creditsNoteDraft, setCreditsNoteDraft] = useState("");
+  const [institutionNoteDraft, setInstitutionNoteDraft] = useState("");
+
+  const openFooterNotesDialog = () => {
+    setCreditsNoteDraft(creditsNote);
+    setInstitutionNoteDraft(institutionNote);
+    setFooterNotesDialogOpen(true);
+  };
+  const closeFooterNotesDialog = () => setFooterNotesDialogOpen(false);
+  const handleSaveFooterNotes = () => {
+    const cleanedCredits = creditsNoteDraft.trim() || DEFAULT_CREDITS_NOTE;
+    const cleanedInstitution = institutionNoteDraft.trim() || DEFAULT_INSTITUTION_NOTE;
+    setCreditsNote(cleanedCredits);
+    setInstitutionNote(cleanedInstitution);
+    try {
+      localStorage.setItem(CREDITS_NOTE_STORAGE_KEY, cleanedCredits);
+      localStorage.setItem(INSTITUTION_NOTE_STORAGE_KEY, cleanedInstitution);
+    } catch (err) { console.error("Failed to save footer notes:", err); }
+    setFooterNotesDialogOpen(false);
   };
 
   // ✅ Fetch person data from backend
@@ -435,6 +650,15 @@ const TranscriptOfRecords = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+
+
+
+
+  const allBranchNames = branches
+    .map((b) => b?.branch || b?.branch_name)
+    .filter(Boolean)
+    .join(" / ")
+    .toUpperCase();
 
   useEffect(() => {
     if (!settings) return;
@@ -872,7 +1096,7 @@ const TranscriptOfRecords = () => {
   };
 
   const buildTorPageHtml = (pageGroups, pageIndex) => {
-    const logoSrc = fetchedLogo || EaristLogo;
+    const logoSrc = logoDataUris.school || fetchedLogo || EaristLogo;
     const name = companyName?.trim() || "";
     const words = name.split(" ");
     const middle = Math.ceil(words.length / 2);
@@ -881,17 +1105,7 @@ const TranscriptOfRecords = () => {
 
     const studentName = formatStudentFullName(studentData);
 
-    const admissionCredentials = Array.isArray(studentData?.requirements)
-      ? studentData.requirements
-        .map((reqId) =>
-          reqId === 0 ? "No Document" :
-            reqId === 1 ? "F138" :
-              reqId === 2 ? "Certificate Of Good Moral Character" :
-                reqId === 3 ? "NSO Birth Certificate" :
-                  reqId === 4 ? "F137" : "",
-        )
-        .join("/")
-      : "";
+    const admissionCredentials = admissionCredentialsNote;
 
     const dateIssuedDisplay = new Date().toLocaleDateString("en-US", {
       month: "long",
@@ -910,25 +1124,45 @@ const TranscriptOfRecords = () => {
 
     // ── Header ──
     const headerHtml = `
-    <div style="display:flex; align-items:center; justify-content:center; width:80rem; margin:0 auto; margin-top: -60px;">
-      <div style="margin-left:-10rem; padding-right:3rem;">
-        <img src="${logoSrc}" alt="Logo" style="width:8rem; height:8rem; border-radius:50%; display:block;" />
+    <div style="position:relative; width:80rem; margin:0 auto;">
+      <div style="position:absolute; top:0; right:0; display:flex; flex-direction:column; align-items:center; z-index:2;">
+        <div style="display:flex; align-items:center; gap:4px;">
+          <img src="${logoDataUris.act || Act}" alt="ACT" style="width:50px; height:50px; object-fit:contain; display:block;" />
+          <img src="${logoDataUris.ukas || Ukas}" alt="UKAS" style="width:50px; height:50px; object-fit:contain; display:block;" />
+          <img src="${logoDataUris.iaf || Iaf}" alt="IAF" style="width:50px; height:50px; object-fit:contain; display:block;" />
+        </div>
+        <div style="font-size:11px; text-align:center; margin-top:20px; line-height:1.2; font-family:Arial, sans-serif;">
+          ${(shortTerm || "").toUpperCase()} FORM NO. I-A<br/>
+          REVISED 2025
+        </div>
       </div>
-      <div style="text-align:center;">
-        <div style="font-family:Arial, sans-serif; font-size:13px;">Republic of the Philippines</div>
-        ${name ? `
-          <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:'uppercase'; ">${firstLine}</div>
-          ${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial; text-transform:'uppercase';">${secondLine}</div>` : ""}
-        ` : ""}
-        <div style="font-family:Arial, sans-serif; font-size:13px;">${campusAddress || ""}</div>
-      </div>
-    </div>
 
-    <div style="text-align:center; width:80rem; margin:0 auto; font-size:1.6rem; letter-spacing:-1px; font-weight:500;">
-      OFFICE OF THE REGISTRAR
-    </div>
-    <div style="text-align:center; width:80rem; margin:0 auto; margin-top:-0.5rem; font-size:2.75rem; letter-spacing:-1px; font-weight:600;">
-      OFFICIAL TRANSCRIPT OF RECORDS
+      <div style="display:flex; align-items:center; justify-content:center; margin-top: -20px;">
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-left:-10rem; padding-right:3rem;">
+          <img src="${logoDataUris.bagongPilipinas || BagongPilipinasLogo}" alt="Bagong Pilipinas" style="width:8.5rem; height:8rem; display:block;" />
+          <img src="${logoSrc}" alt="Logo" style="width:8rem; height:8rem; border-radius:50%; display:block;" />
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:Arial, sans-serif; font-size:13px;">Republic of the Philippines</div>
+          ${name ? `
+            <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:'uppercase'; ">${firstLine}</div>
+            ${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial; text-transform:'uppercase';">${secondLine}</div>` : ""}
+          ` : ""}
+          ${allBranchNames ? `
+            <div style="font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-top:-2px;">
+              ${allBranchNames}
+            </div>
+          ` : ""}
+          <div style="font-family:Arial, sans-serif; font-size:13px;">${campusAddress || ""}</div>
+        </div>
+      </div>
+
+      <div style="text-align:center; font-size:1.6rem; letter-spacing:-1px; font-weight:500;">
+        OFFICE OF THE REGISTRAR
+      </div>
+      <div style="text-align:center; margin-top:-0.5rem; font-size:2.75rem; letter-spacing:-1px; font-weight:600;">
+        OFFICIAL TRANSCRIPT OF RECORDS
+      </div>
     </div>
   `;
 
@@ -945,8 +1179,9 @@ const TranscriptOfRecords = () => {
     <div style="display:flex; margin-top:1rem; width:80rem; margin-left:auto; margin-right:auto; border-bottom:solid black 1px; padding-bottom:0.5rem;">
       <div style="flex:1 1 auto;">
         <div style="display:flex; align-items:center; font-size:22px; font-weight:600; letter-spacing:-1px;">
-          <span style="width:8rem;">NAME :</span>
-          <span>${studentName}</span>
+          <span style="width:15rem;">NAME</span>
+          <span style="width:1rem;">:</span>
+          <span style="margin-left:0.3rem;">${studentName}</span>
         </div>
         ${infoRow("DATE OF BIRTH", formattedDate(studentData.birthOfDate))}
         ${infoRow("ADMISSION CREDENTIALS", admissionCredentials)}
@@ -955,7 +1190,7 @@ const TranscriptOfRecords = () => {
         ${infoRow("STUDENT NUMBER", studentData.student_number)}
         ${infoRow("DEGREE/TITLE EARNED", degreeTitle)}
         ${infoRow("MAJOR", major)}
-     ${infoRow("DATE OF GRADUATION", dateIssuedDisplay)}
+        ${infoRow("DATE OF GRADUATION", dateIssuedDisplay)}
       </div>
       <div style="flex:0 0 225px; margin-left:1rem;">
         ${photoSrc
@@ -1033,7 +1268,7 @@ const TranscriptOfRecords = () => {
     const isLastPage = pageIndex === paginatedSubjects.length - 1;
     const nothingFollowsHtml = isLastPage
       ? `
-      <div style="text-align:center; font-size:17px; font-weight:600; white-space:nowrap; overflow:hidden;">
+      <div style="text-align:center; font-size:17px; font-weight:600; white-space:normal; overflow:visible; line-height:1.3; word-break:break-word;">
       <span style="font-size:14px;">${repeatShortTermWithSpaces(shortTerm)} xxx</span>
 &nbsp;NOTHING FOLLOWS&nbsp;
 <span style="font-size:14px;">xxx ${repeatShortTermWithSpaces(shortTerm)}</span>
@@ -1063,11 +1298,11 @@ const TranscriptOfRecords = () => {
     const gradingSystemHtml = `
   <div style="display:flex; height:145px; border-top:solid 1px black; font-size:18px; align-items:flex-start; padding-top:3px;">
     <div style="width:13rem;">GRADING SYSTEM</div>
-    ${gradeCol(gradingSystemFirstHalf.map((r) => r.grade), "4.5rem")}
-    ${gradeCol(gradingSystemFirstHalf.map((r) => (r.score ? `(${r.score})` : "")), "6.5rem")}
+    ${gradeCol(gradingSystemFirstHalf.map((r) => r.equivalent_grade), "4.5rem")}
+    ${gradeCol(gradingSystemFirstHalf.map((r) => `(${r.min_score}-${r.max_score})`), "6.5rem")}
     ${gradeCol(gradingSystemFirstHalf.map((r) => r.description), "15.5rem")}
-    ${gradeCol(gradingSystemSecondHalf.map((r) => r.grade), "4.5rem")}
-    ${gradeCol(gradingSystemSecondHalf.map((r) => (r.score ? `(${r.score})` : "")), "14rem")}
+    ${gradeCol(gradingSystemSecondHalf.map((r) => r.equivalent_grade), "4.5rem")}
+    ${gradeCol(gradingSystemSecondHalf.map((r) => `(${r.min_score}-${r.max_score})`), "14rem")}
     ${gradeCol(gradingSystemSecondHalf.map((r) => r.description), "22rem")}
   </div>
 `;
@@ -1076,11 +1311,11 @@ const TranscriptOfRecords = () => {
 
     const creditsNoteHtml = `
     <div style="padding-left:2rem; height:35px; border-bottom:solid 1px black; font-size:18px; display:flex; align-items:center;">
-      <span>CREDITS, One college units is at least (17) full hours of instruction in academic or professional subject within a semester.</span>
+      <span>${creditsNote}</span>
     </div>
     <div style="padding-left:2rem; height:65px; border-bottom:solid 1px black; font-size:17px; padding-top:8px;">
       <span style="font-size:18px; letter-spacing:-0.8px;">${(companyName || "").toUpperCase()}</span>
-      <span style="letter-spacing:-0.8px;"> is a State College; hence, a SPECIAL ORDER is not issued to its graduates. The issuance of the Official Transcript of Records and Diploma is a sufficient proof for Graduation.</span>
+      <span style="letter-spacing:-0.8px;"> ${institutionNote}</span>
     </div>
     <div style="padding-left:1rem; height:65px; border-top:solid 1px black; border-bottom:solid 1px black; font-size:18px; padding-top:8px;">
       <span style="font-weight:600;">REMARKS: </span>
@@ -1127,6 +1362,24 @@ const TranscriptOfRecords = () => {
     </div>
   `;
 
+    // ── Footer: all campus addresses (Manila / Cavite, etc) ──
+    const allCampusAddressesHtml = `
+    <div style="width:80rem; margin-left:auto; margin-right:auto; margin-top:0.4rem; padding-top:0.3rem; border-top:solid 1px black; display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:1.5rem;">
+      ${branches
+        .filter((b) => b?.address || b?.branch_address || b?.campus_address)
+        .map(
+          (b, index, arr) => `
+          <span style="font-size:14px; letter-spacing:-0.3px; white-space:nowrap;">
+            <span style="font-weight:700;">${(b.branch || b.branch_name || "").toUpperCase()}:</span>
+            ${b.address || b.branch_address || b.campus_address}
+            ${index < arr.length - 1 ? `<span style="margin:0 0.75rem;">|</span>` : ""}
+          </span>
+        `,
+        )
+        .join("")}
+    </div>
+  `;
+
     return `
     <div class="tor-page">
       ${headerHtml}
@@ -1136,10 +1389,12 @@ const TranscriptOfRecords = () => {
         ${gradingSystemHtml}
         ${creditsNoteHtml}
         ${signaturesHtml}
+        ${allCampusAddressesHtml}
       </div>
     </div>
   `;
   };
+
 
   const handleExportTorPdf = async () => {
     if (paginatedSubjects.length === 0) {
@@ -1148,9 +1403,17 @@ const TranscriptOfRecords = () => {
       return;
     }
 
-    const allPagesHtml = paginatedSubjects
-      .map((pageGroups, pageIndex) => buildTorPageHtml(pageGroups, pageIndex))
-      .join("");
+    let allPagesHtml;
+    try {
+      allPagesHtml = paginatedSubjects
+        .map((pageGroups, pageIndex) => buildTorPageHtml(pageGroups, pageIndex))
+        .join("");
+    } catch (err) {
+      console.error("Failed to build TOR page HTML:", err);
+      setSnackbarMessage("Failed to prepare the Transcript of Records for download.");
+      setOpenSnackbar(true);
+      return;
+    }
 
     try {
       const response = await axios.post(
@@ -1189,6 +1452,34 @@ const TranscriptOfRecords = () => {
       console.error("Failed to generate TOR PDF:", err);
       setSnackbarMessage("Failed to generate Transcript of Records PDF.");
       setOpenSnackbar(true);
+    }
+  };
+
+
+  const handleTorEditCardClick = (key) => {
+    switch (key) {
+      case "capturePhoto":
+        if (!studentData?.person_id) {
+          setSnackbarMessage("Please search and select a student first.");
+          setOpenSnackbar(true);
+          return;
+        }
+        setPhotoCaptureOpen(true);
+        break;
+      case "remarks":
+        openRemarksDialog();
+        break;
+      case "admissionCredentials":
+        openAdmissionCredentialsDialog();
+        break;
+      case "footerNotes":
+        openFooterNotesDialog();
+        break;
+      case "gradingSystem":
+        openGradingSystemDialog();
+        break;
+      default:
+        break;
     }
   };
 
@@ -1426,7 +1717,6 @@ const TranscriptOfRecords = () => {
             )}
           </Box>
 
-
           <button
             onClick={handleExportTorPdf}
 
@@ -1492,7 +1782,7 @@ const TranscriptOfRecords = () => {
                 box-sizing: border-box;
                 width: fit-content;
                 min-width: 215.9mm;
-                min-height: 356mm;
+               min-height: 355.6mm;
                 padding: 10mm 12mm;
                 margin: 0 auto 2.5rem;
             }
@@ -1501,7 +1791,7 @@ const TranscriptOfRecords = () => {
                 @page {
                     margin: 0 !important; 
                     padding: 0 !important;
-                    size: 216mm 356mm;
+                      size: 215.9mm 355.6mm;
                 }
                 html, body {
                     margin: 0 !important;
@@ -1649,6 +1939,97 @@ const TranscriptOfRecords = () => {
           </TableHead>
         </Table>
       </TableContainer>
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          width: "100%",
+          mb: 4,
+        }}
+      >
+        <Box
+          sx={{
+            background: "white",
+            border: `1px solid ${borderColor}`,
+
+            width: "100%",
+            p: 2,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          }}
+        >
+          <Typography
+            sx={{
+              fontWeight: "bold",
+              color: titleColor,
+              fontSize: "16px",
+              mb: 2,
+            }}
+          >
+            QUICK ACTIONS
+          </Typography>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr 1fr",
+                sm: "repeat(3, 1fr)",
+                md: "repeat(5, 1fr)",
+              },
+              gap: 2,
+            }}
+          >
+            {TOR_EDIT_OPTIONS.map((option) => (
+              <Box
+                key={option.key}
+                onClick={() => handleTorEditCardClick(option.key)}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  borderRadius: 2,
+                  border: `1px solid ${option.color}`,
+                  backgroundColor: option.bg,
+                  color: option.color,
+                  padding: "16px 10px",
+                  minHeight: "110px",
+                  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                  "&:hover": {
+                    transform: "translateY(-3px)",
+                    boxShadow: "0 6px 14px rgba(0,0,0,0.14)",
+                  },
+                }}
+              >
+                {option.icon}
+                <Typography
+                  sx={{
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    mt: 1,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {option.label}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: "11px",
+                    color: "text.secondary",
+                    mt: 0.3,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {option.description}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      </Box>
       <br />
       <br />
 
@@ -1852,7 +2233,7 @@ const TranscriptOfRecords = () => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  {["#", "Full Name", "Designation", "Prepared By", "Checked By", "Registrar", "Date of Graduation", "Actions"].map((header) => (
+                  {["#", "Full Name", "Designation", "Prepared By", "Checked By", "Registrar", "Date of Graduation",].map((header) => (
                     <TableCell
                       key={header}
                       sx={{
@@ -1993,75 +2374,7 @@ const TranscriptOfRecords = () => {
                       </TableCell>
                     )}
 
-                    {index === 0 && (
-                      <TableCell
-                        rowSpan={paginatedSignatures.length}
-                        sx={{
-                          border: `1px solid ${borderColor}`,
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                          color: titleColor,
-                          padding: "4px 6px",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            gap: 1,
-                            width: "100%",
-                          }}
-                        >
-                          <button
-                            onClick={openRemarksDialog}
-                            style={{
-                              padding: "8px 16px",
-                              cursor: "pointer",
-                              fontWeight: "bold",
-                              backgroundColor: "#ffffff",
-                              color: "#1976d2",
-                              border: "2px solid #1976d2",
-                              borderRadius: "5px",
-                              height: "40px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              margin: "0 auto",
-                              width: "100%",
-                            }}
-                            type="button"
-                          >
-                            <EditNoteIcon fontSize="small" />
-                            Edit Remarks
-                          </button>
-                          <button
-                            onClick={openGradingSystemDialog}
-                            style={{
-                              padding: "8px 16px",
-                              cursor: "pointer",
-                              fontWeight: "bold",
-                              backgroundColor: "#ffffff",
-                              color: "#2e7d32",
-                              border: "2px solid #2e7d32",
-                              borderRadius: "5px",
-                              height: "40px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              margin: "0 auto",
-                              width: "100%",
-                            }}
-                            type="button"
-                          >
-                            <RuleIcon fontSize="small" />
-                            Edit Grading System
-                          </button>
-                        </Box>
-                      </TableCell>
-                    )}
+
                   </TableRow>
                 ))}
 
@@ -2257,7 +2570,12 @@ const TranscriptOfRecords = () => {
             </Box>
           </Box>
         </Box>
+
+
+
       </Box>
+
+
 
       <Box
         style={{ width: "100%", display: "flex", justifyContent: "center" }}
@@ -2278,8 +2596,41 @@ const TranscriptOfRecords = () => {
                 paddingRight: "3.5rem",
                 marginTop: "3rem",
                 paddingBottom: "1.5rem",
+                position: "relative",
               }}
             >
+              {/* ACT / UKAS / IAF accreditation logos — top right corner */}
+              <Box
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: "5rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  zIndex: 2,
+                  marginTop: "50px"
+                }}
+              >
+                <Box style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <img src={Act} alt="ACT" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
+                  <img src={Ukas} alt="UKAS" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
+                  <img src={Iaf} alt="IAF" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
+                </Box>
+                <Typography
+                  style={{
+                    fontSize: "11px",
+                    textAlign: "center",
+                    marginTop: "20px",
+                    lineHeight: 1.2,
+                    fontFamily: "Arial",
+                  }}
+                >
+                  {(shortTerm || "").toUpperCase()} FORM NO. I-A
+                  <br />
+                  REVISED 2025
+                </Typography>
+              </Box>
               {/* Start Of Header */}
               <Box
                 className="page-header"
@@ -2293,11 +2644,19 @@ const TranscriptOfRecords = () => {
               >
                 <Box
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
                     paddingTop: "1.5rem",
                     marginLeft: "-10rem",
                     paddingRight: "3rem",
                   }}
                 >
+                  <img
+                    src={BagongPilipinasLogo}
+                    alt="Bagong Pilipinas"
+                    style={{ width: "130px", height: "120px" }}
+                  />
                   <img
                     src={fetchedLogo || EaristLogo} // use dynamic logo if available
                     alt="Logo"
@@ -2342,7 +2701,7 @@ const TranscriptOfRecords = () => {
                                 letterSpacing: "-1px",
                                 fontWeight: "600",
                                 fontFamily: "Arial",
-                                  textTransform: "uppercase"
+                                textTransform: "uppercase"
                               }}
                             >
                               {secondLine}
@@ -2352,8 +2711,8 @@ const TranscriptOfRecords = () => {
                       );
                     })()}
 
-                  <Typography style={{ fontFamily: "Arial", fontSize: "13px" }}>
-                    {campusAddress}
+                  <Typography style={{ fontFamily: "Arial", fontSize: "13px", fontWeight: "bold" }}>
+                    {allBranchNames}
                   </Typography>
                 </Box>
               </Box>
@@ -2491,7 +2850,7 @@ const TranscriptOfRecords = () => {
                                 wordSpacing: "1px",
                               }}
                             >
-                              CERT. OF GOOD MORAL CHARACTER / F138 / F137 / PSA BIRTH CERT.
+                              {admissionCredentialsNote}
                             </Typography>
                           )}
                         </Box>
@@ -3132,10 +3491,11 @@ const TranscriptOfRecords = () => {
                                     display: "block",
                                     fontSize: "17px",
                                     fontWeight: "600",
-                                    lineHeight: 1,
-                                    whiteSpace: "nowrap",
+                                    lineHeight: 1.3,
+                                    whiteSpace: "normal",
                                     width: "100%",
-                                    overflow: "hidden",
+                                    overflow: "visible",
+                                    wordBreak: "break-word",
                                   }}
                                 >
                                   <span style={{ fontSize: "14px", marginRight: "2px" }}>
@@ -3214,139 +3574,61 @@ const TranscriptOfRecords = () => {
                             >
                               <span>GRADING SYSTEM</span>
                             </td>
-                            <td
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "start",
-                                width: "4.5rem",
-                              }}
-                            >
+                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "4.5rem" }}>
                               {gradingSystemFirstHalf.map((row, i) => (
                                 <div
-                                  key={`gs-grade-1-${i}`}
-                                  style={{
-                                    margin: "-1px",
-                                    fontWeight: "400",
-                                    fontSize: "16px",
-                                    letterSpacing: "0px",
-                                    paddingTop: i === 0 ? "3px" : 0,
-                                  }}
+                                  key={`gs-grade-1-${row.id}`}
+                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "0px", paddingTop: i === 0 ? "3px" : 0 }}
                                 >
-                                  {row.grade}
+                                  {row.equivalent_grade}
                                 </div>
                               ))}
                             </td>
-                            <td
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "start",
-                                width: "6.5rem",
-                              }}
-                            >
+                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "6.5rem" }}>
                               {gradingSystemFirstHalf.map((row, i) => (
                                 <div
-                                  key={`gs-score-1-${i}`}
-                                  style={{
-                                    margin: "-1px",
-                                    fontWeight: "400",
-                                    fontSize: "16px",
-                                    letterSpacing: "-2px",
-                                    paddingTop: i === 0 ? "3px" : 0,
-                                  }}
+                                  key={`gs-score-1-${row.id}`}
+                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}
                                 >
-                                  {row.score ? `(${row.score})` : ""}
+                                  ({row.min_score}-{row.max_score})
                                 </div>
                               ))}
                             </td>
-                            <td
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "start",
-                                width: "15.5rem",
-                              }}
-                            >
+                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "15.5rem" }}>
                               {gradingSystemFirstHalf.map((row, i) => (
                                 <div
-                                  key={`gs-desc-1-${i}`}
-                                  style={{
-                                    margin: "-1px",
-                                    fontWeight: "400",
-                                    fontSize: "16px",
-                                    letterSpacing: "-1px",
-                                    paddingTop: i === 0 ? "3px" : 0,
-                                  }}
+                                  key={`gs-desc-1-${row.id}`}
+                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}
                                 >
                                   {row.description}
                                 </div>
                               ))}
                             </td>
-                            <td
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "start",
-                                width: "4.5rem",
-                              }}
-                            >
+                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "4.5rem" }}>
                               {gradingSystemSecondHalf.map((row, i) => (
                                 <div
-                                  key={`gs-grade-2-${i}`}
-                                  style={{
-                                    margin: "-1px",
-                                    fontWeight: "400",
-                                    fontSize: "16px",
-                                    letterSpacing: "-1px",
-                                    paddingTop: i === 0 ? "3px" : 0,
-                                  }}
+                                  key={`gs-grade-2-${row.id}`}
+                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}
                                 >
-                                  {row.grade}
+                                  {row.equivalent_grade}
                                 </div>
                               ))}
                             </td>
-                            <td
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "start",
-                                width: "14rem",
-                              }}
-                            >
+                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "14rem" }}>
                               {gradingSystemSecondHalf.map((row, i) => (
                                 <div
-                                  key={`gs-score-2-${i}`}
-                                  style={{
-                                    margin: "-1px",
-                                    fontWeight: "400",
-                                    fontSize: "16px",
-                                    letterSpacing: "-2px",
-                                    paddingTop: i === 0 ? "3px" : 0,
-                                  }}
+                                  key={`gs-score-2-${row.id}`}
+                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}
                                 >
-                                  {row.score ? `(${row.score})` : ""}
+                                  ({row.min_score}-{row.max_score})
                                 </div>
                               ))}
                             </td>
-                            <td
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "start",
-                                width: "22rem",
-                              }}
-                            >
+                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "22rem" }}>
                               {gradingSystemSecondHalf.map((row, i) => (
                                 <div
-                                  key={`gs-desc-2-${i}`}
-                                  style={{
-                                    margin: "-1px",
-                                    fontWeight: "400",
-                                    fontSize: "16px",
-                                    letterSpacing: "-1px",
-                                    paddingTop: i === 0 ? "3px" : 0,
-                                  }}
+                                  key={`gs-desc-2-${row.id}`}
+                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}
                                 >
                                   {row.description}
                                 </div>
@@ -3625,13 +3907,61 @@ const TranscriptOfRecords = () => {
                       </table>
                     </Box>
                   </Box>
-                  {/* End Of Footer */}
+
                 </Box>
               </Box>
+
+
+              <Box
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: ".2rem",
+                }}
+              >
+                {branches
+                  .filter((b) => b?.address || b?.branch_address || b?.campus_address)
+                  .map((b, index, arr) => (
+                    <Typography
+                      key={b.id ?? b.branch}
+                      style={{
+                        fontSize: "14px",
+                        textAlign: "center",
+                        letterSpacing: "-0.3px",
+                        lineHeight: 1.3,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <span style={{ fontWeight: 700 }}>
+                        {(b.branch || b.branch_name || "").toUpperCase()}:
+                      </span>{" "}
+                      {b.address || b.branch_address || b.campus_address}
+                      {index < arr.length - 1 && (
+                        <span style={{ margin: "0 0.75rem", fontWeight: 400 }}>|</span>
+                      )}
+                    </Typography>
+                  ))}
+              </Box>
+
             </Box>
           ))}
+
+
         </Box>
       </Box>
+
+      <PhotoCaptureDialog
+        open={photoCaptureOpen}
+        onClose={() => setPhotoCaptureOpen(false)}
+        personId={studentData?.person_id}
+        onUploaded={(filename) => {
+          setStudentData((prev) => ({ ...prev, profile_image: filename }));
+          setSnackbarMessage("Student photo updated successfully.");
+          setOpenSnackbar(true);
+        }}
+      />
 
       <Dialog open={remarksDialogOpen} onClose={closeRemarksDialog} maxWidth="sm" fullWidth>
         <DialogTitle
@@ -3720,92 +4050,45 @@ const TranscriptOfRecords = () => {
 
         <DialogContent dividers sx={{ p: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            These rows populate the GRADING SYSTEM block printed on every page of
-            the Transcript of Records. "Score Range" is shown in parentheses next
-            to each grade (e.g. entering 97-100 prints as (97-100)).
+            Check the grade conversion rows that should appear in the GRADING SYSTEM
+            block printed on every page of the Transcript of Records. To add or edit
+            a row itself, use Admin → Grade Conversion.
           </Typography>
 
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell sx={{ fontWeight: 600, width: "10%" }} align="center">Show</TableCell>
                   <TableCell sx={{ fontWeight: 600, width: "18%" }}>Grade</TableCell>
                   <TableCell sx={{ fontWeight: 600, width: "27%" }}>Score Range</TableCell>
                   <TableCell sx={{ fontWeight: 600, width: "45%" }}>Description</TableCell>
-                  <TableCell sx={{ fontWeight: 600, width: "10%" }} align="center">
-                    Remove
-                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {gradingSystemDraft.map((row, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        fullWidth
-                        value={row.grade}
-                        onChange={(e) =>
-                          handleGradingSystemDraftChange(index, "grade", e.target.value)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        fullWidth
-                        placeholder="e.g. 97-100"
-                        value={row.score}
-                        onChange={(e) =>
-                          handleGradingSystemDraftChange(index, "score", e.target.value)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        fullWidth
-                        value={row.description}
-                        onChange={(e) =>
-                          handleGradingSystemDraftChange(index, "description", e.target.value)
-                        }
-                      />
-                    </TableCell>
+                {gradingSystemDraft.map((row) => (
+                  <TableRow key={row.id}>
                     <TableCell align="center">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleRemoveGradingSystemRow(index)}
-                      >
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
+                      <Checkbox
+                        checked={!!row.show_on_tor}
+                        onChange={() => handleToggleGradingSystemRow(row.id)}
+                      />
                     </TableCell>
+                    <TableCell>{row.equivalent_grade}</TableCell>
+                    <TableCell>{row.min_score}–{row.max_score}</TableCell>
+                    <TableCell>{row.description}</TableCell>
                   </TableRow>
                 ))}
                 {gradingSystemDraft.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} align="center" sx={{ color: "text.secondary" }}>
-                      No grading system rows yet. Click "Add Row" to start.
+                      No grade conversion rows found. Add them in Admin → Grade Conversion first.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </TableContainer>
-
-          <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
-            <Button
-              onClick={handleAddGradingSystemRow}
-              startIcon={<AddIcon />}
-              variant="outlined"
-              size="small"
-            >
-              Add Row
-            </Button>
-            <Button onClick={handleResetGradingSystem} variant="text" size="small">
-              Reset to Default
-            </Button>
-          </Box>
         </DialogContent>
 
         <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
@@ -3814,6 +4097,90 @@ const TranscriptOfRecords = () => {
           </Button>
           <Button onClick={handleSaveGradingSystem} variant="contained" color="success">
             Save Grading System
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={footerNotesDialogOpen} onClose={closeFooterNotesDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ bgcolor: "#6a1b9a", color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          📄 Edit Credits & Institution Note
+          <IconButton onClick={closeFooterNotesDialog} sx={{ color: "white", border: "2px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 40, height: 40, padding: 0 }}>
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 3 }}>
+          <TextField
+            fullWidth multiline minRows={2} label="Credits line"
+            value={creditsNoteDraft} onChange={(e) => setCreditsNoteDraft(e.target.value)}
+            sx={{ mb: 3 }}
+          />
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Shown after the school name (which is filled in automatically).
+          </Typography>
+          <TextField
+            fullWidth multiline minRows={3} label="Institution note"
+            value={institutionNoteDraft} onChange={(e) => setInstitutionNoteDraft(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button onClick={closeFooterNotesDialog} color="error" variant="outlined">Cancel</Button>
+          <Button onClick={handleSaveFooterNotes} variant="contained" color="success">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={admissionCredentialsDialogOpen}
+        onClose={closeAdmissionCredentialsDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: "#c2410c",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          🎓 Edit Admission Credentials
+          <IconButton
+            onClick={closeAdmissionCredentialsDialog}
+            sx={{
+              color: "white",
+              border: "2px solid rgba(255,255,255,0.6)",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              padding: 0,
+              "&:hover": { backgroundColor: "rgba(255,255,255,0.2)", border: "2px solid white" },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This text appears in the ADMISSION CREDENTIALS field on every page of
+            the Transcript of Records, both on-screen and in the downloaded PDF.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            label="Admission Credentials"
+            value={admissionCredentialsDraft}
+            onChange={(e) => setAdmissionCredentialsDraft(e.target.value)}
+          />
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button onClick={closeAdmissionCredentialsDialog} color="error" variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveAdmissionCredentials} variant="contained" color="success">
+            Save
           </Button>
         </DialogActions>
       </Dialog>

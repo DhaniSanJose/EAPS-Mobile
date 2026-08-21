@@ -97,6 +97,8 @@ const io = initSocket(http, allowedOrigins);
 app.set("io", io);
 
 const signatureDir = path.join(__dirname, "uploads", "signature");
+const torSignatoriesDir = path.join(__dirname, "uploads", "TOR_Signatories");
+
 const authRoute = require("./routes/auth_routes/authRoutes");
 const applicantFormRoute = require("./routes/applicant_routes/applicantFormRoute");
 const examPermit = require("./routes/applicant_routes/examPermitRoute");
@@ -172,7 +174,9 @@ const admissionContact = require("./routes/system_routes/admissionContact");
 const examAttendanceRoute = require("./routes/admission_routes/examAttendanceRoute");
 const admissionReportRoute = require("./routes/admission_routes/admissionReportRoute");
 const courseTypeRoutes = require("./routes/system_routes/courseTypeRoutes");
+const torRoute = require("./routes/admin_routes/torRoute");
 
+app.use("/api", torRoute);
 app.use("/api", courseTypeRoutes);
 app.use("/api", admissionReportRoute);
 app.use("/api", examAttendanceRoute);
@@ -261,6 +265,8 @@ if (!fs.existsSync(uploadPath)) {
 if (!fs.existsSync(signatureDir))
   fs.mkdirSync(signatureDir, { recursive: true });
 
+if (!fs.existsSync(torSignatoriesDir)) 
+  fs.mkdirSync(torSignatoriesDir, { recursive: true });
 
 // Multer setup
 const storage = multer.diskStorage({
@@ -4276,6 +4282,7 @@ app.get("/api/uploads/preview/:uploadId", async (req, res) => {
     res.status(500).json({ error: "Failed to load file" });
   }
 });
+
 
 app.put("/api/missing-documents/:person_id", async (req, res) => {
   const { person_id } = req.params;

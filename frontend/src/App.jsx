@@ -135,8 +135,8 @@ const normalizeSettings = (data = {}) => {
 const hasRequiredSettings = (settings) =>
   Boolean(
     settings?.colors?.header &&
-      settings?.colors?.mainButton &&
-      settings?.branding?.companyName,
+    settings?.colors?.mainButton &&
+    settings?.branding?.companyName,
   );
 
 const UploadApplicants = lazy(
@@ -999,9 +999,9 @@ function App() {
     () =>
       settings
         ? {
-            ...settings,
-            refreshSettings: fetchSettings,
-          }
+          ...settings,
+          refreshSettings: fetchSettings,
+        }
         : null,
     [settings],
   );
@@ -1515,6 +1515,7 @@ function App() {
                           </ProtectedRoute>
                         }
                       />
+                      
                       <Route
                         path="/department_section_panel"
                         element={
@@ -3098,6 +3099,8 @@ function App() {
 
               <InactivityLogoutModal
                 isAuthenticatedPage={isAuthenticated}
+                accentColor={settings?.colors?.header}
+                mainButtonColor={settings?.colors?.mainButton}
                 onLogout={() => {
                   clearAuthStorage();
                   setIsAuthenticated(false);
