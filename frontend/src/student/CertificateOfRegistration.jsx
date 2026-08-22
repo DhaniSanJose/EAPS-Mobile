@@ -37,10 +37,10 @@ const CertificateOfRegistration = forwardRef(
   ({ student_number, onReadyChange }, divToPrintRef) => {
     useAuditMac();
     const settings = useContext(SettingsContext);
-  const colors = settings?.colors || {};
-  const branding = settings?.branding || {};
-  const assets = settings?.assets || {};
-  const headerColor = colors.header || "#1976d2";
+    const colors = settings?.colors || {};
+    const branding = settings?.branding || {};
+    const assets = settings?.assets || {};
+    const headerColor = colors.header || "#1976d2";
     const [fetchedLogo, setFetchedLogo] = useState(null);
     const [companyName, setCompanyName] = useState("");
     const [branches, setBranches] = useState([]);
@@ -266,6 +266,9 @@ const CertificateOfRegistration = forwardRef(
     const [first_name, setUserFirstName] = useState(null);
     const [middle_name, setUserMiddleName] = useState(null);
     const [last_name, setUserLastName] = useState(null);
+    const middleInitial = data[0]?.middle_name?.trim()
+      ? `${data[0].middle_name.trim().charAt(0).toUpperCase()}.`
+      : "";
     const [currId, setCurr] = useState(null);
     const [courseCode, setCourseCode] = useState("");
     const [courseDescription, setCourseDescription] = useState("");
@@ -572,7 +575,7 @@ const CertificateOfRegistration = forwardRef(
             .filter(
               (item) =>
                 String(item?.student_number) ===
-                  String(effectiveStudentNumber) && Number(item?.status) === 1,
+                String(effectiveStudentNumber) && Number(item?.status) === 1,
             )
             .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
           setSelectedPaymentData(matched[0] || null);
@@ -629,10 +632,10 @@ const CertificateOfRegistration = forwardRef(
     const scholarshipDiscountValue = savedUnifast
       ? (resolvedScholarshipCode || "UNIFAST-FHE")
       : (
-          resolvedScholarshipCode ||
-          data[0]?.matriculation_remark ||
-          ""
-        );
+        resolvedScholarshipCode ||
+        data[0]?.matriculation_remark ||
+        ""
+      );
     const officialReceiptValue = savedUnifast
       ? "Scholar"
       : data[0]?.matriculation_remark
@@ -1443,7 +1446,6 @@ const CertificateOfRegistration = forwardRef(
                                 />
                               </td>
 
-                              {/* Center Column - School Information */}
                               <td
                                 style={{
                                   width: "60%",
@@ -1482,7 +1484,13 @@ const CertificateOfRegistration = forwardRef(
                                     {secondLine}
                                   </div>
                                 )}
-                                <div>{campusAddress}</div>
+                                <div
+                                  style={{
+                                    fontFamily: "Arial",
+                                    fontSize: "13px",
+                                  }}
+                                >
+                                  {campusAddress}</div>
 
                                 {/* Add spacing here */}
                                 <div style={{ marginTop: "30px" }}>
@@ -1684,10 +1692,8 @@ const CertificateOfRegistration = forwardRef(
                         {renderDetailField(
                           "Name",
                           <span>
-                            <span style={{ fontWeight: "bold" }}>
-                              {(data[0]?.last_name || "").toUpperCase()}
-                            </span>
-                            {`, ${data[0]?.first_name || ""} ${data[0]?.middle_name || ""} ${data[0]?.extension || ""}`
+                            {(data[0]?.last_name || "").toUpperCase()}
+                            {`, ${data[0]?.first_name || ""} ${middleInitial} ${data[0]?.extension || ""}`
                               .replace(/\s+/g, " ")
                               .trimEnd()
                               .toUpperCase()}
@@ -1735,7 +1741,7 @@ const CertificateOfRegistration = forwardRef(
                             String(data[0]?.gender) === "0"
                             ? "Male"
                             : data[0]?.gender === 1 ||
-                                String(data[0]?.gender) === "1"
+                              String(data[0]?.gender) === "1"
                               ? "Female"
                               : "",
                           LEFT_LABEL_WIDTH,
@@ -1753,7 +1759,7 @@ const CertificateOfRegistration = forwardRef(
                           "Major",
                           major
                             ? major.charAt(0).toUpperCase() +
-                                major.slice(1).toLowerCase()
+                            major.slice(1).toLowerCase()
                             : "",
                           MID_LABEL_WIDTH,
                         )}

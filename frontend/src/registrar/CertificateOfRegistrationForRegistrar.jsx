@@ -382,6 +382,9 @@ const CertificateOfRegistration = forwardRef(
     const [middle_name, setUserMiddleName] = useState(null); // Dynamic userId
 
     const [last_name, setUserLastName] = useState(null); // Dynamic userId
+    const middleInitial = data[0]?.middle_name?.trim()
+      ? `${data[0].middle_name.trim().charAt(0).toUpperCase()}.`
+      : "";
     const [currId, setCurr] = useState(null); // Dynamic userId
     const [courseCode, setCourseCode] = useState("");
     const [courseDescription, setCourseDescription] = useState("");
@@ -1733,7 +1736,13 @@ const CertificateOfRegistration = forwardRef(
                                     {secondLine}
                                   </div>
                                 )}
-                                <div>{campusAddress}</div>
+                                <div
+                                  style={{
+                                    fontFamily: "Arial",
+                                    fontSize: "13px",
+                                  }}
+                                >
+                                  {campusAddress}</div>
 
                                 {/* Add spacing here */}
                                 <div style={{ marginTop: "30px" }}>
@@ -1935,10 +1944,8 @@ const CertificateOfRegistration = forwardRef(
                         {renderDetailField(
                           "Name",
                           <span>
-                            <span style={{ fontWeight: "bold" }}>
-                              {(data[0]?.last_name || "").toUpperCase()}
-                            </span>
-                            {`, ${data[0]?.first_name || ""} ${data[0]?.middle_name || ""} ${data[0]?.extension || ""}`
+                            {(data[0]?.last_name || "").toUpperCase()}
+                            {`, ${data[0]?.first_name || ""} ${middleInitial} ${data[0]?.extension || ""}`
                               .replace(/\s+/g, " ")
                               .trimEnd()
                               .toUpperCase()}

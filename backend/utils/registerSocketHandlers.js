@@ -709,7 +709,6 @@ WHERE proctor LIKE ?
 
 
 
-
     socket.on("assign-student-number", async (payload) => {
       const conn = await db3.getConnection();
       const copiedRequirementFilesForRollback = [];
@@ -847,8 +846,8 @@ WHERE proctor LIKE ?
         // ── BEGIN TRANSACTION in ENROLLMENT db ───────────────────────────────────
         await conn.beginTransaction();
 
-        // ── Build values array matching the 152 columns (skipping person_id) ────
-        // Aligned exactly to person_table structure, columns 2–153.
+        // ── Build values array matching the 148 columns (skipping person_id) ────
+        // Column order matches your schema exactly: col 2 → col 149
         const personValues = [
           student_number,                        // 2   student_number
           studentProfileImg,                     // 3   profile_img
@@ -1045,7 +1044,6 @@ WHERE proctor LIKE ?
         if (!personInsertResult.insertId) {
           throw new Error("Cannot assign student number because the enrollment person record was not created.");
         }
-
         // ── Real person_id from MySQL auto-increment ─────────────────────────────
         const personIdForStudent = personInsertResult.insertId;
 
@@ -1061,8 +1059,8 @@ WHERE proctor LIKE ?
         // ── Insert into person_status_table ──────────────────────────────────────
         const [personStatusInsertResult] = await conn.query(
           `INSERT INTO person_status_table
-    (person_id, exam_status, requirements, residency, student_registration_status, exam_result, hs_ave)
-   VALUES (?, 0, 0, 0, 0, 0, 0)`,
+        (person_id, exam_status, requirements, residency, student_registration_status, exam_result, hs_ave)
+       VALUES (?, 0, 0, 0, 0, 0, 0)`,
           [personIdForStudent],
         );
         if ((personStatusInsertResult.affectedRows || 0) !== 1) {
@@ -1072,8 +1070,8 @@ WHERE proctor LIKE ?
         // ── Insert into student_status_table ─────────────────────────────────────
         const [studentStatusInsertResult] = await conn.query(
           `INSERT INTO student_status_table
-    (student_number, active_curriculum, enrolled_status, year_level_id, active_school_year_id, control_status)
-   VALUES (?, ?, 0, 0, 0, 0)`,
+        (student_number, active_curriculum, enrolled_status, year_level_id, active_school_year_id, control_status)
+       VALUES (?, ?, 0, 0, 0, 0)`,
           [student_number, person_data.program],
         );
         if ((studentStatusInsertResult.affectedRows || 0) !== 1) {
@@ -1111,9 +1109,9 @@ WHERE proctor LIKE ?
 
           const [requirementInsertResult] = await conn.query(
             `INSERT INTO requirement_uploads
-      (requirements_id, person_id, submitted_documents, file_path, original_name,
-       remarks, status, document_status, registrar_status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (requirements_id, person_id, submitted_documents, file_path, original_name,
+           remarks, status, document_status, registrar_status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               req.requirements_id,
               personIdForStudent,
@@ -1146,6 +1144,7 @@ WHERE proctor LIKE ?
         }
 
         // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
+        // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
         const [existingUser] = await conn.query(
           `SELECT id FROM user_accounts WHERE person_id = ?`,
           [personIdForStudent],
@@ -1177,36 +1176,28 @@ WHERE proctor LIKE ?
         conn.release();
         connectionReleased = true;
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // ── Generate QR codes (Student QR + TOR QR) ─── ★ CHANGED SECTION ★ ─────
-        // ═══════════════════════════════════════════════════════════════════════
-        const qrData = `${process.env.DB_HOST_LOCAL}:5173/student_qr_information/${student_number}`;
-        const torQrData = `${process.env.DB_HOST_LOCAL}:5173/tor_qr_information/${student_number}`;
+        const studentQrDir = path.join(__dirname, "uploads", "StudentQRCodeGenerated");
+        if (!fs.existsSync(studentQrDir)) fs.mkdirSync(studentQrDir, { recursive: true });
 
         const qrFilename = `${student_number}_qrcode.png`;
-        const torQrFilename = `${student_number}_tor_qrcode.png`;
+        const studentQrData = `${process.env.DB_HOST_LOCAL}:5173/student_qr_information/${student_number}`;
+        const studentQrPath = path.join(studentQrDir, qrFilename);
 
-        const studentQrDir = path.join(__dirname, "uploads", "StudentQRCodeGenerated");
-        const torQrDir = path.join(__dirname, "uploads", "TORStudentQRCodeGenerated");
-
-        if (!fs.existsSync(studentQrDir)) fs.mkdirSync(studentQrDir, { recursive: true });
-        if (!fs.existsSync(torQrDir)) fs.mkdirSync(torQrDir, { recursive: true });
-
-        const qrPath = path.join(studentQrDir, qrFilename);
-        const torQrPath = path.join(torQrDir, torQrFilename);
-
-        await QRCode.toFile(qrPath, qrData, {
+        await QRCode.toFile(studentQrPath, studentQrData, {
           color: { dark: "#000", light: "#FFF" },
           width: 300,
         });
+
+        const torQrDir = path.join(__dirname, "uploads", "TORQrCodeGenerated");
+        if (!fs.existsSync(torQrDir)) fs.mkdirSync(torQrDir, { recursive: true });
+
+        const torQrData = `${process.env.DB_HOST_LOCAL}:5173/student_tor_information/${student_number}`;
+        const torQrPath = path.join(torQrDir, qrFilename);
 
         await QRCode.toFile(torQrPath, torQrData, {
           color: { dark: "#000", light: "#FFF" },
           width: 300,
         });
-        // ═══════════════════════════════════════════════════════════════════════
-        // ── END CHANGED SECTION ──────────────────────────────────────────────────
-        // ═══════════════════════════════════════════════════════════════════════
 
         // ── Audit log ────────────────────────────────────────────────────────────
         const roleLabel = formatAuditActorRole(auditActorRole);
@@ -1271,7 +1262,7 @@ Click the link below to log in:
     https://ap.earist.edu.ph/login
 
     
-    `.trim(),
+        `.trim(),
           });
           emailSent = true;
         } catch (emailError) {
