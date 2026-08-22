@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.1.11:5173",
+  "http://192.168.1.10:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -175,7 +175,9 @@ const examAttendanceRoute = require("./routes/admission_routes/examAttendanceRou
 const admissionReportRoute = require("./routes/admission_routes/admissionReportRoute");
 const courseTypeRoutes = require("./routes/system_routes/courseTypeRoutes");
 const torRoute = require("./routes/admin_routes/torRoute");
+const graduateVerification = require("./routes/student_routes/graduateVerificationRoute");
 
+app.use("/api", graduateVerification);
 app.use("/api", torRoute);
 app.use("/api", courseTypeRoutes);
 app.use("/api", admissionReportRoute);

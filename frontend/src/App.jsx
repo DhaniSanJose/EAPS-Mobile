@@ -380,12 +380,15 @@ const Register = lazy(() => import("./components/Register"));
 const RegistrarForgotPassword = lazy(
   () => import("./components/RegistrarForgotPassword"),
 );
+const TorQrInformation = lazy(() => import("./components/TorQrInformation"));
+const StudentQrInformation = lazy(() => import("./components/StudentQrInformation"));
 const SideBar = lazy(() => import("./components/Sidebar"));
 const Unauthorized = lazy(() => import("./components/Unauthorized"));
 const CoursePanel = lazy(() => import("./course_management/CoursePanel"));
 const CurriculumPanel = lazy(
   () => import("./course_management/CurriculumPanel"),
 );
+
 const NSTPTagging = lazy(() => import("./course_management/NSTPTagging"));
 const Prerequisite = lazy(() => import("./course_management/Prerequisite"));
 const ProgramPanel = lazy(() => import("./course_management/ProgramPanel"));
@@ -557,7 +560,6 @@ const FacultyDashboard = lazy(() => import("./pages/FacultyDashboard"));
 const RegistrarDashboard = lazy(() => import("./pages/RegistrarDashboard"));
 const ScheduleFilterer = lazy(() => import("./pages/SchedulePlottingFilter"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
-const StudentQrInfo = lazy(() => import("./pages/StudentQrInfo"));
 const SystemDashboardPanel = lazy(() => import("./pages/SystemDashboard"));
 const RegistrarClassList = lazy(() => import("./registrar/RegistrarClassList"));
 const CollegeScheduleChecker = lazy(
@@ -1515,7 +1517,7 @@ function App() {
                           </ProtectedRoute>
                         }
                       />
-                      
+
                       <Route
                         path="/department_section_panel"
                         element={
@@ -2964,10 +2966,7 @@ function App() {
                         path="/applicant_profile/:applicantNumber"
                         element={<ApplicantProfile />}
                       />
-                      <Route
-                        path="/student_qr_information/:studentNumber"
-                        element={<StudentQrInfo />}
-                      />
+                    
                       <Route
                         path="/registrar_exam_permit"
                         element={
@@ -3020,6 +3019,12 @@ function App() {
                           </ProtectedRoute>
                         }
                       />
+                      <Route
+                        path="/tor_qr_information/:student_number"
+                        element={<TorQrInformation />}
+                      />
+                      <Route path="/student_qr_information/:student_number"
+                        element={<StudentQrInformation />} />
                       <Route
                         path="/section_slot_monitoring"
                         element={
@@ -3084,6 +3089,7 @@ function App() {
                           </ProtectedRoute>
                         }
                       />
+
                       <Route
                         path="/admin_branches"
                         element={

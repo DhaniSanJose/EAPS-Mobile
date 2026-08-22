@@ -847,198 +847,199 @@ WHERE proctor LIKE ?
         // ── BEGIN TRANSACTION in ENROLLMENT db ───────────────────────────────────
         await conn.beginTransaction();
 
-        // ── Build values array matching the 148 columns (skipping person_id) ────
-        // Column order matches your schema exactly: col 2 → col 149
+        // ── Build values array matching the 152 columns (skipping person_id) ────
+        // Aligned exactly to person_table structure, columns 2–153.
         const personValues = [
-          student_number,                       // 2  student_number
-          studentProfileImg,                    // 3  profile_img
-          person_data.campus,                   // 4  campus
-          person_data.academicProgram,          // 5  academicProgram
-          person_data.classifiedAs,             // 6  classifiedAs
-          person_data.applyingAs,               // 7  applyingAs
-          person_data.program,                  // 8  program
-          person_data.program2,                 // 9  program2
-          person_data.program3,                 // 10 program3
-          person_data.yearLevel,                // 11 yearLevel
-          person_data.last_name,                // 12 last_name
-          person_data.first_name,               // 13 first_name
-          person_data.middle_name,              // 14 middle_name
-          person_data.extension,                // 15 extension
-          person_data.nickname,                 // 16 nickname
-          person_data.height,                   // 17 height
-          person_data.weight,                   // 18 weight
-          person_data.lrnNumber,                // 19 lrnNumber
-          person_data.nolrnNumber,              // 20 nolrnNumber
-          person_data.gender,                   // 21 gender
-          person_data.pwdMember,                // 22 pwdMember
-          person_data.pwdType,                  // 23 pwdType
-          person_data.pwdId,                    // 24 pwdId
-          person_data.birthOfDate,              // 25 birthOfDate
-          person_data.age,                      // 26 age
-          person_data.birthPlace,               // 27 birthPlace
-          person_data.languageDialectSpoken,    // 28 languageDialectSpoken
-          person_data.citizenship,              // 29 citizenship
-          person_data.religion,                 // 30 religion
-          person_data.civilStatus,
-          person_data.spouse,
-          person_data.facebook_account,
-          person_data.tribeEthnicGroup,         // 32 tribeEthnicGroup
-          person_data.cellphoneNumber,          // 33 cellphoneNumber
-          person_data.emailAddress,             // 34 emailAddress
-          person_data.presentStreet,            // 35 presentStreet
-          person_data.presentBarangay,          // 36 presentBarangay
-          person_data.presentZipCode,           // 37 presentZipCode
-          person_data.presentRegion,            // 38 presentRegion
-          person_data.presentProvince,          // 39 presentProvince
-          person_data.presentMunicipality,      // 40 presentMunicipality
-          person_data.presentDswdHouseholdNumber, // 41 presentDswdHouseholdNumber
-          person_data.sameAsPresentAddress,     // 42 sameAsPresentAddress
-          person_data.permanentStreet,          // 43 permanentStreet
-          person_data.permanentBarangay,        // 44 permanentBarangay
-          person_data.permanentZipCode,         // 45 permanentZipCode
-          person_data.permanentRegion,          // 46 permanentRegion
-          person_data.permanentProvince,        // 47 permanentProvince
-          person_data.permanentMunicipality,    // 48 permanentMunicipality
+          student_number,                        // 2   student_number
+          studentProfileImg,                     // 3   profile_img
+          person_data.campus,                    // 4   campus
+          person_data.academicProgram,           // 5   academicProgram
+          person_data.classifiedAs,              // 6   classifiedAs
+          person_data.applyingAs,                // 7   applyingAs
+          person_data.program,                   // 8   program
+          person_data.program2,                  // 9   program2
+          person_data.program3,                  // 10  program3
+          person_data.yearLevel,                 // 11  yearLevel
+          person_data.last_name,                 // 12  last_name
+          person_data.first_name,                // 13  first_name
+          person_data.middle_name,               // 14  middle_name
+          person_data.extension,                 // 15  extension
+          person_data.nickname,                  // 16  nickname
+          person_data.height,                    // 17  height
+          person_data.weight,                    // 18  weight
+          person_data.lrnNumber,                 // 19  lrnNumber
+          person_data.nolrnNumber,               // 20  nolrnNumber
+          person_data.gender,                    // 21  gender
+          person_data.pwdMember,                 // 22  pwdMember
+          person_data.pwdType,                   // 23  pwdType
+          person_data.pwdId,                     // 24  pwdId
+          person_data.birthOfDate,               // 25  birthOfDate
+          person_data.age,                       // 26  age
+          person_data.birthPlace,                // 27  birthPlace
+          person_data.languageDialectSpoken,     // 28  languageDialectSpoken
+          person_data.citizenship,               // 29  citizenship
+          person_data.religion,                  // 30  religion
+          person_data.civilStatus,               // 31  civilStatus
+          person_data.tribeEthnicGroup,          // 32  tribeEthnicGroup
+          person_data.cellphoneNumber,           // 33  cellphoneNumber
+          person_data.emailAddress,              // 34  emailAddress
+          person_data.presentStreet,             // 35  presentStreet
+          person_data.presentBarangay,           // 36  presentBarangay
+          person_data.presentZipCode,            // 37  presentZipCode
+          person_data.presentRegion,             // 38  presentRegion
+          person_data.presentProvince,           // 39  presentProvince
+          person_data.presentMunicipality,       // 40  presentMunicipality
+          person_data.presentDswdHouseholdNumber,// 41  presentDswdHouseholdNumber
+          person_data.sameAsPresentAddress,      // 42  sameAsPresentAddress
+          person_data.permanentStreet,           // 43  permanentStreet
+          person_data.permanentBarangay,         // 44  permanentBarangay
+          person_data.permanentZipCode,          // 45  permanentZipCode
+          person_data.permanentRegion,           // 46  permanentRegion
+          person_data.permanentProvince,         // 47  permanentProvince
+          person_data.permanentMunicipality,     // 48  permanentMunicipality
           person_data.permanentDswdHouseholdNumber, // 49 permanentDswdHouseholdNumber
-          person_data.solo_parent,              // 50 solo_parent
-          person_data.father_deceased,          // 51 father_deceased
-          person_data.father_family_name,       // 52 father_family_name
-          person_data.father_given_name,        // 53 father_given_name
-          person_data.father_middle_name,       // 54 father_middle_name
-          person_data.father_ext,               // 55 father_ext
-          person_data.father_nickname,          // 56 father_nickname
-          person_data.father_education,         // 57 father_education
-          person_data.father_education_level,   // 58 father_education_level
-          person_data.father_last_school,       // 59 father_last_school
-          person_data.father_course,            // 60 father_course
-          person_data.father_year_graduated,    // 61 father_year_graduated
-          person_data.father_school_address,    // 62 father_school_address
-          person_data.father_contact,           // 63 father_contact
-          person_data.father_occupation,        // 64 father_occupation
-          person_data.father_employer,          // 65 father_employer
-          person_data.father_income,            // 66 father_income
-          person_data.father_email,             // 67 father_email
-          person_data.mother_deceased,          // 68 mother_deceased
-          person_data.mother_family_name,       // 69 mother_family_name
-          person_data.mother_given_name,        // 70 mother_given_name
-          person_data.mother_middle_name,       // 71 mother_middle_name
-          person_data.mother_ext,               // 72 mother_ext
-          person_data.mother_nickname,          // 73 mother_nickname
-          person_data.mother_education,         // 74 mother_education
-          person_data.mother_education_level,   // 75 mother_education_level
-          person_data.mother_last_school,       // 76 mother_last_school
-          person_data.mother_course,            // 77 mother_course
-          person_data.mother_year_graduated,    // 78 mother_year_graduated
-          person_data.mother_school_address,    // 79 mother_school_address
-          person_data.mother_contact,           // 80 mother_contact
-          person_data.mother_occupation,        // 81 mother_occupation
-          person_data.mother_employer,          // 82 mother_employer
-          person_data.mother_income,            // 83 mother_income
-          person_data.mother_email,             // 84 mother_email
-          person_data.guardian,                 // 85 guardian
-          person_data.guardian_family_name,     // 86 guardian_family_name
-          person_data.guardian_given_name,      // 87 guardian_given_name
-          person_data.guardian_middle_name,     // 88 guardian_middle_name
-          person_data.guardian_ext,             // 89 guardian_ext
-          person_data.guardian_nickname,        // 90 guardian_nickname
-          person_data.guardian_address,         // 91 guardian_address
-          person_data.guardian_contact,         // 92 guardian_contact
-          person_data.guardian_email,           // 93 guardian_email
-          person_data.annual_income,
-          person_data.has_no_siblings,
-          person_data.siblings,             // 94 annual_income
-          person_data.schoolLevel,              // 95 schoolLevel
-          person_data.schoolLastAttended,       // 96 schoolLastAttended
-          person_data.schoolAddress,            // 97 schoolAddress
-          person_data.courseProgram,            // 98 courseProgram
-          person_data.honor,                    // 99 honor
-          person_data.generalAverage,           // 100 generalAverage
-          person_data.yearGraduated,            // 101 yearGraduated
-          person_data.schoolLevel1,             // 102 schoolLevel1
-          person_data.schoolLastAttended1,      // 103 schoolLastAttended1
-          person_data.schoolAddress1,           // 104 schoolAddress1
-          person_data.courseProgram1,           // 105 courseProgram1
-          person_data.honor1,                   // 106 honor1
-          person_data.generalAverage1,          // 107 generalAverage1
-          person_data.yearGraduated1,           // 108 yearGraduated1
-          person_data.strand,                   // 109 strand
-          person_data.cough,                    // 110 cough
-          person_data.colds,                    // 111 colds
-          person_data.fever,                    // 112 fever
-          person_data.asthma,                   // 113 asthma
-          person_data.faintingSpells,           // 114 faintingSpells
-          person_data.heartDisease,             // 115 heartDisease
-          person_data.tuberculosis,             // 116 tuberculosis
-          person_data.frequentHeadaches,        // 117 frequentHeadaches
-          person_data.hernia,                   // 118 hernia
-          person_data.chronicCough,             // 119 chronicCough
-          person_data.headNeckInjury,           // 120 headNeckInjury
-          person_data.hiv,                      // 121 hiv
-          person_data.highBloodPressure,        // 122 highBloodPressure
-          person_data.diabetesMellitus,         // 123 diabetesMellitus
-          person_data.allergies,                // 124 allergies
-          person_data.cancer,                   // 125 cancer
-          person_data.smokingCigarette,         // 126 smokingCigarette
-          person_data.alcoholDrinking,          // 127 alcoholDrinking
-          person_data.hospitalized,             // 128 hospitalized
-          person_data.hospitalizationDetails,   // 129 hospitalizationDetails
-          person_data.medications,              // 130 medications
-          person_data.hadCovid,                 // 131 hadCovid
-          person_data.covidDate,                // 132 covidDate
-          person_data.vaccine1Brand,            // 133 vaccine1Brand
-          person_data.vaccine1Date,             // 134 vaccine1Date
-          person_data.vaccine2Brand,            // 135 vaccine2Brand
-          person_data.vaccine2Date,             // 136 vaccine2Date
-          person_data.booster1Brand,            // 137 booster1Brand
-          person_data.booster1Date,             // 138 booster1Date
-          person_data.booster2Brand,            // 139 booster2Brand
-          person_data.booster2Date,             // 140 booster2Date
-          person_data.chestXray,                // 141 chestXray
-          person_data.cbc,                      // 142 cbc
-          person_data.urinalysis,               // 143 urinalysis
-          person_data.otherworkups,             // 144 otherworkups
-          person_data.symptomsToday,            // 145 symptomsToday
-          person_data.remarks,                  // 146 remarks
-          person_data.termsOfAgreement,         // 147 termsOfAgreement
-          person_data.created_at,               // 148 created_at
-          person_data.current_step,             // 149 current_step
+          person_data.solo_parent,               // 50  solo_parent
+          person_data.father_deceased,           // 51  father_deceased
+          person_data.father_family_name,        // 52  father_family_name
+          person_data.father_given_name,         // 53  father_given_name
+          person_data.father_middle_name,        // 54  father_middle_name
+          person_data.father_ext,                // 55  father_ext
+          person_data.father_nickname,           // 56  father_nickname
+          person_data.father_education,          // 57  father_education
+          person_data.father_education_level,    // 58  father_education_level
+          person_data.father_last_school,        // 59  father_last_school
+          person_data.father_course,             // 60  father_course
+          person_data.father_year_graduated,     // 61  father_year_graduated
+          person_data.father_school_address,     // 62  father_school_address
+          person_data.father_contact,            // 63  father_contact
+          person_data.father_occupation,         // 64  father_occupation
+          person_data.father_employer,           // 65  father_employer
+          person_data.father_income,             // 66  father_income
+          person_data.father_email,              // 67  father_email
+          person_data.mother_deceased,           // 68  mother_deceased
+          person_data.mother_family_name,        // 69  mother_family_name
+          person_data.mother_given_name,         // 70  mother_given_name
+          person_data.mother_middle_name,        // 71  mother_middle_name
+          person_data.mother_ext,                // 72  mother_ext
+          person_data.mother_nickname,           // 73  mother_nickname
+          person_data.mother_education,          // 74  mother_education
+          person_data.mother_education_level,    // 75  mother_education_level
+          person_data.mother_last_school,        // 76  mother_last_school
+          person_data.mother_course,             // 77  mother_course
+          person_data.mother_year_graduated,     // 78  mother_year_graduated
+          person_data.mother_school_address,     // 79  mother_school_address
+          person_data.mother_contact,            // 80  mother_contact
+          person_data.mother_occupation,         // 81  mother_occupation
+          person_data.mother_employer,           // 82  mother_employer
+          person_data.mother_income,             // 83  mother_income
+          person_data.mother_email,              // 84  mother_email
+          person_data.guardian,                  // 85  guardian
+          person_data.guardian_family_name,      // 86  guardian_family_name
+          person_data.guardian_given_name,       // 87  guardian_given_name
+          person_data.guardian_middle_name,      // 88  guardian_middle_name
+          person_data.guardian_ext,              // 89  guardian_ext
+          person_data.guardian_nickname,         // 90  guardian_nickname
+          person_data.guardian_address,          // 91  guardian_address
+          person_data.guardian_contact,          // 92  guardian_contact
+          person_data.guardian_email,            // 93  guardian_email
+          person_data.spouse,                    // 94  spouse
+          person_data.facebook_account,          // 95  facebook_account
+          person_data.has_no_siblings,           // 96  has_no_siblings
+          person_data.siblings,                  // 97  siblings
+          person_data.annual_income,             // 98  annual_income
+          person_data.schoolLevel,               // 99  schoolLevel
+          person_data.schoolLastAttended,        // 100 schoolLastAttended
+          person_data.schoolAddress,             // 101 schoolAddress
+          person_data.courseProgram,             // 102 courseProgram
+          person_data.honor,                     // 103 honor
+          person_data.generalAverage,            // 104 generalAverage
+          person_data.yearGraduated,             // 105 yearGraduated
+          person_data.schoolLevel1,              // 106 schoolLevel1
+          person_data.schoolLastAttended1,       // 107 schoolLastAttended1
+          person_data.schoolAddress1,            // 108 schoolAddress1
+          person_data.courseProgram1,            // 109 courseProgram1
+          person_data.honor1,                    // 110 honor1
+          person_data.generalAverage1,           // 111 generalAverage1
+          person_data.yearGraduated1,            // 112 yearGraduated1
+          person_data.strand,                    // 113 strand
+          person_data.cough,                     // 114 cough
+          person_data.colds,                     // 115 colds
+          person_data.fever,                     // 116 fever
+          person_data.asthma,                    // 117 asthma
+          person_data.faintingSpells,            // 118 faintingSpells
+          person_data.heartDisease,              // 119 heartDisease
+          person_data.tuberculosis,              // 120 tuberculosis
+          person_data.frequentHeadaches,         // 121 frequentHeadaches
+          person_data.hernia,                    // 122 hernia
+          person_data.chronicCough,              // 123 chronicCough
+          person_data.headNeckInjury,            // 124 headNeckInjury
+          person_data.hiv,                       // 125 hiv
+          person_data.highBloodPressure,         // 126 highBloodPressure
+          person_data.diabetesMellitus,          // 127 diabetesMellitus
+          person_data.allergies,                 // 128 allergies
+          person_data.cancer,                    // 129 cancer
+          person_data.smokingCigarette,          // 130 smokingCigarette
+          person_data.alcoholDrinking,           // 131 alcoholDrinking
+          person_data.hospitalized,              // 132 hospitalized
+          person_data.hospitalizationDetails,    // 133 hospitalizationDetails
+          person_data.medications,               // 134 medications
+          person_data.hadCovid,                  // 135 hadCovid
+          person_data.covidDate,                 // 136 covidDate
+          person_data.vaccine1Brand,             // 137 vaccine1Brand
+          person_data.vaccine1Date,              // 138 vaccine1Date
+          person_data.vaccine2Brand,             // 139 vaccine2Brand
+          person_data.vaccine2Date,              // 140 vaccine2Date
+          person_data.booster1Brand,             // 141 booster1Brand
+          person_data.booster1Date,              // 142 booster1Date
+          person_data.booster2Brand,             // 143 booster2Brand
+          person_data.booster2Date,              // 144 booster2Date
+          person_data.chestXray,                 // 145 chestXray
+          person_data.cbc,                       // 146 cbc
+          person_data.urinalysis,                // 147 urinalysis
+          person_data.otherworkups,              // 148 otherworkups
+          person_data.symptomsToday,             // 149 symptomsToday
+          person_data.remarks,                   // 150 remarks
+          person_data.termsOfAgreement,          // 151 termsOfAgreement
+          person_data.created_at,                // 152 created_at
+          person_data.current_step,              // 153 current_step
         ];
 
         const placeholders = personValues.map(() => "?").join(", ");
 
         const [personInsertResult] = await conn.query(
           `INSERT INTO person_table (
-        student_number, profile_img, campus, academicProgram, classifiedAs,
-        applyingAs, program, program2, program3, yearLevel, last_name, first_name,
-        middle_name, extension, nickname, height, weight, lrnNumber, nolrnNumber,
-        gender, pwdMember, pwdType, pwdId, birthOfDate, age, birthPlace,
-        languageDialectSpoken, citizenship, religion, civilStatus, spouse, facebook_account, tribeEthnicGroup,
-        cellphoneNumber, emailAddress, presentStreet, presentBarangay, presentZipCode,
-        presentRegion, presentProvince, presentMunicipality, presentDswdHouseholdNumber,
-        sameAsPresentAddress, permanentStreet, permanentBarangay, permanentZipCode,
-        permanentRegion, permanentProvince, permanentMunicipality,
-        permanentDswdHouseholdNumber, solo_parent, father_deceased, father_family_name,
-        father_given_name, father_middle_name, father_ext, father_nickname,
-        father_education, father_education_level, father_last_school, father_course,
-        father_year_graduated, father_school_address, father_contact, father_occupation,
-        father_employer, father_income, father_email, mother_deceased, mother_family_name,
-        mother_given_name, mother_middle_name, mother_ext, mother_nickname,
-        mother_education, mother_education_level, mother_last_school, mother_course,
-        mother_year_graduated, mother_school_address, mother_contact, mother_occupation,
-        mother_employer, mother_income, mother_email, guardian, guardian_family_name,
-        guardian_given_name, guardian_middle_name, guardian_ext, guardian_nickname,
-        guardian_address, guardian_contact, guardian_email, annual_income, has_no_siblings, siblings, schoolLevel,
-        schoolLastAttended, schoolAddress, courseProgram, honor, generalAverage,
-        yearGraduated, schoolLevel1, schoolLastAttended1, schoolAddress1, courseProgram1,
-        honor1, generalAverage1, yearGraduated1, strand, cough, colds, fever, asthma,
-        faintingSpells, heartDisease, tuberculosis, frequentHeadaches, hernia,
-        chronicCough, headNeckInjury, hiv, highBloodPressure, diabetesMellitus,
-        allergies, cancer, smokingCigarette, alcoholDrinking, hospitalized,
-        hospitalizationDetails, medications, hadCovid, covidDate, vaccine1Brand,
-        vaccine1Date, vaccine2Brand, vaccine2Date, booster1Brand, booster1Date,
-        booster2Brand, booster2Date, chestXray, cbc, urinalysis, otherworkups,
-        symptomsToday, remarks, termsOfAgreement, created_at, current_step
-      ) VALUES (${placeholders})`,
+    student_number, profile_img, campus, academicProgram, classifiedAs,
+    applyingAs, program, program2, program3, yearLevel, last_name, first_name,
+    middle_name, extension, nickname, height, weight, lrnNumber, nolrnNumber,
+    gender, pwdMember, pwdType, pwdId, birthOfDate, age, birthPlace,
+    languageDialectSpoken, citizenship, religion, civilStatus, tribeEthnicGroup,
+    cellphoneNumber, emailAddress, presentStreet, presentBarangay, presentZipCode,
+    presentRegion, presentProvince, presentMunicipality, presentDswdHouseholdNumber,
+    sameAsPresentAddress, permanentStreet, permanentBarangay, permanentZipCode,
+    permanentRegion, permanentProvince, permanentMunicipality,
+    permanentDswdHouseholdNumber, solo_parent, father_deceased, father_family_name,
+    father_given_name, father_middle_name, father_ext, father_nickname,
+    father_education, father_education_level, father_last_school, father_course,
+    father_year_graduated, father_school_address, father_contact, father_occupation,
+    father_employer, father_income, father_email, mother_deceased, mother_family_name,
+    mother_given_name, mother_middle_name, mother_ext, mother_nickname,
+    mother_education, mother_education_level, mother_last_school, mother_course,
+    mother_year_graduated, mother_school_address, mother_contact, mother_occupation,
+    mother_employer, mother_income, mother_email, guardian, guardian_family_name,
+    guardian_given_name, guardian_middle_name, guardian_ext, guardian_nickname,
+    guardian_address, guardian_contact, guardian_email, spouse, facebook_account,
+    has_no_siblings, siblings, annual_income, schoolLevel,
+    schoolLastAttended, schoolAddress, courseProgram, honor, generalAverage,
+    yearGraduated, schoolLevel1, schoolLastAttended1, schoolAddress1, courseProgram1,
+    honor1, generalAverage1, yearGraduated1, strand, cough, colds, fever, asthma,
+    faintingSpells, heartDisease, tuberculosis, frequentHeadaches, hernia,
+    chronicCough, headNeckInjury, hiv, highBloodPressure, diabetesMellitus,
+    allergies, cancer, smokingCigarette, alcoholDrinking, hospitalized,
+    hospitalizationDetails, medications, hadCovid, covidDate, vaccine1Brand,
+    vaccine1Date, vaccine2Brand, vaccine2Date, booster1Brand, booster1Date,
+    booster2Brand, booster2Date, chestXray, cbc, urinalysis, otherworkups,
+    symptomsToday, remarks, termsOfAgreement, created_at, current_step
+  ) VALUES (${placeholders})`,
           personValues,
         );
         if (!personInsertResult.insertId) {
@@ -1060,8 +1061,8 @@ WHERE proctor LIKE ?
         // ── Insert into person_status_table ──────────────────────────────────────
         const [personStatusInsertResult] = await conn.query(
           `INSERT INTO person_status_table
-        (person_id, exam_status, requirements, residency, student_registration_status, exam_result, hs_ave)
-       VALUES (?, 0, 0, 0, 0, 0, 0)`,
+    (person_id, exam_status, requirements, residency, student_registration_status, exam_result, hs_ave)
+   VALUES (?, 0, 0, 0, 0, 0, 0)`,
           [personIdForStudent],
         );
         if ((personStatusInsertResult.affectedRows || 0) !== 1) {
@@ -1071,8 +1072,8 @@ WHERE proctor LIKE ?
         // ── Insert into student_status_table ─────────────────────────────────────
         const [studentStatusInsertResult] = await conn.query(
           `INSERT INTO student_status_table
-        (student_number, active_curriculum, enrolled_status, year_level_id, active_school_year_id, control_status)
-       VALUES (?, ?, 0, 0, 0, 0)`,
+    (student_number, active_curriculum, enrolled_status, year_level_id, active_school_year_id, control_status)
+   VALUES (?, ?, 0, 0, 0, 0)`,
           [student_number, person_data.program],
         );
         if ((studentStatusInsertResult.affectedRows || 0) !== 1) {
@@ -1110,9 +1111,9 @@ WHERE proctor LIKE ?
 
           const [requirementInsertResult] = await conn.query(
             `INSERT INTO requirement_uploads
-          (requirements_id, person_id, submitted_documents, file_path, original_name,
-           remarks, status, document_status, registrar_status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (requirements_id, person_id, submitted_documents, file_path, original_name,
+       remarks, status, document_status, registrar_status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               req.requirements_id,
               personIdForStudent,
@@ -1145,7 +1146,6 @@ WHERE proctor LIKE ?
         }
 
         // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
-        // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
         const [existingUser] = await conn.query(
           `SELECT id FROM user_accounts WHERE person_id = ?`,
           [personIdForStudent],
@@ -1177,16 +1177,36 @@ WHERE proctor LIKE ?
         conn.release();
         connectionReleased = true;
 
-        // ── Generate QR code ─────────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Generate QR codes (Student QR + TOR QR) ─── ★ CHANGED SECTION ★ ─────
+        // ═══════════════════════════════════════════════════════════════════════
         const qrData = `${process.env.DB_HOST_LOCAL}:5173/student_qr_information/${student_number}`;
+        const torQrData = `${process.env.DB_HOST_LOCAL}:5173/tor_qr_information/${student_number}`;
+
         const qrFilename = `${student_number}_qrcode.png`;
-        const qrPath = path.join(__dirname, "./uploads/QrCodeGenerated", qrFilename);
-        
+        const torQrFilename = `${student_number}_tor_qrcode.png`;
+
+        const studentQrDir = path.join(__dirname, "uploads", "StudentQRCodeGenerated");
+        const torQrDir = path.join(__dirname, "uploads", "TORStudentQRCodeGenerated");
+
+        if (!fs.existsSync(studentQrDir)) fs.mkdirSync(studentQrDir, { recursive: true });
+        if (!fs.existsSync(torQrDir)) fs.mkdirSync(torQrDir, { recursive: true });
+
+        const qrPath = path.join(studentQrDir, qrFilename);
+        const torQrPath = path.join(torQrDir, torQrFilename);
 
         await QRCode.toFile(qrPath, qrData, {
           color: { dark: "#000", light: "#FFF" },
           width: 300,
         });
+
+        await QRCode.toFile(torQrPath, torQrData, {
+          color: { dark: "#000", light: "#FFF" },
+          width: 300,
+        });
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── END CHANGED SECTION ──────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
 
         // ── Audit log ────────────────────────────────────────────────────────────
         const roleLabel = formatAuditActorRole(auditActorRole);
@@ -1251,7 +1271,7 @@ Click the link below to log in:
     https://ap.earist.edu.ph/login
 
     
-        `.trim(),
+    `.trim(),
           });
           emailSent = true;
         } catch (emailError) {

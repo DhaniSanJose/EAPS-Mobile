@@ -53,8 +53,12 @@ import PhotoCaptureDialog from "../components/PhotoCaptureDialog";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";
+
   const text = String(value).trim();
-  return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
+
+  return ["null", "undefined"].includes(text.toLowerCase())
+    ? ""
+    : text;
 };
 
 const formatSuggestionName = (student) =>
@@ -62,8 +66,82 @@ const formatSuggestionName = (student) =>
     cleanSuggestionValue(student?.first_name),
     cleanSuggestionValue(student?.middle_name),
     cleanSuggestionValue(student?.last_name),
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
+
+const formatStudentFullName = (student) => {
+  if (!student) return "";
+
+  const clean = (value) => {
+    if (value === null || value === undefined) return "";
+
+    const text = String(value).trim();
+
+    if (
+      !text ||
+      text.toLowerCase() === "null" ||
+      text.toLowerCase() === "undefined"
+    ) {
+      return "";
+    }
+
+    return text;
+  };
+
+  const lastName = clean(
+    student.last_name ??
+    student.family_name ??
+    student.lastname ??
+    student.lastName
+  );
+
+  const firstName = clean(
+    student.first_name ??
+    student.given_name ??
+    student.firstname ??
+    student.firstName
+  );
+
+  const middleName = clean(
+    student.middle_name ??
+    student.middleName ??
+    student.middlename
+  );
+
+  const extension = clean(
+    student.extension ??
+    student.ext ??
+    student.name_extension ??
+    student.suffix
+  );
+
+  /*
+   * TOR format:
+   * LAST NAME, FIRST NAME MIDDLE NAME EXTENSION
+   *
+   * Examples:
+   * MONTANO, MARK ANTHONY
+   * MONTANO, MARK ANTHONY JR.
+   */
+
+  const nameParts = [
+    firstName,
+    middleName,
+    extension,
+  ].filter(Boolean);
+
+  if (lastName && nameParts.length > 0) {
+    return `${lastName}, ${nameParts.join(" ")}`.toUpperCase();
+  }
+
+  if (lastName) {
+    return lastName.toUpperCase();
+  }
+
+  return nameParts.join(" ").toUpperCase();
+};
 
 const TOR_EDIT_OPTIONS = [
   {
@@ -106,7 +184,17 @@ const TOR_EDIT_OPTIONS = [
     color: "#2e7d32",
     bg: "#e8f5e9",
   },
+  {
+    key: "signatories",
+    label: "Edit Signatories",
+    description: "Names, designations, and signature images",
+    icon: <EditNoteIcon sx={{ fontSize: 32 }} />,
+    color: "#0288d1",
+    bg: "#e0f7fa",
+  },
 ];
+
+const VALID_TOR_ROLES = ["prepared_by", "checked_by", "registrar"];
 
 const TranscriptOfRecords = () => {
   const settings = useContext(SettingsContext);
@@ -296,39 +384,44 @@ const TranscriptOfRecords = () => {
   const [campusAddress, setCampusAddress] = useState("");
   const [gradeConversion, setGradeConversions] = useState([]);
 
-  // ---- TOR settings (remarks / admission credentials / footer notes) ----
-  const DEFAULT_REMARKS = "COPY FOR EMPLOYMENT PURPOSES ONLY.";
-  const DEFAULT_ADMISSION_CREDENTIALS =
-    "CERT. OF GOOD MORAL CHARACTER / F138 / F137 / PSA BIRTH CERT.";
-  const DEFAULT_CREDITS_NOTE =
-    "CREDITS, One college units is at least (17) full hours of instruction in academic or professional subject within a semester.";
-  const DEFAULT_INSTITUTION_NOTE =
-    "is a State College; hence, a SPECIAL ORDER is not issued to its graduates. The issuance of the Official Transcript of Records and Diploma is a sufficient proof for Graduation.";
 
-  const [remarks, setRemarks] = useState(DEFAULT_REMARKS);
-  const [admissionCredentialsNote, setAdmissionCredentialsNote] = useState(DEFAULT_ADMISSION_CREDENTIALS);
-  const [creditsNote, setCreditsNote] = useState(DEFAULT_CREDITS_NOTE);
-  const [institutionNote, setInstitutionNote] = useState(DEFAULT_INSTITUTION_NOTE);
+
+  const [remarks, setRemarks] = useState("");
+  const [admissionCredentialsNote, setAdmissionCredentialsNote] = useState("");
+  const [creditsNote, setCreditsNote] = useState("");
+  const [institutionNote, setInstitutionNote] = useState("");
   const [institutionWebsite, setInstitutionWebsite] = useState("");
+
+  const [documentNumbers, setDocumentNumbers] = useState([]);
+
+  const getDocumentNumber = (pageIndex) => documentNumbers[pageIndex] || "";
+
+  const setDocumentNumberForPage = (pageIndex, value) => {
+    setDocumentNumbers((prev) => {
+      const next = [...prev];
+      next[pageIndex] = value;
+      return next;
+    });
+  };
 
   const [remarksDialogOpen, setRemarksDialogOpen] = useState(false);
   const [remarksDraft, setRemarksDraft] = useState("");
-  const [admissionCredentialsDialogOpen, setAdmissionCredentialsDialogOpen] = useState(false);
-  const [admissionCredentialsDraft, setAdmissionCredentialsDraft] = useState("");
+
   const [footerNotesDialogOpen, setFooterNotesDialogOpen] = useState(false);
   const [creditsNoteDraft, setCreditsNoteDraft] = useState("");
   const [institutionNoteDraft, setInstitutionNoteDraft] = useState("");
+
 
   const fetchTorSettings = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/tor-settings`);
       const data = res.data?.data;
       if (data) {
-        setRemarks(data.remarks || DEFAULT_REMARKS);
-        setAdmissionCredentialsNote(data.admission_credentials || DEFAULT_ADMISSION_CREDENTIALS);
-        setCreditsNote(data.credits_note || DEFAULT_CREDITS_NOTE);
-        setInstitutionNote(data.institution_note || DEFAULT_INSTITUTION_NOTE);
-        setInstitutionWebsite(data.institution_website || "");
+        setRemarks(data.remarks ?? "");
+        setAdmissionCredentialsNote(data.admission_credentials ?? "");
+        setCreditsNote(data.credits_note ?? "");
+        setInstitutionNote(data.institution_note ?? "");
+        setInstitutionWebsite(data.institution_website ?? "");
       }
     } catch (err) {
       console.error("Failed to fetch TOR settings:", err);
@@ -350,7 +443,12 @@ const TranscriptOfRecords = () => {
       institution_website: institutionWebsite,
       ...overrides,
     };
-    await axios.put(`${API_BASE_URL}/api/tor-settings`, payload);
+    await axios.put(`${API_BASE_URL}/api/tor-settings`, payload, {
+      headers: getFlatAuditHeaders({
+        "x-employee-id": employeeID,
+        "x-page-id": pageId,
+      }),
+    });
   };
 
   const openRemarksDialog = () => {
@@ -358,13 +456,19 @@ const TranscriptOfRecords = () => {
     setRemarksDialogOpen(true);
   };
   const closeRemarksDialog = () => setRemarksDialogOpen(false);
+
+
   const handleSaveRemarks = async () => {
-    const cleaned = remarksDraft.trim() || DEFAULT_REMARKS;
+    const cleaned = remarksDraft.trim();
     try {
       await saveTorSettings({ remarks: cleaned });
       setRemarks(cleaned);
+      setSnackbarSeverity("success");
+      setSnackbarMessage("Remarks saved successfully.");
+      setOpenSnackbar(true);
     } catch (err) {
       console.error("Failed to save remarks:", err);
+      setSnackbarSeverity("warning");
       setSnackbarMessage("Failed to save remarks.");
       setOpenSnackbar(true);
       return;
@@ -372,43 +476,41 @@ const TranscriptOfRecords = () => {
     setRemarksDialogOpen(false);
   };
 
-  const openAdmissionCredentialsDialog = () => {
-    setAdmissionCredentialsDraft(admissionCredentialsNote);
-    setAdmissionCredentialsDialogOpen(true);
-  };
+
   const closeAdmissionCredentialsDialog = () => setAdmissionCredentialsDialogOpen(false);
-  const handleSaveAdmissionCredentials = async () => {
-    const cleaned = admissionCredentialsDraft.trim() || DEFAULT_ADMISSION_CREDENTIALS;
-    try {
-      await saveTorSettings({ admission_credentials: cleaned });
-      setAdmissionCredentialsNote(cleaned);
-    } catch (err) {
-      console.error("Failed to save admission credentials:", err);
-      setSnackbarMessage("Failed to save admission credentials.");
-      setOpenSnackbar(true);
-      return;
-    }
-    setAdmissionCredentialsDialogOpen(false);
-  };
+
+  const [institutionWebsiteDraft, setInstitutionWebsiteDraft] = useState("");
 
   const openFooterNotesDialog = () => {
     setCreditsNoteDraft(creditsNote);
     setInstitutionNoteDraft(institutionNote);
+    setInstitutionWebsiteDraft(institutionWebsite);
     setFooterNotesDialogOpen(true);
   };
-  const closeFooterNotesDialog = () => setFooterNotesDialogOpen(false);
+
+  const closeFooterNotesDialog = () => {
+    setFooterNotesDialogOpen(false);
+  };
+
   const handleSaveFooterNotes = async () => {
-    const cleanedCredits = creditsNoteDraft.trim() || DEFAULT_CREDITS_NOTE;
-    const cleanedInstitution = institutionNoteDraft.trim() || DEFAULT_INSTITUTION_NOTE;
+    const cleanedCredits = creditsNoteDraft.trim();
+    const cleanedInstitution = institutionNoteDraft.trim();
+    const cleanedWebsite = institutionWebsiteDraft.trim();
     try {
       await saveTorSettings({
         credits_note: cleanedCredits,
         institution_note: cleanedInstitution,
+        institution_website: cleanedWebsite,
       });
       setCreditsNote(cleanedCredits);
       setInstitutionNote(cleanedInstitution);
+      setInstitutionWebsite(cleanedWebsite);
+      setSnackbarSeverity("success");
+      setSnackbarMessage("Footer info saved successfully.");
+      setOpenSnackbar(true);
     } catch (err) {
       console.error("Failed to save footer notes:", err);
+      setSnackbarSeverity("warning");
       setSnackbarMessage("Failed to save footer notes.");
       setOpenSnackbar(true);
       return;
@@ -464,21 +566,31 @@ const TranscriptOfRecords = () => {
     try {
       await Promise.all(
         changedRows.map((row) =>
-          axios.put(`${API_BASE_URL}/api/tor-grading-system/${row.id}/toggle`, {
-            show_on_tor: row.show_on_tor,
-          }),
+          axios.put(
+            `${API_BASE_URL}/api/tor-grading-system/${row.id}/toggle`,
+            { show_on_tor: row.show_on_tor },
+            {
+              headers: getFlatAuditHeaders({
+                "x-employee-id": employeeID,
+                "x-page-id": pageId,
+              }),
+            },
+          ),
         ),
       );
       await fetchTorGradingSystem();
+      setSnackbarSeverity("success");
+      setSnackbarMessage("Grading system saved successfully.");
+      setOpenSnackbar(true);
     } catch (err) {
       console.error("Failed to save grading system:", err);
+      setSnackbarSeverity("warning");
       setSnackbarMessage("Failed to save grading system changes.");
       setOpenSnackbar(true);
       return;
     }
     setGradingSystemDialogOpen(false);
   };
-
   // Split rows currently shown on the TOR into two visual columns,
   // matching the original two-block layout (left block / right block).
   const gradingSystemHalf = Math.ceil(gradingSystemRows.length / 2);
@@ -534,15 +646,7 @@ const TranscriptOfRecords = () => {
   };
 
 
-  const [admissionCredentialsNote, setAdmissionCredentialsNote] = useState(() => {
-    try {
-      const stored = localStorage.getItem(ADMISSION_CREDENTIALS_STORAGE_KEY);
-      if (stored) return stored;
-    } catch (err) {
-      console.error("Failed to load admission credentials note:", err);
-    }
-    return DEFAULT_ADMISSION_CREDENTIALS;
-  });
+
   const [admissionCredentialsDialogOpen, setAdmissionCredentialsDialogOpen] = useState(false);
   const [admissionCredentialsDraft, setAdmissionCredentialsDraft] = useState("");
 
@@ -551,52 +655,23 @@ const TranscriptOfRecords = () => {
     setAdmissionCredentialsDraft(admissionCredentialsNote);
     setAdmissionCredentialsDialogOpen(true);
   };
-  const closeAdmissionCredentialsDialog = () => setAdmissionCredentialsDialogOpen(false);
-  const handleSaveAdmissionCredentials = () => {
-    const cleaned = admissionCredentialsDraft.trim() || DEFAULT_ADMISSION_CREDENTIALS;
-    setAdmissionCredentialsNote(cleaned);
+
+  const handleSaveAdmissionCredentials = async () => {
+    const cleaned = admissionCredentialsDraft.trim();
     try {
-      localStorage.setItem(ADMISSION_CREDENTIALS_STORAGE_KEY, cleaned);
+      await saveTorSettings({ admission_credentials: cleaned });
+      setAdmissionCredentialsNote(cleaned);
+      setSnackbarSeverity("success");
+      setSnackbarMessage("Admission credentials saved successfully.");
+      setOpenSnackbar(true);
     } catch (err) {
-      console.error("Failed to save admission credentials note:", err);
+      console.error("Failed to save admission credentials:", err);
+      setSnackbarSeverity("warning");
+      setSnackbarMessage("Failed to save admission credentials.");
+      setOpenSnackbar(true);
+      return;
     }
     setAdmissionCredentialsDialogOpen(false);
-  };
-
-  const [creditsNote, setCreditsNote] = useState(() => {
-    try {
-      const stored = localStorage.getItem(CREDITS_NOTE_STORAGE_KEY);
-      if (stored) return stored;
-    } catch (err) { console.error("Failed to load credits note:", err); }
-    return DEFAULT_CREDITS_NOTE;
-  });
-  const [institutionNote, setInstitutionNote] = useState(() => {
-    try {
-      const stored = localStorage.getItem(INSTITUTION_NOTE_STORAGE_KEY);
-      if (stored) return stored;
-    } catch (err) { console.error("Failed to load institution note:", err); }
-    return DEFAULT_INSTITUTION_NOTE;
-  });
-  const [footerNotesDialogOpen, setFooterNotesDialogOpen] = useState(false);
-  const [creditsNoteDraft, setCreditsNoteDraft] = useState("");
-  const [institutionNoteDraft, setInstitutionNoteDraft] = useState("");
-
-  const openFooterNotesDialog = () => {
-    setCreditsNoteDraft(creditsNote);
-    setInstitutionNoteDraft(institutionNote);
-    setFooterNotesDialogOpen(true);
-  };
-  const closeFooterNotesDialog = () => setFooterNotesDialogOpen(false);
-  const handleSaveFooterNotes = () => {
-    const cleanedCredits = creditsNoteDraft.trim() || DEFAULT_CREDITS_NOTE;
-    const cleanedInstitution = institutionNoteDraft.trim() || DEFAULT_INSTITUTION_NOTE;
-    setCreditsNote(cleanedCredits);
-    setInstitutionNote(cleanedInstitution);
-    try {
-      localStorage.setItem(CREDITS_NOTE_STORAGE_KEY, cleanedCredits);
-      localStorage.setItem(INSTITUTION_NOTE_STORAGE_KEY, cleanedInstitution);
-    } catch (err) { console.error("Failed to save footer notes:", err); }
-    setFooterNotesDialogOpen(false);
   };
 
   // ✅ Fetch person data from backend
@@ -610,11 +685,7 @@ const TranscriptOfRecords = () => {
   };
 
   const location = useLocation();
-  const [signatures, setSignatures] = useState([]);
-  const [selectedPreparedBy, setSelectedPreparedBy] = useState(null);
-  const [selectedCheckedBy, setSelectedCheckedBy] = useState(null);
-  const [selectedRegistrar, setSelectedRegistrar] = useState(null);
-  const [signaturePage, setSignaturePage] = useState(0);
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem("email");
@@ -650,14 +721,14 @@ const TranscriptOfRecords = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
-
-
+  const [photoCaptureOpen, setPhotoCaptureOpen] = useState(false);
+  const [snackbarSeverity, setSnackbarSeverity] = useState("warning");
 
 
   const allBranchNames = branches
     .map((b) => b?.branch || b?.branch_name)
     .filter(Boolean)
-    .join(" / ")
+    .join(" | ")
     .toUpperCase();
 
   useEffect(() => {
@@ -802,7 +873,7 @@ const TranscriptOfRecords = () => {
   const [loading, setLoading] = useState(false);
 
   const pageId = 62;
-  const SIGNATURES_PER_PAGE = 5;
+
 
   //Put this After putting the code of the past code
   useEffect(() => {
@@ -945,19 +1016,7 @@ const TranscriptOfRecords = () => {
     setStudentSuggestions([]);
   };
 
-  useEffect(() => {
-    const fetchSignatures = async () => {
-      try {
-        const res = await axios.get(`${API_BASE_URL}/api/signature`);
-        setSignatures(res.data?.success ? res.data.data || [] : []);
-        setSignaturePage(0);
-      } catch (err) {
-        console.error(err);
-        setSignatures([]);
-      }
-    };
-    fetchSignatures();
-  }, []);
+
 
   useEffect(() => {
     fetchGradeConversionDic();
@@ -975,14 +1034,6 @@ const TranscriptOfRecords = () => {
     }
   };
 
-  const paginatedSignatures = signatures.slice(
-    signaturePage * SIGNATURES_PER_PAGE,
-    signaturePage * SIGNATURES_PER_PAGE + SIGNATURES_PER_PAGE,
-  );
-  const totalSignaturePages = Math.max(
-    1,
-    Math.ceil(signatures.length / SIGNATURES_PER_PAGE),
-  );
 
   const getSignatureImageSrc = (signature) =>
     signature?.signature_image
@@ -1091,9 +1142,38 @@ const TranscriptOfRecords = () => {
 
   const divToPrintRef = useRef();
 
-  const printDiv = () => {
-    window.print();
-  };
+  const [torQrStatus, setTorQrStatus] = useState({ has_qr: false, tor_qr_image_url: null });
+
+  useEffect(() => {
+    const studentNumberValue = studentData?.student_number;
+
+    if (!studentNumberValue) {
+      setTorQrStatus({ has_qr: false, tor_qr_image_url: null });
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchTorQrStatus = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/tor-qr-status/${studentNumberValue}`);
+        if (!cancelled) {
+          setTorQrStatus({
+            has_qr: Boolean(res.data?.has_qr),
+            tor_qr_image_url: res.data?.tor_qr_image_url || null,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to check TOR QR status:", err);
+        if (!cancelled) setTorQrStatus({ has_qr: false, tor_qr_image_url: null });
+      }
+    };
+
+    fetchTorQrStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [studentData?.student_number]);
 
   const buildTorPageHtml = (pageGroups, pageIndex) => {
     const logoSrc = logoDataUris.school || fetchedLogo || EaristLogo;
@@ -1157,7 +1237,7 @@ const TranscriptOfRecords = () => {
         </div>
       </div>
 
-      <div style="text-align:center; font-size:1.6rem; letter-spacing:-1px; font-weight:500;">
+      <div style="text-align:center; margin-top: 30px; font-size:1.6rem; letter-spacing:-1px; font-weight:500;">
         OFFICE OF THE REGISTRAR
       </div>
       <div style="text-align:center; margin-top:-0.5rem; font-size:2.75rem; letter-spacing:-1px; font-weight:600;">
@@ -1192,8 +1272,11 @@ const TranscriptOfRecords = () => {
         ${infoRow("MAJOR", major)}
         ${infoRow("DATE OF GRADUATION", dateIssuedDisplay)}
       </div>
-      <div style="flex:0 0 225px; margin-left:1rem;">
-        ${photoSrc
+    <div style="flex:0 0 225px; margin-left:1rem;">
+  <div style="text-align:center; font-size:14px; font-weight:600; margin-bottom:4px; letter-spacing:0.3px;">
+ ${documentNumbers[pageIndex] || ""}
+  </div>
+  ${photoSrc
         ? `<img src="${photoSrc}" style="width:225px; height:225px; object-fit:cover; border:1px solid black; display:block;" />`
         : `<div style="width:225px; height:225px; border:1px solid black;"></div>`
       }
@@ -1300,24 +1383,24 @@ const TranscriptOfRecords = () => {
     <div style="width:13rem;">GRADING SYSTEM</div>
     ${gradeCol(gradingSystemFirstHalf.map((r) => r.equivalent_grade), "4.5rem")}
     ${gradeCol(gradingSystemFirstHalf.map((r) => `(${r.min_score}-${r.max_score})`), "6.5rem")}
-    ${gradeCol(gradingSystemFirstHalf.map((r) => r.description), "15.5rem")}
+    ${gradeCol(gradingSystemFirstHalf.map((r) => r.descriptive_rating), "15.5rem")}
     ${gradeCol(gradingSystemSecondHalf.map((r) => r.equivalent_grade), "4.5rem")}
     ${gradeCol(gradingSystemSecondHalf.map((r) => `(${r.min_score}-${r.max_score})`), "14rem")}
-    ${gradeCol(gradingSystemSecondHalf.map((r) => r.description), "22rem")}
+    ${gradeCol(gradingSystemSecondHalf.map((r) => r.descriptive_rating), "22rem")}
   </div>
 `;
 
     const pageRemarksText = getPageRemarksText(isLastPage, degreeTitle);
 
     const creditsNoteHtml = `
-    <div style="padding-left:2rem; height:35px; border-bottom:solid 1px black; font-size:18px; display:flex; align-items:center;">
+    <div style="padding-left:2rem; height:30px; border-bottom:solid 1px black; font-size:18px; display:flex; align-items:center;">
       <span>${creditsNote}</span>
     </div>
-    <div style="padding-left:2rem; height:65px; border-bottom:solid 1px black; font-size:17px; padding-top:8px;">
+    <div style="padding-left:2rem; height:60px; border-bottom:solid 1px black; font-size:17px; padding-top:5px;">
       <span style="font-size:18px; letter-spacing:-0.8px;">${(companyName || "").toUpperCase()}</span>
       <span style="letter-spacing:-0.8px;"> ${institutionNote}</span>
     </div>
-    <div style="padding-left:1rem; height:65px; border-top:solid 1px black; border-bottom:solid 1px black; font-size:18px; padding-top:8px;">
+    <div style="padding-left:1rem; height:60px; border-top:solid 1px black; border-bottom:solid 1px black; font-size:18px; padding-top:4px;">
       <span style="font-weight:600;">REMARKS: </span>
       <span style="font-weight:400;">${pageRemarksText}</span>
     </div>
@@ -1327,72 +1410,95 @@ const TranscriptOfRecords = () => {
   `;
 
     const signatureBlock = (label, signature) => `
-    <div style="width:20rem;">
-      <span style="font-size:18px; letter-spacing:-0.8px;">${label}</span>
-      <div style="margin-top:0.4rem; text-align:left;">
-        ${signature?.signature_image
-        ? `<img src="${getSignatureImageSrc(signature)}" style="width:11rem; height:2.7rem; object-fit:contain; display:block; margin-bottom:-0.2rem;" />`
+  <div style="width:20rem; text-align:center;">
+    <span style="font-size:18px; letter-spacing:-0.8px;">${label}</span>
+    <div style="margin-top:0.3rem; text-align:center;">
+      ${signature?.signature_image
+        ? `<img src="${getSignatureImageSrc(signature)}" style="width:16rem; height:4rem; object-fit:contain; display:block; margin:0 auto -0.2rem;" />`
         : ""
       }
-        <span style="display:block; font-size:20px; font-weight:500; letter-spacing:-1px; white-space:nowrap;">
-          ${signature?.full_name?.toUpperCase() || ""}
-        </span>
-      </div>
+      <span style="display:block; font-size:18px; font-weight:500; letter-spacing:-1px; white-space:normal; word-break:break-word; line-height:1.15; max-width:19rem; margin:0 auto;">
+        ${signature?.full_name?.toUpperCase() || ""}
+      </span>
     </div>
-  `;
+  </div>
+`;
 
     const registrarBlock = `
-    <div style="width:21rem; text-align:center; display:flex; flex-direction:column; align-items:center;">
-      ${selectedRegistrar?.signature_image
-        ? `<img src="${getSignatureImageSrc(selectedRegistrar)}" style="width:11rem; height:2.7rem; object-fit:contain; display:block; margin-bottom:-0.2rem;" />`
+  <div style="width:21rem; text-align:center; display:flex; flex-direction:column; align-items:center;">
+    ${torSignatories.registrar?.signature_image
+        ? `<img src="${getSignatureImageSrc(torSignatories.registrar)}" style="width:11rem; height:2.7rem; object-fit:contain; display:block; margin-bottom:-0.2rem;" />`
         : ""
       }
-      <span style="font-size:24px; letter-spacing:-2px;">${selectedRegistrar?.full_name?.toUpperCase() || ""}</span>
-      <hr style="width:100%;" />
-      <span style="font-size:18px; letter-spacing:-1px;">REGISTRAR</span>
-    </div>
-  `;
+    <span style="font-size:22px; letter-spacing:-1px; white-space:normal; word-break:break-word; max-width:20rem; line-height:1.15;">${torSignatories.registrar?.full_name?.toUpperCase() || ""}</span>
+    <span style="font-size:18px; letter-spacing:-1px;">REGISTRAR</span>
+  </div>
+`;
+
+    const verificationQrBlock = torQrStatus.has_qr && torQrStatus.tor_qr_image_url
+      ? `
+  <div style="width:8rem; text-align:center; display:flex; flex-direction:column; align-items:center; margin-left:auto;">
+    <img src="${API_BASE_URL}${torQrStatus.tor_qr_image_url}" alt="Scan to verify this Transcript of Records" style="width:6.5rem; height:6.5rem; object-fit:contain; display:block;" />
+    <span style="font-size:11px; letter-spacing:-0.3px; margin-top:0.2rem; line-height:1.1;">SCAN TO VERIFY</span>
+  </div>
+`
+      : "";
 
     const signaturesHtml = `
-    <div style="display:flex; padding-left:1rem; height:9rem; border-bottom:solid black 1px; align-items:flex-start;">
-      <div style="width:17rem;"></div>
-      ${signatureBlock("PREPARED BY:", selectedPreparedBy)}
-      ${signatureBlock("CHECKED BY:", selectedCheckedBy)}
-      ${registrarBlock}
-    </div>
-  `;
+  <div style="display:flex; padding-left:0.8rem; height:8rem; border-bottom:solid black 1px; align-items:flex-start;">
+<div style="width:8rem; height:8rem; position:relative; text-align:center; font-size:12px; font-style:italic;">
+  <div style="position:absolute; bottom:0.5rem; left:60%; transform:translateX(-50%); z-index:0;">
+    <span style="white-space:nowrap; display:block;">NOT VALID WITHOUT OFFICIAL</span>
+    <span style="white-space:nowrap; display:block;">SEAL OF THE INSTITUTE</span>
+  </div>
+</div>
+    <div style="width:3rem;"></div>
+    ${signatureBlock("PREPARED BY:", torSignatories.prepared_by)}
+    ${signatureBlock("CHECKED BY:", torSignatories.checked_by)}
+    ${registrarBlock}
+    ${verificationQrBlock}
+  </div>
+`;
 
-    // ── Footer: all campus addresses (Manila / Cavite, etc) ──
     const allCampusAddressesHtml = `
-    <div style="width:80rem; margin-left:auto; margin-right:auto; margin-top:0.4rem; padding-top:0.3rem; border-top:solid 1px black; display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:1.5rem;">
-      ${branches
+  <div style="width:80rem; margin-left:auto; margin-right:auto; padding-top:0.5rem; display:flex; align-items:center; justify-content:center; white-space:nowrap;">
+    ${institutionWebsite ? `
+      <span style="font-size:13px; font-weight:700; letter-spacing:0.3px;">
+        ${institutionWebsite}
+        ${branches.filter((b) => b?.address || b?.branch_address || b?.campus_address).length > 0
+          ? `<span style="margin:0 0.75rem; font-weight:400;">|</span>`
+          : ""
+        }
+      </span>
+    ` : ""}
+    ${branches
         .filter((b) => b?.address || b?.branch_address || b?.campus_address)
         .map(
           (b, index, arr) => `
-          <span style="font-size:14px; letter-spacing:-0.3px; white-space:nowrap;">
-            <span style="font-weight:700;">${(b.branch || b.branch_name || "").toUpperCase()}:</span>
-            ${b.address || b.branch_address || b.campus_address}
-            ${index < arr.length - 1 ? `<span style="margin:0 0.75rem;">|</span>` : ""}
-          </span>
-        `,
+        <span style="font-size:14px; letter-spacing:-0.3px; line-height:1.3;">
+          <span style="font-weight:700;">${(b.branch || b.branch_name || "").toUpperCase()}:</span>
+          ${b.address || b.branch_address || b.campus_address}
+          ${index < arr.length - 1 ? `<span style="margin:0 0.75rem; font-weight:400;">|</span>` : ""}
+        </span>
+      `,
         )
         .join("")}
-    </div>
-  `;
+  </div>
+`;
 
     return `
-    <div class="tor-page">
-      ${headerHtml}
-      ${studentInfoHtml}
-      ${subjectsTableHtml}
-      <div style="width:80rem; margin-left:auto; margin-right:auto; margin-top:0.5rem;">
-        ${gradingSystemHtml}
-        ${creditsNoteHtml}
-        ${signaturesHtml}
-        ${allCampusAddressesHtml}
-      </div>
-    </div>
-  `;
+<div class="tor-page">
+  ${headerHtml}
+  ${studentInfoHtml}
+  ${subjectsTableHtml}
+  <div style="width:80rem; margin-left:auto; margin-right:auto; margin-top:0.4rem;">
+    ${gradingSystemHtml}
+    ${creditsNoteHtml}
+    ${signaturesHtml}
+    ${allCampusAddressesHtml}
+  </div>
+</div>
+`;
   };
 
 
@@ -1478,39 +1584,393 @@ const TranscriptOfRecords = () => {
       case "gradingSystem":
         openGradingSystemDialog();
         break;
+      case "signatories":
+        openSignatoriesDialog();
+        break;
       default:
         break;
     }
   };
 
+
+
+
+
+  // ============================================================
+  // TOR SIGNATORIES
+  // ============================================================
+
+  const [torSignatories, setTorSignatories] = useState({
+    prepared_by: null,
+    checked_by: null,
+    registrar: null,
+  });
+  const [signaturePage, setSignaturePage] = useState(0);
+
+  // Convert the object returned by /api/tor-signatories
+  // into an array that can be displayed by the signature table.
+  const signatures = [
+    torSignatories?.prepared_by,
+    torSignatories?.checked_by,
+    torSignatories?.registrar,
+  ].filter(Boolean);
+
+  const SIGNATURES_PER_PAGE = 10;
+
+  const totalSignaturePages = Math.max(
+    1,
+    Math.ceil(signatures.length / SIGNATURES_PER_PAGE)
+  );
+
+  const paginatedSignatures = signatures.slice(
+    signaturePage * SIGNATURES_PER_PAGE,
+    (signaturePage + 1) * SIGNATURES_PER_PAGE
+  );
+  // ============================================================
+  // SELECTED SIGNATORIES
+  // ============================================================
+
+  const [selectedPreparedBy, setSelectedPreparedBy] = useState(null);
+
+  const [selectedCheckedBy, setSelectedCheckedBy] = useState(null);
+
+  const [selectedRegistrar, setSelectedRegistrar] = useState(null);
+
+  // ============================================================
+  // CHECK IF SIGNATURE IS ALREADY USED
+  // ============================================================
+
+  const isSignatureSelectedForAnotherRole = (signature, role) => {
+    if (!signature) return false;
+
+    const signatureId = signature.id;
+
+    if (!signatureId) return false;
+
+    if (
+      role !== "prepared" &&
+      selectedPreparedBy?.id === signatureId
+    ) {
+      return true;
+    }
+
+    if (
+      role !== "checked" &&
+      selectedCheckedBy?.id === signatureId
+    ) {
+      return true;
+    }
+
+    if (
+      role !== "registrar" &&
+      selectedRegistrar?.id === signatureId
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // ============================================================
+  // SIGNATURE SELECTION HANDLERS
+  // ============================================================
+
   const handlePreparedByChange = (signature) => {
-    setSelectedPreparedBy((prev) =>
-      prev?.id === signature.id ? null : signature,
-    );
+    setSelectedPreparedBy((previous) => {
+      if (previous?.id === signature?.id) {
+        return null;
+      }
+
+      return signature || null;
+    });
   };
 
   const handleCheckedByChange = (signature) => {
-    setSelectedCheckedBy((prev) =>
-      prev?.id === signature.id ? null : signature,
-    );
+    setSelectedCheckedBy((previous) => {
+      if (previous?.id === signature?.id) {
+        return null;
+      }
+
+      return signature || null;
+    });
   };
 
   const handleRegistrarChange = (signature) => {
-    setSelectedRegistrar((prev) =>
-      prev?.id === signature.id ? null : signature,
-    );
+    setSelectedRegistrar((previous) => {
+      if (previous?.id === signature?.id) {
+        return null;
+      }
+
+      return signature || null;
+    });
   };
 
-  const isSignatureSelectedForAnotherRole = (signature, currentRole) => {
-    const selections = {
-      prepared: selectedPreparedBy,
-      checked: selectedCheckedBy,
-      registrar: selectedRegistrar,
-    };
+  // ============================================================
+  // FETCH TOR SIGNATORIES
+  // ============================================================
 
-    return Object.entries(selections).some(
-      ([role, selected]) => role !== currentRole && selected?.id === signature.id,
-    );
+  const fetchTorSignatories = async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/tor-signatories`
+      );
+
+      const data = response.data?.data || {};
+
+      const normalizedData = {
+        prepared_by: data?.prepared_by || null,
+        checked_by: data?.checked_by || null,
+        registrar: data?.registrar || null,
+      };
+
+      setTorSignatories(normalizedData);
+
+      setSelectedPreparedBy(
+        normalizedData.prepared_by
+      );
+
+      setSelectedCheckedBy(
+        normalizedData.checked_by
+      );
+
+      setSelectedRegistrar(
+        normalizedData.registrar
+      );
+
+      // Reset pagination whenever the records are refreshed.
+      setSignaturePage(0);
+
+    } catch (error) {
+      console.error(
+        "Failed to fetch TOR signatories:",
+        error
+      );
+
+      setTorSignatories({
+        prepared_by: null,
+        checked_by: null,
+        registrar: null,
+      });
+
+      setSelectedPreparedBy(null);
+      setSelectedCheckedBy(null);
+      setSelectedRegistrar(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchTorSignatories();
+  }, []);
+
+  // ============================================================
+  // YEAR GRADUATED FORMATTER
+  // ============================================================
+
+  const formatYearGraduatedRange = (value) => {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "";
+    }
+
+    const text = String(value).trim();
+
+    if (!text) {
+      return "";
+    }
+
+    // Already formatted as a range.
+    if (
+      text.includes("-") ||
+      text.includes("–") ||
+      text.includes("—")
+    ) {
+      return text;
+    }
+
+    // Normal school year / calendar year.
+    if (/^\d{4}$/.test(text)) {
+      return text;
+    }
+
+    // Handle date values.
+    const parsedDate = new Date(text);
+
+    if (!Number.isNaN(parsedDate.getTime())) {
+      return String(parsedDate.getFullYear());
+    }
+
+    return text;
+  };
+
+  const repeatShortTermWithSpaces = (value, times = 12) => {
+    if (value === null || value === undefined) {
+      return "";
+    }
+
+    const text = String(value).trim().toLowerCase();
+
+    if (!text) {
+      return "";
+    }
+
+    return Array(times).fill(text).join(" ");
+  };
+
+
+  const [signatoriesDialogOpen, setSignatoriesDialogOpen] =
+    useState(false);
+
+  const [signatoriesDraft, setSignatoriesDraft] = useState({
+    prepared_by: {
+      full_name: "",
+      designation: "",
+      file: null,
+      preview: null,
+    },
+
+    checked_by: {
+      full_name: "",
+      designation: "",
+      file: null,
+      preview: null,
+    },
+
+    registrar: {
+      full_name: "",
+      designation: "",
+      file: null,
+      preview: null,
+    },
+  });
+
+  // ============================================================
+  // OPEN SIGNATORIES DIALOG
+  // ============================================================
+
+  const openSignatoriesDialog = () => {
+    setSignatoriesDraft({
+      prepared_by: {
+        full_name:
+          torSignatories?.prepared_by?.full_name || "",
+        designation:
+          torSignatories?.prepared_by?.designation || "",
+        file: null,
+        preview: null,
+      },
+
+      checked_by: {
+        full_name:
+          torSignatories?.checked_by?.full_name || "",
+        designation:
+          torSignatories?.checked_by?.designation || "",
+        file: null,
+        preview: null,
+      },
+
+      registrar: {
+        full_name:
+          torSignatories?.registrar?.full_name || "",
+        designation:
+          torSignatories?.registrar?.designation || "",
+        file: null,
+        preview: null,
+      },
+    });
+
+    setSignatoriesDialogOpen(true);
+  };
+
+  const closeSignatoriesDialog = () => {
+    setSignatoriesDialogOpen(false);
+  };
+
+  // ============================================================
+  // SIGNATORY FIELD CHANGE
+  // ============================================================
+
+  const handleSignatoryFieldChange = (
+    role,
+    field,
+    value
+  ) => {
+    setSignatoriesDraft((previous) => ({
+      ...previous,
+
+      [role]: {
+        ...previous[role],
+        [field]: value,
+      },
+    }));
+  };
+
+  // ============================================================
+  // SIGNATURE FILE CHANGE
+  // ============================================================
+
+  const handleSignatoryFileChange = (
+    role,
+    file
+  ) => {
+    if (!file) {
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+
+    setSignatoriesDraft((previous) => ({
+      ...previous,
+
+      [role]: {
+        ...previous[role],
+        file,
+        preview,
+      },
+    }));
+  };
+
+  // ============================================================
+  // SAVE SIGNATORIES
+  // ============================================================
+  const handleSaveSignatories = async () => {
+    try {
+      await Promise.all(
+        VALID_TOR_ROLES.map(async (role) => {
+          const draft = signatoriesDraft?.[role];
+          if (!draft) return;
+
+          const formData = new FormData();
+          formData.append("full_name", draft.full_name || "");
+          formData.append("designation", draft.designation || "");
+          if (draft.file) formData.append("signature", draft.file);
+
+          await axios.put(
+            `${API_BASE_URL}/api/tor-signatories/${role}`,
+            formData,
+            {
+              headers: getFlatAuditHeaders({
+                "x-employee-id": employeeID,
+                "x-page-id": pageId,
+                "Content-Type": "multipart/form-data",
+              }),
+            },
+          );
+        })
+      );
+
+      await fetchTorSignatories();
+      setSignatoriesDialogOpen(false);
+      setSnackbarSeverity("success");
+      setSnackbarMessage("TOR signatories saved successfully.");
+      setOpenSnackbar(true);
+    } catch (error) {
+      console.error("Failed to save TOR signatories:", error);
+      setSnackbarSeverity("warning");
+      setSnackbarMessage("Failed to save signatories.");
+      setOpenSnackbar(true);
+    }
   };
 
   const handleGradeConversion = (grade) => {
@@ -1972,12 +2432,10 @@ const TranscriptOfRecords = () => {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr 1fr",
-                sm: "repeat(3, 1fr)",
-                md: "repeat(5, 1fr)",
-              },
+              gridTemplateColumns: "repeat(6, minmax(140px, 1fr))",
               gap: 2,
+              overflowX: { xs: "auto", md: "visible" },
+              pb: { xs: 1, md: 0 },
             }}
           >
             {TOR_EDIT_OPTIONS.map((option) => (
@@ -2593,171 +3051,180 @@ const TranscriptOfRecords = () => {
               style={{
                 pageBreakAfter: "always",
                 breakAfter: "page",
-                paddingRight: "3.5rem",
                 marginTop: "3rem",
                 paddingBottom: "1.5rem",
                 position: "relative",
               }}
             >
-              {/* ACT / UKAS / IAF accreditation logos — top right corner */}
               <Box
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  right: "5rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  zIndex: 2,
-                  marginTop: "50px"
-                }}
-              >
-                <Box style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <img src={Act} alt="ACT" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
-                  <img src={Ukas} alt="UKAS" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
-                  <img src={Iaf} alt="IAF" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
-                </Box>
-                <Typography
-                  style={{
-                    fontSize: "11px",
-                    textAlign: "center",
-                    marginTop: "20px",
-                    lineHeight: 1.2,
-                    fontFamily: "Arial",
-                  }}
-                >
-                  {(shortTerm || "").toUpperCase()} FORM NO. I-A
-                  <br />
-                  REVISED 2025
-                </Typography>
-              </Box>
-              {/* Start Of Header */}
-              <Box
-                className="page-header"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  height: "10rem",
+                  position: "relative",
                   width: "80rem",
-                  justifyContent: "center",
+                  marginLeft: "auto",
+                  marginRight: "auto",
                 }}
               >
                 <Box
                   style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
-                    gap: "0.5rem",
-                    paddingTop: "1.5rem",
-                    marginLeft: "-10rem",
-                    paddingRight: "3rem",
+                    zIndex: 2,
+                    marginTop: "50px",
                   }}
                 >
-                  <img
-                    src={BagongPilipinasLogo}
-                    alt="Bagong Pilipinas"
-                    style={{ width: "130px", height: "120px" }}
-                  />
-                  <img
-                    src={fetchedLogo || EaristLogo} // use dynamic logo if available
-                    alt="Logo"
+                  <Box style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <img src={Act} alt="ACT" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
+                    <img src={Ukas} alt="UKAS" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
+                    <img src={Iaf} alt="IAF" style={{ width: "50px", height: "50px", objectFit: "contain" }} />
+                  </Box>
+                  <Typography
                     style={{
-                      width: "120px",
-                      height: "120px",
-                      borderRadius: "50%",
+                      fontSize: "11px",
+                      textAlign: "center",
+                      marginTop: "20px",
+                      lineHeight: 1.2,
+                      fontFamily: "Arial",
                     }}
-                  />
+                  >
+                    {(shortTerm || "").toUpperCase()} FORM NO. I-A
+                    <br />
+                    REVISED 2025
+                  </Typography>
                 </Box>
-                <Box style={{ marginTop: "1.5rem", textAlign: "center" }}>
-                  <div style={{ fontFamily: "Arial", fontSize: "13px" }}>
-                    Republic of the Philippines
-                  </div>
 
-                  {companyName &&
-                    (() => {
-                      const words = companyName.trim().split(" ");
-                      const middle = Math.ceil(words.length / 2);
-                      const firstLine = words.slice(0, middle).join(" ");
-                      const secondLine = words.slice(middle).join(" ");
-                      return (
-                        <>
-                          <Typography
-                            style={{
-                              marginTop: "0rem",
-                              lineHeight: "1",
-                              fontSize: "1.6rem",
-                              letterSpacing: "-1px",
-                              fontWeight: "600",
-                              fontFamily: "Arial",
-                              textTransform: "uppercase"
-                            }}
-                          >
-                            {firstLine}
-                          </Typography>
-                          {secondLine && (
+                {/* Start Of Header */}
+                <Box
+                  className="page-header"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    height: "10rem",
+                    width: "80rem",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Box
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      paddingTop: "1.5rem",
+                      marginLeft: "-10rem",
+                      paddingRight: "3rem",
+                    }}
+                  >
+                    <img
+                      src={BagongPilipinasLogo}
+                      alt="Bagong Pilipinas"
+                      style={{ width: "130px", height: "120px" }}
+                    />
+                    <img
+                      src={fetchedLogo || EaristLogo}
+                      alt="Logo"
+                      style={{
+                        width: "120px",
+                        height: "120px",
+                        borderRadius: "50%",
+                      }}
+                    />
+                  </Box>
+                  <Box style={{ marginTop: "1.5rem", textAlign: "center" }}>
+                    <div style={{ fontFamily: "Arial", fontSize: "13px" }}>
+                      Republic of the Philippines
+                    </div>
+
+                    {companyName &&
+                      (() => {
+                        const words = companyName.trim().split(" ");
+                        const middle = Math.ceil(words.length / 2);
+                        const firstLine = words.slice(0, middle).join(" ");
+                        const secondLine = words.slice(middle).join(" ");
+                        return (
+                          <>
                             <Typography
                               style={{
+                                marginTop: "0rem",
                                 lineHeight: "1",
                                 fontSize: "1.6rem",
                                 letterSpacing: "-1px",
                                 fontWeight: "600",
                                 fontFamily: "Arial",
-                                textTransform: "uppercase"
+                                textTransform: "uppercase",
                               }}
                             >
-                              {secondLine}
+                              {firstLine}
                             </Typography>
-                          )}
-                        </>
-                      );
-                    })()}
+                            {secondLine && (
+                              <Typography
+                                style={{
+                                  lineHeight: "1",
+                                  fontSize: "1.6rem",
+                                  letterSpacing: "-1px",
+                                  fontWeight: "600",
+                                  fontFamily: "Arial",
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                {secondLine}
+                              </Typography>
+                            )}
+                          </>
+                        );
+                      })()}
 
-                  <Typography style={{ fontFamily: "Arial", fontSize: "13px", fontWeight: "bold" }}>
-                    {allBranchNames}
-                  </Typography>
+                    <Typography style={{ fontFamily: "Arial", fontSize: "13px", fontWeight: "bold" }}>
+                      {allBranchNames}
+                    </Typography>
+                  </Box>
                 </Box>
+                <Typography
+                  style={{
+                    height: "1.5rem",
+                    textAlign: "center",
+                    width: "80rem",
+                    fontSize: "1.6rem",
+                    letterSpacing: "-1px",
+                    fontWeight: "500",
+                  }}
+                >
+                  OFFICE OF THE REGISTRAR
+                </Typography>
+                <Typography
+                  style={{
+                    height: "2.5rem",
+                    marginTop: "-0.5rem",
+                    width: "80rem",
+                    textAlign: "center",
+                    fontSize: "2.75rem",
+                    letterSpacing: "-1px",
+                    fontWeight: "600",
+                  }}
+                >
+                  OFFICIAL TRANSCRIPT OF RECORDS
+                </Typography>
               </Box>
-              <Typography
-                style={{
-                  height: "1.5rem",
-                  marginLeft: "1rem",
-                  textAlign: "center",
-                  width: "80rem",
-                  fontSize: "1.6rem",
-                  letterSpacing: "-1px",
-                  fontWeight: "500",
-                }}
-              >
-                OFFICE OF THE REGISTRAR
-              </Typography>
-              <Typography
-                style={{
-                  height: "2.5rem",
-                  marginLeft: "1rem",
-                  marginTop: "-0.5rem",
-                  width: "80rem",
-                  textAlign: "center",
-                  fontSize: "2.75rem",
-                  letterSpacing: "-1px",
-                  fontWeight: "600",
-                }}
-              >
-                OFFICIAL TRANSCRIPT OF RECORDS
-              </Typography>
-              <Box style={{ display: "flex", marginTop: "1rem" }}>
-                <Box>
+
+              <Box style={{ display: "flex", marginTop: "1rem", width: "80rem", marginLeft: "auto", marginRight: "auto" }}>
+                <Box style={{ width: "100%" }}>
                   <Box
                     style={{
                       display: "flex",
                       height: "17.5rem",
-                      marginLeft: "1rem",
                       width: "80rem",
+                      marginLeft: "auto",
+                      marginRight: "auto",
                       borderBottom: "solid black 1px",
                     }}
                   >
                     <Box
                       sx={{
                         padding: "1rem",
-                        width: "80rem",
+                        flex: "1 1 auto",
+                        minWidth: 0,
                       }}
                     >
                       <Box>
@@ -2911,7 +3378,6 @@ const TranscriptOfRecords = () => {
                               wordSpacing: "5px",
                             }}
                           >
-
                             {formatYearGraduatedRange(studentData.yearGraduated1)}
                           </Typography>
                         </Box>
@@ -3047,8 +3513,35 @@ const TranscriptOfRecords = () => {
                       </Box>
                     </Box>
                     <Box
-                      style={{ marginLeft: "-12.6rem", marginTop: "1.3rem" }}
+                      style={{ marginLeft: "-12.6rem", marginTop: "1.3rem", flexShrink: 0 }}
                     >
+                      <TextField
+                        variant="outlined"
+                        placeholder="Enter Document No."
+                        value={getDocumentNumber(pageIndex)}
+                        onChange={(e) => setDocumentNumberForPage(pageIndex, e.target.value)}
+                        size="small"
+                        inputProps={{
+                          style: {
+                            textAlign: "center",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            padding: "6px 8px",
+                          },
+                        }}
+                        sx={{
+                          width: "280px",
+                          mb: "4px",
+                          backgroundColor: "#fff",
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "6px",
+                          },
+                          "& input::placeholder": {
+                            fontSize: "16px",
+                            opacity: 0.6,
+                          },
+                        }}
+                      />
                       {!studentData?.profile_image ? (
                         <Avatar
                           sx={{
@@ -3068,7 +3561,7 @@ const TranscriptOfRecords = () => {
                             width: 225,
                             height: 225,
                             mx: "auto",
-                            border: "1px solid black"
+                            border: "1px solid black",
                           }}
                           variant="square"
                         />
@@ -3080,17 +3573,18 @@ const TranscriptOfRecords = () => {
                   <Box
                     style={{
                       display: "flex",
-                      marginLeft: "1rem",
                       marginTop: "0.5rem",
-                      flexWrap: "wrap",
                       width: "80rem",
+                      marginLeft: "auto",
+                      marginRight: "auto",
                       borderTop: "solid black 1px",
                       overflow: "hidden",
                     }}
                   >
                     <Box
                       style={{
-                        flex: "0 0 50%",
+                        flex: "1 1 auto",
+                        minWidth: 0,
                         marginBottom: "1rem",
                         boxSizing: "border-box",
                       }}
@@ -3100,6 +3594,7 @@ const TranscriptOfRecords = () => {
                         style={{
                           height: "auto",
                           minHeight: 0,
+                          width: "80rem",
                           borderCollapse: "collapse",
                         }}
                       >
@@ -3268,6 +3763,7 @@ const TranscriptOfRecords = () => {
                                     <tr
                                       style={{
                                         display: "flex",
+
                                         alignItems: isCompactTermRow
                                           ? "center"
                                           : "flex-start",
@@ -3281,6 +3777,7 @@ const TranscriptOfRecords = () => {
                                       <td
                                         style={{
                                           width: "13rem",
+
                                           fontWeight: "400",
                                           display: "flex",
                                           flexDirection: "column",
@@ -3474,6 +3971,7 @@ const TranscriptOfRecords = () => {
                               display: "flex",
                               height: "auto",
                               lineHeight: 1,
+
                             }}
                           >
                             {pageIndex === paginatedSubjects.length - 1 ? (
@@ -3481,7 +3979,7 @@ const TranscriptOfRecords = () => {
                                 className="table-cell-padding"
                                 style={{
                                   textAlign: "center",
-                                  width: "79.9rem",
+                                  width: "80rem",
                                   padding: "1px 0 0",
                                   lineHeight: 1,
                                 }}
@@ -3498,13 +3996,26 @@ const TranscriptOfRecords = () => {
                                     wordBreak: "break-word",
                                   }}
                                 >
-                                  <span style={{ fontSize: "14px", marginRight: "2px" }}>
-                                    {repeatShortTermWithSpaces(shortTerm)} xxx{" "}
-                                  </span>
-                                  NOTHING FOLLOWS
-                                  <span style={{ fontSize: "14px", marginLeft: "2px" }}>
-                                    {" "}
-                                    xxx {repeatShortTermWithSpaces(shortTerm)}
+                                  <span
+                                    style={{
+                                      display: "block",
+                                      fontSize: "17px",
+                                      fontWeight: "600",
+                                      lineHeight: 1.3,
+                                      whiteSpace: "normal",
+                                      width: "100%",
+                                      overflow: "visible",
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    <span style={{ fontSize: "14px", marginRight: "2px" }}>
+                                      {repeatShortTermWithSpaces(shortTerm)} xxx{" "}
+                                    </span>
+                                    NOTHING FOLLOWS
+                                    <span style={{ fontSize: "14px", marginLeft: "2px" }}>
+                                      {" "}
+                                      xxx {repeatShortTermWithSpaces(shortTerm)}
+                                    </span>
                                   </span>
                                 </span>
                               </td>
@@ -3513,9 +4024,10 @@ const TranscriptOfRecords = () => {
                                 style={{
                                   textAlign: "center",
                                   borderTop: "dashed 1px black",
-                                  width: "79.9rem",
+                                  width: "80rem",
                                   padding: "1px 0 0",
                                   lineHeight: 1,
+                                  marginTop: "20px"
                                 }}
                               >
                                 <span
@@ -3531,418 +4043,483 @@ const TranscriptOfRecords = () => {
                           </tr>
                         </tbody>
                       </table>
-                    </Box>
-                  </Box>
-                  {/* End of Main Content */}
-                  {/* Start Of Footer */}
-                  <Box
-                    className="page-footer"
-                    style={{
-                      display: "flex",
-                      marginLeft: "1rem",
-                      marginTop: "-1rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Box
-                      style={{
-                        flex: "0 0 50%",
-                        marginBottom: "1rem",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <table>
-                        <thead>
-                          <tr
-                            className="grading_sytse_tble"
-                            style={{
-                              display: "flex",
-                              height: "145px",
-                              borderTop: "solid 1px black",
-                            }}
-                          >
-                            <td
-                              style={{
-                                fontWeight: "400",
-                                fontSize: "18px",
-                                display: "flex",
-                                alignItems: "start",
-                                justifyContent: "center",
-                                letterSpacing: "-1px",
-                                width: "13rem",
-                              }}
-                            >
-                              <span>GRADING SYSTEM</span>
-                            </td>
-                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "4.5rem" }}>
-                              {gradingSystemFirstHalf.map((row, i) => (
-                                <div
-                                  key={`gs-grade-1-${row.id}`}
-                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "0px", paddingTop: i === 0 ? "3px" : 0 }}
-                                >
-                                  {row.equivalent_grade}
-                                </div>
-                              ))}
-                            </td>
-                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "6.5rem" }}>
-                              {gradingSystemFirstHalf.map((row, i) => (
-                                <div
-                                  key={`gs-score-1-${row.id}`}
-                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}
-                                >
-                                  ({row.min_score}-{row.max_score})
-                                </div>
-                              ))}
-                            </td>
-                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "15.5rem" }}>
-                              {gradingSystemFirstHalf.map((row, i) => (
-                                <div
-                                  key={`gs-desc-1-${row.id}`}
-                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}
-                                >
-                                  {row.description}
-                                </div>
-                              ))}
-                            </td>
-                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "4.5rem" }}>
-                              {gradingSystemSecondHalf.map((row, i) => (
-                                <div
-                                  key={`gs-grade-2-${row.id}`}
-                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}
-                                >
-                                  {row.equivalent_grade}
-                                </div>
-                              ))}
-                            </td>
-                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "14rem" }}>
-                              {gradingSystemSecondHalf.map((row, i) => (
-                                <div
-                                  key={`gs-score-2-${row.id}`}
-                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}
-                                >
-                                  ({row.min_score}-{row.max_score})
-                                </div>
-                              ))}
-                            </td>
-                            <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "22rem" }}>
-                              {gradingSystemSecondHalf.map((row, i) => (
-                                <div
-                                  key={`gs-desc-2-${row.id}`}
-                                  style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}
-                                >
-                                  {row.description}
-                                </div>
-                              ))}
-                            </td>
-                          </tr>
-                          <tr
-                            style={{
-                              display: "flex",
-                              paddingLeft: "2rem",
-                              height: "35px",
-                              borderBottom: "solid 1px black",
-                            }}
-                          >
-                            <td>
-                              <span style={{ fontSize: "18px" }}>
-                                CREDITS, O
-                              </span>
-                              <span>
-                                ne college units is at least (17) full hours of
-                                instruction in academic or professional subject
-                                within a semester.
-                              </span>
-                            </td>
-                          </tr>
-                          <tr
-                            style={{
-                              display: "flex",
-                              paddingLeft: "2rem",
-                              height: "65px",
-                              borderBottom: "solid 1px black",
-                            }}
-                          >
-                            <td style={{ marginTop: "8px" }}>
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  marginRight: "8px",
-                                  letterSpacing: "-0.8px",
-                                  wordSpacing: "1px",
-                                }}
-                              >
-                                {companyName?.toUpperCase()}
-                              </span>
-                              <span
-                                style={{
-                                  letterSpacing: "-0.8px",
-                                  fontSize: "17px",
-                                  wordSpacing: "1px",
-                                }}
-                              >
-                                is a State College; hence, a SPECIAL ORDER is
-                                not issued to its graduates. The <br />
-                                issuance of the Official Transcript of Records
-                                and Diploma is a sufficient proof for
-                                Graduation.
-                              </span>
-                            </td>
-                          </tr>
-                          <tr
-                            style={{
-                              display: "flex",
-                              paddingLeft: "1rem",
-                              marginTop: "0.3rem",
-                              height: "65px",
-                              borderTop: "solid 1px black",
-                              borderBottom: "solid 1px black",
-                              alignItems: "center",
-                            }}
-                          >
-                            <td style={{ marginTop: "8px" }}>
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  fontWeight: "600",
-                                  marginRight: "8px",
-                                  letterSpacing: "-0.8px",
-                                  wordSpacing: "1px",
-                                }}
-                              >
-                                REMARKS:
-                              </span>
-                              <span style={{ fontSize: "18px", fontWeight: "400", letterSpacing: "-0.5px" }}>
-                                {getPageRemarksText(
-                                  pageIndex === paginatedSubjects.length - 1,
-                                  studentData?.program_description
-                                    ? studentData.program_description.toUpperCase()
-                                    : "",
-                                )}
-                              </span>
-                            </td>
-                          </tr>
-                          <tr
-                            style={{
-                              display: "flex",
-                              paddingLeft: "1rem",
-                              marginTop: "0.3rem",
-                              height: "35px",
-                            }}
-                          >
-                            <td style={{ marginTop: "3px" }}>
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  fontWeight: "400",
-                                  marginRight: "2.4rem",
-                                  letterSpacing: "-0.8px",
-                                  wordSpacing: "1px",
-                                }}
-                              >
-                                DATE ISSUED:
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  letterSpacing: "-1px",
-                                  wordSpacing: "3px",
-                                }}
-                              >
-                                {dateIssuedDisplay}
-                              </span>
-                            </td>
-                          </tr>
-                          <tr
-                            className="no-border"
-                            style={{
-                              display: "flex",
-                              paddingLeft: "1rem",
-                              marginTop: "0.3rem",
-                              height: "9rem",
-                              borderBottom: "solid black 1px",
-                            }}
-                          >
-                            <td style={{ marginTop: "3px", width: "17rem" }}>
-                              <div>
-                                <span
-                                  style={{
-                                    fontSize: "18px",
-                                    letterSpacing: "-1px",
-                                    wordSpacing: "3px",
-                                  }}
-                                ></span>
-                                <span></span>
-                              </div>
-                            </td>
-                            <td style={{ marginTop: "3px", width: "20rem" }}>
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  fontWeight: "400",
-                                  marginRight: "2.4rem",
-                                  letterSpacing: "-0.8px",
-                                  wordSpacing: "1px",
-                                }}
-                              >
-                                PREPARED BY:
-                              </span>
-                              <div style={{ marginTop: "0.4rem", textAlign: "left" }}>
-                                {selectedPreparedBy?.signature_image && (
-                                  <img
-                                    src={getSignatureImageSrc(selectedPreparedBy)}
-                                    alt={selectedPreparedBy.signature_name || "Prepared by signature"}
-                                    style={{
-                                      width: "11rem",
-                                      height: "2.7rem",
-                                      objectFit: "contain",
-                                      display: "block",
-                                      margin: "0 0 -0.2rem",
-                                    }}
-                                  />
-                                )}
-                                <span
-                                  style={{
-                                    display: "block",
-                                    fontSize: "20px",
-                                    fontWeight: "500",
-                                    letterSpacing: "-1px",
-                                    wordSpacing: "3px",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {selectedPreparedBy?.full_name?.toUpperCase() || ""}
-                                </span>
-                              </div>
-                            </td>
-                            <td style={{ marginTop: "3px", width: "20rem" }}>
-                              <span
-                                style={{
-                                  fontSize: "18px",
-                                  fontWeight: "400",
-                                  marginRight: "2.4rem",
-                                  letterSpacing: "-0.8px",
-                                  wordSpacing: "1px",
-                                }}
-                              >
-                                CHECKED BY:
-                              </span>
-                              <div style={{ marginTop: "0.4rem", textAlign: "left" }}>
-                                {selectedCheckedBy?.signature_image && (
-                                  <img
-                                    src={getSignatureImageSrc(selectedCheckedBy)}
-                                    alt={selectedCheckedBy.signature_name || "Checked by signature"}
-                                    style={{
-                                      width: "11rem",
-                                      height: "2.7rem",
-                                      objectFit: "contain",
-                                      display: "block",
-                                      margin: "0 0 -0.2rem",
-                                    }}
-                                  />
-                                )}
-                                <span
-                                  style={{
-                                    display: "block",
-                                    fontSize: "20px",
-                                    fontWeight: "500",
-                                    letterSpacing: "-1px",
-                                    wordSpacing: "3px",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {selectedCheckedBy?.full_name?.toUpperCase() || ""}
-                                </span>
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                marginTop: "-3px",
-                                width: "21rem",
-                                justifyContent: "center",
-                                alignContent: "center",
-                              }}
-                            >
-                              <div
+                      <Box
+                        className="page-footer"
+                        style={{
+                          display: "flex",
+
+                          width: "80rem",
+                          marginLeft: "auto",
+                          marginRight: "auto",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Box
+                          style={{
+                            flex: "1 1 auto",
+                            minWidth: 0,
+                            marginBottom: "1rem",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          <table style={{ width: "80rem", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr
+                                className="grading_sytse_tble"
                                 style={{
                                   display: "flex",
-                                  flexDirection: "column",
-                                  textAlign: "center",
+                                  height: "145px",
+                                  borderTop: "solid 1px black",
                                 }}
                               >
-                                {selectedRegistrar?.signature_image && (
-                                  <img
-                                    src={getSignatureImageSrc(selectedRegistrar)}
-                                    alt={selectedRegistrar.signature_name || "Registrar signature"}
-                                    style={{
-                                      width: "11rem",
-                                      height: "2.7rem",
-                                      objectFit: "contain",
-                                      display: "block",
-                                      margin: "0 auto -0.2rem",
-                                    }}
-                                  />
-                                )}
-                                <span
+                                <td
                                   style={{
-                                    fontSize: "24px",
-                                    letterSpacing: "-2px",
-                                    wordSpacing: "3px",
+                                    fontWeight: "400",
+                                    fontSize: "18px",
+                                    display: "flex",
+                                    alignItems: "start",
+                                    justifyContent: "center",
+                                    letterSpacing: "-1px",
+                                    width: "13rem",
                                   }}
                                 >
-                                  {selectedRegistrar?.full_name?.toUpperCase() || ""}
-                                </span>
-                                <hr />
-                                <span
+                                  <span>GRADING SYSTEM</span>
+                                </td>
+
+                                {/* grade — first half */}
+                                <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "4.5rem" }}>
+                                  {gradingSystemFirstHalf.map((row, i) => (
+                                    <div key={`gs-grade-1-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "0px", paddingTop: i === 0 ? "3px" : 0 }}>
+                                      {row.equivalent_grade}
+                                    </div>
+                                  ))}
+                                </td>
+
+                                {/* score range — first half */}
+                                <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "6.5rem" }}>
+                                  {gradingSystemFirstHalf.map((row, i) => (
+                                    <div key={`gs-score-1-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}>
+                                      ({row.min_score}-{row.max_score})
+                                    </div>
+                                  ))}
+                                </td>
+
+                                {/* description — first half (FIXED) */}
+                                <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "15.5rem" }}>
+                                  {gradingSystemFirstHalf.map((row, i) => (
+                                    <div key={`gs-desc-1-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}>
+                                      {row.descriptive_rating}
+                                    </div>
+                                  ))}
+                                </td>
+
+                                {/* grade — second half */}
+                                <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "4.5rem" }}>
+                                  {gradingSystemSecondHalf.map((row, i) => (
+                                    <div key={`gs-grade-2-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}>
+                                      {row.equivalent_grade}
+                                    </div>
+                                  ))}
+                                </td>
+
+                                {/* score range — second half */}
+                                <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "14rem" }}>
+                                  {gradingSystemSecondHalf.map((row, i) => (
+                                    <div key={`gs-score-2-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}>
+                                      ({row.min_score}-{row.max_score})
+                                    </div>
+                                  ))}
+                                </td>
+
+                                {/* description — second half (FIXED) */}
+                                <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "22rem" }}>
+                                  {gradingSystemSecondHalf.map((row, i) => (
+                                    <div key={`gs-desc-2-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-1px", paddingTop: i === 0 ? "3px" : 0 }}>
+                                      {row.descriptive_rating}
+                                    </div>
+                                  ))}
+                                </td>
+                              </tr>
+                              <tr
+                                style={{
+                                  display: "flex",
+                                  paddingLeft: "2rem",
+                                  height: "35px",
+                                  marginTop: "5px",
+                                  borderBottom: "solid 1px black",
+                                }}
+                              >
+                                <td>
+                                  <span style={{ fontSize: "18px" }}>{creditsNote}</span>
+                                </td>
+                              </tr>
+                              <tr
+                                style={{
+                                  display: "flex",
+                                  paddingLeft: "2rem",
+                                  height: "65px",
+                                  borderBottom: "solid 1px black",
+                                }}
+                              >
+                                <td style={{ marginTop: "8px" }}>
+                                  <span
+                                    style={{
+                                      fontSize: "18px",
+                                      marginRight: "8px",
+                                      letterSpacing: "-0.8px",
+                                      wordSpacing: "1px",
+                                    }}
+                                  >
+                                    {companyName?.toUpperCase()}
+                                  </span>
+                                  <span style={{ letterSpacing: "-0.8px", fontSize: "17px", wordSpacing: "1px" }}>
+                                    {institutionNote}
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr
+                                style={{
+                                  display: "flex",
+                                  paddingLeft: "1rem",
+                                  marginTop: "0.3rem",
+                                  height: "65px",
+                                  borderTop: "solid 1px black",
+                                  borderBottom: "solid 1px black",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <td style={{ marginTop: "8px" }}>
+                                  <span
+                                    style={{
+                                      fontSize: "18px",
+                                      fontWeight: "600",
+                                      marginRight: "8px",
+                                      letterSpacing: "-0.8px",
+                                      wordSpacing: "1px",
+                                    }}
+                                  >
+                                    REMARKS:
+                                  </span>
+                                  <span style={{ fontSize: "18px", fontWeight: "400", letterSpacing: "-0.5px" }}>
+                                    {getPageRemarksText(
+                                      pageIndex === paginatedSubjects.length - 1,
+                                      studentData?.program_description
+                                        ? studentData.program_description.toUpperCase()
+                                        : "",
+                                    )}
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr
+                                className="no-border"
+                                style={{
+                                  display: "flex",
+                                  alignItems: "flex-start",
+                                  paddingLeft: "1rem",
+                                  marginTop: "0.3rem",
+                                  height: "9rem",
+                                  borderBottom: "solid black 1px",
+                                }}
+                              >
+                                <td
                                   style={{
-                                    fontSize: "18px",
-                                    letterSpacing: "-1px",
-                                    wordSpacing: "3px",
+                                    marginTop: "3px",
+                                    width: "8rem",
+                                    height: "9rem",
+                                    position: "relative",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    justifyContent: "flex-end",
+                                    alignItems: "center",
+                                    fontSize: "13px",
+                                    paddingBottom: "0.5rem",
+                                    lineHeight: 1.3,
                                   }}
-                                >REGISTRAR
-                                </span>
-                              </div>
-                            </td>
-                          </tr>
-                        </thead>
-                      </table>
+                                >
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      bottom: "0.5rem",
+                                      left: "60%",
+                                      transform: "translateX(-50%)",
+                                      textAlign: "center",
+                                      zIndex: 0,
+                                      pointerEvents: "none",
+                                    }}
+                                  >
+                                    <span style={{ whiteSpace: "nowrap", display: "block" }}>NOT VALID WITHOUT OFFICIAL</span>
+                                    <span style={{ whiteSpace: "nowrap", display: "block" }}>SEAL OF THE INSTITUTE</span>
+                                  </div>
+                                </td>
+                                <td style={{ marginTop: "3px", width: "3rem" }}>
+                                  <div>
+                                    <span
+                                      style={{
+                                        fontSize: "18px",
+                                        letterSpacing: "-1px",
+                                        wordSpacing: "3px",
+                                      }}
+                                    ></span>
+                                    <span></span>
+                                  </div>
+                                </td>
+                                <td style={{ marginTop: "3px", width: "20rem" }}>
+                                  <span
+                                    style={{
+                                      fontSize: "18px",
+                                      fontWeight: "400",
+                                      marginRight: "2.4rem",
+                                      letterSpacing: "-0.8px",
+                                      wordSpacing: "1px",
+                                    }}
+                                  >
+                                    PREPARED BY:
+                                  </span>
+                                  <div style={{ marginTop: "0.4rem", textAlign: "center" }}>
+                                    {selectedPreparedBy?.signature_image && (
+                                      <img
+                                        src={getSignatureImageSrc(selectedPreparedBy)}
+                                        alt={selectedPreparedBy.signature_name || "Prepared by signature"}
+                                        style={{
+                                          width: "16rem",
+                                          height: "4rem",
+                                          objectFit: "contain",
+                                          display: "block",
+                                          margin: "0 auto -0.2rem",
+                                        }}
+                                      />
+                                    )}
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        fontSize: "18px",
+                                        fontWeight: "500",
+                                        letterSpacing: "-1px",
+                                        wordSpacing: "3px",
+                                        whiteSpace: "normal",
+                                        wordBreak: "break-word",
+                                        lineHeight: "1.15",
+                                        maxWidth: "19rem",
+                                      }}
+                                    >
+                                      {selectedPreparedBy?.full_name?.toUpperCase() || ""}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={{ marginTop: "3px", width: "20rem" }}>
+                                  <span
+                                    style={{
+                                      fontSize: "18px",
+                                      fontWeight: "400",
+                                      marginRight: "2.4rem",
+                                      letterSpacing: "-0.8px",
+                                      wordSpacing: "1px",
+                                    }}
+                                  >
+                                    CHECKED BY:
+                                  </span>
+                                  <div style={{ marginTop: "0.4rem", textAlign: "center" }}>
+                                    {selectedCheckedBy?.signature_image && (
+                                      <img
+                                        src={getSignatureImageSrc(selectedCheckedBy)}
+                                        alt={selectedCheckedBy.signature_name || "Checked by signature"}
+                                        style={{
+                                          width: "16rem",
+                                          height: "4rem",
+                                          objectFit: "contain",
+                                          display: "block",
+                                          margin: "0 auto -0.2rem",
+                                        }}
+                                      />
+                                    )}
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        fontSize: "18px",
+                                        fontWeight: "500",
+                                        letterSpacing: "-1px",
+                                        wordSpacing: "3px",
+                                        whiteSpace: "normal",
+                                        wordBreak: "break-word",
+                                        lineHeight: "1.15",
+                                        maxWidth: "19rem",
+                                      }}
+                                    >
+                                      {selectedCheckedBy?.full_name?.toUpperCase() || ""}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td
+                                  style={{
+                                    marginTop: "3px",
+                                    width: "21rem",
+                                    justifyContent: "center",
+                                    alignContent: "center",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    {selectedRegistrar?.signature_image && (
+                                      <img
+                                        src={getSignatureImageSrc(selectedRegistrar)}
+                                        alt={selectedRegistrar.signature_name || "Registrar signature"}
+                                        style={{
+                                          width: "16rem",
+                                          height: "4rem",
+                                          objectFit: "contain",
+                                          display: "block",
+                                          margin: "0 auto -0.2rem",
+                                        }}
+                                      />
+                                    )}
+                                    <span
+                                      style={{
+                                        fontSize: "22px",
+                                        letterSpacing: "-1px",
+                                        whiteSpace: "normal",
+                                        wordBreak: "break-word",
+                                        maxWidth: "20rem",
+                                        lineHeight: "1.15",
+                                      }}
+                                    >
+                                      {selectedRegistrar?.full_name?.toUpperCase() || ""}
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontSize: "18px",
+                                        letterSpacing: "-1px",
+                                        wordSpacing: "3px",
+                                      }}
+                                    >
+                                      REGISTRAR
+                                    </span>
+                                  </div>
+                                </td>
+
+                                <td
+                                  style={{
+                                    marginTop: "3px",
+                                    width: "8rem",
+                                    marginLeft: "auto",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      width: "6.5rem",
+                                      height: "6.5rem",
+                                      border: torQrStatus.has_qr ? "none" : "1px dashed #aaa",
+                                      borderRadius: "4px",
+                                      backgroundColor: torQrStatus.has_qr ? "transparent" : "#fafafa",
+                                      mx: "auto",
+                                    }}
+                                  >
+                                    {studentData?.student_number && torQrStatus.has_qr && torQrStatus.tor_qr_image_url ? (
+                                      <img
+                                        src={`${API_BASE_URL}/api/graduate-qr/${studentData.student_number}`}
+                                        alt="Scan to verify this Transcript of Records"
+                                        style={{ width: "6.5rem", height: "6.5rem", objectFit: "contain", display: "block" }}
+                                      />
+                                    ) : (
+                                      <Typography
+                                        sx={{
+                                          fontSize: "9px",
+                                          color: "#999",
+                                          textAlign: "center",
+                                          lineHeight: 1.2,
+                                          px: 0.5,
+                                        }}
+                                      >
+                                        No QR issued
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                  <span
+                                    style={{
+                                      fontSize: "11px",
+                                      letterSpacing: "-0.3px",
+                                      marginTop: "0.2rem",
+                                      lineHeight: 1.1,
+                                      textAlign: "center",
+                                      display: "block",
+                                    }}
+                                  >
+                                    SCAN TO VERIFY
+                                  </span>
+                                </td>
+                              </tr>
+
+                              <tr
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  marginTop: "0.4rem",
+                                  paddingTop: "0.3rem",
+                                }}
+                              >
+                                <td
+                                  style={{
+                                    width: "80rem",
+                                    textAlign: "center",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {institutionWebsite && (
+                                    <span
+                                      style={{
+                                        fontSize: "13px",
+                                        fontWeight: 700,
+                                        letterSpacing: "0.3px",
+                                      }}
+                                    >
+                                      {institutionWebsite}
+                                      {branches.filter((b) => b?.address || b?.branch_address || b?.campus_address).length > 0 && (
+                                        <span style={{ margin: "0 0.75rem", fontWeight: 400 }}>|</span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {branches
+                                    .filter((b) => b?.address || b?.branch_address || b?.campus_address)
+                                    .map((b, index, arr) => (
+                                      <span
+                                        key={b.id ?? b.branch}
+                                        style={{
+                                          fontSize: "14px",
+                                          letterSpacing: "-0.3px",
+                                          lineHeight: 1.3,
+                                        }}
+                                      >
+                                        <span style={{ fontWeight: 700 }}>
+                                          {(b.branch || b.branch_name || "").toUpperCase()}:
+                                        </span>{" "}
+                                        {b.address || b.branch_address || b.campus_address}
+                                        {index < arr.length - 1 && (
+                                          <span style={{ margin: "0 0.75rem", fontWeight: 400 }}>|</span>
+                                        )}
+                                      </span>
+                                    ))}
+                                </td>
+                              </tr>
+                            </thead>
+                          </table>
+                        </Box>
+                      </Box>
                     </Box>
                   </Box>
 
                 </Box>
-              </Box>
-
-
-              <Box
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: ".2rem",
-                }}
-              >
-                {branches
-                  .filter((b) => b?.address || b?.branch_address || b?.campus_address)
-                  .map((b, index, arr) => (
-                    <Typography
-                      key={b.id ?? b.branch}
-                      style={{
-                        fontSize: "14px",
-                        textAlign: "center",
-                        letterSpacing: "-0.3px",
-                        lineHeight: 1.3,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <span style={{ fontWeight: 700 }}>
-                        {(b.branch || b.branch_name || "").toUpperCase()}:
-                      </span>{" "}
-                      {b.address || b.branch_address || b.campus_address}
-                      {index < arr.length - 1 && (
-                        <span style={{ margin: "0 0.75rem", fontWeight: 400 }}>|</span>
-                      )}
-                    </Typography>
-                  ))}
               </Box>
 
             </Box>
@@ -4076,7 +4653,7 @@ const TranscriptOfRecords = () => {
                     </TableCell>
                     <TableCell>{row.equivalent_grade}</TableCell>
                     <TableCell>{row.min_score}–{row.max_score}</TableCell>
-                    <TableCell>{row.description}</TableCell>
+                    <TableCell>{row.descriptive_rating}</TableCell>
                   </TableRow>
                 ))}
                 {gradingSystemDraft.length === 0 && (
@@ -4120,6 +4697,14 @@ const TranscriptOfRecords = () => {
           <TextField
             fullWidth multiline minRows={3} label="Institution note"
             value={institutionNoteDraft} onChange={(e) => setInstitutionNoteDraft(e.target.value)}
+          />
+          <TextField
+            fullWidth
+            label="Institute website"
+            placeholder="Enter Institute Website"
+            value={institutionWebsiteDraft}
+            onChange={(e) => setInstitutionWebsiteDraft(e.target.value)}
+            sx={{ mt: 3 }}
           />
         </DialogContent>
         <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
@@ -4185,6 +4770,142 @@ const TranscriptOfRecords = () => {
         </DialogActions>
       </Dialog>
 
+
+      <Dialog open={signatoriesDialogOpen} onClose={closeSignatoriesDialog} maxWidth="md" fullWidth>
+        <DialogTitle
+          sx={{
+            bgcolor: "#0288d1",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          ✍️ Edit Signatories
+          <IconButton
+            onClick={closeSignatoriesDialog}
+            sx={{
+              color: "white",
+              border: "2px solid rgba(255,255,255,0.6)",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              padding: 0,
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3, bgcolor: "#f7f9fc" }}>
+          {[
+            { role: "prepared_by", label: "Prepared By", color: "#0288d1" },
+            { role: "checked_by", label: "Checked By", color: "#7b1fa2" },
+            { role: "registrar", label: "Registrar", color: "#2e7d32" },
+          ].map(({ role, label, color }, i, arr) => {
+            const draft = signatoriesDraft[role];
+            const currentImage = torSignatories[role]?.signature_image;
+            return (
+              <Paper
+                key={role}
+                variant="outlined"
+                sx={{
+                  p: 2.5,
+                  mb: i < arr.length - 1 ? 2 : 0,
+                  borderRadius: 2,
+                  borderLeft: `4px solid ${color}`,
+                }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 700, color, mb: 1.5, letterSpacing: 0.3 }}
+                >
+                  {label}
+                </Typography>
+
+                {/* Signature preview — full width, tall, so it's actually legible */}
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: 160,
+                    border: "1px dashed #bbb",
+                    borderRadius: 1.5,
+                    bgcolor: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    mb: 1.5,
+                  }}
+                >
+                  {draft.preview || currentImage ? (
+                    <img
+                      src={
+                        draft.preview ||
+                        `${API_BASE_URL}/uploads/${currentImage}`
+                      }
+                      alt={`${label} signature`}
+                      style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                    />
+                  ) : (
+                    <Typography sx={{ fontSize: 13, color: "#999" }}>
+                      No signature uploaded
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                  <Button
+                    component="label"
+                    size="small"
+                    variant="outlined"
+                    sx={{ borderColor: color, color, textTransform: "none", flexShrink: 0 }}
+                  >
+                    Upload image
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={(e) =>
+                        handleSignatoryFileChange(role, e.target.files?.[0])
+                      }
+                    />
+                  </Button>
+
+                  <TextField
+                    label="Full name"
+                    size="small"
+                    value={draft.full_name}
+                    onChange={(e) =>
+                      handleSignatoryFieldChange(role, "full_name", e.target.value)
+                    }
+                    sx={{ width: 220 }}
+                  />
+                  <TextField
+                    label="Designation"
+                    size="small"
+                    value={draft.designation}
+                    onChange={(e) =>
+                      handleSignatoryFieldChange(role, "designation", e.target.value)
+                    }
+                    sx={{ width: 220 }}
+                  />
+                </Box>
+              </Paper>
+            );
+          })}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button onClick={closeSignatoriesDialog} color="error" variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveSignatories} variant="contained" color="success">
+            Save Signatories
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={openSnackbar}
         autoHideDuration={4000}
@@ -4193,7 +4914,7 @@ const TranscriptOfRecords = () => {
       >
         <Alert
           onClose={() => setOpenSnackbar(false)}
-          severity="warning"
+          severity={snackbarSeverity}
           sx={{ width: "100%" }}
         >
           {snackbarMessage}

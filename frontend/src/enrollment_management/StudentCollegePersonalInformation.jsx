@@ -2376,7 +2376,7 @@ const StudentCollegePersonalInformation = () => {
               <label className="w-40 font-medium">Campus:</label>
 
               <FormControl
-                readOnly
+            
                 fullWidth
                 size="small"
                 required
@@ -2384,6 +2384,7 @@ const StudentCollegePersonalInformation = () => {
                 className="mb-4"
               >
                 <Select
+                readOnly
                   id="campus-select"
                   name="campus"
                   value={person.campus || ""}
@@ -2570,6 +2571,7 @@ const StudentCollegePersonalInformation = () => {
                     >
                       <InputLabel>Course Applied</InputLabel>
                       <Select
+                         readOnly
                         name="program"
                         value={isProgramLocked ? registrarCurriculumId : person.program || ""}
                         onBlur={() => handleUpdate(person)}
@@ -2878,6 +2880,7 @@ const StudentCollegePersonalInformation = () => {
                     Height:
                   </Typography>
                   <TextField
+                     InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="height"
@@ -2904,6 +2907,7 @@ const StudentCollegePersonalInformation = () => {
                     Weight:
                   </Typography>
                   <TextField
+                     InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="weight"
@@ -3237,6 +3241,7 @@ const StudentCollegePersonalInformation = () => {
                 >
                   <InputLabel id="citizenship-label">Citizenship</InputLabel>
                   <Select
+                  readOnly
                     labelId="citizenship-label"
                     id="citizenship"
                     name="citizenship"
@@ -3384,6 +3389,7 @@ const StudentCollegePersonalInformation = () => {
                 >
                   <InputLabel id="religion-label">Religion</InputLabel>
                   <Select
+                  readOnly
                     labelId="religion-label"
                     id="religion"
                     name="religion"
@@ -3443,6 +3449,7 @@ const StudentCollegePersonalInformation = () => {
                 >
                   <InputLabel id="civil-status-label">Civil Status</InputLabel>
                   <Select
+                  readOnly
                     labelId="civil-status-label"
                     id="civilStatus"
                     name="civilStatus"
@@ -3474,6 +3481,7 @@ const StudentCollegePersonalInformation = () => {
                     Spouse<span style={{ color: "red" }}> *</span>
                   </Typography>
                   <TextField
+                  
                     fullWidth
                     size="small"
                     name="spouse"
@@ -3499,6 +3507,7 @@ const StudentCollegePersonalInformation = () => {
                 >
                   <InputLabel id="tribe-label">Tribe/Ethnic Group</InputLabel>
                   <Select
+                  readOnly
                     labelId="tribe-label"
                     id="tribeEthnicGroup"
                     name="tribeEthnicGroup"
@@ -3587,6 +3596,7 @@ const StudentCollegePersonalInformation = () => {
                 </Typography>
 
                 <TextField
+          
                   fullWidth
                   size="small"
                   name="cellphoneNumber"
@@ -3606,7 +3616,7 @@ const StudentCollegePersonalInformation = () => {
                   helperText={
                     errors.cellphoneNumber && "This field is required."
                   }
-                  InputProps={{
+                  InputProps={{ readOnly: true,
                     startAdornment: (
                       <Typography sx={{ mr: 1, fontWeight: "bold" }}>
                         +63
@@ -3622,15 +3632,16 @@ const StudentCollegePersonalInformation = () => {
                 </Typography>
 
                 <TextField
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   fullWidth
                   size="small"
                   name="emailAddress"
                   required
                   value={person.emailAddress || ""}
                   placeholder="Your registered email"
-                  InputProps={{
-                    readOnly: true,
-                  }}
+                
                   sx={{
                     backgroundColor: "#f0f0f0",
                   }}
@@ -3643,6 +3654,9 @@ const StudentCollegePersonalInformation = () => {
                 </Typography>
 
                 <TextField
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   fullWidth
                   size="small"
                   name="facebook_account"

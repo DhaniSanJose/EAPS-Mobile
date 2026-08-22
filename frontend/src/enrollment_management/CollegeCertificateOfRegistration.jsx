@@ -21,7 +21,6 @@ import {
   DialogContentText,
   DialogActions,
 } from "@mui/material";
-
 import EaristLogo from "../assets/EaristLogo.png";
 import "../styles/Print.css";
 import { Search } from "@mui/icons-material";
@@ -4660,7 +4659,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
                                 height: "150px",
                                 display: "block",
                               }}
-                              src={`${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`}
+                              src={`${API_BASE_URL}/uploads/StudentQRCodeGenerated/${student_number}_qrcode.png`}
                               alt=""
                               onError={() => setQrCodeMissing(true)}
                             />

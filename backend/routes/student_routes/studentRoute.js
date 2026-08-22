@@ -3,7 +3,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { db, db3 } = require("../database/database");
-
+const QRCode = require("qrcode");
 const router = express.Router();
 
 const {
@@ -2285,6 +2285,210 @@ router.get("/student/latin-honor-standing/:id", async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch student Latin honor standing:", error);
     res.status(500).json({ error: "Failed to fetch Latin honor standing" });
+  }
+});
+
+router.get("/student-qr-information/:student_number", async (req, res) => {
+  const studentNumber = String(req.params.student_number || "").trim();
+  if (!studentNumber) {
+    return res.status(400).json({ success: false, message: "Student number is required." });
+  }
+
+  try {
+    // 1) Student must exist
+    const [studentRows] = await db3.query(
+      `
+      SELECT
+        snt.student_number,
+        pt.person_id,
+        pt.first_name,
+        pt.middle_name,
+        pt.last_name,
+        pt.extension,
+        pt.profile_img
+      FROM student_numbering_table snt
+      INNER JOIN person_table pt ON pt.person_id = snt.person_id
+      WHERE snt.student_number = ?
+      LIMIT 1
+      `,
+      [studentNumber],
+    );
+
+    if (studentRows.length === 0) {
+      return res.status(404).json({ success: false, message: "No student record found for this student number." });
+    }
+
+    const student = studentRows[0];
+
+    // 2) GATE: must have a portal account (mirrors the TOR QR gate)
+    const [accountRows] = await db3.query(
+      `SELECT id, status FROM user_accounts WHERE person_id = ? AND role = 'student' LIMIT 1`,
+      [student.person_id],
+    );
+
+    if (accountRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "This student does not have a portal account yet.",
+      });
+    }
+
+    // 3) Program/curriculum for display (latest enrollment record on file, regardless of term)
+    const [curriculumRows] = await db3.query(
+      `
+      SELECT pgt.program_code, pgt.program_description, pgt.major, es.curriculum_id
+      FROM enrolled_subject es
+      LEFT JOIN curriculum_table ct ON ct.curriculum_id = es.curriculum_id
+      LEFT JOIN program_table pgt ON pgt.program_id = ct.program_id
+      WHERE es.student_number = ?
+      ORDER BY es.id DESC
+      LIMIT 1
+      `,
+      [studentNumber],
+    );
+
+    // 4) Active school year — now also resolves AY + semester labels
+    // (e.g. "AY 2026-2027" / "1st Semester") instead of just the raw
+    // active_school_year_id, by joining year_table + semester_table.
+    const [[activeYear]] = await db3.query(
+      `SELECT
+         asy.id AS active_school_year_id,
+         asy.year_id,
+         asy.semester_id,
+         yt.year_description,
+         smt.semester_description,
+         smt.ordinal_label
+       FROM active_school_year_table AS asy
+       LEFT JOIN year_table AS yt ON yt.year_id = asy.year_id
+       LEFT JOIN semester_table AS smt ON smt.semester_id = asy.semester_id
+       WHERE asy.astatus = 1
+       LIMIT 1`,
+    );
+
+    // Build display-ready labels from the raw year/semester data above.
+    // year_description is stored as the starting year (e.g. 2026), so the
+    // school year label is constructed as "AY {year}-{year + 1}".
+    const schoolYearLabel = activeYear?.year_description
+      ? `AY ${activeYear.year_description}-${Number(activeYear.year_description) + 1}`
+      : null;
+    const semesterLabel =
+      activeYear?.ordinal_label || activeYear?.semester_description || null;
+
+    let enrolledStatus = 0; // default: NOT enrolled unless proven otherwise
+    let yearLevelDescription = null;
+    let sectionDescription = null;
+    let ongoingSubjects = [];
+
+    if (activeYear) {
+      // Definitive enrolled/not-enrolled check for the active term.
+      // CROSS JOIN + LEFT JOIN guarantees a row even if the student has
+      // no student_status_table record yet for this term (defaults to 0).
+      const [[statusRow]] = await db3.query(
+        `
+        SELECT
+          COALESCE(sst.enrolled_status, 0) AS enrolled_status,
+          ylt.year_level_description
+        FROM student_numbering_table AS snt
+        CROSS JOIN active_school_year_table AS asy
+        LEFT JOIN student_status_table AS sst
+          ON sst.student_number = snt.student_number
+         AND sst.active_school_year_id = asy.id
+        LEFT JOIN year_level_table AS ylt
+          ON sst.year_level_id = ylt.year_level_id
+        WHERE snt.student_number = ?
+          AND asy.astatus = 1
+        LIMIT 1
+        `,
+        [studentNumber],
+      );
+
+      enrolledStatus = Number(statusRow?.enrolled_status || 0);
+      yearLevelDescription = statusRow?.year_level_description || null;
+
+      // Only pull ongoing subjects if actually enrolled this term —
+      // otherwise a student with leftover rows from a prior partial
+      // enrollment attempt would misleadingly show a class list.
+      if (enrolledStatus === 1) {
+        const [subjectRows] = await db3.query(
+          `
+          SELECT
+            es.id,
+            ct.course_code,
+            ct.course_description,
+            ct.course_unit,
+            ct.lab_unit,
+            st.description AS section_description,
+            rdt.description AS day_description,
+            tt.school_time_start,
+            tt.school_time_end,
+            rt.room_description,
+            pft.fname AS prof_fname,
+            pft.mname AS prof_mname,
+            pft.lname AS prof_lname
+          FROM enrolled_subject es
+          INNER JOIN course_table ct ON es.course_id = ct.course_id
+          LEFT JOIN dprtmnt_section_table dst ON es.department_section_id = dst.id
+          LEFT JOIN section_table st ON dst.section_id = st.id
+          LEFT JOIN time_table tt
+            ON tt.course_id = es.course_id
+            AND tt.department_section_id = es.department_section_id
+            AND tt.school_year_id = es.active_school_year_id
+          LEFT JOIN room_day_table rdt ON tt.room_day = rdt.id
+          LEFT JOIN room_table rt ON tt.department_room_id = rt.room_id
+          LEFT JOIN prof_table pft ON tt.professor_id = pft.prof_id
+          WHERE es.student_number = ?
+            AND es.active_school_year_id = ?
+          ORDER BY ct.course_code ASC
+          `,
+          [studentNumber, activeYear.active_school_year_id],
+        );
+
+        ongoingSubjects = subjectRows.map((s) => ({
+          course_code: s.course_code,
+          course_description: s.course_description,
+          units: (Number(s.course_unit) || 0) + (Number(s.lab_unit) || 0),
+          section: s.section_description,
+          schedule: s.day_description
+            ? `${s.day_description} ${s.school_time_start || ""}-${s.school_time_end || ""}`.trim()
+            : null,
+          room: s.room_description,
+          instructor: [s.prof_lname, s.prof_fname].filter(Boolean).join(", ") || null,
+        }));
+
+        sectionDescription = subjectRows[0]?.section_description || null;
+      }
+    }
+
+    const clean = (v) => (v === null || v === undefined ? "" : String(v).trim());
+    const nameParts = [clean(student.first_name), clean(student.middle_name), clean(student.extension)].filter(Boolean);
+    const fullName = clean(student.last_name) && nameParts.length
+      ? `${clean(student.last_name)}, ${nameParts.join(" ")}`.toUpperCase()
+      : clean(student.last_name).toUpperCase();
+
+    return res.json({
+      success: true,
+      student: {
+        student_number: student.student_number,
+        full_name: fullName,
+        profile_image: student.profile_img || null,
+      },
+      program: curriculumRows[0] || null,
+      account_status: accountRows[0].status,
+      active_school_year: activeYear || null,
+      // New: ready-to-display AY + semester strings, e.g.
+      // school_year_label: "AY 2026-2027", semester_label: "1st Semester"
+      school_year_label: schoolYearLabel,
+      semester_label: semesterLabel,
+      enrolled_status: enrolledStatus,
+      year_level: yearLevelDescription,
+      section: sectionDescription,
+      subjects: ongoingSubjects,
+      // this file is already written by /send_student_password_reminder + assign-student-number
+      qr_image_url: `/uploads/StudentQRCodeGenerated/${studentNumber}_qrcode.png`,
+    });
+  } catch (error) {
+    console.error("Student QR information lookup failed:", error);
+    return res.status(500).json({ success: false, message: "Unable to load student information right now." });
   }
 });
 

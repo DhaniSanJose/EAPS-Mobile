@@ -8,6 +8,7 @@ const router = express.Router();
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const QRCode = require("qrcode");
 
 const studentPhotoDir = path.join(__dirname, "..", "..", "uploads", "Student1by1");
 if (!fs.existsSync(studentPhotoDir)) {
@@ -241,6 +242,7 @@ router.get("/student_list/:student_number", async (req, res) => {
   }
 });
 
+// ── Single, merged PUT handler (duplicate removed) ──────────────────────────
 router.put(
   "/student_account/:person_id",
   uploadStudentPhoto.single("student_photo"),
@@ -317,6 +319,9 @@ router.put(
 
       const hashedPassword = password ? await bcrypt.hash(String(password), 10) : null;
 
+      // ── Track the account id no matter which branch runs ──────────────────
+      let accountId = accountRows.length > 0 ? accountRows[0].id : null;
+
       if (accountRows.length > 0) {
         const params = [nextLastName, nextMiddleName || null, nextFirstName, normalizedEmail, status];
         let passwordSql = "";
@@ -353,22 +358,26 @@ router.put(
         if (req.file && accountRows[0].profile_picture) {
           fs.unlink(path.join(studentPhotoDir, accountRows[0].profile_picture), () => {});
         }
-      } else if (hashedPassword) {
-        await conn.query(
+      } else {
+        // ── Always create the account row, even without a password ──────────
+        const [insertResult] = await conn.query(
           `INSERT INTO user_accounts
             (person_id, role, last_name, middle_name, first_name, email, password, profile_picture, status, force_password_change, totp_enabled)
-           VALUES (?, 'student', ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+           VALUES (?, 'student', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             person_id,
             nextLastName,
             nextMiddleName || null,
             nextFirstName,
             normalizedEmail,
-            hashedPassword,
+            hashedPassword || null,
             req.file ? req.file.filename : null,
             status,
+            hashedPassword ? 1 : 0,
+            1,
           ],
         );
+        accountId = insertResult.insertId;
       }
 
       await conn.commit();
@@ -388,6 +397,8 @@ router.put(
           ? "Student account saved successfully"
           : "Student information saved successfully",
         profile_img: nextProfileImg,
+        id: accountId,
+        person_id: Number(person_id),
       });
     } catch (error) {
       if (conn) await conn.rollback();
@@ -400,6 +411,7 @@ router.put(
   },
 );
 
+// ── Restored: was missing from the last paste ────────────────────────────────
 router.post("/send_student_password_reminder", async (req, res) => {
   const { person_id, email, password } = req.body;
 
@@ -442,10 +454,56 @@ router.post("/send_student_password_reminder", async (req, res) => {
 
     const company_name = companyRows[0]?.company_name || "Company";
     const short_term = companyRows[0]?.short_term || "System";
-    const frontendUrl = process.env.FRONTEND_URL;
+
+    let frontendUrl = (process.env.FRONTEND_URL || "").trim();
+    // Same scheme guard as /graduate-qr — a bare host:port with no http(s)://
+    // produces a QR code that scanners treat as plain text, not a link.
+    if (frontendUrl && !/^https?:\/\//i.test(frontendUrl)) {
+      frontendUrl = `http://${frontendUrl}`;
+    }
 
     const { first_name, last_name, middle_name, student_number } = student[0];
     const fullName = `${last_name}, ${first_name} ${middle_name || ""}`.trim();
+
+    // ── Generate QR codes (Student QR + TOR QR) ──────────────────────────────
+    if (student_number) {
+      try {
+        // Uses FRONTEND_URL (same source of truth as /graduate-qr) instead of
+        // DB_HOST_LOCAL + hardcoded :5173, which only worked while the Vite
+        // dev server was running and would break entirely once deployed.
+        const qrData = `${frontendUrl}/student_qr_information/${student_number}`;
+        const torQrData = `${frontendUrl}/tor_qr_information/${student_number}`;
+
+        const qrFilename = `${student_number}_qrcode.png`;
+        const torQrFilename = `${student_number}_tor_qrcode.png`;
+
+        const studentQrDir = path.join(__dirname, "..", "..", "uploads", "StudentQRCodeGenerated");
+        const torQrDir = path.join(__dirname, "..", "..", "uploads", "TORStudentQRCodeGenerated");
+
+        if (!fs.existsSync(studentQrDir)) fs.mkdirSync(studentQrDir, { recursive: true });
+        if (!fs.existsSync(torQrDir)) fs.mkdirSync(torQrDir, { recursive: true });
+
+        const qrPath = path.join(studentQrDir, qrFilename);
+        const torQrPath = path.join(torQrDir, torQrFilename);
+
+        await QRCode.toFile(qrPath, qrData, {
+          color: { dark: "#000", light: "#FFF" },
+          width: 300,
+        });
+
+        await QRCode.toFile(torQrPath, torQrData, {
+          color: { dark: "#000", light: "#FFF" },
+          width: 300,
+        });
+      } catch (qrErr) {
+        console.error("[send_student_password_reminder] QR generation failed:", qrErr);
+        // non-fatal — still send the email even if QR generation fails
+      }
+    } else {
+      console.warn(
+        `[send_student_password_reminder] No student_number found for person_id=${person_id}; skipping QR generation.`,
+      );
+    }
 
     emailDeliveryAttempted = true;
     await transporter.sendMail({
@@ -552,5 +610,6 @@ router.post("/send_student_password_reminder", async (req, res) => {
     if (conn) conn.release();
   }
 });
+
 
 module.exports = router;

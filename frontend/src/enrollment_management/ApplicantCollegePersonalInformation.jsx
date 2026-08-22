@@ -2572,11 +2572,13 @@ const ApplicantCollegePersonalInformation = () => {
                     <FormControl
                       fullWidth
                       size="small"
-                      required
+                    
+                      readOnly
                       error={!!errors.program}
                     >
                       <InputLabel>Course Applied</InputLabel>
                       <Select
+                      readOnly
                         name="program"
                         value={isProgramLocked ? registrarCurriculumId : person.program || ""}
                         onBlur={() => handleUpdate(person)}
@@ -2883,6 +2885,7 @@ const ApplicantCollegePersonalInformation = () => {
                     Height:
                   </Typography>
                   <TextField
+                   InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="height"
@@ -2909,6 +2912,7 @@ const ApplicantCollegePersonalInformation = () => {
                     Weight:
                   </Typography>
                   <TextField
+                   InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="weight"

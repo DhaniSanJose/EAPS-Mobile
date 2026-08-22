@@ -4590,7 +4590,7 @@ const CertificateOfRegistration = forwardRef(
                                 height: "150px",
                                 display: "block",
                               }}
-                              src={`${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`}
+                              src={`${API_BASE_URL}/uploads/StudentQRCodeGenerated/${student_number}_qrcode.png`}
                               alt=""
                               onError={() => setQrCodeMissing(true)}
                             />

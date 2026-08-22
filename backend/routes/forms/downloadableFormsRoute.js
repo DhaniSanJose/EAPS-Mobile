@@ -2574,13 +2574,15 @@ router.post("/generate-tor-pdf", async (req, res) => {
       font-family: Arial, sans-serif;
     }
 
-    .tor-page {
+
+  .tor-page {
       width: 215.9mm;
-      height: 342.9mm;
+      min-height: 345.4mm; 
       padding: 10mm 12mm;
-      overflow: hidden;
+      overflow: visible;   
       position: relative;
     }
+
 
     .tor-page:not(:last-of-type) {
       page-break-after: always;
@@ -2602,7 +2604,7 @@ router.post("/generate-tor-pdf", async (req, res) => {
      * Nudge this up/down slightly if text wraps oddly or margins look off.
      */
     .tor-page > * {
-      zoom: 0.566;
+      zoom: 0.544;
     }
 
     table {
@@ -2625,11 +2627,15 @@ router.post("/generate-tor-pdf", async (req, res) => {
     `.trim();
 
     await page.setContent(wrappedHtml, {
-      waitUntil: "networkidle0",
-      timeout: 60000,
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
     });
 
-    await waitForImages(page);
+    await Promise.race([
+      waitForImages(page),
+      new Promise((resolve) => setTimeout(resolve, 8000)),
+    ]);
+
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const pdfBuffer = await page.pdf({
@@ -2639,7 +2645,7 @@ router.post("/generate-tor-pdf", async (req, res) => {
       preferCSSPageSize: false,
       margin: {
         top: "0.20in",
-        bottom: "0.20in",
+        bottom: "0",
         left: "0",
         right: "0"
       },
