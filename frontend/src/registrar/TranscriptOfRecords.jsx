@@ -1224,10 +1224,10 @@ const TranscriptOfRecords = () => {
         </div>
         <div style="text-align:center;">
           <div style="font-family:Arial, sans-serif; font-size:13px;">Republic of the Philippines</div>
-          ${name ? `
-            <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:'uppercase'; ">${firstLine}</div>
-            ${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial; text-transform:'uppercase';">${secondLine}</div>` : ""}
-          ` : ""}
+     ${name ? `
+  <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:uppercase;">${firstLine.toUpperCase()}</div>
+  ${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:uppercase;">${secondLine.toUpperCase()}</div>` : ""}
+` : ""}
           ${allBranchNames ? `
             <div style="font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-top:-2px;">
               ${allBranchNames}
@@ -3346,6 +3346,7 @@ const TranscriptOfRecords = () => {
                               fontWeight: "400",
                               letterSpacing: "-1.5px",
                               wordSpacing: "5px",
+                              textTransform: "uppercase"
                             }}
                           >
                             {studentData.schoolLastAttended1}
