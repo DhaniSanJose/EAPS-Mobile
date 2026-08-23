@@ -4266,15 +4266,14 @@ router.post("/generate-cor-pdf", async (req, res) => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const pdfBuffer = await page.pdf({
-      format: "A4",
+         format: "A4",
       printBackground: true,
-      preferCSSPageSize: false, // let Puppeteer control the page size
-      scale: 1, // no scaling — we sized the viewport correctly
+      preferCSSPageSize: false, // Puppeteer's format:"A4" wins over any @page size in the HTML
       margin: {
-        top: "6mm",
-        bottom: "6mm",
-        left: "10mm",
-        right: "10mm",
+        top: "0.25in",
+        bottom: "0.25in",
+        left: "0.25in",
+        right: "0.25in",
       },
     });
 

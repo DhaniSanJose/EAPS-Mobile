@@ -4293,7 +4293,7 @@ const Register = () => {
 
               <div className="TextField" style={{ position: "relative" }}>
                 <label style={{ color: "black" }}>
-                  Email Address<span style={{ color: "red" }}> *</span>
+              Email Address<span style={{ color: "red" }}> *</span>
                 </label>
                 <input
                   required

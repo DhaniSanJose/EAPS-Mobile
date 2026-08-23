@@ -22,6 +22,8 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import EditNoteIcon from "@mui/icons-material/EditNote";
@@ -151,6 +153,15 @@ const TOR_EDIT_OPTIONS = [
     icon: <CameraAltIcon sx={{ fontSize: 32 }} />,
     color: "#0277bd",
     bg: "#e1f5fe",
+  },
+
+  {
+    key: "documentNumber",
+    label: "Edit Document Number",
+    description: "Set the document number printed on every page",
+    icon: <EditNoteIcon sx={{ fontSize: 32 }} />,
+    color: "#00695c",
+    bg: "#e0f2f1",
   },
   {
     key: "remarks",
@@ -393,6 +404,7 @@ const TranscriptOfRecords = () => {
   const [institutionWebsite, setInstitutionWebsite] = useState("");
 
   const [documentNumbers, setDocumentNumbers] = useState([]);
+  const [printOnSecurityPaper, setPrintOnSecurityPaper] = useState(false);
 
   const getDocumentNumber = (pageIndex) => documentNumbers[pageIndex] || "";
 
@@ -402,6 +414,36 @@ const TranscriptOfRecords = () => {
       next[pageIndex] = value;
       return next;
     });
+  };
+
+  const [documentNumberDialogOpen, setDocumentNumberDialogOpen] = useState(false);
+  const [documentNumberDraft, setDocumentNumberDraft] = useState([]); // array, index = page
+
+  const openDocumentNumberDialog = () => {
+    const totalPages = Math.max(paginatedSubjects.length, 1);
+    setDocumentNumberDraft(
+      Array.from({ length: totalPages }, (_, i) => documentNumbers[i] || "")
+    );
+    setDocumentNumberDialogOpen(true);
+  };
+
+  const closeDocumentNumberDialog = () => setDocumentNumberDialogOpen(false);
+
+  const handleDocumentNumberDraftChange = (pageIndex, value) => {
+    setDocumentNumberDraft((prev) => {
+      const next = [...prev];
+      next[pageIndex] = value;
+      return next;
+    });
+  };
+
+  const handleSaveDocumentNumber = () => {
+    const cleaned = documentNumberDraft.map((v) => (v || "").trim());
+    setDocumentNumbers(cleaned);
+    setSnackbarSeverity("success");
+    setSnackbarMessage("Document numbers saved.");
+    setOpenSnackbar(true);
+    setDocumentNumberDialogOpen(false);
   };
 
   const [remarksDialogOpen, setRemarksDialogOpen] = useState(false);
@@ -1202,7 +1244,8 @@ const TranscriptOfRecords = () => {
       ? `${API_BASE_URL}/uploads/Student1by1/${studentData.profile_image}`
       : "";
 
-    // ── Header ──
+    const hideOnSecurityPaper = printOnSecurityPaper ? "visibility:hidden;" : "";
+
     const headerHtml = `
     <div style="position:relative; width:80rem; margin:0 auto;">
       <div style="position:absolute; top:0; right:0; display:flex; flex-direction:column; align-items:center; z-index:2;">
@@ -1220,9 +1263,9 @@ const TranscriptOfRecords = () => {
       <div style="display:flex; align-items:center; justify-content:center; margin-top: -20px;">
         <div style="display:flex; align-items:center; gap:0.5rem; margin-left:-10rem; padding-right:3rem;">
           <img src="${logoDataUris.bagongPilipinas || BagongPilipinasLogo}" alt="Bagong Pilipinas" style="width:8.5rem; height:8rem; display:block;" />
-          <img src="${logoSrc}" alt="Logo" style="width:8rem; height:8rem; border-radius:50%; display:block;" />
+          <img src="${logoSrc}" alt="Logo" style="width:8rem; height:8rem; border-radius:50%; display:block; ${hideOnSecurityPaper}" />
         </div>
-        <div style="text-align:center;">
+        <div style="text-align:center; ${hideOnSecurityPaper}">
           <div style="font-family:Arial, sans-serif; font-size:13px;">Republic of the Philippines</div>
      ${name ? `
   <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:uppercase;">${firstLine.toUpperCase()}</div>
@@ -1237,10 +1280,10 @@ const TranscriptOfRecords = () => {
         </div>
       </div>
 
-      <div style="text-align:center; margin-top: 30px; font-size:1.6rem; letter-spacing:-1px; font-weight:500;">
+      <div style="text-align:center; margin-top: 30px; font-size:1.6rem; letter-spacing:-1px; font-weight:500; ${hideOnSecurityPaper}">
         OFFICE OF THE REGISTRAR
       </div>
-      <div style="text-align:center; margin-top:-0.5rem; font-size:2.75rem; letter-spacing:-1px; font-weight:600;">
+      <div style="text-align:center; margin-top:-0.5rem; font-size:2.75rem; letter-spacing:-1px; font-weight:600; ${hideOnSecurityPaper}">
         OFFICIAL TRANSCRIPT OF RECORDS
       </div>
     </div>
@@ -1273,7 +1316,7 @@ const TranscriptOfRecords = () => {
         ${infoRow("DATE OF GRADUATION", dateIssuedDisplay)}
       </div>
     <div style="flex:0 0 225px; margin-left:1rem;">
-  <div style="text-align:center; font-size:14px; font-weight:600; margin-bottom:4px; letter-spacing:0.3px;">
+  <div style="text-align:center; font-size:14px; font-weight:600; margin-bottom:4px; letter-spacing:0.3px; ${hideOnSecurityPaper}">
  ${documentNumbers[pageIndex] || ""}
   </div>
   ${photoSrc
@@ -1283,7 +1326,6 @@ const TranscriptOfRecords = () => {
       </div>
     </div>
   `;
-
     // ── Subjects table (div-based, no table/flex hybrid) ──
     const tableHeaderHtml = `
     <div style="display:flex; height:65px; align-items:center; border-bottom:solid 1px black; font-weight:600; font-size:20px;">
@@ -1415,7 +1457,7 @@ const TranscriptOfRecords = () => {
     <div style="margin-top:0.3rem; text-align:center;">
       ${signature?.signature_image
         ? `<img src="${getSignatureImageSrc(signature)}" style="width:16rem; height:4rem; object-fit:contain; display:block; margin:0 auto -0.2rem;" />`
-        : ""
+        : `<div style="width:16rem; height:4rem; margin:0 auto;"></div>`
       }
       <span style="display:block; font-size:18px; font-weight:500; letter-spacing:-1px; white-space:normal; word-break:break-word; line-height:1.15; max-width:19rem; margin:0 auto;">
         ${signature?.full_name?.toUpperCase() || ""}
@@ -1428,7 +1470,7 @@ const TranscriptOfRecords = () => {
   <div style="width:21rem; text-align:center; display:flex; flex-direction:column; align-items:center;">
     ${torSignatories.registrar?.signature_image
         ? `<img src="${getSignatureImageSrc(torSignatories.registrar)}" style="width:11rem; height:2.7rem; object-fit:contain; display:block; margin-bottom:-0.2rem;" />`
-        : ""
+        : `<div style="width:11rem; height:2.7rem; margin-bottom:-0.2rem;"></div>`
       }
     <span style="font-size:22px; letter-spacing:-1px; white-space:normal; word-break:break-word; max-width:20rem; line-height:1.15;">${torSignatories.registrar?.full_name?.toUpperCase() || ""}</span>
     <span style="font-size:18px; letter-spacing:-1px;">REGISTRAR</span>
@@ -1561,7 +1603,6 @@ const TranscriptOfRecords = () => {
     }
   };
 
-
   const handleTorEditCardClick = (key) => {
     switch (key) {
       case "capturePhoto":
@@ -1571,6 +1612,9 @@ const TranscriptOfRecords = () => {
           return;
         }
         setPhotoCaptureOpen(true);
+        break;
+      case "documentNumber":
+        openDocumentNumberDialog();
         break;
       case "remarks":
         openRemarksDialog();
@@ -1829,6 +1873,7 @@ const TranscriptOfRecords = () => {
       designation: "",
       file: null,
       preview: null,
+      removed: false, // ✅ NEW
     },
 
     checked_by: {
@@ -1836,6 +1881,7 @@ const TranscriptOfRecords = () => {
       designation: "",
       file: null,
       preview: null,
+      removed: false, // ✅ NEW
     },
 
     registrar: {
@@ -1843,45 +1889,39 @@ const TranscriptOfRecords = () => {
       designation: "",
       file: null,
       preview: null,
+      removed: false, // ✅ NEW
     },
   });
-
-  // ============================================================
-  // OPEN SIGNATORIES DIALOG
-  // ============================================================
 
   const openSignatoriesDialog = () => {
     setSignatoriesDraft({
       prepared_by: {
-        full_name:
-          torSignatories?.prepared_by?.full_name || "",
-        designation:
-          torSignatories?.prepared_by?.designation || "",
+        full_name: torSignatories?.prepared_by?.full_name || "",
+        designation: torSignatories?.prepared_by?.designation || "",
         file: null,
         preview: null,
+        removed: false, // ✅ NEW
       },
-
       checked_by: {
-        full_name:
-          torSignatories?.checked_by?.full_name || "",
-        designation:
-          torSignatories?.checked_by?.designation || "",
+        full_name: torSignatories?.checked_by?.full_name || "",
+        designation: torSignatories?.checked_by?.designation || "",
         file: null,
         preview: null,
+        removed: false, // ✅ NEW
       },
-
       registrar: {
-        full_name:
-          torSignatories?.registrar?.full_name || "",
-        designation:
-          torSignatories?.registrar?.designation || "",
+        full_name: torSignatories?.registrar?.full_name || "",
+        designation: torSignatories?.registrar?.designation || "",
         file: null,
         preview: null,
+        removed: false, // ✅ NEW
       },
     });
 
     setSignatoriesDialogOpen(true);
   };
+
+
 
   const closeSignatoriesDialog = () => {
     setSignatoriesDialogOpen(false);
@@ -1906,14 +1946,7 @@ const TranscriptOfRecords = () => {
     }));
   };
 
-  // ============================================================
-  // SIGNATURE FILE CHANGE
-  // ============================================================
-
-  const handleSignatoryFileChange = (
-    role,
-    file
-  ) => {
+  const handleSignatoryFileChange = (role, file) => {
     if (!file) {
       return;
     }
@@ -1922,18 +1955,30 @@ const TranscriptOfRecords = () => {
 
     setSignatoriesDraft((previous) => ({
       ...previous,
-
       [role]: {
         ...previous[role],
         file,
         preview,
+        removed: false, // uploading a new file cancels any pending removal
       },
     }));
   };
 
-  // ============================================================
-  // SAVE SIGNATORIES
-  // ============================================================
+  // ✅ NEW — mark this role's signature for removal on save
+  const handleRemoveSignature = (role) => {
+    setSignatoriesDraft((previous) => ({
+      ...previous,
+      [role]: {
+        ...previous[role],
+        file: null,
+        preview: null,
+        removed: true,
+      },
+    }));
+  };
+
+
+
   const handleSaveSignatories = async () => {
     try {
       await Promise.all(
@@ -1944,7 +1989,11 @@ const TranscriptOfRecords = () => {
           const formData = new FormData();
           formData.append("full_name", draft.full_name || "");
           formData.append("designation", draft.designation || "");
-          if (draft.file) formData.append("signature", draft.file);
+          if (draft.file) {
+            formData.append("signature", draft.file);
+          } else if (draft.removed) {
+            formData.append("remove_signature", "true"); // ✅ NEW
+          }
 
           await axios.put(
             `${API_BASE_URL}/api/tor-signatories/${role}`,
@@ -2176,6 +2225,23 @@ const TranscriptOfRecords = () => {
               </Box>
             )}
           </Box>
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={printOnSecurityPaper}
+                onChange={(e) => setPrintOnSecurityPaper(e.target.checked)}
+                color="success"
+              />
+            }
+            label={
+              <Typography sx={{ fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap" }}>
+                Print on Security Paper
+              </Typography>
+            }
+            sx={{ mr: 1 }}
+          />
+
 
           <button
             onClick={handleExportTorPdf}
@@ -2432,7 +2498,7 @@ const TranscriptOfRecords = () => {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: "repeat(6, minmax(140px, 1fr))",
+              gridTemplateColumns: "repeat(7, minmax(140px, 1fr))",
               gap: 2,
               overflowX: { xs: "auto", md: "visible" },
               pb: { xs: 1, md: 0 },
@@ -4277,7 +4343,7 @@ const TranscriptOfRecords = () => {
                                     PREPARED BY:
                                   </span>
                                   <div style={{ marginTop: "0.4rem", textAlign: "center" }}>
-                                    {selectedPreparedBy?.signature_image && (
+                                    {selectedPreparedBy?.signature_image ? (
                                       <img
                                         src={getSignatureImageSrc(selectedPreparedBy)}
                                         alt={selectedPreparedBy.signature_name || "Prepared by signature"}
@@ -4289,6 +4355,8 @@ const TranscriptOfRecords = () => {
                                           margin: "0 auto -0.2rem",
                                         }}
                                       />
+                                    ) : (
+                                      <div style={{ width: "16rem", height: "4rem", margin: "0 auto" }} />
                                     )}
                                     <span
                                       style={{
@@ -4320,7 +4388,7 @@ const TranscriptOfRecords = () => {
                                     CHECKED BY:
                                   </span>
                                   <div style={{ marginTop: "0.4rem", textAlign: "center" }}>
-                                    {selectedCheckedBy?.signature_image && (
+                                    {selectedCheckedBy?.signature_image ? (
                                       <img
                                         src={getSignatureImageSrc(selectedCheckedBy)}
                                         alt={selectedCheckedBy.signature_name || "Checked by signature"}
@@ -4332,6 +4400,8 @@ const TranscriptOfRecords = () => {
                                           margin: "0 auto -0.2rem",
                                         }}
                                       />
+                                    ) : (
+                                      <div style={{ width: "16rem", height: "4rem", margin: "0 auto" }} />
                                     )}
                                     <span
                                       style={{
@@ -4365,7 +4435,7 @@ const TranscriptOfRecords = () => {
                                       textAlign: "center",
                                     }}
                                   >
-                                    {selectedRegistrar?.signature_image && (
+                                    {selectedRegistrar?.signature_image ? (
                                       <img
                                         src={getSignatureImageSrc(selectedRegistrar)}
                                         alt={selectedRegistrar.signature_name || "Registrar signature"}
@@ -4377,6 +4447,8 @@ const TranscriptOfRecords = () => {
                                           margin: "0 auto -0.2rem",
                                         }}
                                       />
+                                    ) : (
+                                      <div style={{ width: "16rem", height: "4rem", margin: "0 auto" }} />
                                     )}
                                     <span
                                       style={{
@@ -4461,7 +4533,7 @@ const TranscriptOfRecords = () => {
                               <tr
                                 style={{
                                   display: "flex",
-                                  alignItems: "center",
+                                  alignItems: "center",  
                                   justifyContent: "center",
                                   marginTop: "0.4rem",
                                   paddingTop: "0.3rem",
@@ -4839,12 +4911,13 @@ const TranscriptOfRecords = () => {
                     mb: 1.5,
                   }}
                 >
-                  {draft.preview || currentImage ? (
+                  {draft.removed ? (
+                    <Typography sx={{ fontSize: 13, color: "#c62828", fontStyle: "italic" }}>
+                      Signature will be removed on save
+                    </Typography>
+                  ) : draft.preview || currentImage ? (
                     <img
-                      src={
-                        draft.preview ||
-                        `${API_BASE_URL}/uploads/${currentImage}`
-                      }
+                      src={draft.preview || `${API_BASE_URL}/uploads/${currentImage}`}
                       alt={`${label} signature`}
                       style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                     />
@@ -4867,28 +4940,36 @@ const TranscriptOfRecords = () => {
                       type="file"
                       hidden
                       accept="image/*"
-                      onChange={(e) =>
-                        handleSignatoryFileChange(role, e.target.files?.[0])
-                      }
+                      onChange={(e) => handleSignatoryFileChange(role, e.target.files?.[0])}
                     />
                   </Button>
+
+                  {/* ✅ NEW — only show if there's something to remove and it isn't already marked removed */}
+                  {(draft.preview || currentImage) && !draft.removed && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteOutlineIcon />}
+                      sx={{ textTransform: "none", flexShrink: 0 }}
+                      onClick={() => handleRemoveSignature(role)}
+                    >
+                      Remove signature
+                    </Button>
+                  )}
 
                   <TextField
                     label="Full name"
                     size="small"
                     value={draft.full_name}
-                    onChange={(e) =>
-                      handleSignatoryFieldChange(role, "full_name", e.target.value)
-                    }
+                    onChange={(e) => handleSignatoryFieldChange(role, "full_name", e.target.value)}
                     sx={{ width: 220 }}
                   />
                   <TextField
                     label="Designation"
                     size="small"
                     value={draft.designation}
-                    onChange={(e) =>
-                      handleSignatoryFieldChange(role, "designation", e.target.value)
-                    }
+                    onChange={(e) => handleSignatoryFieldChange(role, "designation", e.target.value)}
                     sx={{ width: 220 }}
                   />
                 </Box>
@@ -4903,6 +4984,64 @@ const TranscriptOfRecords = () => {
           </Button>
           <Button onClick={handleSaveSignatories} variant="contained" color="success">
             Save Signatories
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={documentNumberDialogOpen} onClose={closeDocumentNumberDialog} maxWidth="sm" fullWidth>
+        <DialogTitle
+          sx={{
+            bgcolor: "#00695c",
+            color: "white",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          🔢 Edit Document Number
+          <IconButton
+            onClick={closeDocumentNumberDialog}
+            sx={{
+              color: "white",
+              border: "2px solid rgba(255,255,255,0.6)",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              padding: 0,
+              "&:hover": { backgroundColor: "rgba(255,255,255,0.2)", border: "2px solid white" },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This transcript currently has <strong>{documentNumberDraft.length}</strong> page
+            {documentNumberDraft.length !== 1 ? "s" : ""}. Each page can have its own document number,
+            printed at its top-right corner — you can still edit an individual page's number directly
+            above its photo as well.
+          </Typography>
+
+          {documentNumberDraft.map((value, pageIndex) => (
+            <TextField
+              key={pageIndex}
+              fullWidth
+              label={`Page ${pageIndex + 1} Document Number`}
+              placeholder="Enter Document No."
+              value={value}
+              onChange={(e) => handleDocumentNumberDraftChange(pageIndex, e.target.value)}
+              sx={{ mb: pageIndex < documentNumberDraft.length - 1 ? 2 : 0 }}
+            />
+          ))}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+          <Button onClick={closeDocumentNumberDialog} color="error" variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveDocumentNumber} variant="contained" color="success">
+            Save Document Number{documentNumberDraft.length !== 1 ? "s" : ""}
           </Button>
         </DialogActions>
       </Dialog>

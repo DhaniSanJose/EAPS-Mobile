@@ -77,7 +77,8 @@ const VerifyDocumentRoomAssignment = () => {
 
   useEffect(() => {
     axios.get(`${API_BASE_URL}/api/active_school_year`).then((res) => {
-      setSchoolYearId(res.data[0]?.school_year_id);
+      const row = Array.isArray(res.data) ? res.data[0] : res.data;
+      setSchoolYearId(row?.school_year_id ?? row?.id ?? "");
     });
   }, []);
 
@@ -121,7 +122,7 @@ const VerifyDocumentRoomAssignment = () => {
   const [employeeID, setEmployeeID] = useState("");
   const getAuditConfigForPage = () =>
     getAuditConfig({
-"x-audit-actor-id":
+      "x-audit-actor-id":
         employeeID ||
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
@@ -197,11 +198,21 @@ const VerifyDocumentRoomAssignment = () => {
       setSnackbarMessage("Please select a valid building and room.");
       setSnackbarSeverity("error");
       setOpenSnackbar(true);
+
+
       return;
     }
 
     if (!day || !buildingName || !startTime || !endTime || !roomQuota) {
       setSnackbarMessage("Please complete all required fields.");
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
+      return;
+    }
+
+
+    if (!schoolYearId) {
+      setSnackbarMessage("No active school year found — cannot save schedule ❌");
       setSnackbarSeverity("error");
       setOpenSnackbar(true);
       return;
@@ -1063,7 +1074,7 @@ const VerifyDocumentRoomAssignment = () => {
                   >
                     {/* LEFT SIDE */}
                     <Typography fontSize="14px" fontWeight="bold" color="white">
-                Total Room Schedule Records: ({filteredSchedules.length})
+                      Total Room Schedule Records: ({filteredSchedules.length})
                     </Typography>
 
                     {/* RIGHT SIDE */}

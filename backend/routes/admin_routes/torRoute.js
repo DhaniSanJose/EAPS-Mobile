@@ -140,7 +140,6 @@ router.get("/tor-signatories", async (req, res) => {
   }
 });
 
-// PUT update one signatory (full_name, designation, optional new signature image)
 router.put(
   "/tor-signatories/:role",
   CanEdit,
@@ -153,13 +152,20 @@ router.put(
       }
 
       const { full_name, designation } = req.body;
+      // multipart/form-data sends this as a string
+      const removeSignature =
+        req.body.remove_signature === "true" ||
+        req.body.remove_signature === "1" ||
+        req.body.remove_signature === true;
       const { actorId } = getAuditActor(req);
 
       let signaturePath = null;
+      let clearSignature = false;
+
       if (req.file) {
+        // New file uploaded — replace whatever's there
         signaturePath = `TOR_Signatories/${req.file.filename}`;
 
-        // Delete old signature image if replacing it
         const [[existing]] = await db3.query(
           "SELECT signature_image FROM tor_signatories WHERE role = ?",
           [role],
@@ -176,14 +182,39 @@ router.put(
             console.error("Failed to delete old TOR signatory image:", cleanupErr);
           }
         }
+      } else if (removeSignature) {
+        // No new file, but the user explicitly asked to remove the existing one
+        const [[existing]] = await db3.query(
+          "SELECT signature_image FROM tor_signatories WHERE role = ?",
+          [role],
+        );
+        if (existing?.signature_image) {
+          const oldPath = path.join(
+            __dirname,
+            "../../uploads",
+            existing.signature_image,
+          );
+          try {
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+          } catch (cleanupErr) {
+            console.error("Failed to delete removed TOR signatory image:", cleanupErr);
+          }
+        }
+        clearSignature = true;
       }
 
-      const setClause = signaturePath
-        ? "full_name = ?, designation = ?, signature_image = ?, updated_by = ?"
-        : "full_name = ?, designation = ?, updated_by = ?";
-      const values = signaturePath
-        ? [full_name ?? "", designation ?? "", signaturePath, actorId, role]
-        : [full_name ?? "", designation ?? "", actorId, role];
+      let setClause;
+      let values;
+      if (signaturePath) {
+        setClause = "full_name = ?, designation = ?, signature_image = ?, updated_by = ?";
+        values = [full_name ?? "", designation ?? "", signaturePath, actorId, role];
+      } else if (clearSignature) {
+        setClause = "full_name = ?, designation = ?, signature_image = NULL, updated_by = ?";
+        values = [full_name ?? "", designation ?? "", actorId, role];
+      } else {
+        setClause = "full_name = ?, designation = ?, updated_by = ?";
+        values = [full_name ?? "", designation ?? "", actorId, role];
+      }
 
       await db3.query(
         `UPDATE tor_signatories SET ${setClause} WHERE role = ?`,
@@ -192,8 +223,10 @@ router.put(
 
       await insertTorAuditLog({
         req,
-        action: "TOR_SIGNATORY_UPDATE",
-        message: `updated the TOR ${role.replace("_", " ")} signatory (${full_name || "N/A"}).`,
+        action: clearSignature ? "TOR_SIGNATORY_SIGNATURE_REMOVE" : "TOR_SIGNATORY_UPDATE",
+        message: clearSignature
+          ? `removed the signature image for the TOR ${role.replace("_", " ")} signatory (${full_name || "N/A"}).`
+          : `updated the TOR ${role.replace("_", " ")} signatory (${full_name || "N/A"}).`,
       });
 
       const [[updated]] = await db3.query(
@@ -208,10 +241,6 @@ router.put(
     }
   },
 );
-
-/* ---------------------------------------------------------------------- */
-/*  GRADING SYSTEM — toggle which grade_conversion rows show on the TOR    */
-/* ---------------------------------------------------------------------- */
 
 // GET grade conversion rows flagged for TOR display, in score order
 router.get("/tor-grading-system", async (req, res) => {

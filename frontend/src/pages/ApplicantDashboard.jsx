@@ -1105,13 +1105,18 @@ const ApplicantDashboard = (props) => {
     7: "Baccalaureate Graduate",
     8: "Master Degree Graduate",
   };
-  // ✅ CHANGED: header info-strip values (Academic Year / Program Applied /
-  // Date Applied / Status) — Academic Year now prefers the fetched active
-  // school year (e.g. "2025-2026 (1st Semester)") over the older
-  // person/settings fallback fields.
-  const academicYearValue = activeSchoolYear
-    ? `${activeSchoolYear.current_year}-${activeSchoolYear.next_year}`
-    : person?.academic_year || academic.academicYear || "N/A";
+
+  const academicYearValue = (() => {
+    if (activeSchoolYear?.current_year && activeSchoolYear?.next_year) {
+      // shape from the school-year admin router's /active_school_year
+      return `${activeSchoolYear.current_year}-${activeSchoolYear.next_year}`;
+    }
+    if (activeSchoolYear?.year_description) {
+      // shape from the stats/ecat router's /active_school_year (only has year_description)
+      return `${activeSchoolYear.year_description}-${Number(activeSchoolYear.year_description) + 1}`;
+    }
+    return person?.academic_year || academic.academicYear || "N/A";
+  })();
 
   const semesterValue =
     activeSchoolYear?.semester_description ||

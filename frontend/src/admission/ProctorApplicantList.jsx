@@ -194,6 +194,20 @@ const ProctorApplicantList = () => {
     extension: "",
   });
 
+  const [activeScheduleId, setActiveScheduleId] = useState(null);
+
+useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const proctorParam = params.get("proctor");
+  const scheduleParam = params.get("schedule");
+
+  if (proctorParam) {
+    setSearchQuery(proctorParam);
+    setActiveScheduleId(scheduleParam || null);
+    handleSearchByProctor(proctorParam, scheduleParam);
+  }
+}, [location.search]);
+
   const handleSearchByProctor = async (proctorName, scheduleID) => {
     try {
       const { data } = await axios.get(
@@ -658,19 +672,20 @@ const ProctorApplicantList = () => {
     }
   };
 
-  // 🔎 Auto-search whenever searchQuery changes (debounced)
-  useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-      if (searchQuery.trim() !== "") {
-        handleSearchByProctor(searchQuery); // ✅ use the real function
-      } else {
-        setApplicants([]);
-        setProctor(null);
-      }
-    }, 500);
 
-    return () => clearTimeout(delayDebounce);
-  }, [searchQuery]);
+useEffect(() => {
+  const delayDebounce = setTimeout(() => {
+    if (searchQuery.trim() !== "") {
+      handleSearchByProctor(searchQuery, activeScheduleId); // ← now scoped too
+    } else {
+      setApplicants([]);
+      setProctor(null);
+    }
+  }, 500);
+
+  return () => clearTimeout(delayDebounce);
+}, [searchQuery, activeScheduleId]);
+
 
   const formatDateLong = (dateString) => {
     if (!dateString) return "";
@@ -823,6 +838,7 @@ const ProctorApplicantList = () => {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
+                setActiveScheduleId(null);
             }}
             sx={{
               width: 450,

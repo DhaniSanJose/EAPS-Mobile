@@ -1183,7 +1183,7 @@ const Login = ({ setIsAuthenticated }) => {
 
             {/* Email */}
             <div className="TextField" style={{ position: "relative" }}>
-              <label htmlFor="email">Email Address</label>
+              <label htmlFor="email">Applicant ID / Email Address</label>
               <input
                 type="email"
                 id="email"

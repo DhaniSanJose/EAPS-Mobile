@@ -1460,12 +1460,12 @@ const ApplicantCollegePersonalInformation = () => {
   const applicantSuggestions =
     searchQuery.trim().length >= 2
       ? persons
-          .filter((applicant) =>
-            getApplicantSuggestionText(applicant).includes(
-              searchQuery.trim().toLowerCase(),
-            ),
-          )
-          .slice(0, 10)
+        .filter((applicant) =>
+          getApplicantSuggestionText(applicant).includes(
+            searchQuery.trim().toLowerCase(),
+          ),
+        )
+        .slice(0, 10)
       : [];
 
   const handleApplicantSuggestionSelect = async (applicant) => {
@@ -1793,24 +1793,24 @@ const ApplicantCollegePersonalInformation = () => {
   }
 
   // 🔒 Disable right-click
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  // document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
-  document.addEventListener("keydown", (e) => {
-    const isBlockedKey =
-      e.key === "F12" ||
-      e.key === "F11" ||
-      (e.ctrlKey &&
-        e.shiftKey &&
-        (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
-      (e.ctrlKey && e.key.toLowerCase() === "u") ||
-      (e.ctrlKey && e.key.toLowerCase() === "p");
+  // // 🔒 Block DevTools shortcuts + Ctrl+P silently
+  // document.addEventListener("keydown", (e) => {
+  //   const isBlockedKey =
+  //     e.key === "F12" ||
+  //     e.key === "F11" ||
+  //     (e.ctrlKey &&
+  //       e.shiftKey &&
+  //       (e.key.toLowerCase() === "i" || e.key.toLowerCase() === "j")) ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "u") ||
+  //     (e.ctrlKey && e.key.toLowerCase() === "p");
 
-    if (isBlockedKey) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
+  //   if (isBlockedKey) {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // });
 
   // dot not alter
   return (
@@ -2382,7 +2382,7 @@ const ApplicantCollegePersonalInformation = () => {
               <label className="w-40 font-medium">Campus:</label>
 
               <FormControl
-                readOnly
+
                 fullWidth
                 size="small"
                 required
@@ -2390,6 +2390,7 @@ const ApplicantCollegePersonalInformation = () => {
                 className="mb-4"
               >
                 <Select
+                  readOnly
                   id="campus-select"
                   name="campus"
                   value={person.campus || ""}
@@ -2572,13 +2573,12 @@ const ApplicantCollegePersonalInformation = () => {
                     <FormControl
                       fullWidth
                       size="small"
-                    
-                      readOnly
+
                       error={!!errors.program}
                     >
                       <InputLabel>Course Applied</InputLabel>
                       <Select
-                      readOnly
+                        readOnly
                         name="program"
                         value={isProgramLocked ? registrarCurriculumId : person.program || ""}
                         onBlur={() => handleUpdate(person)}
@@ -2670,6 +2670,7 @@ const ApplicantCollegePersonalInformation = () => {
                     >
                       <InputLabel id="year-level-label">Year Level</InputLabel>
                       <Select
+                        readOnly
                         labelId="year-level-label"
                         id="year-level-select"
                         name="yearLevel"
@@ -2885,7 +2886,7 @@ const ApplicantCollegePersonalInformation = () => {
                     Height:
                   </Typography>
                   <TextField
-                   InputProps={{ readOnly: true }}
+                    InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="height"
@@ -2912,7 +2913,7 @@ const ApplicantCollegePersonalInformation = () => {
                     Weight:
                   </Typography>
                   <TextField
-                   InputProps={{ readOnly: true }}
+                    InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="weight"
@@ -3140,8 +3141,7 @@ const ApplicantCollegePersonalInformation = () => {
                         : ""
                     }
                     sx={{ width: 200 }}
-                    InputProps={{ sx: { height: 40 } }}
-                    inputProps={{ style: { height: 40 } }}
+                   InputProps={{ readOnly: true, sx: { height: 40 } }}
                   />
                 </>
               )}
@@ -3248,6 +3248,7 @@ const ApplicantCollegePersonalInformation = () => {
                 >
                   <InputLabel id="citizenship-label">Citizenship</InputLabel>
                   <Select
+                    readOnly
                     labelId="citizenship-label"
                     id="citizenship"
                     name="citizenship"
@@ -3395,6 +3396,7 @@ const ApplicantCollegePersonalInformation = () => {
                 >
                   <InputLabel id="religion-label">Religion</InputLabel>
                   <Select
+                    readOnly
                     labelId="religion-label"
                     id="religion"
                     name="religion"
@@ -3454,6 +3456,7 @@ const ApplicantCollegePersonalInformation = () => {
                 >
                   <InputLabel id="civil-status-label">Civil Status</InputLabel>
                   <Select
+                    readOnly
                     labelId="civil-status-label"
                     id="civilStatus"
                     name="civilStatus"
@@ -3485,6 +3488,9 @@ const ApplicantCollegePersonalInformation = () => {
                     Spouse<span style={{ color: "red" }}> *</span>
                   </Typography>
                   <TextField
+                    InputProps={{
+                      readOnly: true,
+                    }}
                     fullWidth
                     size="small"
                     name="spouse"
@@ -3510,6 +3516,7 @@ const ApplicantCollegePersonalInformation = () => {
                 >
                   <InputLabel id="tribe-label">Tribe/Ethnic Group</InputLabel>
                   <Select
+                    readOnly
                     labelId="tribe-label"
                     id="tribeEthnicGroup"
                     name="tribeEthnicGroup"
@@ -3617,13 +3624,14 @@ const ApplicantCollegePersonalInformation = () => {
                   helperText={
                     errors.cellphoneNumber && "This field is required."
                   }
-                  InputProps={{
-                    startAdornment: (
-                      <Typography sx={{ mr: 1, fontWeight: "bold" }}>
-                        +63
-                      </Typography>
-                    ),
-                  }}
+              InputProps={{
+  readOnly: true,
+  startAdornment: (
+    <Typography sx={{ mr: 1, fontWeight: "bold" }}>
+      +63
+    </Typography>
+  ),
+}}
                 />
               </Box>
 
@@ -3654,6 +3662,9 @@ const ApplicantCollegePersonalInformation = () => {
                 </Typography>
 
                 <TextField
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   fullWidth
                   size="small"
                   name="facebook_account"
@@ -4003,6 +4014,53 @@ const ApplicantCollegePersonalInformation = () => {
               label="Same as Present Address"
             />
 
+            <Box display="flex" gap={2} mb={2}>
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Street
+                </Typography>
+                <TextField
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  fullWidth
+                  size="small"
+                  name="permanentStreet"
+                  placeholder="Enter your Permanent Street"
+                  value={person.permanentStreet || ""}
+                  onBlur={() => handleUpdate(person)}
+                  onChange={handleChange}
+                  error={!!errors.permanentStreet}
+                  helperText={
+                    errors.permanentStreet && "This field is required."
+                  }
+                />
+              </Box>
+
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Zip Code
+                </Typography>
+                <TextField
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  fullWidth
+                  size="small"
+                  type="number"
+                  name="permanentZipCode"
+                  placeholder="Enter your Permanent Zip Code"
+                  value={person.permanentZipCode || ""}
+                  onBlur={() => handleUpdate(person)}
+                  onChange={handleChange}
+                  error={!!errors.permanentZipCode}
+                  helperText={
+                    errors.permanentZipCode && "This field is required."
+                  }
+                />
+              </Box>
+            </Box>
+
             {/* Permanent Region & Province */}
             <Box display="flex" gap={2} mb={2}>
               {/* Permanent Region */}
@@ -4017,6 +4075,7 @@ const ApplicantCollegePersonalInformation = () => {
                   error={!!errors.permanentRegion}
                 >
                   <Select
+                    readOnly
                     name="permanentRegion"
                     displayEmpty
                     value={person.permanentRegion || ""}
@@ -4067,6 +4126,7 @@ const ApplicantCollegePersonalInformation = () => {
                   error={!!errors.permanentProvince}
                 >
                   <Select
+                    readOnly
                     name="permanentProvince"
                     displayEmpty
                     value={person.permanentProvince || ""}
@@ -4119,6 +4179,7 @@ const ApplicantCollegePersonalInformation = () => {
                   error={!!errors.permanentMunicipality}
                 >
                   <Select
+                    readOnly
                     name="permanentMunicipality"
                     displayEmpty
                     value={person.permanentMunicipality || ""}
@@ -4163,6 +4224,7 @@ const ApplicantCollegePersonalInformation = () => {
                   error={!!errors.permanentBarangay}
                 >
                   <Select
+                    readOnly
                     name="permanentBarangay"
                     displayEmpty
                     value={person.permanentBarangay || ""}
@@ -4194,46 +4256,7 @@ const ApplicantCollegePersonalInformation = () => {
               </Box>
             </Box>
 
-            <Box display="flex" gap={2} mb={2}>
-              <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">
-                  Permanent Street
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  name="permanentStreet"
-                  placeholder="Enter your Permanent Street"
-                  value={person.permanentStreet || ""}
-                  onBlur={() => handleUpdate(person)}
-                  onChange={handleChange}
-                  error={!!errors.permanentStreet}
-                  helperText={
-                    errors.permanentStreet && "This field is required."
-                  }
-                />
-              </Box>
 
-              <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">
-                  Permanent Zip Code
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  name="permanentZipCode"
-                  placeholder="Enter your Permanent Zip Code"
-                  value={person.permanentZipCode || ""}
-                  onBlur={() => handleUpdate(person)}
-                  onChange={handleChange}
-                  error={!!errors.permanentZipCode}
-                  helperText={
-                    errors.permanentZipCode && "This field is required."
-                  }
-                />
-              </Box>
-            </Box>
 
             {/* DSWD Household Number */}
             <Box mb={2}>
@@ -4241,6 +4264,9 @@ const ApplicantCollegePersonalInformation = () => {
                 Permanent DSWD Household Number
               </Typography>
               <TextField
+                InputProps={{
+                  readOnly: true,
+                }}
                 fullWidth
                 size="small"
                 variant="outlined"
@@ -4402,6 +4428,7 @@ const ApplicantCollegePersonalInformation = () => {
                             />
 
                             <Button
+                            disabled
                               size="small"
                               onClick={async () => {
                                 setSelectedFile(null);

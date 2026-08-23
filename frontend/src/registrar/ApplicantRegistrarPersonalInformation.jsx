@@ -3520,7 +3520,36 @@ const ApplicantRegistrarPersonalInformation = () => {
             />
 
 
+    <Box display="flex" gap={2} mb={2}>
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">Permanent Street</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  name="permanentStreet"
+                  placeholder="Enter your Permanent Street"
+                  value={person.permanentStreet || ""}
+                  onBlur={() => handleUpdate(person)} onChange={handleChange}
+                  error={!!errors.permanentStreet}
+                  helperText={errors.permanentStreet && "This field is required."}
+                />
+              </Box>
 
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">Permanent Zip Code</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="number"
+                  name="permanentZipCode"
+                  placeholder="Enter your Permanent Zip Code"
+                  value={person.permanentZipCode || ""}
+                  onBlur={() => handleUpdate(person)} onChange={handleChange}
+                  error={!!errors.permanentZipCode}
+                  helperText={errors.permanentZipCode && "This field is required."}
+                />
+              </Box>
+            </Box>
 
             {/* Permanent Region & Province */}
             <Box display="flex" gap={2} mb={2}>
@@ -3676,36 +3705,7 @@ const ApplicantRegistrarPersonalInformation = () => {
             </Box>
 
 
-            <Box display="flex" gap={2} mb={2}>
-              <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Street</Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  name="permanentStreet"
-                  placeholder="Enter your Permanent Street"
-                  value={person.permanentStreet || ""}
-                  onBlur={() => handleUpdate(person)} onChange={handleChange}
-                  error={!!errors.permanentStreet}
-                  helperText={errors.permanentStreet && "This field is required."}
-                />
-              </Box>
-
-              <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">Permanent Zip Code</Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  name="permanentZipCode"
-                  placeholder="Enter your Permanent Zip Code"
-                  value={person.permanentZipCode || ""}
-                  onBlur={() => handleUpdate(person)} onChange={handleChange}
-                  error={!!errors.permanentZipCode}
-                  helperText={errors.permanentZipCode && "This field is required."}
-                />
-              </Box>
-            </Box>
+        
 
 
 

@@ -54,7 +54,7 @@ const EntranceExamRoomAssignment = () => {
   const [employeeID, setEmployeeID] = useState("");
   const getAuditConfigForPage = () =>
     getAuditConfig({
-"x-audit-actor-id":
+      "x-audit-actor-id":
         employeeID ||
         localStorage.getItem("employee_id") ||
         localStorage.getItem("email") ||
@@ -114,7 +114,8 @@ const EntranceExamRoomAssignment = () => {
   useEffect(() => {
     axios.get(`${API_BASE_URL}/api/active_school_year`)
       .then(res => {
-        setSchoolYearId(res.data[0]?.school_year_id);
+        const row = Array.isArray(res.data) ? res.data[0] : res.data;
+        setSchoolYearId(row?.school_year_id ?? row?.id ?? "");
       });
   }, []);
 
@@ -234,7 +235,12 @@ const EntranceExamRoomAssignment = () => {
       setOpenSnackbar(true);
       return;
     }
-
+    if (!schoolYearId) {
+      setSnackbarMessage("No active school year found — cannot save schedule ❌");
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
+      return;
+    }
     try {
       if (editingSchedule) {
         await axios.put(

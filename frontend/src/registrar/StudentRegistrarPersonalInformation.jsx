@@ -66,22 +66,60 @@ import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
+import useRegistrarScopeRevision from "../hooks/useRegistrarScopeRevision";
+import {
+  getRegistrarCurriculumId,
+  isRegistrarProgramSelectionLocked,
+  restrictToRegistrarCurriculum,
+} from "../utils/registrarCurriculumRestriction";
+import SaveIcon from "@mui/icons-material/Save";
 
 const cleanStudentValue = (value) => {
   if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    const fallback =
+      value.label ??
+      value.name ??
+      value.description ??
+      value.program_description ??
+      value.program_code ??
+      "";
+    if (fallback === value) return "";
+    return cleanStudentValue(fallback);
+  }
   const text = String(value).trim();
   return ["null", "undefined"].includes(text.toLowerCase()) ? "" : text;
 };
 
 const formatStudentSuggestionName = (student) =>
   [
+    cleanStudentValue(student?.last_name),
     cleanStudentValue(student?.first_name),
     cleanStudentValue(student?.middle_name),
-    cleanStudentValue(student?.last_name),
     cleanStudentValue(student?.extension),
   ]
     .filter(Boolean)
     .join(" ");
+
+const getStudentSuggestionText = (student) =>
+  [
+    student?.student_number,
+    student?.first_name,
+    student?.middle_name,
+    student?.last_name,
+    student?.extension,
+    student?.emailAddress,
+    student?.program_code,
+    student?.program_description,
+  ]
+    .map(cleanStudentValue)
+    .join(" ")
+    .toLowerCase();
+
+const getStudentSuggestionValue = (student) =>
+  cleanStudentValue(student?.student_number) ||
+  formatStudentSuggestionName(student) ||
+  cleanStudentValue(student?.emailAddress);
 
 const StudentRegistrarPersonalInformation = () => {
   useAuditMac();
@@ -129,7 +167,7 @@ const StudentRegistrarPersonalInformation = () => {
     if (branding.campusAddress) setCampusAddress(branding.campusAddress);
 
     // ✅ Branches (JSON stored in DB)
-    setBranches(settings?.branches || []);
+    setBranches(settings.branches || []);
   }, [settings]);
 
   const getBranchLabel = (branchId) => {
@@ -249,7 +287,7 @@ const StudentRegistrarPersonalInformation = () => {
   const [hasAccess, setHasAccess] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const pageId = 38;
+  const pageId = 131;
 
   const [employeeID, setEmployeeID] = useState("");
 
@@ -262,14 +300,12 @@ const StudentRegistrarPersonalInformation = () => {
     if (storedUser && storedRole && storedID) {
       setUser(storedUser);
       setUserRole(storedRole);
+      setUserID(storedID);
       setEmployeeID(storedEmployeeID);
-      if (storedRole === "applicant") {
-        setUserID(storedID);
-      }
 
       if (storedRole === "registrar") {
         checkAccess(storedEmployeeID);
-      } else if (storedRole !== "applicant" && storedRole !== "superadmin") {
+      } else {
         window.location.href = "/login";
       }
     } else {
@@ -333,16 +369,12 @@ const StudentRegistrarPersonalInformation = () => {
       return;
     }
 
-    if (storedRole === "applicant") {
-      setUserID(loggedInPersonId);
-      return;
-    }
-
-    // ⭐ CASE 3: Staff with no URL ID → start blank
+    // ⭐ CASE 3: No URL ID and no last selected → start blank
     setUserID("");
   }, [queryPersonId]);
 
   const [activeStep, setActiveStep] = useState(0);
+
 
   const steps = [
     { label: "Personal Information", icon: <PersonIcon />, path: "/student_registrar_personal_information" },
@@ -535,7 +567,8 @@ const StudentRegistrarPersonalInformation = () => {
       }
 
       // ✅ Send update request
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
+      await axios.put(`${API_BASE_URL}/api/enrollment/person/${targetId}`, cleanedData);
+
 
       console.log(`✅ SuperAdmin updated person_id: ${targetId} successfully.`);
     } catch (error) {
@@ -544,6 +577,7 @@ const StudentRegistrarPersonalInformation = () => {
         status: error.response?.status,
         details: error.response?.data || error,
       });
+      throw error;
     }
   };
 
@@ -590,7 +624,8 @@ const StudentRegistrarPersonalInformation = () => {
     return age < 0 ? "" : age;
   };
 
-  // 🧩 Real-time handleChange with Manila-based age + filtering reset
+  // 🧩 Local form updates only — no auto-save. Persisted only via the
+  // "Save Changes" button (handleManualSave).
   const handleChange = (e) => {
     const target = e && e.target ? e.target : {};
     const { name, type, checked, value } = target;
@@ -604,20 +639,16 @@ const StudentRegistrarPersonalInformation = () => {
 
     if (name === "academicProgram") {
       if (Number(value) === 1) {
-        // Graduate → default to Master
         updatedPerson.yearLevel = "Master";
       } else {
-        // Reset for college
         updatedPerson.yearLevel = "";
       }
     }
 
-    // ✅ Auto-calculate age
     if (name === "birthOfDate") {
       updatedPerson.age = calculateAge(value);
     }
 
-    // ✅ Auto yearLevel if Freshman
     if (name === "classifiedAs" && value === "Freshman (First Year)") {
       updatedPerson.yearLevel = "First Year";
     }
@@ -627,380 +658,24 @@ const StudentRegistrarPersonalInformation = () => {
     }
 
     setPerson(updatedPerson);
-    handleUpdate(updatedPerson); // real-time save
   };
 
-  // ✅ Safe handleBlur for SuperAdmin — updates correct applicant only
-  const handleBlur = async () => {
-    try {
-      // ✅ Determine correct applicant/person_id
-      const targetId =
-        selectedPerson?.person_id || queryPersonId || person.person_id;
-      if (!targetId) {
-        console.warn("⚠️ No valid applicant ID found — skipping update.");
-        return;
-      }
+  const [saving, setSaving] = useState(false);
 
-      const allowedFields = [
-        "person_id",
-        "profile_img",
-        "campus",
-        "academicProgram",
-        "classifiedAs",
-        "applyingAs",
-        "program",
-        "program2",
-        "program3",
-        "yearLevel",
-        "last_name",
-        "first_name",
-        "middle_name",
-        "extension",
-        "nickname",
-        "height",
-        "weight",
-        "lrnNumber",
-        "nolrnNumber",
-        "gender",
-        "pwdMember",
-        "pwdType",
-        "pwdId",
-        "birthOfDate",
-        "age",
-        "birthPlace",
-        "languageDialectSpoken",
-        "citizenship",
-        "religion",
-        "civilStatus",
-        "tribeEthnicGroup",
-        "cellphoneNumber",
-        "emailAddress",
-        "presentStreet",
-        "presentBarangay",
-        "presentZipCode",
-        "presentRegion",
-        "presentProvince",
-        "presentMunicipality",
-        "presentDswdHouseholdNumber",
-        "sameAsPresentAddress",
-        "permanentStreet",
-        "permanentBarangay",
-        "permanentZipCode",
-        "permanentRegion",
-        "permanentProvince",
-        "permanentMunicipality",
-        "permanentDswdHouseholdNumber",
-        "solo_parent",
-        "father_deceased",
-        "father_family_name",
-        "father_given_name",
-        "father_middle_name",
-        "father_ext",
-        "father_nickname",
-        "father_education",
-        "father_education_level",
-        "father_last_school",
-        "father_course",
-        "father_year_graduated",
-        "father_school_address",
-        "father_contact",
-        "father_occupation",
-        "father_employer",
-        "father_income",
-        "father_email",
-        "mother_deceased",
-        "mother_family_name",
-        "mother_given_name",
-        "mother_middle_name",
-        "mother_ext",
-        "mother_nickname",
-        "mother_education",
-        "mother_education_level",
-        "mother_last_school",
-        "mother_course",
-        "mother_year_graduated",
-        "mother_school_address",
-        "mother_contact",
-        "mother_occupation",
-        "mother_employer",
-        "mother_income",
-        "mother_email",
-        "guardian",
-        "guardian_family_name",
-        "guardian_given_name",
-        "guardian_middle_name",
-        "guardian_ext",
-        "guardian_nickname",
-        "guardian_address",
-        "guardian_contact",
-        "guardian_email",
-        "annual_income",
-        "schoolLevel",
-        "schoolLastAttended",
-        "schoolAddress",
-        "courseProgram",
-        "honor",
-        "generalAverage",
-        "yearGraduated",
-        "schoolLevel1",
-        "schoolLastAttended1",
-        "schoolAddress1",
-        "courseProgram1",
-        "honor1",
-        "generalAverage1",
-        "yearGraduated1",
-        "strand",
-        // 🩺 Health and medical
-        "cough",
-        "colds",
-        "fever",
-        "asthma",
-        "faintingSpells",
-        "heartDisease",
-        "tuberculosis",
-        "frequentHeadaches",
-        "hernia",
-        "chronicCough",
-        "headNeckInjury",
-        "hiv",
-        "highBloodPressure",
-        "diabetesMellitus",
-        "allergies",
-        "cancer",
-        "smokingCigarette",
-        "alcoholDrinking",
-        "hospitalized",
-        "hospitalizationDetails",
-        "medications",
-        // 🧬 Covid / Vaccination
-        "hadCovid",
-        "covidDate",
-        "vaccine1Brand",
-        "vaccine1Date",
-        "vaccine2Brand",
-        "vaccine2Date",
-        "booster1Brand",
-        "booster1Date",
-        "booster2Brand",
-        "booster2Date",
-        // 🧪 Lab results / medical findings
-        "chestXray",
-        "cbc",
-        "urinalysis",
-        "otherworkups",
-        // 🧍 Additional fields
-        "symptomsToday",
-        "remarks",
-        // ✅ Agreement / Meta
-        "termsOfAgreement",
-        "created_at",
-        "current_step",
-      ];
-
-      // ✅ Clean payload before sending
-      const cleanedData = Object.fromEntries(
-        Object.entries(person).filter(([key]) => allowedFields.includes(key)),
-      );
-
-      if (Object.keys(cleanedData).length === 0) {
-        console.warn("⚠️ No valid fields to update — skipping blur save.");
-        return;
-      }
-
-      // ✅ Execute safe update
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
-      console.log(`💾 Auto-saved (on blur) for person_id: ${targetId}`);
-    } catch (err) {
-      console.error("❌ Auto-save (on blur) failed:", {
-        message: err.message,
-        status: err.response?.status,
-        details: err.response?.data || err,
-      });
+  // 💾 Manual save only — the single source of truth for persisting changes.
+  const handleManualSave = async () => {
+    if (!userID) {
+      setSnack({ open: true, message: "No student selected.", severity: "warning" });
+      return;
     }
-  };
-
-  // ✅ Safe autoSave for SuperAdmin — same logic as handleBlur
-  const autoSave = async () => {
     try {
-      const targetId =
-        selectedPerson?.person_id || queryPersonId || person.person_id;
-      if (!targetId) {
-        console.warn("⚠️ No valid applicant ID found — skipping autoSave.");
-        return;
-      }
-
-      const allowedFields = [
-        "person_id",
-        "profile_img",
-        "campus",
-        "academicProgram",
-        "classifiedAs",
-        "applyingAs",
-        "program",
-        "program2",
-        "program3",
-        "yearLevel",
-        "last_name",
-        "first_name",
-        "middle_name",
-        "extension",
-        "nickname",
-        "height",
-        "weight",
-        "lrnNumber",
-        "nolrnNumber",
-        "gender",
-        "pwdMember",
-        "pwdType",
-        "pwdId",
-        "birthOfDate",
-        "age",
-        "birthPlace",
-        "languageDialectSpoken",
-        "citizenship",
-        "religion",
-        "civilStatus",
-        "tribeEthnicGroup",
-        "cellphoneNumber",
-        "emailAddress",
-        "presentStreet",
-        "presentBarangay",
-        "presentZipCode",
-        "presentRegion",
-        "presentProvince",
-        "presentMunicipality",
-        "presentDswdHouseholdNumber",
-        "sameAsPresentAddress",
-        "permanentStreet",
-        "permanentBarangay",
-        "permanentZipCode",
-        "permanentRegion",
-        "permanentProvince",
-        "permanentMunicipality",
-        "permanentDswdHouseholdNumber",
-        "solo_parent",
-        "father_deceased",
-        "father_family_name",
-        "father_given_name",
-        "father_middle_name",
-        "father_ext",
-        "father_nickname",
-        "father_education",
-        "father_education_level",
-        "father_last_school",
-        "father_course",
-        "father_year_graduated",
-        "father_school_address",
-        "father_contact",
-        "father_occupation",
-        "father_employer",
-        "father_income",
-        "father_email",
-        "mother_deceased",
-        "mother_family_name",
-        "mother_given_name",
-        "mother_middle_name",
-        "mother_ext",
-        "mother_nickname",
-        "mother_education",
-        "mother_education_level",
-        "mother_last_school",
-        "mother_course",
-        "mother_year_graduated",
-        "mother_school_address",
-        "mother_contact",
-        "mother_occupation",
-        "mother_employer",
-        "mother_income",
-        "mother_email",
-        "guardian",
-        "guardian_family_name",
-        "guardian_given_name",
-        "guardian_middle_name",
-        "guardian_ext",
-        "guardian_nickname",
-        "guardian_address",
-        "guardian_contact",
-        "guardian_email",
-        "annual_income",
-        "schoolLevel",
-        "schoolLastAttended",
-        "schoolAddress",
-        "courseProgram",
-        "honor",
-        "generalAverage",
-        "yearGraduated",
-        "schoolLevel1",
-        "schoolLastAttended1",
-        "schoolAddress1",
-        "courseProgram1",
-        "honor1",
-        "generalAverage1",
-        "yearGraduated1",
-        "strand",
-        // 🩺 Health and medical
-        "cough",
-        "colds",
-        "fever",
-        "asthma",
-        "faintingSpells",
-        "heartDisease",
-        "tuberculosis",
-        "frequentHeadaches",
-        "hernia",
-        "chronicCough",
-        "headNeckInjury",
-        "hiv",
-        "highBloodPressure",
-        "diabetesMellitus",
-        "allergies",
-        "cancer",
-        "smokingCigarette",
-        "alcoholDrinking",
-        "hospitalized",
-        "hospitalizationDetails",
-        "medications",
-        // 🧬 Covid / Vaccination
-        "hadCovid",
-        "covidDate",
-        "vaccine1Brand",
-        "vaccine1Date",
-        "vaccine2Brand",
-        "vaccine2Date",
-        "booster1Brand",
-        "booster1Date",
-        "booster2Brand",
-        "booster2Date",
-        // 🧪 Lab results / medical findings
-        "chestXray",
-        "cbc",
-        "urinalysis",
-        "otherworkups",
-        // 🧍 Additional fields
-        "symptomsToday",
-        "remarks",
-        // ✅ Agreement / Meta
-        "termsOfAgreement",
-        "created_at",
-        "current_step",
-      ];
-      const cleanedData = Object.fromEntries(
-        Object.entries(person).filter(([key]) => allowedFields.includes(key)),
-      );
-
-      if (Object.keys(cleanedData).length === 0) {
-        console.warn("⚠️ No valid fields to update — skipping autoSave.");
-        return;
-      }
-
-      await axios.put(`${API_BASE_URL}/api/person/${targetId}`, cleanedData);
-      console.log(`💾 Auto-saved (manual) for person_id: ${targetId}`);
+      setSaving(true);
+      await handleUpdate(person);
+      setSnack({ open: true, message: "All changes saved successfully!", severity: "success" });
     } catch (err) {
-      console.error("❌ Auto-save (manual) failed:", {
-        message: err.message,
-        status: err.response?.status,
-        details: err.response?.data || err,
-      });
+      setSnack({ open: true, message: "Failed to save changes.", severity: "error" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1085,7 +760,7 @@ const StudentRegistrarPersonalInformation = () => {
 
       const fileName = response.data.filename || response.data.profile_img;
 
-      // ✅ Set image AND trigger auto-save
+      // ✅ Set image AND trigger save (explicit user action, not auto-save)
       const updatedPerson = {
         ...person,
         profile_img: fileName,
@@ -1270,19 +945,22 @@ const StudentRegistrarPersonalInformation = () => {
   }, [person.permanentMunicipality]);
 
   const [curriculumOptions, setCurriculumOptions] = useState([]);
+  const scopeRevision = useRegistrarScopeRevision();
+  const isProgramLocked = isRegistrarProgramSelectionLocked();
+  const registrarCurriculumId = getRegistrarCurriculumId();
 
   useEffect(() => {
     const fetchCurriculums = async () => {
       try {
         const response = await axios.get(`${API_BASE_URL}/api/applied_program`);
-        setCurriculumOptions(response.data); // array of { curriculum_id: "..." }
+        setCurriculumOptions(restrictToRegistrarCurriculum(response.data)); // array of { curriculum_id: "..." }
       } catch (error) {
         console.error("Error fetching curriculum options:", error);
       }
     };
 
     fetchCurriculums();
-  }, []);
+  }, [scopeRevision]);
 
   const filteredCurriculum = curriculumOptions.filter((item) => {
     // ✅ CAMPUS FILTER
@@ -1300,9 +978,7 @@ const StudentRegistrarPersonalInformation = () => {
   const [errors, setErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [searchError, setSearchError] = useState("");
-  const [studentSuggestions, setStudentSuggestions] = useState([]);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       if (searchQuery.trim() === "") return;
@@ -1340,57 +1016,6 @@ const StudentRegistrarPersonalInformation = () => {
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
 
-  useEffect(() => {
-    const query = searchQuery.trim();
-
-    if (!suggestionsOpen || query.length < 2) {
-      setStudentSuggestions([]);
-      setSuggestionsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setSuggestionsLoading(true);
-
-    const delayDebounce = setTimeout(async () => {
-      try {
-        const res = await axios.get(`${API_BASE_URL}/api/cor-student-suggestions`, {
-          params: { query, limit: 10 },
-        });
-
-        if (!cancelled) {
-          setStudentSuggestions(res.data || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch student suggestions:", err);
-        if (!cancelled) setStudentSuggestions([]);
-      } finally {
-        if (!cancelled) setSuggestionsLoading(false);
-      }
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(delayDebounce);
-    };
-  }, [searchQuery, suggestionsOpen]);
-
-  const handleStudentSuggestionSelect = (student) => {
-    const nextStudentNumber = String(student?.student_number || "");
-    if (!nextStudentNumber) return;
-
-    setSearchQuery(nextStudentNumber);
-    setSelectedPerson(student);
-    setSuggestionsOpen(false);
-    setStudentSuggestions([]);
-
-    if (student?.person_id) {
-      sessionStorage.setItem("admin_edit_person_id", student.person_id);
-      sessionStorage.setItem("admin_edit_person_data", JSON.stringify(student));
-      setUserID(student.person_id);
-    }
-  };
-
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [persons, setPersons] = useState([]);
 
@@ -1414,9 +1039,7 @@ const StudentRegistrarPersonalInformation = () => {
 
     // 🔹 Try to find a matching applicant from the list
     const match = persons.find((p) =>
-      `${p.first_name} ${p.middle_name} ${p.last_name} ${p.emailAddress} ${p.student_number || ""}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()),
+      getStudentSuggestionText(p).includes(searchQuery.toLowerCase()),
     );
 
     if (match) {
@@ -1438,6 +1061,39 @@ const StudentRegistrarPersonalInformation = () => {
       });
     }
   }, [searchQuery, persons]);
+
+  useEffect(() => {
+    const fetchPersons = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/student_upload_documents_data`,
+        );
+        setPersons(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Error fetching student suggestions:", err);
+      }
+    };
+
+    fetchPersons();
+  }, []);
+
+  const studentSuggestions =
+    searchQuery.trim().length >= 2
+      ? persons
+        .filter((student) =>
+          getStudentSuggestionText(student).includes(
+            searchQuery.trim().toLowerCase(),
+          ),
+        )
+        .slice(0, 10)
+      : [];
+
+  const handleStudentSuggestionSelect = (student) => {
+    const nextValue = getStudentSuggestionValue(student);
+    setSearchQuery(nextValue);
+    setSelectedPerson(student);
+    setSuggestionsOpen(false);
+  };
 
   const [studentData, setStudentData] = useState(null);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -1509,7 +1165,7 @@ const StudentRegistrarPersonalInformation = () => {
       .then((res) => {
         if (res.data?.student_number) {
           // AUTO-INSERT applicant_number into search bar
-          setSearchQuery(res.data.student_number);
+          setSearchQuery(cleanStudentValue(res.data.student_number));
 
           // If you have a fetchUploads() or fetchExamScore() — call it
           if (typeof fetchUploadsByApplicantNumber === "function") {
@@ -1557,44 +1213,6 @@ const StudentRegistrarPersonalInformation = () => {
   const divToPrintRef = useRef();
   const [showPrintView, setShowPrintView] = useState(false);
 
-  const printDiv = () => {
-    const divToPrint = divToPrintRef.current;
-    if (divToPrint) {
-      const newWin = window.open("", "Print-Window");
-      newWin.document.open();
-      newWin.document.write(`
-        <html>
-          <head>
-            <title>Examination Permit</title>
-            <style>
-              @page { size: A4; margin: 0; }
-              body {
-                margin: 0;
-                padding: 0;
-                display: flex;
-                margin-left: "
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-              }
-              .print-container {
-                width: 8.5in;
-                min-height: 11in;
-                margin: auto;
-                background: white;
-              }
-              * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            </style>
-          </head>
-          <body onload="window.print(); setTimeout(() => window.close(), 100);">
-            <div class="print-container">${divToPrint.innerHTML}</div>
-          </body>
-        </html>
-      `);
-      newWin.document.close();
-    }
-  };
-
   const [examPermitError, setExamPermitError] = useState("");
   const [examPermitModalOpen, setExamPermitModalOpen] = useState(false);
 
@@ -1602,6 +1220,7 @@ const StudentRegistrarPersonalInformation = () => {
     setExamPermitModalOpen(false);
     setExamPermitError("");
   };
+
 
   const [generatingKey, setGeneratingKey] = useState(null); // "ecat" | "personalData" | "registrar" | "admissionServices" | "examPermitDownload"
   const hiddenFormRef = useRef();
@@ -1633,6 +1252,7 @@ const StudentRegistrarPersonalInformation = () => {
       dateStamped: true,
     },
   };
+
 
   const buildClientFilename = (prefix, { lastName, firstName, applicantNumber }) => {
     const safeLast = (lastName || "Applicant").trim().replace(/\s+/g, "_");
@@ -1753,12 +1373,6 @@ const StudentRegistrarPersonalInformation = () => {
   };
 
 
-
-
-
-
-
-
   const links = [
     { key: "ecat", label: "ECAT Application Form", onClick: () => generateFormPdf("ecat") },
     { key: "personalData", label: "Personal Data Form", onClick: () => generateFormPdf("personalData") },
@@ -1811,6 +1425,7 @@ const StudentRegistrarPersonalInformation = () => {
     }
   });
 
+
   // dot not alter
   return (
     <Box
@@ -1823,8 +1438,6 @@ const StudentRegistrarPersonalInformation = () => {
         padding: 2,
       }}
     >
-
-
 
       {showPrintView && (
         <div
@@ -1915,11 +1528,7 @@ const StudentRegistrarPersonalInformation = () => {
                   maxHeight: 320,
                 }}
               >
-                {suggestionsLoading ? (
-                  <Box sx={{ px: 2, py: 1.25, fontSize: 13, color: "#666" }}>
-                    Searching...
-                  </Box>
-                ) : studentSuggestions.length > 0 ? (
+                {studentSuggestions.length > 0 ? (
                   studentSuggestions.map((student) => {
                     const studentNumber = cleanStudentValue(student?.student_number);
                     const name = formatStudentSuggestionName(student);
@@ -1939,21 +1548,15 @@ const StudentRegistrarPersonalInformation = () => {
                           gap: 1,
                           fontSize: 14,
                           borderBottom: "1px solid #f0f0f0",
-                          "&:hover": {
-                            backgroundColor: "#f5f7fb",
-                          },
+                          "&:hover": { backgroundColor: "#f5f7fb" },
                         }}
                       >
                         <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
                           {studentNumber || "N/A"}
                         </Typography>
-                        <Typography sx={{ fontSize: 14, color: "#555" }}>
-                          |
-                        </Typography>
+                        <Typography sx={{ fontSize: 14, color: "#555" }}>|</Typography>
                         <Typography sx={{ fontSize: 14 }} noWrap>
-                          {name ||
-                            cleanStudentValue(student?.emailAddress) ||
-                            "Unnamed Student"}
+                          {name || cleanStudentValue(student?.emailAddress) || "Unnamed Student"}
                         </Typography>
                       </Box>
                     );
@@ -1980,6 +1583,8 @@ const StudentRegistrarPersonalInformation = () => {
       <RegistrarEnrollmentTabs />
       <br />
       <br />
+
+
       <TableContainer component={Paper} sx={{ width: "100%", mb: 1 }}>
         <Table>
           <TableHead
@@ -2111,22 +1716,46 @@ const StudentRegistrarPersonalInformation = () => {
         </Box>
       </Box>
 
-      <h1
-        style={{
-          fontSize: "30px",
-          fontWeight: "bold",
-          textAlign: "center",
-          color: "black",
-          marginTop: "25px",
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2,
+          mt: "25px",
+          px: 2,
+          position: "relative",
         }}
       >
-        PRINTABLE DOCUMENTS
-      </h1>
-
+        <h1
+          style={{
+            fontSize: "30px",
+            fontWeight: "bold",
+            textAlign: "center",
+            color: "black",
+            margin: 0,
+          }}
+        >
+          PRINTABLE DOCUMENTS
+        </h1>
+        <Button
+          variant="contained"
+          onClick={handleManualSave}
+          disabled={saving || !userID}
+          startIcon={<SaveIcon />}
+          sx={{
+            position: "absolute",
+            right: 16,
+            textTransform: "none",
+            fontWeight: "bold",
+          }}
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </Box>
 
       <Container>
         {/* Cards Section */}
-
 
         <Box
           sx={{
@@ -2220,7 +1849,6 @@ const StudentRegistrarPersonalInformation = () => {
             );
           })}
         </Box>
-
 
 
         <Container>
@@ -2370,7 +1998,6 @@ const StudentRegistrarPersonalInformation = () => {
                 placeholder="Enter your Student Number"
                 required
                 value={person.student_number ?? ""}
-                onBlur={handleBlur}
                 onChange={handleChange}
                 error={!!errors.student_number}
                 helperText={errors.student_number && "This field is required."}
@@ -2381,7 +2008,7 @@ const StudentRegistrarPersonalInformation = () => {
               <label className="w-40 font-medium">Campus:</label>
 
               <FormControl
-                readOnly
+
                 fullWidth
                 size="small"
                 required
@@ -2389,6 +2016,7 @@ const StudentRegistrarPersonalInformation = () => {
                 className="mb-4"
               >
                 <Select
+                  readOnly
                   id="campus-select"
                   name="campus"
                   value={person.campus || ""}
@@ -2445,7 +2073,6 @@ const StudentRegistrarPersonalInformation = () => {
                   value={person.academicProgram ?? ""}
                   label="Academic Program"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Program</em>
@@ -2478,7 +2105,6 @@ const StudentRegistrarPersonalInformation = () => {
                   value={person.classifiedAs ?? ""}
                   label="Classified As"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Classification</em>
@@ -2515,7 +2141,6 @@ const StudentRegistrarPersonalInformation = () => {
                   value={person.applyingAs ?? ""}
                   label="Applying As"
                   onChange={handleChange}
-                  onBlur={handleBlur}
                 >
                   <MenuItem value="">
                     <em>Select Applying</em>
@@ -2575,15 +2200,18 @@ const StudentRegistrarPersonalInformation = () => {
                     >
                       <InputLabel>Course Applied</InputLabel>
                       <Select
+
                         name="program"
-                        value={person.program || ""}
-                        onBlur={() => handleUpdate(person)}
+                        value={isProgramLocked ? registrarCurriculumId : person.program || ""}
                         onChange={handleChange}
+                        disabled={isProgramLocked}
                         label="Program"
                       >
-                        <MenuItem value="">
-                          <em>Select Program</em>
-                        </MenuItem>
+                        {!isProgramLocked && (
+                          <MenuItem value="">
+                            <em>Select Program</em>
+                          </MenuItem>
+                        )}
                         {filteredCurriculum.map((item, index) => (
                           <MenuItem key={index} value={item.curriculum_id}>
                             {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
@@ -2597,59 +2225,6 @@ const StudentRegistrarPersonalInformation = () => {
                     </FormControl>
                   </Box>
 
-                  {/* <Box display="flex" alignItems="center" gap={2} mb={1}>
-                           <label className="w-40 font-medium">Course Applied:</label>
-                            <FormControl fullWidth size="small" required error={!!errors.program2}>
-                                                                      <InputLabel>Course Applied</InputLabel>
-                                                                      <Select
-                                                                          name="program2"
-                                                                          value={person.program2 || ""}
-                                                                          onBlur={() => handleUpdate(person)} onChange={handleChange}
-                                                                          label="Program 2"
-                                                                      >
-                                                                          <MenuItem value=""><em>Select Program</em></MenuItem>
-                                                                          {filteredCurriculum.map((item, index) => (
-                                                                              <MenuItem key={index} value={item.curriculum_id}>
-                                                                                  {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
-                                                                                      } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
-                                                                              </MenuItem>
-                                                                          ))}
-                          
-                          
-                                                                      </Select>
-                                                                      {errors.program2 && (
-                                                                          <FormHelperText>This field is required.</FormHelperText>
-                                                                      )}
-                                                                  </FormControl>
-                         </Box> */}
-
-                  {/* Program 3 */}
-                  {/* <Box display="flex" alignItems="center" gap={2}>
-                           <label className="w-40 font-medium">Course Applied:</label>
-                          <FormControl fullWidth size="small" required error={!!errors.program3}>
-                                                                    <InputLabel>Course Applied</InputLabel>
-                                                                    <Select
-                                                                        name="program3"
-                                                                        value={person.program3 || ""}
-                                                                        onBlur={() => handleUpdate(person)} onChange={handleChange}
-                                                                        label="Program 3"
-                                                                    >
-                                                                        <MenuItem value=""><em>Select Program</em></MenuItem>
-                                                                        {filteredCurriculum.map((item, index) => (
-                                                                            <MenuItem key={index} value={item.curriculum_id}>
-                                                                                {`(${item.program_code}): ${item.program_description}${item.major ? ` (${item.major})` : ""
-                                                                                    } (${item.current_year}-${item.next_year}) (${getBranchLabel(item.components)})`}
-                                                                            </MenuItem>
-                                                                        ))}
-                        
-                        
-                                                                    </Select>
-                                                                    {errors.program3 && (
-                                                                        <FormHelperText>This field is required.</FormHelperText>
-                                                                    )}
-                                                                </FormControl>
-                         </Box> */}
-
                   {/* Year Level */}
                   <div className="flex items-center mb-4 gap-2">
                     <label className="w-40 mt:[2] font-medium ">
@@ -2662,6 +2237,7 @@ const StudentRegistrarPersonalInformation = () => {
                       error={!!errors.yearLevel}
                     >
                       <InputLabel id="year-level-label">Year Level</InputLabel>
+
                       <Select
                         labelId="year-level-label"
                         id="year-level-select"
@@ -2669,7 +2245,6 @@ const StudentRegistrarPersonalInformation = () => {
                         value={getYearLevelSelectValue()}
                         label="Year Level"
                         onChange={handleChange}
-                        onBlur={() => handleUpdate(person)}
                       >
                         <MenuItem value="">
                           <em>Select Year Level</em>
@@ -2758,14 +2333,13 @@ const StudentRegistrarPersonalInformation = () => {
                   Last Name
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+
                   fullWidth
                   size="small"
                   name="last_name"
                   required
                   value={person.last_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Last Name"
                   error={errors.last_name}
                   helperText={errors.last_name ? "This field is required." : ""}
@@ -2778,14 +2352,13 @@ const StudentRegistrarPersonalInformation = () => {
                   First Name
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+
                   fullWidth
                   size="small"
                   name="first_name"
                   required
                   value={person.first_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your First Name"
                   error={errors.first_name}
                   helperText={
@@ -2800,14 +2373,13 @@ const StudentRegistrarPersonalInformation = () => {
                   Middle Name
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+
                   fullWidth
                   size="small"
                   name="middle_name"
                   required
                   value={person.middle_name ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Middle Name"
                   error={errors.middle_name}
                   helperText={
@@ -2824,14 +2396,13 @@ const StudentRegistrarPersonalInformation = () => {
                 <FormControl fullWidth size="small" error={errors.extension}>
                   <InputLabel id="extension-label">Extension</InputLabel>
                   <Select
-                    readOnly
+
                     labelId="extension-label"
                     id="extension-select"
                     name="extension"
                     value={person.extension ?? ""}
                     label="Extension"
                     onChange={handleChange}
-                    onBlur={handleBlur}
                   >
                     <MenuItem value="">
                       <em>None</em>
@@ -2863,7 +2434,6 @@ const StudentRegistrarPersonalInformation = () => {
                   required
                   value={person.nickname ?? ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   placeholder="Enter your Nickname"
                   error={errors.nickname}
                   helperText={errors.nickname ? "This field is required." : ""}
@@ -2879,12 +2449,12 @@ const StudentRegistrarPersonalInformation = () => {
                     Height:
                   </Typography>
                   <TextField
+                    InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="height"
                     value={person.height || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     placeholder="Enter your Height"
                     error={!!errors.height}
                     fullWidth
@@ -2905,12 +2475,12 @@ const StudentRegistrarPersonalInformation = () => {
                     Weight:
                   </Typography>
                   <TextField
+                    InputProps={{ readOnly: true }}
                     size="small"
                     type="number"
                     name="weight"
                     value={person.weight || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     placeholder="Enter your Weight"
                     error={!!errors.weight}
                     fullWidth
@@ -2951,11 +2521,10 @@ const StudentRegistrarPersonalInformation = () => {
                     : (person.lrnNumber ?? "")
                 }
                 onChange={handleChange}
-                onBlur={handleBlur}
                 size="small"
                 sx={{ width: 220 }}
                 InputProps={{
-                  readOnly: true, // ✅ makes the field non-editable but keeps normal styling
+
                   sx: { height: 40 },
                 }}
                 inputProps={{
@@ -2968,7 +2537,7 @@ const StudentRegistrarPersonalInformation = () => {
               <FormControlLabel
                 control={
                   <Checkbox
-                    disabled
+
                     name="lrn_na"
                     checked={person.lrnNumber === "No LRN Number"}
                     onChange={(e) => {
@@ -2980,9 +2549,7 @@ const StudentRegistrarPersonalInformation = () => {
 
                       setPerson(updatedPerson);
                       setIsLrnNA(checked); // optional: if you're tracking this separately
-                      setLrnNAFlag(checked ? "1" : "0"); // optional: if you're sending this to backend
                     }}
-                    onBlur={handleBlur}
                   />
                 }
                 label="N/A"
@@ -3007,7 +2574,6 @@ const StudentRegistrarPersonalInformation = () => {
                     },
                   });
                 }}
-                onBlur={handleBlur}
                 error={Boolean(errors.gender)}
                 sx={{ width: 150 }}
                 InputProps={{
@@ -3054,7 +2620,6 @@ const StudentRegistrarPersonalInformation = () => {
                     name="pwdType"
                     value={person.pwdType ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     required={person.pwdMember === 1}
                     error={person.pwdMember === 1 && !!errors.pwdType}
                     helperText={
@@ -3122,7 +2687,6 @@ const StudentRegistrarPersonalInformation = () => {
                     name="pwdId"
                     value={person.pwdId ?? ""}
                     onChange={handleChange}
-                    onBlur={handleBlur}
                     required={person.pwdMember === 1}
                     error={person.pwdMember === 1 && !!errors.pwdId}
                     helperText={
@@ -3148,14 +2712,13 @@ const StudentRegistrarPersonalInformation = () => {
                   Birth of Date
                 </Typography>
                 <DateField
-                  InputProps={{ readOnly: true }}
+
                   fullWidth
                   size="small"
                   name="birthOfDate"
                   required
                   value={person.birthOfDate || ""}
                   onChange={handleChange}
-                  onBlur={handleBlur}
                   error={!!errors.birthOfDate}
                   helperText={
                     errors.birthOfDate ? "This field is required." : ""
@@ -3174,7 +2737,6 @@ const StudentRegistrarPersonalInformation = () => {
                   value={person.age || ""}
                   placeholder="Enter your Age"
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.age}
                   helperText={errors.age ? "This field is required." : ""}
@@ -3186,14 +2748,13 @@ const StudentRegistrarPersonalInformation = () => {
                   Birth Place
                 </Typography>
                 <TextField
-                  InputProps={{ readOnly: true }}
+
                   fullWidth
                   size="small"
                   name="birthPlace"
                   placeholder="Enter your Birth Place"
                   value={person.birthPlace ?? ""}
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.birthPlace}
                   helperText={
@@ -3213,7 +2774,6 @@ const StudentRegistrarPersonalInformation = () => {
                   placeholder="Enter your Language Spoken"
                   value={person.languageDialectSpoken ?? ""}
                   required
-                  onBlur={handleBlur}
                   onChange={handleChange}
                   error={!!errors.languageDialectSpoken}
                   helperText={
@@ -3238,12 +2798,12 @@ const StudentRegistrarPersonalInformation = () => {
                 >
                   <InputLabel id="citizenship-label">Citizenship</InputLabel>
                   <Select
+                    readOnly
                     labelId="citizenship-label"
                     id="citizenship"
                     name="citizenship"
                     value={person.citizenship || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     label="Citizenship"
                   >
                     <MenuItem value="">
@@ -3385,12 +2945,12 @@ const StudentRegistrarPersonalInformation = () => {
                 >
                   <InputLabel id="religion-label">Religion</InputLabel>
                   <Select
+                    readOnly
                     labelId="religion-label"
                     id="religion"
                     name="religion"
                     value={person.religion || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     label="Religion"
                   >
                     <MenuItem value="">
@@ -3444,12 +3004,12 @@ const StudentRegistrarPersonalInformation = () => {
                 >
                   <InputLabel id="civil-status-label">Civil Status</InputLabel>
                   <Select
+
                     labelId="civil-status-label"
                     id="civilStatus"
                     name="civilStatus"
                     value={person.civilStatus || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     label="Civil Status"
                   >
                     <MenuItem value="">
@@ -3475,13 +3035,13 @@ const StudentRegistrarPersonalInformation = () => {
                     Spouse<span style={{ color: "red" }}> *</span>
                   </Typography>
                   <TextField
+              
                     fullWidth
                     size="small"
                     name="spouse"
                     placeholder="Enter Spouse Name"
                     value={person.spouse || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     error={!!errors.spouse}
                     helperText={errors.spouse ? "This field is required." : ""}
                   />
@@ -3500,12 +3060,12 @@ const StudentRegistrarPersonalInformation = () => {
                 >
                   <InputLabel id="tribe-label">Tribe/Ethnic Group</InputLabel>
                   <Select
+                    readOnly
                     labelId="tribe-label"
                     id="tribeEthnicGroup"
                     name="tribeEthnicGroup"
                     value={person.tribeEthnicGroup || ""}
                     onChange={handleChange}
-                    onBlur={() => handleUpdate(person)}
                     label="Tribe/Ethnic Group"
                   >
                     <MenuItem value="">
@@ -3565,6 +3125,7 @@ const StudentRegistrarPersonalInformation = () => {
               </Box>
             </Box>
 
+
             <br />
             <Typography
               style={{
@@ -3587,12 +3148,12 @@ const StudentRegistrarPersonalInformation = () => {
                 </Typography>
 
                 <TextField
+
                   fullWidth
                   size="small"
                   name="cellphoneNumber"
                   placeholder="9XXXXXXXXX"
                   value={person.cellphoneNumber || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     const onlyNumbers = e.target.value.replace(/\D/g, ""); // remove letters
                     handleChange({
@@ -3607,6 +3168,7 @@ const StudentRegistrarPersonalInformation = () => {
                     errors.cellphoneNumber && "This field is required."
                   }
                   InputProps={{
+                    readOnly: true,
                     startAdornment: (
                       <Typography sx={{ mr: 1, fontWeight: "bold" }}>
                         +63
@@ -3622,15 +3184,16 @@ const StudentRegistrarPersonalInformation = () => {
                 </Typography>
 
                 <TextField
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   fullWidth
                   size="small"
                   name="emailAddress"
                   required
                   value={person.emailAddress || ""}
                   placeholder="Your registered email"
-                  InputProps={{
-                    readOnly: true,
-                  }}
+
                   sx={{
                     backgroundColor: "#f0f0f0",
                   }}
@@ -3643,18 +3206,21 @@ const StudentRegistrarPersonalInformation = () => {
                 </Typography>
 
                 <TextField
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   fullWidth
                   size="small"
                   name="facebook_account"
                   placeholder="Enter Facebook Profile Name/Link"
                   value={person.facebook_account || ""}
                   onChange={handleChange}
-                  onBlur={() => handleUpdate(person)}
                   error={!!errors.facebook_account}
                   helperText={errors.facebook_account ? "This field is required." : ""}
                 />
               </Box>
             </Box>
+
 
             <Typography
               style={{
@@ -3707,7 +3273,6 @@ const StudentRegistrarPersonalInformation = () => {
                   size="small"
                   name="presentStreet"
                   value={person.presentStreet || ""}
-                  onBlur={() => handleUpdate(person)}
                   placeholder="Enter your Present Street"
                   onChange={handleChange}
                   error={!!errors.presentStreet}
@@ -3727,7 +3292,6 @@ const StudentRegistrarPersonalInformation = () => {
                   name="presentZipCode"
                   placeholder="Enter your Zip Code"
                   value={person.presentZipCode || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={handleChange}
                   error={!!errors.presentZipCode}
                   helperText={
@@ -3754,7 +3318,6 @@ const StudentRegistrarPersonalInformation = () => {
                   displayEmpty
                   readOnly
                   value={person.presentRegion || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedRegion(e.target.value);
@@ -3764,7 +3327,6 @@ const StudentRegistrarPersonalInformation = () => {
                     setProvinceList([]);
                     setCityList([]);
                     setBarangayList([]);
-                    autoSave();
                   }}
                 >
                   <MenuItem value="">
@@ -3802,7 +3364,6 @@ const StudentRegistrarPersonalInformation = () => {
                   name="presentProvince"
                   displayEmpty
                   value={person.presentProvince || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedProvince(e.target.value);
@@ -3810,7 +3371,6 @@ const StudentRegistrarPersonalInformation = () => {
                     setSelectedBarangay("");
                     setCityList([]);
                     setBarangayList([]);
-                    autoSave();
                   }}
                   disabled={!person.presentRegion}
                 >
@@ -3852,13 +3412,11 @@ const StudentRegistrarPersonalInformation = () => {
                   name="presentMunicipality"
                   displayEmpty
                   value={person.presentMunicipality || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedCity(e.target.value);
                     setSelectedBarangay("");
                     setBarangayList([]);
-                    autoSave();
                   }}
                   disabled={!person.presentProvince}
                 >
@@ -3894,11 +3452,9 @@ const StudentRegistrarPersonalInformation = () => {
                   name="presentBarangay"
                   displayEmpty
                   value={person.presentBarangay || ""}
-                  onBlur={() => handleUpdate(person)}
                   onChange={(e) => {
                     handleChange(e);
                     setSelectedBarangay(e.target.value);
-                    autoSave();
                   }}
                   disabled={!person.presentMunicipality}
                 >
@@ -3930,7 +3486,6 @@ const StudentRegistrarPersonalInformation = () => {
                 size="small"
                 name="presentDswdHouseholdNumber"
                 value={person.presentDswdHouseholdNumber || ""}
-                onBlur={() => handleUpdate(person)}
                 onChange={handleChange}
                 placeholder="Enter your Present DSWD Household Number"
                 error={!!errors.presentDswdHouseholdNumber}
@@ -3983,13 +3538,52 @@ const StudentRegistrarPersonalInformation = () => {
                     }
 
                     setPerson(updatedPerson);
-                    handleUpdate(updatedPerson); // optional: real-time save
                   }}
-                  onBlur={() => handleUpdate(person)}
                 />
               }
               label="Same as Present Address"
             />
+
+            <Box display="flex" gap={2} mb={2}>
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Street
+                </Typography>
+                <TextField
+                  InputProps={{ readOnly: true }}
+                  fullWidth
+                  size="small"
+                  name="permanentStreet"
+                  placeholder="Enter your Permanent Street"
+                  value={person.permanentStreet || ""}
+                  onChange={handleChange}
+                  error={!!errors.permanentStreet}
+                  helperText={
+                    errors.permanentStreet && "This field is required."
+                  }
+                />
+              </Box>
+
+              <Box flex={1}>
+                <Typography mb={1} fontWeight="medium">
+                  Permanent Zip Code
+                </Typography>
+                <TextField
+                  InputProps={{ readOnly: true }}
+                  fullWidth
+                  size="small"
+                  type="number"
+                  name="permanentZipCode"
+                  placeholder="Enter your Permanent Zip Code"
+                  value={person.permanentZipCode || ""}
+                  onChange={handleChange}
+                  error={!!errors.permanentZipCode}
+                  helperText={
+                    errors.permanentZipCode && "This field is required."
+                  }
+                />
+              </Box>
+            </Box>
 
             {/* Permanent Region & Province */}
             <Box display="flex" gap={2} mb={2}>
@@ -4005,10 +3599,10 @@ const StudentRegistrarPersonalInformation = () => {
                   error={!!errors.permanentRegion}
                 >
                   <Select
+                    readOnly
                     name="permanentRegion"
                     displayEmpty
                     value={person.permanentRegion || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentRegion(e.target.value);
@@ -4018,7 +3612,6 @@ const StudentRegistrarPersonalInformation = () => {
                       setPermanentProvinceList([]);
                       setPermanentCityList([]);
                       setPermanentBarangayList([]);
-                      autoSave();
                     }}
                   >
                     <MenuItem value="">
@@ -4055,10 +3648,10 @@ const StudentRegistrarPersonalInformation = () => {
                   error={!!errors.permanentProvince}
                 >
                   <Select
+                    readOnly
                     name="permanentProvince"
                     displayEmpty
                     value={person.permanentProvince || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentProvince(e.target.value);
@@ -4066,7 +3659,6 @@ const StudentRegistrarPersonalInformation = () => {
                       setPermanentBarangay("");
                       setPermanentCityList([]);
                       setPermanentBarangayList([]);
-                      autoSave();
                     }}
                     disabled={!person.permanentRegion}
                   >
@@ -4107,16 +3699,15 @@ const StudentRegistrarPersonalInformation = () => {
                   error={!!errors.permanentMunicipality}
                 >
                   <Select
+                    readOnly
                     name="permanentMunicipality"
                     displayEmpty
                     value={person.permanentMunicipality || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentCity(e.target.value);
                       setPermanentBarangay("");
                       setPermanentBarangayList([]);
-                      autoSave();
                     }}
                     disabled={!person.permanentProvince}
                   >
@@ -4151,14 +3742,13 @@ const StudentRegistrarPersonalInformation = () => {
                   error={!!errors.permanentBarangay}
                 >
                   <Select
+                    readOnly
                     name="permanentBarangay"
                     displayEmpty
                     value={person.permanentBarangay || ""}
-                    onBlur={() => handleUpdate(person)}
                     onChange={(e) => {
                       handleChange(e);
                       setPermanentBarangay(e.target.value);
-                      autoSave();
                     }}
                     disabled={!person.permanentMunicipality}
                   >
@@ -4182,46 +3772,7 @@ const StudentRegistrarPersonalInformation = () => {
               </Box>
             </Box>
 
-            <Box display="flex" gap={2} mb={2}>
-              <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">
-                  Permanent Street
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  name="permanentStreet"
-                  placeholder="Enter your Permanent Street"
-                  value={person.permanentStreet || ""}
-                  onBlur={() => handleUpdate(person)}
-                  onChange={handleChange}
-                  error={!!errors.permanentStreet}
-                  helperText={
-                    errors.permanentStreet && "This field is required."
-                  }
-                />
-              </Box>
 
-              <Box flex={1}>
-                <Typography mb={1} fontWeight="medium">
-                  Permanent Zip Code
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="number"
-                  name="permanentZipCode"
-                  placeholder="Enter your Permanent Zip Code"
-                  value={person.permanentZipCode || ""}
-                  onBlur={() => handleUpdate(person)}
-                  onChange={handleChange}
-                  error={!!errors.permanentZipCode}
-                  helperText={
-                    errors.permanentZipCode && "This field is required."
-                  }
-                />
-              </Box>
-            </Box>
 
             {/* DSWD Household Number */}
             <Box mb={2}>
@@ -4229,13 +3780,13 @@ const StudentRegistrarPersonalInformation = () => {
                 Permanent DSWD Household Number
               </Typography>
               <TextField
+                InputProps={{ readOnly: true }}
                 fullWidth
                 size="small"
                 variant="outlined"
                 placeholder="Enter your Permanent DSWD Household Number"
                 name="permanentDswdHouseholdNumber"
                 value={person.permanentDswdHouseholdNumber || ""}
-                onBlur={() => handleUpdate(person)}
                 onChange={handleChange}
                 error={!!errors.permanentDswdHouseholdNumber}
                 helperText={
@@ -4390,6 +3941,7 @@ const StudentRegistrarPersonalInformation = () => {
                             />
 
                             <Button
+                              disabled
                               size="small"
                               onClick={async () => {
                                 setSelectedFile(null);
@@ -4399,7 +3951,7 @@ const StudentRegistrarPersonalInformation = () => {
                                 setPerson(updatedPerson);
                                 await handleUpdate(updatedPerson);
 
-                                setSnackbar({
+                                setSnack({
                                   open: true,
                                   message: "Image removed successfully.",
                                   severity: "info",
@@ -4408,7 +3960,7 @@ const StudentRegistrarPersonalInformation = () => {
                               sx={{
                                 position: "absolute",
                                 top: -8,
-                                right: "calc(50% - 103px)",
+                                right: "calc(50% - 96px)",
                                 minWidth: 0,
                                 width: 28,
                                 height: 28,
