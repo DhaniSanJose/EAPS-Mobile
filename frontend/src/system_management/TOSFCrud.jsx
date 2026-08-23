@@ -23,11 +23,10 @@ import {
   Grid,
   Tabs,
   Tab,
-  Chip,
-  Stack,
-  Divider,
-  Card,
-  CardContent,
+  Select,
+  MenuItem,
+  FormControl,
+  CircularProgress,
   IconButton,
 } from "@mui/material";
 import EARISTLogo from "../assets/EARISTLogo.png";
@@ -37,96 +36,330 @@ import API_BASE_URL from "../apiConfig";
 import SaveIcon from "@mui/icons-material/Save";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import PriceChangeIcon from "@mui/icons-material/PriceChange";
-import CategoryIcon from "@mui/icons-material/Category";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import SchoolIcon from "@mui/icons-material/School";
-import RuleIcon from "@mui/icons-material/Rule";
 import CloseIcon from "@mui/icons-material/Close";
-import TuneIcon from "@mui/icons-material/Tune";
+import SearchIcon from "@mui/icons-material/Search";
 
 // ---------------------------------------------------------------------------
-// Small presentational helpers (purely visual — no business logic)
+// Shared style constants — copied 1:1 from Department Registration so both
+// pages look and behave the same way (pagination bar, plain bordered/striped
+// tables, green/red row action buttons, colored modal headers).
 // ---------------------------------------------------------------------------
 
-const StatusChip = ({ active }) => (
-  <Chip
-    label={active ? "Active" : "Inactive"}
-    size="small"
-    sx={{
-      fontWeight: 600,
-      fontSize: "0.7rem",
-      color: active ? "#1e7d34" : "#8a8f98",
-      backgroundColor: active
-        ? "rgba(46, 160, 67, 0.12)"
-        : "rgba(140, 140, 140, 0.12)",
-    }}
-  />
+const pagerBtnSx = {
+  minWidth: 80,
+  color: "white",
+  borderColor: "white",
+  backgroundColor: "transparent",
+  "&:hover": {
+    borderColor: "white",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  "&.Mui-disabled": {
+    color: "white",
+    borderColor: "white",
+    backgroundColor: "transparent",
+    opacity: 1,
+  },
+};
+
+const pagerSelectSx = {
+  fontSize: "12px",
+  height: 36,
+  color: "white",
+  border: "1px solid white",
+  backgroundColor: "transparent",
+  ".MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+  "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+  "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "white" },
+  "& svg": { color: "white" },
+};
+
+const addBarButtonSx = {
+  backgroundColor: "#1976d2",
+  color: "#fff",
+  fontWeight: "bold",
+  borderRadius: "8px",
+  minWidth: "200px",
+  textTransform: "none",
+  px: 2,
+  mr: "15px",
+  "&:hover": { backgroundColor: "#1565c0" },
+};
+
+const editRowBtnSx = {
+  backgroundColor: "green",
+  color: "white",
+  borderRadius: "5px",
+  padding: "8px",
+  width: "100px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  cursor: "pointer",
+  "&:hover": { backgroundColor: "#0b7a0b" },
+};
+
+const deleteRowBtnSx = {
+  backgroundColor: "#9E0000",
+  color: "white",
+  borderRadius: "5px",
+  padding: "8px",
+  width: "100px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  cursor: "pointer",
+  "&:hover": { backgroundColor: "#7a0000" },
+};
+
+const searchFieldSx = {
+  width: 380,
+  backgroundColor: "#fff",
+  borderRadius: 1,
+  "& .MuiOutlinedInput-root": { borderRadius: "10px" },
+};
+
+// ---------------------------------------------------------------------------
+// PaginationBar — the "Total Records + First/Prev/Page/Next/Last (+ Add)"
+// bar, rendered above and below every table, exactly like Department Reg.
+// ---------------------------------------------------------------------------
+
+const PaginationBar = ({
+  headerColor,
+  borderColor,
+  totalLabel,
+  currentPage,
+  totalPages,
+  onPageChange,
+  showAddButton,
+  addButtonLabel,
+  onAdd,
+}) => (
+  <TableContainer component={Paper} sx={{ width: "100%" }}>
+    <Table size="small">
+      <TableHead sx={{ backgroundColor: headerColor, color: "white" }}>
+        <TableRow>
+          <TableCell
+            sx={{
+              border: `1px solid ${borderColor}`,
+              py: 0.5,
+              backgroundColor: headerColor,
+              color: "white",
+            }}
+          >
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              flexWrap="wrap"
+              sx={{ padding: "6px" }}
+            >
+              <Typography fontSize="14px" fontWeight="bold" color="white">
+                {totalLabel}
+              </Typography>
+
+              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                <Button
+                  onClick={() => onPageChange(1)}
+                  disabled={currentPage === 1}
+                  variant="outlined"
+                  size="small"
+                  sx={pagerBtnSx}
+                >
+                  First
+                </Button>
+                <Button
+                  onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
+                  disabled={currentPage === 1}
+                  variant="outlined"
+                  size="small"
+                  sx={pagerBtnSx}
+                >
+                  Prev
+                </Button>
+
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <Select
+                    value={currentPage}
+                    onChange={(e) => onPageChange(Number(e.target.value))}
+                    displayEmpty
+                    sx={pagerSelectSx}
+                    MenuProps={{
+                      PaperProps: { sx: { maxHeight: 200, backgroundColor: "#fff" } },
+                    }}
+                  >
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <MenuItem key={i + 1} value={i + 1}>
+                        Page {i + 1}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography fontSize="11px" color="white">
+                  of {totalPages} page{totalPages > 1 ? "s" : ""}
+                </Typography>
+
+                <Button
+                  onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  variant="outlined"
+                  size="small"
+                  sx={pagerBtnSx}
+                >
+                  Next
+                </Button>
+                <Button
+                  onClick={() => onPageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  variant="outlined"
+                  size="small"
+                  sx={pagerBtnSx}
+                >
+                  Last
+                </Button>
+
+                {showAddButton && (
+                  <Button variant="contained" sx={addBarButtonSx} onClick={onAdd}>
+                    {addButtonLabel}
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          </TableCell>
+        </TableRow>
+      </TableHead>
+    </Table>
+  </TableContainer>
 );
 
-const SectionHeading = ({ icon, title, subtitle, accentColor, actions }) => (
-  <Stack
-    direction="row"
-    spacing={1.5}
-    alignItems={{ xs: "flex-start", sm: "center" }}
-    justifyContent="space-between"
-    flexWrap="wrap"
-    rowGap={1.5}
-    sx={{ mb: 2 }}
-  >
-    <Stack direction="row" spacing={1.5} alignItems="flex-start">
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 38,
-          height: 38,
-          borderRadius: "10px",
-          flexShrink: 0,
-          backgroundColor: `${accentColor}1a`,
-          color: accentColor,
+// ---------------------------------------------------------------------------
+// PlainTable — bordered header row (#F5F5F5 / black text), bordered cells,
+// odd/even striped body rows. Same visual language as Department Reg.
+// ---------------------------------------------------------------------------
+
+const PlainTable = ({
+  headers,
+  showActionColumn,
+  borderColor,
+  children,
+  emptyMessage,
+  colSpanOverride,
+}) => (
+  <Table size="small">
+    <TableHead>
+      <TableRow
+        style={{
+          border: `1px solid ${borderColor}`,
+          backgroundColor: "#F5F5F5",
+          color: "#000",
+          textAlign: "center",
         }}
       >
-        {icon}
-      </Box>
-      <Box>
-        <Typography
-          sx={{ fontWeight: 700, fontSize: "1.05rem", lineHeight: 1.3 }}
-        >
-          {title}
-        </Typography>
-        {subtitle && (
-          <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-            {subtitle}
-          </Typography>
+        {headers.map(
+          (header) =>
+            (header !== "Actions" || showActionColumn) && (
+              <TableCell
+                key={header}
+                sx={{ color: "#000", border: `1px solid ${borderColor}`, textAlign: "center" }}
+              >
+                {header}
+              </TableCell>
+            ),
         )}
-      </Box>
-    </Stack>
-    {actions && (
-      <Stack direction="row" spacing={1}>
-        {actions}
-      </Stack>
-    )}
-  </Stack>
+      </TableRow>
+    </TableHead>
+    <TableBody
+      sx={{
+        border: `1px solid ${borderColor}`,
+        "& .MuiTableRow-root:nth-of-type(odd)": { backgroundColor: "#ffffff" },
+        "& .MuiTableRow-root:nth-of-type(even)": { backgroundColor: "lightgray" },
+      }}
+    >
+      {React.Children.count(children) === 0 && (
+        <TableRow>
+          <TableCell
+            colSpan={colSpanOverride || headers.length}
+            sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}
+          >
+            <em>{emptyMessage}</em>
+          </TableCell>
+        </TableRow>
+      )}
+      {children}
+    </TableBody>
+  </Table>
 );
 
-const cardSx = (borderColor) => ({
-  p: 3,
-  mb: 3,
-  borderRadius: "14px",
-  border: `1px solid ${borderColor}22`,
-  boxShadow: "0 1px 3px rgba(16,24,40,0.06)",
-});
+// ---------------------------------------------------------------------------
+// RowActions — the exact green "Edit" / red "Delete" buttons from
+// Department Registration.
+// ---------------------------------------------------------------------------
 
-const fieldLabelSx = {
-  fontWeight: 600,
-  fontSize: "0.72rem",
-  letterSpacing: "0.04em",
-  color: "text.secondary",
-  mb: 0.5,
-};
+const RowActions = ({ canEdit, canDelete, onEdit, onDelete }) => (
+  <Box
+    sx={{
+      display: "flex",
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 1,
+    }}
+  >
+    {canEdit && (
+      <Button variant="contained" size="small" sx={editRowBtnSx} onClick={onEdit}>
+        <EditIcon fontSize="small" /> Edit
+      </Button>
+    )}
+    {canDelete && (
+      <Button variant="contained" size="small" sx={deleteRowBtnSx} onClick={onDelete}>
+        <DeleteIcon fontSize="small" /> Delete
+      </Button>
+    )}
+  </Box>
+);
+
+// ---------------------------------------------------------------------------
+// SectionHeader — plain section title + optional search box, replacing the
+// old card headers/icons.
+// ---------------------------------------------------------------------------
+
+const SectionHeader = ({ titleColor, title, search, onSearchChange, placeholder, extra }) => (
+  <Box
+    sx={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 2,
+      mb: 1.5,
+      mt: 3,
+    }}
+  >
+    <Typography sx={{ fontWeight: "bold", color: titleColor, fontSize: "22px" }}>
+      {title}
+    </Typography>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+      {extra}
+      {onSearchChange && (
+        <TextField
+          variant="outlined"
+          placeholder={placeholder}
+          size="small"
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          sx={searchFieldSx}
+          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: "gray" }} /> }}
+        />
+      )}
+    </Box>
+  </Box>
+);
+
+// ---------------------------------------------------------------------------
+// Business constants (unchanged)
+// ---------------------------------------------------------------------------
 
 const FEE_CATEGORY = {
   TUITION: 2,
@@ -154,8 +387,7 @@ const normalizedFeeTokens = (fee) =>
 
 const isNstpFee = (fee) => normalizedFeeTokens(fee).includes("NSTP");
 
-const isTuitionCategory = (fee) =>
-  Number(fee?.fee_category) === FEE_CATEGORY.TUITION;
+const isTuitionCategory = (fee) => Number(fee?.fee_category) === FEE_CATEGORY.TUITION;
 
 const isBaseComputedTuitionFee = (fee) => {
   const tokens = normalizedFeeTokens(fee);
@@ -170,118 +402,9 @@ const isBaseComputedTuitionFee = (fee) => {
 };
 
 const isComputedTuitionRate = (rate) =>
-  Number(rate?.fee_rate_id) === COMPUTED_TUITION_FEE_RATE_ID ||
-  Boolean(rate?.isComputedTuition);
+  Number(rate?.fee_rate_id) === COMPUTED_TUITION_FEE_RATE_ID || Boolean(rate?.isComputedTuition);
 
-// Reusable clean table shell — replaces the old "border on every single cell" pattern
-const CleanTable = ({
-  headers,
-  showActionColumn,
-  headerColor,
-  children,
-  emptyMessage,
-  colSpanOverride,
-}) => (
-  <TableContainer
-    sx={{
-      borderRadius: "12px",
-      border: "1px solid #eef0f3",
-      overflow: "hidden",
-    }}
-  >
-    <Table size="small">
-      <TableHead>
-        <TableRow sx={{ backgroundColor: headerColor || "#1976d2" }}>
-          {headers.map(
-            (header) =>
-              (header !== "Actions" || showActionColumn) && (
-                <TableCell
-                  key={header}
-                  sx={{
-                    color: "white",
-                    fontWeight: 700,
-                    fontSize: "0.72rem",
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase",
-                    textAlign: "center",
-                    border: "none",
-                    py: 1.1,
-                  }}
-                >
-                  {header}
-                </TableCell>
-              ),
-          )}
-        </TableRow>
-      </TableHead>
-      <TableBody
-        sx={{
-          "& tr:nth-of-type(odd)": { backgroundColor: "#fafbfc" },
-          "& tr:hover": { backgroundColor: "#f1f5fb" },
-          "& td": {
-            border: "none",
-            borderBottom: "1px solid #f0f1f3",
-            textAlign: "center",
-            py: 1,
-          },
-        }}
-      >
-        {React.Children.count(children) === 0 && (
-          <TableRow>
-            <TableCell
-              colSpan={colSpanOverride || headers.length}
-              sx={{ textAlign: "center", color: "text.secondary", py: 3 }}
-            >
-              {emptyMessage}
-            </TableCell>
-          </TableRow>
-        )}
-        {children}
-      </TableBody>
-    </Table>
-  </TableContainer>
-);
-
-const RowActions = ({ canEdit, canDelete, onEdit, onDelete }) => (
-  <Stack direction="row" spacing={1} justifyContent="center">
-    {canEdit && (
-      <Button
-        onClick={onEdit}
-        size="small"
-        startIcon={<EditIcon fontSize="small" />}
-        sx={{
-          textTransform: "none",
-          minWidth: 0,
-          px: 1.4,
-          borderRadius: "8px",
-          backgroundColor: "#e8f5e9",
-          color: "#1e7d34",
-          "&:hover": { backgroundColor: "#d7efd9" },
-        }}
-      >
-        Edit
-      </Button>
-    )}
-    {canDelete && (
-      <Button
-        onClick={onDelete}
-        size="small"
-        startIcon={<DeleteIcon fontSize="small" />}
-        sx={{
-          textTransform: "none",
-          minWidth: 0,
-          px: 1.4,
-          borderRadius: "8px",
-          backgroundColor: "#fdecea",
-          color: "#b3261e",
-          "&:hover": { backgroundColor: "#fbdedb" },
-        }}
-      >
-        Delete
-      </Button>
-    )}
-  </Stack>
-);
+const itemsPerPage = 20;
 
 // ---------------------------------------------------------------------------
 
@@ -332,6 +455,8 @@ const TOSF = () => {
     }
   }, [settings]);
 
+  const headerColor = colors.header || "#1976d2";
+
   const [userID, setUserID] = useState("");
   const [user, setUser] = useState("");
   const [userRole, setUserRole] = useState("");
@@ -348,8 +473,7 @@ const TOSF = () => {
       "x-employee-id": employeeID,
       "x-page-id": pageId,
       "x-audit-actor-id": employeeID,
-      "x-audit-actor-role":
-        userRole || localStorage.getItem("role") || "registrar",
+      "x-audit-actor-role": userRole || localStorage.getItem("role") || "registrar",
     },
   };
 
@@ -377,9 +501,7 @@ const TOSF = () => {
 
   const checkAccess = async (employeeID) => {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`);
       if (response.data && response.data.page_privilege === 1) {
         setHasAccess(true);
         setCanCreate(Number(response.data?.can_create) === 1);
@@ -402,29 +524,132 @@ const TOSF = () => {
   };
 
   // Snackbar state
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
+  const handleSnackbarClose = () => setSnackbar((prev) => ({ ...prev, open: false }));
 
-  const [scholarshipUpdateDialogOpen, setScholarshipUpdateDialogOpen] =
-    useState(false);
-  const [scholarshipDeleteDialogOpen, setScholarshipDeleteDialogOpen] =
-    useState(false);
-  const [selectedScholarshipId, setSelectedScholarshipId] = useState(null);
+  // -------------------------------------------------------------------
+  // Tab navigation
+  // -------------------------------------------------------------------
+  const [activeTab, setActiveTab] = useState(0);
+
+  // =====================================================================
+  // FEE CATALOG
+  // =====================================================================
+  const defaultFeeCatalogForm = {
+    fee_code: "",
+    fee_name: "",
+    fee_category: FEE_CATEGORY.OTHER,
+    is_active: 1,
+    sort_order: 1,
+    fee_group: "",
+    account_type: "",
+  };
+
+  const [feeCatalog, setFeeCatalog] = useState([]);
+  const [feeCatalogForm, setFeeCatalogForm] = useState(defaultFeeCatalogForm);
+  const [feeCatalogModalOpen, setFeeCatalogModalOpen] = useState(false);
+  const [feeCatalogEditMode, setFeeCatalogEditMode] = useState(false);
+  const [feeCatalogEditId, setFeeCatalogEditId] = useState(null);
+  const [feeCatalogDeleteDialogOpen, setFeeCatalogDeleteDialogOpen] = useState(false);
+  const [selectedFeeCatalog, setSelectedFeeCatalog] = useState(null);
+  const [searchFeeCatalog, setSearchFeeCatalog] = useState("");
+  const [feeCatalogPage, setFeeCatalogPage] = useState(1);
+
+  // =====================================================================
+  // FEE RATES
+  // =====================================================================
+  const defaultFeeRateForm = {
+    fee_id: "",
+    dprtmnt_curriculum_id: "",
+    branch_id: "",
+    amount: "",
+    applied_to: 0,
+    applies_to_all: 1,
+    is_active: 1,
+  };
+
+  const [feeRates, setFeeRates] = useState([]);
+  const [curriculumOptions, setCurriculumOptions] = useState([]);
+  const [yearLevelOptions, setYearLevelOptions] = useState([]);
+  const [feeRateForm, setFeeRateForm] = useState(defaultFeeRateForm);
+  const [feeRateModalOpen, setFeeRateModalOpen] = useState(false);
+  const [feeRateEditMode, setFeeRateEditMode] = useState(false);
+  const [feeRateEditId, setFeeRateEditId] = useState(null);
+  const [feeRateDeleteDialogOpen, setFeeRateDeleteDialogOpen] = useState(false);
+  const [selectedFeeRate, setSelectedFeeRate] = useState(null);
+  const [searchFeeRates, setSearchFeeRates] = useState("");
+  const [feeRatePage, setFeeRatePage] = useState(1);
+
+  const baseComputedTuitionRate = feeRates.find((rate) => isBaseComputedTuitionFee(rate)) || null;
+  const baseComputedTuitionFee =
+    baseComputedTuitionRate || feeCatalog.find((fee) => isBaseComputedTuitionFee(fee)) || null;
+  const sortedScholarshipFeeRates = [...feeRates].sort((a, b) => {
+    const tuitionCompare = Number(isTuitionCategory(b)) - Number(isTuitionCategory(a));
+    if (tuitionCompare !== 0) return tuitionCompare;
+    return (
+      Number(a.sort_order ?? 999999) - Number(b.sort_order ?? 999999) ||
+      String(a.fee_name || "").localeCompare(String(b.fee_name || "")) ||
+      Number(a.fee_rate_id || 0) - Number(b.fee_rate_id || 0)
+    );
+  });
+  const scholarshipFeeRateOptions = [
+    {
+      fee_rate_id: COMPUTED_TUITION_FEE_RATE_ID,
+      fee_code: baseComputedTuitionFee?.fee_code || "TUITION",
+      fee_name: baseComputedTuitionFee?.fee_name || "Tuition Fee",
+      fee_category: baseComputedTuitionFee?.fee_category ?? FEE_CATEGORY.TUITION,
+      amount: null,
+      isComputedTuition: true,
+    },
+    ...sortedScholarshipFeeRates,
+  ];
+
+  // =====================================================================
+  // FEE GROUPS / FUND NUMBERS (small nested CRUD, opened from Fee Catalog)
+  // =====================================================================
+  const defaultFeeGroupForm = { description: "" };
+  const defaultAccountTypeForm = { description: "" };
+
+  const [feeGroups, setFeeGroups] = useState([]);
+  const [accountTypes, setAccountTypes] = useState([]);
+  const [feeGroupForm, setFeeGroupForm] = useState(defaultFeeGroupForm);
+  const [accountTypeForm, setAccountTypeForm] = useState(defaultAccountTypeForm);
+  const [feeGroupDeleteDialogOpen, setFeeGroupDeleteDialogOpen] = useState(false);
+  const [accountTypeDeleteDialogOpen, setAccountTypeDeleteDialogOpen] = useState(false);
+  const [selectedFeeGroup, setSelectedFeeGroup] = useState(null);
+  const [selectedAccountType, setSelectedAccountType] = useState(null);
+  const [feeGroupEditDialogOpen, setFeeGroupEditDialogOpen] = useState(false);
+  const [feeGroupEditForm, setFeeGroupEditForm] = useState(defaultFeeGroupForm);
+  const [feeGroupEditId, setFeeGroupEditId] = useState(null);
+  const [accountTypeEditDialogOpen, setAccountTypeEditDialogOpen] = useState(false);
+  const [accountTypeEditForm, setAccountTypeEditForm] = useState(defaultAccountTypeForm);
+  const [accountTypeEditId, setAccountTypeEditId] = useState(null);
+  const [feeGroupsModalOpen, setFeeGroupsModalOpen] = useState(false);
+  const [accountTypesModalOpen, setAccountTypesModalOpen] = useState(false);
+
+  // =====================================================================
+  // SCHOLARSHIP TYPES
+  // =====================================================================
+  const defaultScholarshipForm = {
+    scholarship_code: "",
+    scholarship_name: "",
+    scholarship_status: 1,
+  };
+
   const [scholarshipTypes, setScholarshipTypes] = useState([]);
-  const [scholarshipForm, setScholarshipForm] = useState({
-    scholarship_code: "",
-    scholarship_name: "",
-    scholarship_status: 1,
-  });
-  const [scholarshipEditForm, setScholarshipEditForm] = useState({
-    scholarship_code: "",
-    scholarship_name: "",
-    scholarship_status: 1,
-  });
+  const [scholarshipForm, setScholarshipForm] = useState(defaultScholarshipForm);
+  const [scholarshipModalOpen, setScholarshipModalOpen] = useState(false);
+  const [scholarshipEditMode, setScholarshipEditMode] = useState(false);
   const [editingScholarshipId, setEditingScholarshipId] = useState(null);
+  const [scholarshipDeleteDialogOpen, setScholarshipDeleteDialogOpen] = useState(false);
+  const [selectedScholarshipId, setSelectedScholarshipId] = useState(null);
+  const [searchScholarshipTypes, setSearchScholarshipTypes] = useState("");
+  const [scholarshipTypePage, setScholarshipTypePage] = useState(1);
+
+  // =====================================================================
+  // SCHOLARSHIP FEES (rules)
+  // =====================================================================
   const [scholarshipRuleOptions, setScholarshipRuleOptions] = useState({
     yearLevels: [],
     schoolYears: [],
@@ -432,11 +657,8 @@ const TOSF = () => {
     years: [],
     semesters: [],
   });
-  const [selectedScholarshipForRules, setSelectedScholarshipForRules] =
-    useState("");
+  const [selectedScholarshipForRules, setSelectedScholarshipForRules] = useState("");
   const [scholarshipRules, setScholarshipRules] = useState([]);
-  const [editingScholarshipRuleId, setEditingScholarshipRuleId] =
-    useState(null);
   const [scholarshipRuleForm, setScholarshipRuleForm] = useState({
     scholarship_id: "",
     fee_rate_id: "",
@@ -447,13 +669,17 @@ const TOSF = () => {
     semester_id: "",
     status: 1,
   });
-  const [scholarshipRuleUpdateDialogOpen, setScholarshipRuleUpdateDialogOpen] =
-    useState(false);
-  const [scholarshipRuleDeleteDialogOpen, setScholarshipRuleDeleteDialogOpen] =
-    useState(false);
-  const [selectedScholarshipRuleId, setSelectedScholarshipRuleId] =
-    useState(null);
+  const [scholarshipRuleModalOpen, setScholarshipRuleModalOpen] = useState(false);
+  const [scholarshipRuleEditMode, setScholarshipRuleEditMode] = useState(false);
+  const [editingScholarshipRuleId, setEditingScholarshipRuleId] = useState(null);
+  const [scholarshipRuleUpdateDialogOpen, setScholarshipRuleUpdateDialogOpen] = useState(false);
+  const [scholarshipRuleDeleteDialogOpen, setScholarshipRuleDeleteDialogOpen] = useState(false);
+  const [selectedScholarshipRuleId, setSelectedScholarshipRuleId] = useState(null);
+  const [scholarshipRulePage, setScholarshipRulePage] = useState(1);
 
+  // =====================================================================
+  // FETCHERS
+  // =====================================================================
   const fetchScholarshipTypes = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/scholarship_types`);
@@ -470,21 +696,13 @@ const TOSF = () => {
 
   const fetchScholarshipRuleOptions = async () => {
     try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/tosf/scholarship-fee-options`,
-      );
-      const schoolYears = Array.isArray(res.data?.schoolYears)
-        ? res.data.schoolYears
-        : [];
-      const semesters = Array.isArray(res.data?.semesters)
-        ? res.data.semesters
-        : [];
+      const res = await axios.get(`${API_BASE_URL}/api/tosf/scholarship-fee-options`);
+      const schoolYears = Array.isArray(res.data?.schoolYears) ? res.data.schoolYears : [];
+      const semesters = Array.isArray(res.data?.semesters) ? res.data.semesters : [];
       const activeSchoolYear = res.data?.activeSchoolYear || null;
 
       setScholarshipRuleOptions({
-        yearLevels: Array.isArray(res.data?.yearLevels)
-          ? res.data.yearLevels
-          : [],
+        yearLevels: Array.isArray(res.data?.yearLevels) ? res.data.yearLevels : [],
         schoolYears,
         activeSchoolYear,
         years: Array.isArray(res.data?.years) ? res.data.years : [],
@@ -494,14 +712,10 @@ const TOSF = () => {
         ...prev,
         school_year_id:
           prev.school_year_id ||
-          (activeSchoolYear?.year_id == null
-            ? ""
-            : String(activeSchoolYear.year_id)),
+          (activeSchoolYear?.year_id == null ? "" : String(activeSchoolYear.year_id)),
         semester_id:
           prev.semester_id ||
-          (activeSchoolYear?.semester_id == null
-            ? ""
-            : String(activeSchoolYear.semester_id)),
+          (activeSchoolYear?.semester_id == null ? "" : String(activeSchoolYear.semester_id)),
       }));
     } catch (error) {
       console.error("Error fetching scholarship fee options:", error);
@@ -529,141 +743,29 @@ const TOSF = () => {
     }
   };
 
-  const showSnackbar = (message, severity = "success") => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleSnackbarClose = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  const defaultFeeCatalogForm = {
-    fee_code: "",
-    fee_name: "",
-    fee_category: FEE_CATEGORY.OTHER,
-    is_active: 1,
-    sort_order: 1,
-    fee_group: "",
-    account_type: "",
-  };
-
-  const defaultFeeRateForm = {
-    fee_id: "",
-    dprtmnt_curriculum_id: "",
-    branch_id: "",
-    amount: "",
-    applied_to: 0,
-    applies_to_all: 1,
-    is_active: 1,
-  };
-
-  const [feeCatalog, setFeeCatalog] = useState([]);
-  const [feeRates, setFeeRates] = useState([]);
-  const [curriculumOptions, setCurriculumOptions] = useState([]);
-  const [yearLevelOptions, setYearLevelOptions] = useState([]);
-  const [feeCatalogForm, setFeeCatalogForm] = useState(defaultFeeCatalogForm);
-  const [feeRateForm, setFeeRateForm] = useState(defaultFeeRateForm);
-  const [feeCatalogDeleteDialogOpen, setFeeCatalogDeleteDialogOpen] =
-    useState(false);
-  const [feeRateDeleteDialogOpen, setFeeRateDeleteDialogOpen] = useState(false);
-  const [selectedFeeCatalog, setSelectedFeeCatalog] = useState(null);
-  const [selectedFeeRate, setSelectedFeeRate] = useState(null);
-  const [feeCatalogEditDialogOpen, setFeeCatalogEditDialogOpen] =
-    useState(false);
-  const [feeCatalogEditForm, setFeeCatalogEditForm] = useState(
-    defaultFeeCatalogForm,
-  );
-  const [feeCatalogEditId, setFeeCatalogEditId] = useState(null);
-  const [feeRateEditDialogOpen, setFeeRateEditDialogOpen] = useState(false);
-  const [feeRateEditForm, setFeeRateEditForm] = useState(defaultFeeRateForm);
-  const [feeRateEditId, setFeeRateEditId] = useState(null);
-  const baseComputedTuitionRate =
-    feeRates.find((rate) => isBaseComputedTuitionFee(rate)) || null;
-  const baseComputedTuitionFee =
-    baseComputedTuitionRate ||
-    feeCatalog.find((fee) => isBaseComputedTuitionFee(fee)) ||
-    null;
-  const sortedScholarshipFeeRates = [...feeRates].sort((a, b) => {
-    const tuitionCompare =
-      Number(isTuitionCategory(b)) - Number(isTuitionCategory(a));
-    if (tuitionCompare !== 0) return tuitionCompare;
-    return (
-      Number(a.sort_order ?? 999999) - Number(b.sort_order ?? 999999) ||
-      String(a.fee_name || "").localeCompare(String(b.fee_name || "")) ||
-      Number(a.fee_rate_id || 0) - Number(b.fee_rate_id || 0)
-    );
-  });
-  const scholarshipFeeRateOptions = [
-    {
-      fee_rate_id: COMPUTED_TUITION_FEE_RATE_ID,
-      fee_code: baseComputedTuitionFee?.fee_code || "TUITION",
-      fee_name: baseComputedTuitionFee?.fee_name || "Tuition Fee",
-      fee_category: baseComputedTuitionFee?.fee_category ?? FEE_CATEGORY.TUITION,
-      amount: null,
-      isComputedTuition: true,
-    },
-    ...sortedScholarshipFeeRates,
-  ];
-
-  const defaultFeeGroupForm = { description: "" };
-  const defaultAccountTypeForm = { description: "" };
-
-  const [feeGroups, setFeeGroups] = useState([]);
-  const [accountTypes, setAccountTypes] = useState([]);
-  const [feeGroupForm, setFeeGroupForm] = useState(defaultFeeGroupForm);
-  const [accountTypeForm, setAccountTypeForm] = useState(
-    defaultAccountTypeForm,
-  );
-  const [feeGroupDeleteDialogOpen, setFeeGroupDeleteDialogOpen] =
-    useState(false);
-  const [accountTypeDeleteDialogOpen, setAccountTypeDeleteDialogOpen] =
-    useState(false);
-  const [selectedFeeGroup, setSelectedFeeGroup] = useState(null);
-  const [selectedAccountType, setSelectedAccountType] = useState(null);
-  const [feeGroupEditDialogOpen, setFeeGroupEditDialogOpen] = useState(false);
-  const [feeGroupEditForm, setFeeGroupEditForm] = useState(defaultFeeGroupForm);
-  const [feeGroupEditId, setFeeGroupEditId] = useState(null);
-  const [accountTypeEditDialogOpen, setAccountTypeEditDialogOpen] =
-    useState(false);
-  const [accountTypeEditForm, setAccountTypeEditForm] = useState(
-    defaultAccountTypeForm,
-  );
-  const [accountTypeEditId, setAccountTypeEditId] = useState(null);
-
   const fetchDynamicFees = async () => {
     try {
-      const [catalogRes, ratesRes, optionsRes, feeGroupsRes, accountTypesRes] =
-        await Promise.all([
-          axios.get(`${API_BASE_URL}/api/tosf/fee-catalog`),
-          axios.get(`${API_BASE_URL}/api/tosf/fee-rates`),
-          axios.get(`${API_BASE_URL}/api/tosf/fee-options`),
-          axios.get(`${API_BASE_URL}/api/tosf/fee-groups`),
-          axios.get(`${API_BASE_URL}/api/tosf/account-types`),
-        ]);
+      const [catalogRes, ratesRes, optionsRes, feeGroupsRes, accountTypesRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/tosf/fee-catalog`),
+        axios.get(`${API_BASE_URL}/api/tosf/fee-rates`),
+        axios.get(`${API_BASE_URL}/api/tosf/fee-options`),
+        axios.get(`${API_BASE_URL}/api/tosf/fee-groups`),
+        axios.get(`${API_BASE_URL}/api/tosf/account-types`),
+      ]);
 
       setFeeCatalog(Array.isArray(catalogRes.data) ? catalogRes.data : []);
       setFeeRates(Array.isArray(ratesRes.data) ? ratesRes.data : []);
       setFeeGroups(Array.isArray(feeGroupsRes.data) ? feeGroupsRes.data : []);
-      setAccountTypes(
-        Array.isArray(accountTypesRes.data) ? accountTypesRes.data : [],
-      );
-      const nextYearLevels = Array.isArray(optionsRes.data?.yearLevels)
-        ? optionsRes.data.yearLevels
-        : [];
-      setCurriculumOptions(
-        Array.isArray(optionsRes.data?.curricula)
-          ? optionsRes.data.curricula
-          : [],
-      );
+      setAccountTypes(Array.isArray(accountTypesRes.data) ? accountTypesRes.data : []);
+      const nextYearLevels = Array.isArray(optionsRes.data?.yearLevels) ? optionsRes.data.yearLevels : [];
+      setCurriculumOptions(Array.isArray(optionsRes.data?.curricula) ? optionsRes.data.curricula : []);
       setYearLevelOptions(nextYearLevels);
       setFeeRateForm((prev) => {
         if (!nextYearLevels.length) return prev;
         const exists = nextYearLevels.some(
           (level) => String(level.year_level_id) === String(prev.applied_to),
         );
-        return exists || Number(prev.applied_to) === 0
-          ? prev
-          : { ...prev, applied_to: 0 };
+        return exists || Number(prev.applied_to) === 0 ? prev : { ...prev, applied_to: 0 };
       });
     } catch (err) {
       console.error("Error fetching dynamic fees:", err);
@@ -675,182 +777,38 @@ const TOSF = () => {
     fetchDynamicFees();
   }, []);
 
+  // =====================================================================
+  // Pagination reset effects — MUST live above any conditional early
+  // return (see Access Guards below) so hook count/order never changes
+  // between renders. Do not move these below the guard again.
+  // =====================================================================
+  useEffect(() => setFeeCatalogPage(1), [searchFeeCatalog]);
+  useEffect(() => setFeeRatePage(1), [searchFeeRates]);
+  useEffect(() => setScholarshipTypePage(1), [searchScholarshipTypes]);
+  useEffect(() => setScholarshipRulePage(1), [selectedScholarshipForRules]);
+
+  // =====================================================================
+  // FEE CATALOG — handlers
+  // =====================================================================
   const handleFeeCatalogChange = (e) => {
     const { name, value } = e.target;
     setFeeCatalogForm((prev) => ({
       ...prev,
-      [name]: [
-        "fee_category",
-        "is_active",
-        "sort_order",
-        "fee_group",
-        "account_type",
-      ].includes(name)
-        ? value === ""
-          ? ""
-          : Number(value)
+      [name]: ["fee_category", "is_active", "sort_order", "fee_group", "account_type"].includes(name)
+        ? value === "" ? "" : Number(value)
         : value,
     }));
-  };
-
-  const handleFeeCatalogEditChange = (e) => {
-    const { name, value } = e.target;
-    setFeeCatalogEditForm((prev) => ({
-      ...prev,
-      [name]: [
-        "fee_category",
-        "is_active",
-        "sort_order",
-        "fee_group",
-        "account_type",
-      ].includes(name)
-        ? value === ""
-          ? ""
-          : Number(value)
-        : value,
-    }));
-  };
-
-  const getFeeCatalogItemById = (feeId) =>
-    feeCatalog.find((fee) => String(fee.fee_id) === String(feeId)) || null;
-
-  const isFeeRateFormForTuition = (form) =>
-    isBaseComputedTuitionFee(getFeeCatalogItemById(form.fee_id));
-
-  const handleFeeRateChange = (e) => {
-    const { name, value } = e.target;
-    setFeeRateForm((prev) => {
-      const next = {
-        ...prev,
-        [name]: [
-          "fee_id",
-          "applied_to",
-          "applies_to_all",
-          "is_active",
-        ].includes(name)
-          ? Number(value)
-          : name === "amount"
-            ? value.replace(/\D/g, "")
-            : value,
-        ...(name === "applies_to_all" && Number(value) === 1
-          ? { dprtmnt_curriculum_id: "" }
-          : {}),
-      };
-
-      return isFeeRateFormForTuition(next) ? { ...next, amount: 0 } : next;
-    });
-  };
-
-  const handleFeeRateEditChange = (e) => {
-    const { name, value } = e.target;
-    setFeeRateEditForm((prev) => {
-      const next = {
-        ...prev,
-        [name]: [
-          "fee_id",
-          "applied_to",
-          "applies_to_all",
-          "is_active",
-        ].includes(name)
-          ? Number(value)
-          : name === "amount"
-            ? value.replace(/\D/g, "")
-            : value,
-        ...(name === "applies_to_all" && Number(value) === 1
-          ? { dprtmnt_curriculum_id: "" }
-          : {}),
-      };
-
-      return isFeeRateFormForTuition(next) ? { ...next, amount: 0 } : next;
-    });
-  };
-
-  const normalizeFeeRateParams = (form) => {
-    const appliesToAll = Number(form.applies_to_all ?? 1) === 1 ? 1 : 0;
-    const appliedTo =
-      form.applied_to === "" || form.applied_to == null
-        ? 0
-        : Number(form.applied_to);
-    const branchId =
-      form.branch_id === "" || form.branch_id == null
-        ? null
-        : Number(form.branch_id);
-    const dprtmntCurriculumId =
-      appliesToAll === 1
-        ? null
-        : form.dprtmnt_curriculum_id === "" ||
-            form.dprtmnt_curriculum_id == null
-          ? null
-          : Number(form.dprtmnt_curriculum_id);
-    const feeId =
-      form.fee_id === "" || form.fee_id == null ? null : Number(form.fee_id);
-
-    return { feeId, dprtmntCurriculumId, branchId, appliedTo, appliesToAll };
-  };
-
-  const feeRateParamsMatch = (left, right) =>
-    left.feeId === right.feeId &&
-    left.dprtmntCurriculumId === right.dprtmntCurriculumId &&
-    left.branchId === right.branchId &&
-    left.appliedTo === right.appliedTo &&
-    left.appliesToAll === right.appliesToAll;
-
-  const findDuplicateFeeRate = (form, excludeFeeRateId = null) => {
-    const candidate = normalizeFeeRateParams(form);
-    if (!candidate.feeId) return null;
-
-    return (
-      feeRates.find((rate) => {
-        if (
-          excludeFeeRateId &&
-          String(rate.fee_rate_id) === String(excludeFeeRateId)
-        ) {
-          return false;
-        }
-
-        return feeRateParamsMatch(candidate, {
-          feeId: rate.fee_id == null ? null : Number(rate.fee_id),
-          dprtmntCurriculumId:
-            Number(rate.applies_to_all ?? 1) === 1
-              ? null
-              : rate.dprtmnt_curriculum_id == null ||
-                  rate.dprtmnt_curriculum_id === ""
-                ? null
-                : Number(rate.dprtmnt_curriculum_id),
-          branchId:
-            rate.branch_id == null || rate.branch_id === ""
-              ? null
-              : Number(rate.branch_id),
-          appliedTo: rate.applied_to == null ? 0 : Number(rate.applied_to),
-          appliesToAll: Number(rate.applies_to_all ?? 1) === 1 ? 1 : 0,
-        });
-      }) || null
-    );
-  };
-
-  const getFeeRateDuplicateMessage = (duplicate) => {
-    const feeLabel = duplicate.fee_code
-      ? `${duplicate.fee_code} - ${duplicate.fee_name}`
-      : duplicate.fee_name || "this fee";
-
-    return `A fee rate for ${feeLabel} with the same curriculum scope, branch, and year level already exists.`;
   };
 
   const findFeeWithSortOrder = (sortOrder, excludeFeeId = null) =>
     feeCatalog.find(
-      (fee) =>
-        Number(fee.sort_order) === Number(sortOrder) &&
-        String(fee.fee_id) !== String(excludeFeeId),
+      (fee) => Number(fee.sort_order) === Number(sortOrder) && String(fee.fee_id) !== String(excludeFeeId),
     );
 
   const getSortOrderConflictMessage = (sortOrder, excludeFeeId = null) => {
     const duplicate = findFeeWithSortOrder(sortOrder, excludeFeeId);
     if (!duplicate) return null;
-
-    const feeLabel = duplicate.fee_code
-      ? `${duplicate.fee_code} - ${duplicate.fee_name}`
-      : duplicate.fee_name || "another fee";
-
+    const feeLabel = duplicate.fee_code ? `${duplicate.fee_code} - ${duplicate.fee_name}` : duplicate.fee_name || "another fee";
     return `Display order ${sortOrder} is already assigned to ${feeLabel}. Please choose a different order number.`;
   };
 
@@ -862,126 +820,26 @@ const TOSF = () => {
     return "";
   };
 
-  const resetFeeCatalogForm = () => {
-    setFeeCatalogForm(defaultFeeCatalogForm);
-  };
-
-  const closeFeeCatalogEditDialog = () => {
-    setFeeCatalogEditDialogOpen(false);
-    setFeeCatalogEditId(null);
-    setFeeCatalogEditForm(defaultFeeCatalogForm);
-  };
-
-  const resetFeeRateForm = () => {
-    setFeeRateForm(defaultFeeRateForm);
-  };
-
-  const closeFeeRateEditDialog = () => {
-    setFeeRateEditDialogOpen(false);
-    setFeeRateEditId(null);
-    setFeeRateEditForm(defaultFeeRateForm);
-  };
-
-  const createFeeCatalog = async () => {
+  const openAddFeeCatalog = () => {
     if (!canCreate) {
-      showSnackbar(
-        "You do not have permission to create items on this page",
-        "error",
-      );
+      showSnackbar("You do not have permission to create items on this page", "error");
       return;
     }
-
-    const sortOrderConflict = getSortOrderConflictMessage(
-      feeCatalogForm.sort_order,
-    );
-    const sortOrderError = validateSortOrder(feeCatalogForm.sort_order);
-    if (sortOrderError) {
-      showSnackbar(sortOrderError, "warning");
-      return;
-    }
-    if (sortOrderConflict) {
-      showSnackbar(sortOrderConflict, "warning");
-      return;
-    }
-
-    try {
-      await axios.post(
-        `${API_BASE_URL}/api/tosf/fee-catalog`,
-        feeCatalogForm,
-        permissionHeaders,
-      );
-      showSnackbar("Fee added successfully!");
-      resetFeeCatalogForm();
-      fetchDynamicFees();
-    } catch (error) {
-      console.error("Error saving fee:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error saving fee",
-        "error",
-      );
-    }
+    setFeeCatalogForm(defaultFeeCatalogForm);
+    setFeeCatalogEditMode(false);
+    setFeeCatalogEditId(null);
+    setFeeCatalogModalOpen(true);
   };
 
-  const updateFeeCatalog = async () => {
+  const openEditFeeCatalog = (fee) => {
     if (!canEdit) {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-
-    const sortOrderConflict = getSortOrderConflictMessage(
-      feeCatalogEditForm.sort_order,
-      feeCatalogEditId,
-    );
-    const sortOrderError = validateSortOrder(feeCatalogEditForm.sort_order);
-    if (sortOrderError) {
-      showSnackbar(sortOrderError, "warning");
-      return;
-    }
-    if (sortOrderConflict) {
-      showSnackbar(sortOrderConflict, "warning");
-      return;
-    }
-
-    try {
-      await axios.put(
-        `${API_BASE_URL}/api/tosf/fee-catalog/${feeCatalogEditId}`,
-        feeCatalogEditForm,
-        permissionHeaders,
-      );
-      showSnackbar("Fee updated successfully!");
-      closeFeeCatalogEditDialog();
-      fetchDynamicFees();
-    } catch (error) {
-      console.error("Error updating fee:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error updating fee",
-        "error",
-      );
-    }
-  };
-
-  const handleFeeCatalogSubmit = async (e) => {
-    e.preventDefault();
-    await createFeeCatalog();
-  };
-
-  const handleFeeCatalogEditSubmit = async (e) => {
-    e.preventDefault();
-    await updateFeeCatalog();
-  };
-
-  const handleFeeCatalogEdit = (fee) => {
-    if (!canEdit) {
-      showSnackbar("You do not have permission to edit this item", "error");
-      return;
-    }
-
-    setFeeCatalogEditForm({
+    setFeeCatalogForm({
       fee_code: fee.fee_code || "",
       fee_name: fee.fee_name || "",
-      fee_category: feeCategoryOptions.some(
-        (option) => Number(option.value) === Number(fee.fee_category),
-      )
+      fee_category: feeCategoryOptions.some((option) => Number(option.value) === Number(fee.fee_category))
         ? Number(fee.fee_category)
         : FEE_CATEGORY.OTHER,
       is_active: Number(fee.is_active ?? 1),
@@ -990,7 +848,55 @@ const TOSF = () => {
       account_type: fee.account_type ?? "",
     });
     setFeeCatalogEditId(fee.fee_id);
-    setFeeCatalogEditDialogOpen(true);
+    setFeeCatalogEditMode(true);
+    setFeeCatalogModalOpen(true);
+  };
+
+  const closeFeeCatalogModal = () => {
+    setFeeCatalogModalOpen(false);
+    setFeeCatalogEditMode(false);
+    setFeeCatalogEditId(null);
+    setFeeCatalogForm(defaultFeeCatalogForm);
+  };
+
+  const handleSaveFeeCatalog = async () => {
+    if (feeCatalogEditMode && !canEdit) {
+      showSnackbar("You do not have permission to edit this item", "error");
+      return;
+    }
+    if (!feeCatalogEditMode && !canCreate) {
+      showSnackbar("You do not have permission to create items on this page", "error");
+      return;
+    }
+
+    const sortOrderError = validateSortOrder(feeCatalogForm.sort_order);
+    if (sortOrderError) {
+      showSnackbar(sortOrderError, "warning");
+      return;
+    }
+    const sortOrderConflict = getSortOrderConflictMessage(
+      feeCatalogForm.sort_order,
+      feeCatalogEditMode ? feeCatalogEditId : null,
+    );
+    if (sortOrderConflict) {
+      showSnackbar(sortOrderConflict, "warning");
+      return;
+    }
+
+    try {
+      if (feeCatalogEditMode) {
+        await axios.put(`${API_BASE_URL}/api/tosf/fee-catalog/${feeCatalogEditId}`, feeCatalogForm, permissionHeaders);
+        showSnackbar("Fee updated successfully!");
+      } else {
+        await axios.post(`${API_BASE_URL}/api/tosf/fee-catalog`, feeCatalogForm, permissionHeaders);
+        showSnackbar("Fee added successfully!");
+      }
+      closeFeeCatalogModal();
+      fetchDynamicFees();
+    } catch (error) {
+      console.error("Error saving fee:", error);
+      showSnackbar(error.response?.data?.message || "Error saving fee", "error");
+    }
   };
 
   const handleFeeCatalogDelete = (fee) => {
@@ -1004,95 +910,49 @@ const TOSF = () => {
 
   const executeFeeCatalogDelete = async () => {
     if (!selectedFeeCatalog) return;
-
     try {
-      await axios.delete(
-        `${API_BASE_URL}/api/tosf/fee-catalog/${selectedFeeCatalog.fee_id}`,
-        permissionHeaders,
-      );
+      await axios.delete(`${API_BASE_URL}/api/tosf/fee-catalog/${selectedFeeCatalog.fee_id}`, permissionHeaders);
       showSnackbar("Fee deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
       console.error("Error deleting fee:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error deleting fee",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error deleting fee", "error");
     } finally {
       setFeeCatalogDeleteDialogOpen(false);
       setSelectedFeeCatalog(null);
     }
   };
 
-  const handleFeeGroupChange = (e) => {
-    const { name, value } = e.target;
-    setFeeGroupForm((prev) => ({ ...prev, [name]: value }));
-  };
+  // =====================================================================
+  // FEE GROUPS — handlers
+  // =====================================================================
+  const handleFeeGroupChange = (e) => setFeeGroupForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleFeeGroupEditChange = (e) => setFeeGroupEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const handleFeeGroupEditChange = (e) => {
-    const { name, value } = e.target;
-    setFeeGroupEditForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAccountTypeChange = (e) => {
-    const { name, value } = e.target;
-    setAccountTypeForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAccountTypeEditChange = (e) => {
-    const { name, value } = e.target;
-    setAccountTypeEditForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const resetFeeGroupForm = () => {
-    setFeeGroupForm(defaultFeeGroupForm);
-  };
-
+  const resetFeeGroupForm = () => setFeeGroupForm(defaultFeeGroupForm);
   const closeFeeGroupEditDialog = () => {
     setFeeGroupEditDialogOpen(false);
     setFeeGroupEditId(null);
     setFeeGroupEditForm(defaultFeeGroupForm);
   };
 
-  const resetAccountTypeForm = () => {
-    setAccountTypeForm(defaultAccountTypeForm);
-  };
-
-  const closeAccountTypeEditDialog = () => {
-    setAccountTypeEditDialogOpen(false);
-    setAccountTypeEditId(null);
-    setAccountTypeEditForm(defaultAccountTypeForm);
-  };
-
   const createFeeGroup = async () => {
     if (!canCreate) {
-      showSnackbar(
-        "You do not have permission to create items on this page",
-        "error",
-      );
+      showSnackbar("You do not have permission to create items on this page", "error");
       return;
     }
-
     if (!feeGroupForm.description.trim()) {
       showSnackbar("Fee group description is required", "warning");
       return;
     }
-
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/tosf/fee-groups`,
-        feeGroupForm,
-        permissionHeaders,
-      );
+      await axios.post(`${API_BASE_URL}/api/tosf/fee-groups`, feeGroupForm, permissionHeaders);
       showSnackbar("Fee group added successfully!");
       resetFeeGroupForm();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error saving fee group:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error saving fee group",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error saving fee group", "error");
     }
   };
 
@@ -1101,27 +961,18 @@ const TOSF = () => {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-
     if (!feeGroupEditForm.description.trim()) {
       showSnackbar("Fee group description is required", "warning");
       return;
     }
-
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/tosf/fee-groups/${feeGroupEditId}`,
-        feeGroupEditForm,
-        permissionHeaders,
-      );
+      await axios.put(`${API_BASE_URL}/api/tosf/fee-groups/${feeGroupEditId}`, feeGroupEditForm, permissionHeaders);
       showSnackbar("Fee group updated successfully!");
       closeFeeGroupEditDialog();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error updating fee group:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error updating fee group",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error updating fee group", "error");
     }
   };
 
@@ -1140,7 +991,6 @@ const TOSF = () => {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-
     setFeeGroupEditForm({ description: item.description || "" });
     setFeeGroupEditId(item.id);
     setFeeGroupEditDialogOpen(true);
@@ -1157,55 +1007,49 @@ const TOSF = () => {
 
   const executeFeeGroupDelete = async () => {
     if (!selectedFeeGroup) return;
-
     try {
-      await axios.delete(
-        `${API_BASE_URL}/api/tosf/fee-groups/${selectedFeeGroup.id}`,
-        permissionHeaders,
-      );
+      await axios.delete(`${API_BASE_URL}/api/tosf/fee-groups/${selectedFeeGroup.id}`, permissionHeaders);
       showSnackbar("Fee group deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
       console.error("Error deleting fee group:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error deleting fee group",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error deleting fee group", "error");
     } finally {
       setFeeGroupDeleteDialogOpen(false);
       setSelectedFeeGroup(null);
     }
   };
 
+  // =====================================================================
+  // FUND NUMBERS (account types) — handlers
+  // =====================================================================
+  const handleAccountTypeChange = (e) => setAccountTypeForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleAccountTypeEditChange = (e) => setAccountTypeEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const resetAccountTypeForm = () => setAccountTypeForm(defaultAccountTypeForm);
+  const closeAccountTypeEditDialog = () => {
+    setAccountTypeEditDialogOpen(false);
+    setAccountTypeEditId(null);
+    setAccountTypeEditForm(defaultAccountTypeForm);
+  };
+
   const createAccountType = async () => {
     if (!canCreate) {
-      showSnackbar(
-        "You do not have permission to create items on this page",
-        "error",
-      );
+      showSnackbar("You do not have permission to create items on this page", "error");
       return;
     }
-
     if (!accountTypeForm.description.trim()) {
       showSnackbar("Account type description is required", "warning");
       return;
     }
-
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/tosf/account-types`,
-        accountTypeForm,
-        permissionHeaders,
-      );
+      await axios.post(`${API_BASE_URL}/api/tosf/account-types`, accountTypeForm, permissionHeaders);
       showSnackbar("Account type added successfully!");
       resetAccountTypeForm();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error saving fund number:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error saving fund number",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error saving fund number", "error");
     }
   };
 
@@ -1214,27 +1058,18 @@ const TOSF = () => {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-
     if (!accountTypeEditForm.description.trim()) {
       showSnackbar("Account type description is required", "warning");
       return;
     }
-
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/tosf/account-types/${accountTypeEditId}`,
-        accountTypeEditForm,
-        permissionHeaders,
-      );
+      await axios.put(`${API_BASE_URL}/api/tosf/account-types/${accountTypeEditId}`, accountTypeEditForm, permissionHeaders);
       showSnackbar("Account type updated successfully!");
       closeAccountTypeEditDialog();
       fetchDynamicFees();
     } catch (error) {
       console.error("Error updating fund number:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error updating fund number",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error updating fund number", "error");
     }
   };
 
@@ -1253,7 +1088,6 @@ const TOSF = () => {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-
     setAccountTypeEditForm({ description: item.description || "" });
     setAccountTypeEditId(item.id);
     setAccountTypeEditDialogOpen(true);
@@ -1270,128 +1104,163 @@ const TOSF = () => {
 
   const executeAccountTypeDelete = async () => {
     if (!selectedAccountType) return;
-
     try {
-      await axios.delete(
-        `${API_BASE_URL}/api/tosf/account-types/${selectedAccountType.id}`,
-        permissionHeaders,
-      );
+      await axios.delete(`${API_BASE_URL}/api/tosf/account-types/${selectedAccountType.id}`, permissionHeaders);
       showSnackbar("Account type deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
       console.error("Error deleting fund number:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error deleting fund number",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error deleting fund number", "error");
     } finally {
       setAccountTypeDeleteDialogOpen(false);
       setSelectedAccountType(null);
     }
   };
 
-  const createFeeRate = async () => {
+  // =====================================================================
+  // FEE RATES — handlers
+  // =====================================================================
+  const getFeeCatalogItemById = (feeId) => feeCatalog.find((fee) => String(fee.fee_id) === String(feeId)) || null;
+  const isFeeRateFormForTuition = (form) => isBaseComputedTuitionFee(getFeeCatalogItemById(form.fee_id));
+
+  const handleFeeRateChange = (e) => {
+    const { name, value } = e.target;
+    setFeeRateForm((prev) => {
+      const next = {
+        ...prev,
+        [name]: ["fee_id", "applied_to", "applies_to_all", "is_active"].includes(name)
+          ? Number(value)
+          : name === "amount"
+            ? value.replace(/\D/g, "")
+            : value,
+        ...(name === "applies_to_all" && Number(value) === 1 ? { dprtmnt_curriculum_id: "" } : {}),
+      };
+      return isFeeRateFormForTuition(next) ? { ...next, amount: 0 } : next;
+    });
+  };
+
+  const normalizeFeeRateParams = (form) => {
+    const appliesToAll = Number(form.applies_to_all ?? 1) === 1 ? 1 : 0;
+    const appliedTo = form.applied_to === "" || form.applied_to == null ? 0 : Number(form.applied_to);
+    const branchId = form.branch_id === "" || form.branch_id == null ? null : Number(form.branch_id);
+    const dprtmntCurriculumId =
+      appliesToAll === 1
+        ? null
+        : form.dprtmnt_curriculum_id === "" || form.dprtmnt_curriculum_id == null
+          ? null
+          : Number(form.dprtmnt_curriculum_id);
+    const feeId = form.fee_id === "" || form.fee_id == null ? null : Number(form.fee_id);
+
+    return { feeId, dprtmntCurriculumId, branchId, appliedTo, appliesToAll };
+  };
+
+  const feeRateParamsMatch = (left, right) =>
+    left.feeId === right.feeId &&
+    left.dprtmntCurriculumId === right.dprtmntCurriculumId &&
+    left.branchId === right.branchId &&
+    left.appliedTo === right.appliedTo &&
+    left.appliesToAll === right.appliesToAll;
+
+  const findDuplicateFeeRate = (form, excludeFeeRateId = null) => {
+    const candidate = normalizeFeeRateParams(form);
+    if (!candidate.feeId) return null;
+
+    return (
+      feeRates.find((rate) => {
+        if (excludeFeeRateId && String(rate.fee_rate_id) === String(excludeFeeRateId)) return false;
+        return feeRateParamsMatch(candidate, {
+          feeId: rate.fee_id == null ? null : Number(rate.fee_id),
+          dprtmntCurriculumId:
+            Number(rate.applies_to_all ?? 1) === 1
+              ? null
+              : rate.dprtmnt_curriculum_id == null || rate.dprtmnt_curriculum_id === ""
+                ? null
+                : Number(rate.dprtmnt_curriculum_id),
+          branchId: rate.branch_id == null || rate.branch_id === "" ? null : Number(rate.branch_id),
+          appliedTo: rate.applied_to == null ? 0 : Number(rate.applied_to),
+          appliesToAll: Number(rate.applies_to_all ?? 1) === 1 ? 1 : 0,
+        });
+      }) || null
+    );
+  };
+
+  const getFeeRateDuplicateMessage = (duplicate) => {
+    const feeLabel = duplicate.fee_code ? `${duplicate.fee_code} - ${duplicate.fee_name}` : duplicate.fee_name || "this fee";
+    return `A fee rate for ${feeLabel} with the same curriculum scope, branch, and year level already exists.`;
+  };
+
+  const openAddFeeRate = () => {
     if (!canCreate) {
-      showSnackbar(
-        "You do not have permission to create items on this page",
-        "error",
-      );
+      showSnackbar("You do not have permission to create items on this page", "error");
       return;
     }
-
-    const duplicate = findDuplicateFeeRate(feeRateForm);
-    if (duplicate) {
-      showSnackbar(getFeeRateDuplicateMessage(duplicate), "error");
-      return;
-    }
-
-    try {
-      const payload = isFeeRateFormForTuition(feeRateForm)
-        ? { ...feeRateForm, amount: 0 }
-        : feeRateForm;
-      await axios.post(
-        `${API_BASE_URL}/api/tosf/fee-rates`,
-        payload,
-        permissionHeaders,
-      );
-      showSnackbar("Fee rate added successfully!");
-      resetFeeRateForm();
-      fetchDynamicFees();
-    } catch (error) {
-      console.error("Error saving fee rate:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error saving fee rate",
-        "error",
-      );
-    }
+    setFeeRateForm(defaultFeeRateForm);
+    setFeeRateEditMode(false);
+    setFeeRateEditId(null);
+    setFeeRateModalOpen(true);
   };
 
-  const updateFeeRate = async () => {
+  const openEditFeeRate = (rate) => {
     if (!canEdit) {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-
-    const duplicate = findDuplicateFeeRate(feeRateEditForm, feeRateEditId);
-    if (duplicate) {
-      showSnackbar(getFeeRateDuplicateMessage(duplicate), "error");
-      return;
-    }
-
-    try {
-      const payload = isFeeRateFormForTuition(feeRateEditForm)
-        ? { ...feeRateEditForm, amount: 0 }
-        : feeRateEditForm;
-      await axios.put(
-        `${API_BASE_URL}/api/tosf/fee-rates/${feeRateEditId}`,
-        payload,
-        permissionHeaders,
-      );
-      showSnackbar("Fee rate updated successfully!");
-      closeFeeRateEditDialog();
-      fetchDynamicFees();
-    } catch (error) {
-      console.error("Error updating fee rate:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error updating fee rate",
-        "error",
-      );
-    }
-  };
-
-  const handleFeeRateSubmit = async (e) => {
-    e.preventDefault();
-    await createFeeRate();
-  };
-
-  const handleFeeRateEditSubmit = async (e) => {
-    e.preventDefault();
-    await updateFeeRate();
-  };
-
-  const handleFeeRateEdit = (rate) => {
-    if (!canEdit) {
-      showSnackbar("You do not have permission to edit this item", "error");
-      return;
-    }
-
-    setFeeRateEditForm({
+    setFeeRateForm({
       fee_id: Number(rate.fee_id || ""),
       dprtmnt_curriculum_id: rate.dprtmnt_curriculum_id || "",
       branch_id: rate.branch_id || "",
       amount: rate.amount || "",
       applied_to:
         Number(rate.applied_to) === 0 ||
-        yearLevelOptions.some(
-          (level) => String(level.year_level_id) === String(rate.applied_to),
-        )
+        yearLevelOptions.some((level) => String(level.year_level_id) === String(rate.applied_to))
           ? Number(rate.applied_to)
           : 0,
       applies_to_all: Number(rate.applies_to_all ?? 1),
       is_active: Number(rate.is_active ?? 1),
     });
     setFeeRateEditId(rate.fee_rate_id);
-    setFeeRateEditDialogOpen(true);
+    setFeeRateEditMode(true);
+    setFeeRateModalOpen(true);
+  };
+
+  const closeFeeRateModal = () => {
+    setFeeRateModalOpen(false);
+    setFeeRateEditMode(false);
+    setFeeRateEditId(null);
+    setFeeRateForm(defaultFeeRateForm);
+  };
+
+  const handleSaveFeeRate = async () => {
+    if (feeRateEditMode && !canEdit) {
+      showSnackbar("You do not have permission to edit this item", "error");
+      return;
+    }
+    if (!feeRateEditMode && !canCreate) {
+      showSnackbar("You do not have permission to create items on this page", "error");
+      return;
+    }
+
+    const duplicate = findDuplicateFeeRate(feeRateForm, feeRateEditMode ? feeRateEditId : null);
+    if (duplicate) {
+      showSnackbar(getFeeRateDuplicateMessage(duplicate), "error");
+      return;
+    }
+
+    try {
+      const payload = isFeeRateFormForTuition(feeRateForm) ? { ...feeRateForm, amount: 0 } : feeRateForm;
+      if (feeRateEditMode) {
+        await axios.put(`${API_BASE_URL}/api/tosf/fee-rates/${feeRateEditId}`, payload, permissionHeaders);
+        showSnackbar("Fee rate updated successfully!");
+      } else {
+        await axios.post(`${API_BASE_URL}/api/tosf/fee-rates`, payload, permissionHeaders);
+        showSnackbar("Fee rate added successfully!");
+      }
+      closeFeeRateModal();
+      fetchDynamicFees();
+    } catch (error) {
+      console.error("Error saving fee rate:", error);
+      showSnackbar(error.response?.data?.message || "Error saving fee rate", "error");
+    }
   };
 
   const handleFeeRateDelete = (rate) => {
@@ -1405,68 +1274,86 @@ const TOSF = () => {
 
   const executeFeeRateDelete = async () => {
     if (!selectedFeeRate) return;
-
     try {
-      await axios.delete(
-        `${API_BASE_URL}/api/tosf/fee-rates/${selectedFeeRate.fee_rate_id}`,
-        permissionHeaders,
-      );
+      await axios.delete(`${API_BASE_URL}/api/tosf/fee-rates/${selectedFeeRate.fee_rate_id}`, permissionHeaders);
       showSnackbar("Fee rate deleted successfully!");
       fetchDynamicFees();
     } catch (error) {
       console.error("Error deleting fee rate:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error deleting fee rate",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error deleting fee rate", "error");
     } finally {
       setFeeRateDeleteDialogOpen(false);
       setSelectedFeeRate(null);
     }
   };
 
+  // =====================================================================
+  // SCHOLARSHIP TYPES — handlers
+  // =====================================================================
   const handleScholarshipChange = (e) => {
     const { name, value } = e.target;
-
     if (name === "scholarship_status") {
-      setScholarshipForm((prev) => ({
-        ...prev,
-        scholarship_status: Number(value),
-      }));
+      setScholarshipForm((prev) => ({ ...prev, scholarship_status: Number(value) }));
       return;
     }
-
-    setScholarshipForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setScholarshipForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const resetScholarshipForm = () => {
-    setScholarshipForm({
-      scholarship_code: "",
-      scholarship_name: "",
-      scholarship_status: 1,
-    });
-  };
-
-  const saveScholarshipType = async () => {
+  const openAddScholarship = () => {
     if (!canCreate) {
-      showSnackbar(
-        "You do not have permission to create items on this page",
-        "error",
-      );
+      showSnackbar("You do not have permission to create items on this page", "error");
       return;
     }
+    setScholarshipForm(defaultScholarshipForm);
+    setScholarshipEditMode(false);
+    setEditingScholarshipId(null);
+    setScholarshipModalOpen(true);
+  };
 
+  const openEditScholarship = (item) => {
+    if (!canEdit) {
+      showSnackbar("You do not have permission to edit this item", "error");
+      return;
+    }
+    setScholarshipForm({
+      scholarship_code: item.scholarship_code || "",
+      scholarship_name: item.scholarship_name || "",
+      scholarship_status: Number(item.scholarship_status ?? 1),
+    });
+    setEditingScholarshipId(item.id);
+    setScholarshipEditMode(true);
+    setScholarshipModalOpen(true);
+  };
+
+  const closeScholarshipModal = () => {
+    setScholarshipModalOpen(false);
+    setScholarshipEditMode(false);
+    setEditingScholarshipId(null);
+    setScholarshipForm(defaultScholarshipForm);
+  };
+
+  const handleSaveScholarship = async () => {
+    if (scholarshipEditMode && !canEdit) {
+      showSnackbar("You do not have permission to edit this item", "error");
+      return;
+    }
+    if (!scholarshipEditMode && !canCreate) {
+      showSnackbar("You do not have permission to create items on this page", "error");
+      return;
+    }
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/insert_scholarship_type`,
-        scholarshipForm,
-        permissionHeaders,
-      );
-      showSnackbar("Scholarship type added successfully!");
-      resetScholarshipForm();
+      if (scholarshipEditMode) {
+        await axios.put(
+          `${API_BASE_URL}/api/update_scholarship_type/${editingScholarshipId}`,
+          scholarshipForm,
+          permissionHeaders,
+        );
+        showSnackbar("Scholarship type updated successfully!");
+      } else {
+        await axios.post(`${API_BASE_URL}/api/insert_scholarship_type`, scholarshipForm, permissionHeaders);
+        showSnackbar("Scholarship type added successfully!");
+      }
+      closeScholarshipModal();
       fetchScholarshipTypes();
     } catch (error) {
       console.error("Error saving scholarship type:", error);
@@ -1474,82 +1361,33 @@ const TOSF = () => {
     }
   };
 
-  const handleScholarshipSubmit = async (e) => {
-    e.preventDefault();
-    await saveScholarshipType();
-  };
-
-  const handleScholarshipEdit = (item) => {
-    if (!canEdit) {
-      showSnackbar("You do not have permission to edit this item", "error");
+  const handleScholarshipDelete = (id) => {
+    if (!canDelete) {
+      showSnackbar("You do not have permission to delete this item", "error");
       return;
     }
-    setScholarshipEditForm({
-      scholarship_code: item.scholarship_code || "",
-      scholarship_name: item.scholarship_name || "",
-      scholarship_status: Number(item.scholarship_status ?? 1),
-    });
-    setEditingScholarshipId(item.id);
-    setScholarshipUpdateDialogOpen(true);
+    setSelectedScholarshipId(id);
+    setScholarshipDeleteDialogOpen(true);
   };
 
-  const resetScholarshipEditForm = () => {
-    setScholarshipEditForm({
-      scholarship_code: "",
-      scholarship_name: "",
-      scholarship_status: 1,
-    });
-    setEditingScholarshipId(null);
-    setScholarshipUpdateDialogOpen(false);
-  };
-
-  const saveScholarshipEdit = async () => {
-    if (!editingScholarshipId) {
-      return;
-    }
-
-    if (!canEdit) {
-      showSnackbar("You do not have permission to edit this item", "error");
-      return;
-    }
-
+  const executeScholarshipDelete = async () => {
+    if (!selectedScholarshipId) return;
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/update_scholarship_type/${editingScholarshipId}`,
-        scholarshipEditForm,
-        permissionHeaders,
-      );
-      showSnackbar("Scholarship type updated successfully!");
-      resetScholarshipEditForm();
+      await axios.delete(`${API_BASE_URL}/api/delete_scholarship_type/${selectedScholarshipId}`, permissionHeaders);
+      showSnackbar("Scholarship type deleted successfully!");
       fetchScholarshipTypes();
     } catch (error) {
-      console.error("Error updating scholarship type:", error);
-      showSnackbar("Error updating scholarship type", "error");
+      console.error("Error deleting scholarship type:", error);
+      showSnackbar("Error deleting scholarship type", "error");
+    } finally {
+      setScholarshipDeleteDialogOpen(false);
+      setSelectedScholarshipId(null);
     }
   };
 
-  const resetScholarshipRuleForm = () => {
-    const activeSchoolYear = scholarshipRuleOptions.activeSchoolYear;
-
-    setScholarshipRuleForm({
-      scholarship_id: selectedScholarshipForRules || "",
-      fee_rate_id: "",
-      discount_type: 0,
-      discount_value: "Full Discount",
-      year_level_id: 0,
-      school_year_id:
-        activeSchoolYear?.year_id == null
-          ? ""
-          : String(activeSchoolYear.year_id),
-      semester_id:
-        activeSchoolYear?.semester_id == null
-          ? ""
-          : String(activeSchoolYear.semester_id),
-      status: 1,
-    });
-    setEditingScholarshipRuleId(null);
-  };
-
+  // =====================================================================
+  // SCHOLARSHIP FEES (rules) — handlers
+  // =====================================================================
   const handleScholarshipRuleChange = (e) => {
     const { name, value } = e.target;
     if (name === "discount_type") {
@@ -1568,24 +1406,70 @@ const TOSF = () => {
     setScholarshipRuleForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const saveScholarshipRule = async () => {
-    if (editingScholarshipRuleId && !canEdit) {
+  const openAddScholarshipRule = () => {
+    if (!selectedScholarshipForRules) {
+      showSnackbar("Select a scholarship first", "warning");
+      return;
+    }
+    if (!canCreate) {
+      showSnackbar("You do not have permission to create items on this page", "error");
+      return;
+    }
+    const activeSchoolYear = scholarshipRuleOptions.activeSchoolYear;
+    setScholarshipRuleForm({
+      scholarship_id: selectedScholarshipForRules,
+      fee_rate_id: "",
+      discount_type: 0,
+      discount_value: "Full Discount",
+      year_level_id: 0,
+      school_year_id: activeSchoolYear?.year_id == null ? "" : String(activeSchoolYear.year_id),
+      semester_id: activeSchoolYear?.semester_id == null ? "" : String(activeSchoolYear.semester_id),
+      status: 1,
+    });
+    setScholarshipRuleEditMode(false);
+    setEditingScholarshipRuleId(null);
+    setScholarshipRuleModalOpen(true);
+  };
+
+  const openEditScholarshipRule = (rule) => {
+    if (!canEdit) {
       showSnackbar("You do not have permission to edit this item", "error");
       return;
     }
-    if (!editingScholarshipRuleId && !canCreate) {
-      showSnackbar(
-        "You do not have permission to create items on this page",
-        "error",
-      );
+    setEditingScholarshipRuleId(rule.id);
+    setScholarshipRuleForm({
+      scholarship_id: String(rule.scholarship_id ?? selectedScholarshipForRules ?? ""),
+      fee_rate_id: String(rule.fee_rate_id ?? ""),
+      discount_type: Number(rule.discount_type ?? 0),
+      discount_value: Number(rule.discount_type ?? 0) === 0 ? "Full Discount" : String(rule.discount_value ?? ""),
+      year_level_id: Number(rule.year_level_id ?? 0),
+      school_year_id: rule.school_year_id == null ? "" : String(rule.school_year_id),
+      semester_id: rule.semester_id == null ? "" : String(rule.semester_id),
+      status: Number(rule.status ?? 1),
+    });
+    setScholarshipRuleEditMode(true);
+    setScholarshipRuleModalOpen(true);
+  };
+
+  const closeScholarshipRuleModal = () => {
+    setScholarshipRuleModalOpen(false);
+    setScholarshipRuleEditMode(false);
+    setEditingScholarshipRuleId(null);
+  };
+
+  const saveScholarshipRule = async () => {
+    if (scholarshipRuleEditMode && !canEdit) {
+      showSnackbar("You do not have permission to edit this item", "error");
+      return;
+    }
+    if (!scholarshipRuleEditMode && !canCreate) {
+      showSnackbar("You do not have permission to create items on this page", "error");
       return;
     }
 
     try {
       const payload = {
-        scholarship_id: Number(
-          scholarshipRuleForm.scholarship_id || selectedScholarshipForRules,
-        ),
+        scholarship_id: Number(scholarshipRuleForm.scholarship_id || selectedScholarshipForRules),
         fee_rate_id: Number(scholarshipRuleForm.fee_rate_id),
         discount_type: Number(scholarshipRuleForm.discount_type),
         discount_value:
@@ -1600,7 +1484,7 @@ const TOSF = () => {
         status: Number(scholarshipRuleForm.status),
       };
 
-      if (editingScholarshipRuleId) {
+      if (scholarshipRuleEditMode && editingScholarshipRuleId) {
         await axios.put(
           `${API_BASE_URL}/api/tosf/scholarship-fees/${editingScholarshipRuleId}`,
           payload,
@@ -1608,56 +1492,29 @@ const TOSF = () => {
         );
         showSnackbar("Scholarship fee updated successfully!");
       } else {
-        await axios.post(
-          `${API_BASE_URL}/api/tosf/scholarship-fees`,
-          payload,
-          permissionHeaders,
-        );
+        await axios.post(`${API_BASE_URL}/api/tosf/scholarship-fees`, payload, permissionHeaders);
         showSnackbar("Scholarship fee added successfully!");
       }
 
-      resetScholarshipRuleForm();
+      closeScholarshipRuleModal();
       fetchScholarshipRules(selectedScholarshipForRules);
     } catch (error) {
       console.error("Error saving scholarship fee:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error saving scholarship fee",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error saving scholarship fee", "error");
     }
   };
 
-  const handleScholarshipRuleSubmit = async (e) => {
-    e.preventDefault();
-    if (editingScholarshipRuleId) {
+  const handleScholarshipRuleSave = () => {
+    if (scholarshipRuleEditMode) {
       setScholarshipRuleUpdateDialogOpen(true);
       return;
     }
-    await saveScholarshipRule();
+    saveScholarshipRule();
   };
 
-  const handleScholarshipRuleEdit = (rule) => {
-    if (!canEdit) {
-      showSnackbar("You do not have permission to edit this item", "error");
-      return;
-    }
-    setEditingScholarshipRuleId(rule.id);
-    setScholarshipRuleForm({
-      scholarship_id: String(
-        rule.scholarship_id ?? selectedScholarshipForRules ?? "",
-      ),
-      fee_rate_id: String(rule.fee_rate_id ?? ""),
-      discount_type: Number(rule.discount_type ?? 0),
-      discount_value:
-        Number(rule.discount_type ?? 0) === 0
-          ? "Full Discount"
-          : String(rule.discount_value ?? ""),
-      year_level_id: Number(rule.year_level_id ?? 0),
-      school_year_id:
-        rule.school_year_id == null ? "" : String(rule.school_year_id),
-      semester_id: rule.semester_id == null ? "" : String(rule.semester_id),
-      status: Number(rule.status ?? 1),
-    });
+  const executeScholarshipRuleUpdate = async () => {
+    setScholarshipRuleUpdateDialogOpen(false);
+    await saveScholarshipRule();
   };
 
   const handleScholarshipRuleDelete = (ruleId) => {
@@ -1672,74 +1529,22 @@ const TOSF = () => {
   const executeScholarshipRuleDelete = async () => {
     if (!selectedScholarshipRuleId) return;
     try {
-      await axios.delete(
-        `${API_BASE_URL}/api/tosf/scholarship-fees/${selectedScholarshipRuleId}`,
-        permissionHeaders,
-      );
+      await axios.delete(`${API_BASE_URL}/api/tosf/scholarship-fees/${selectedScholarshipRuleId}`, permissionHeaders);
       showSnackbar("Scholarship fee deleted successfully!");
       fetchScholarshipRules(selectedScholarshipForRules);
     } catch (error) {
       console.error("Error deleting scholarship fee:", error);
-      showSnackbar(
-        error.response?.data?.message || "Error deleting scholarship fee",
-        "error",
-      );
+      showSnackbar(error.response?.data?.message || "Error deleting scholarship fee", "error");
     } finally {
       setScholarshipRuleDeleteDialogOpen(false);
       setSelectedScholarshipRuleId(null);
     }
   };
 
-  const handleScholarshipDelete = (id) => {
-    if (!canDelete) {
-      showSnackbar("You do not have permission to delete this item", "error");
-      return;
-    }
-    setSelectedScholarshipId(id);
-    setScholarshipDeleteDialogOpen(true);
-  };
-
-  const executeScholarshipDelete = async () => {
-    if (!selectedScholarshipId) return;
-    if (!canDelete) {
-      showSnackbar("You do not have permission to delete this item", "error");
-      setScholarshipDeleteDialogOpen(false);
-      setSelectedScholarshipId(null);
-      return;
-    }
-    try {
-      await axios.delete(
-        `${API_BASE_URL}/api/delete_scholarship_type/${selectedScholarshipId}`,
-        permissionHeaders,
-      );
-      showSnackbar("Scholarship type deleted successfully!");
-      fetchScholarshipTypes();
-    } catch (error) {
-      console.error("Error deleting scholarship type:", error);
-      showSnackbar("Error deleting scholarship type", "error");
-    } finally {
-      setScholarshipDeleteDialogOpen(false);
-      setSelectedScholarshipId(null);
-    }
-  };
-
-  const executeScholarshipRuleUpdate = async () => {
-    setScholarshipRuleUpdateDialogOpen(false);
-    await saveScholarshipRule();
-  };
-
-  // ---------------------------------------------------------------------
-  // NEW: tab navigation state (purely visual — groups the six sections
-  // into three focused workspaces instead of one long page)
-  // ---------------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState(0);
-
-  // NEW: Fee Groups / Fund Numbers CRUD now lives in modals, triggered from
-  // the Fee Catalog section header, instead of taking up their own tab.
-  const [feeGroupsModalOpen, setFeeGroupsModalOpen] = useState(false);
-  const [accountTypesModalOpen, setAccountTypesModalOpen] = useState(false);
-
   // ✅ Access Guards
+  // NOTE: every hook (useState/useEffect) used by this component is declared
+  // ABOVE this point, so these early returns never change the number/order
+  // of hooks called between renders.
   if (loading || hasAccess === null) {
     return <LoadingOverlay open={loading} message="Checking Access..." />;
   }
@@ -1751,91 +1556,40 @@ const TOSF = () => {
   const showCreateActions = canCreate;
   const showActionColumn = canEdit || canDelete;
   const feeRateFormIsTuition = isFeeRateFormForTuition(feeRateForm);
-  const feeRateEditFormIsTuition = isFeeRateFormForTuition(feeRateEditForm);
+
   const getFeeCategoryLabel = (value) =>
-    feeCategoryOptions.find((option) => Number(option.value) === Number(value))
-      ?.label || "-";
+    feeCategoryOptions.find((option) => Number(option.value) === Number(value))?.label || "-";
   const getFeeGroupLabel = (fee) =>
     fee.fee_group_description ||
-    feeGroups.find((item) => String(item.id) === String(fee.fee_group))
-      ?.description ||
+    feeGroups.find((item) => String(item.id) === String(fee.fee_group))?.description ||
     "-";
   const getAccountTypeLabel = (fee) =>
     fee.account_type_description ||
-    accountTypes.find((item) => String(item.id) === String(fee.account_type))
-      ?.description ||
+    accountTypes.find((item) => String(item.id) === String(fee.account_type))?.description ||
     "-";
   const getAppliedToLabel = (value) =>
     Number(value) === 0
       ? "All Year Level"
-      : yearLevelOptions.find(
-          (level) => String(level.year_level_id) === String(value),
-        )?.year_level_description || "-";
+      : yearLevelOptions.find((level) => String(level.year_level_id) === String(value))?.year_level_description || "-";
   const getBranchLabel = (value) =>
-    branches.find((branch) => String(branch.id) === String(value))?.branch ||
-    "All Branches";
+    branches.find((branch) => String(branch.id) === String(value))?.branch || "All Branches";
   const getFeeRateOptionLabel = (rate) => {
     if (!rate) return "-";
     return `${rate.fee_code || ""}${rate.fee_code ? " - " : ""}${rate.fee_name || "Fee"}`;
   };
   const getScholarshipFeeRateLabel = (rule) => {
     if (isComputedTuitionRate(rule)) {
-      return getFeeRateOptionLabel(
-        baseComputedTuitionFee || scholarshipFeeRateOptions[0],
-      );
+      return getFeeRateOptionLabel(baseComputedTuitionFee || scholarshipFeeRateOptions[0]);
     }
-    const rate = feeRates.find(
-      (item) => String(item.fee_rate_id) === String(rule.fee_rate_id),
-    );
-    if (rate) {
-      return getFeeRateOptionLabel(rate);
-    }
+    const rate = feeRates.find((item) => String(item.fee_rate_id) === String(rule.fee_rate_id));
+    if (rate) return getFeeRateOptionLabel(rate);
     return rule.fee_name || rule.fee_code || rule.fee_rate_id || "-";
   };
   const getScholarshipYearLevelLabel = (value) =>
     Number(value) === 0
       ? "All Year Level"
-      : scholarshipRuleOptions.yearLevels.find(
-          (level) => String(level.year_level_id) === String(value),
-        )?.year_level_description ||
-        value ||
-        "-";
-  const getScholarshipSchoolYearLabel = (value) => {
-    const schoolYear = scholarshipRuleOptions.schoolYears.find(
-      (item) => String(item.year_id) === String(value),
-    );
-    return formatScholarshipAcademicYear(schoolYear) || value || "-";
-  };
-  const getScholarshipSemesterLabel = (value) =>
-    scholarshipRuleOptions.semesters.find(
-      (item) => String(item.semester_id) === String(value),
-    )?.semester_description ||
-    value ||
-    "-";
-  const getScholarshipDiscountDisplayLabel = (rule) => {
-    const type = Number(rule?.discount_type ?? 0);
-    const value = rule?.discount_value;
-
-    if (
-      type === 0 ||
-      value == null ||
-      value === "" ||
-      value === "Full Discount"
-    ) {
-      return "Full Discount";
-    }
-
-    const normalizedValue = Number(value);
-    if (!Number.isFinite(normalizedValue)) {
-      return String(value);
-    }
-
-    if (type === 1) {
-      return `${normalizedValue}%`;
-    }
-
-    return `${normalizedValue.toLocaleString()}`;
-  };
+      : scholarshipRuleOptions.yearLevels.find((level) => String(level.year_level_id) === String(value))
+          ?.year_level_description || value || "-";
   const formatScholarshipAcademicYear = (year) => {
     if (!year) return "";
     if (typeof year === "object") {
@@ -1845,103 +1599,98 @@ const TOSF = () => {
       return formatScholarshipAcademicYear(year.year_description);
     }
     if (typeof year === "string" && year.includes("-")) return year;
-
     const startYear = Number(year);
     if (Number.isNaN(startYear)) return "";
-
     return `${startYear} - ${startYear + 1}`;
   };
+  const getScholarshipSchoolYearLabel = (value) => {
+    const schoolYear = scholarshipRuleOptions.schoolYears.find((item) => String(item.year_id) === String(value));
+    return formatScholarshipAcademicYear(schoolYear) || value || "-";
+  };
+  const getScholarshipSemesterLabel = (value) =>
+    scholarshipRuleOptions.semesters.find((item) => String(item.semester_id) === String(value))?.semester_description ||
+    value ||
+    "-";
+  const getScholarshipDiscountDisplayLabel = (rule) => {
+    const type = Number(rule?.discount_type ?? 0);
+    const value = rule?.discount_value;
+    if (type === 0 || value == null || value === "" || value === "Full Discount") return "Full Discount";
+    const normalizedValue = Number(value);
+    if (!Number.isFinite(normalizedValue)) return String(value);
+    if (type === 1) return `${normalizedValue}%`;
+    return `${normalizedValue.toLocaleString()}`;
+  };
 
-  const headerColor = colors.header || "#1976d2";
-  const verificationDialogPaperSx = {
-    borderRadius: "16px",
-    overflow: "hidden",
-    boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
-  };
-  const verificationDialogTitleSx = {
-    bgcolor: headerColor,
-    color: "white",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    fontWeight: "bold",
-    px: 3,
-    py: 2,
-  };
-  const verificationDialogCloseSx = {
-    color: "white",
-    border: "2px solid rgba(255,255,255,0.6)",
-    borderRadius: "50%",
-    width: 38,
-    height: 38,
-    padding: 0,
-    "&:hover": {
-      backgroundColor: "rgba(255,255,255,0.2)",
-      border: "2px solid white",
-    },
-  };
+  // =====================================================================
+  // Filtering + pagination (mirrors Department Registration's search/page)
+  // =====================================================================
+  const filteredFeeCatalog = feeCatalog.filter((fee) => {
+    const q = searchFeeCatalog.toLowerCase();
+    return (
+      fee.fee_code?.toLowerCase().includes(q) ||
+      fee.fee_name?.toLowerCase().includes(q) ||
+      getFeeCategoryLabel(fee.fee_category).toLowerCase().includes(q)
+    );
+  });
+  const feeCatalogTotalPages = Math.ceil(filteredFeeCatalog.length / itemsPerPage) || 1;
+  const feeCatalogIndexLast = feeCatalogPage * itemsPerPage;
+  const feeCatalogIndexFirst = feeCatalogIndexLast - itemsPerPage;
+  const currentFeeCatalog = filteredFeeCatalog.slice(feeCatalogIndexFirst, feeCatalogIndexLast);
+
+  const filteredFeeRates = feeRates.filter((rate) => {
+    const q = searchFeeRates.toLowerCase();
+    return (
+      rate.fee_code?.toLowerCase().includes(q) ||
+      rate.fee_name?.toLowerCase().includes(q) ||
+      getBranchLabel(rate.branch_id).toLowerCase().includes(q)
+    );
+  });
+  const feeRateTotalPages = Math.ceil(filteredFeeRates.length / itemsPerPage) || 1;
+  const feeRateIndexLast = feeRatePage * itemsPerPage;
+  const feeRateIndexFirst = feeRateIndexLast - itemsPerPage;
+  const currentFeeRates = filteredFeeRates.slice(feeRateIndexFirst, feeRateIndexLast);
+
+  const filteredScholarshipTypes = scholarshipTypes.filter((item) => {
+    const q = searchScholarshipTypes.toLowerCase();
+    return (
+      item.scholarship_code?.toLowerCase().includes(q) || item.scholarship_name?.toLowerCase().includes(q)
+    );
+  });
+  const scholarshipTypeTotalPages = Math.ceil(filteredScholarshipTypes.length / itemsPerPage) || 1;
+  const scholarshipTypeIndexLast = scholarshipTypePage * itemsPerPage;
+  const scholarshipTypeIndexFirst = scholarshipTypeIndexLast - itemsPerPage;
+  const currentScholarshipTypes = filteredScholarshipTypes.slice(scholarshipTypeIndexFirst, scholarshipTypeIndexLast);
+
+  const scholarshipRuleTotalPages = Math.ceil(scholarshipRules.length / itemsPerPage) || 1;
+  const scholarshipRuleIndexLast = scholarshipRulePage * itemsPerPage;
+  const scholarshipRuleIndexFirst = scholarshipRuleIndexLast - itemsPerPage;
+  const currentScholarshipRules = scholarshipRules.slice(scholarshipRuleIndexFirst, scholarshipRuleIndexLast);
 
   return (
-    <Box
-      sx={{
-        height: "calc(100vh - 150px)",
-        overflowY: "auto",
-        backgroundColor: "transparent",
-        mt: 1,
-        p: { xs: 1.5, md: 2.5 },
-      }}
-    >
-      {/* Page header */}
-      <Typography
-        variant="h4"
-        sx={{
-          fontWeight: "bold",
-          color: titleColor,
-          fontSize: "36px",
-        }}
-      >
+    <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
+      <Typography variant="h4" sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}>
         TUITION FEE MANAGEMENT
       </Typography>
       <br />
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-
       <br />
 
-      {/* Tab navigation — replaces the long single-page stack of six sections */}
       <Tabs
         value={activeTab}
         onChange={(_, val) => setActiveTab(val)}
         variant="scrollable"
         scrollButtons="auto"
         sx={{
-          mb: 3,
+          mb: 2,
           minHeight: 40,
-          borderBottom: "1px solid #eef0f3",
-          "& .MuiTab-root": {
-            textTransform: "none",
-            fontWeight: 600,
-            fontSize: "0.9rem",
-            minHeight: 40,
-            gap: 0.75,
-          },
+          borderBottom: "1px solid #ccc",
+          "& .MuiTab-root": { textTransform: "none", fontWeight: 700, fontSize: "0.95rem", minHeight: 40 },
           "& .Mui-selected": { color: `${headerColor} !important` },
-          "& .MuiTabs-indicator": {
-            backgroundColor: headerColor,
-            height: 3,
-            borderRadius: "3px 3px 0 0",
-          },
+          "& .MuiTabs-indicator": { backgroundColor: headerColor, height: 3 },
         }}
       >
-        <Tab
-          icon={<ReceiptLongIcon fontSize="small" />}
-          iconPosition="start"
-          label="Fees & Rates"
-        />
-        <Tab
-          icon={<SchoolIcon fontSize="small" />}
-          iconPosition="start"
-          label="Scholarships"
-        />
+        <Tab label="Fees & Rates" />
+        <Tab label="Scholarships" />
       </Tabs>
 
       {/* ================================================================ */}
@@ -1949,1702 +1698,1126 @@ const TOSF = () => {
       {/* ================================================================ */}
       {activeTab === 0 && (
         <Box>
-          <Card sx={cardSx(borderColor)}>
-            <SectionHeading
-              icon={<ReceiptLongIcon />}
-              title="Fee Catalog"
-              subtitle="Define the fees available for assignment (tuition, misc, and other charges)."
-              accentColor={headerColor}
-              actions={
-                <>
-                  <Button
-                    onClick={() => setFeeGroupsModalOpen(true)}
-                    variant="outlined"
-                    size="small"
-                    startIcon={<CategoryIcon fontSize="small" />}
-                    sx={{
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      borderColor: `${headerColor}55`,
-                      color: headerColor,
-                    }}
-                  >
-                    Fee Groups
-                  </Button>
-                  <Button
-                    onClick={() => setAccountTypesModalOpen(true)}
-                    variant="outlined"
-                    size="small"
-                    startIcon={<AccountBalanceIcon fontSize="small" />}
-                    sx={{
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      borderColor: `${headerColor}55`,
-                      color: headerColor,
-                    }}
-                  >
-                    Fund Numbers
-                  </Button>
-                </>
-              }
-            />
-            <form onSubmit={handleFeeCatalogSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={4} md={3}>
-                  <Typography sx={fieldLabelSx}>FEE CODE</Typography>
-                  <TextField
-                    name="fee_code"
-                    value={feeCatalogForm.fee_code}
-                    onChange={handleFeeCatalogChange}
-                    size="small"
-                    fullWidth
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={8} md={5}>
-                  <Typography sx={fieldLabelSx}>FEE NAME</Typography>
-                  <TextField
-                    name="fee_name"
-                    value={feeCatalogForm.fee_name}
-                    onChange={handleFeeCatalogChange}
-                    size="small"
-                    fullWidth
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4} md={2}>
-                  <Typography sx={fieldLabelSx}>CATEGORY</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="fee_category"
-                    value={feeCatalogForm.fee_category}
-                    onChange={handleFeeCatalogChange}
-                    size="small"
-                    fullWidth
-                  >
-                    {feeCategoryOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={6} sm={4} md={1}>
-                  <Typography sx={fieldLabelSx}>ORDER</Typography>
-                  <TextField
-                    name="sort_order"
-                    type="number"
-                    value={feeCatalogForm.sort_order}
-                    onChange={handleFeeCatalogChange}
-                    size="small"
-                    fullWidth
-                    inputProps={{ min: 1, step: 1 }}
-                  />
-                </Grid>
-                <Grid item xs={6} sm={4} md={1}>
-                  <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="is_active"
-                    value={feeCatalogForm.is_active}
-                    onChange={handleFeeCatalogChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={1}>Active</option>
-                    <option value={0}>Inactive</option>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Typography sx={fieldLabelSx}>FEE GROUP</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="fee_group"
-                    value={feeCatalogForm.fee_group}
-                    onChange={handleFeeCatalogChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value="">Select Fee Group</option>
-                    {feeGroups.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.description}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Typography sx={fieldLabelSx}>FUND NUMBER</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="account_type"
-                    value={feeCatalogForm.account_type}
-                    onChange={handleFeeCatalogChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value="">Select Fund Number</option>
-                    {accountTypes.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.description}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-              </Grid>
+          <SectionHeader
+            titleColor={titleColor}
+            title="Fee Catalog"
+            search={searchFeeCatalog}
+            onSearchChange={setSearchFeeCatalog}
+            placeholder="Search Fee Code / Name / Category"
+            extra={
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setFeeGroupsModalOpen(true)}
+                  sx={{ textTransform: "none", borderRadius: "8px", borderColor: headerColor, color: headerColor }}
+                >
+                  Fee Groups
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setAccountTypesModalOpen(true)}
+                  sx={{ textTransform: "none", borderRadius: "8px", borderColor: headerColor, color: headerColor }}
+                >
+                  Fund Numbers
+                </Button>
+              </>
+            }
+          />
 
-              <Box sx={{ mt: 2, textAlign: "right" }}>
-                {showCreateActions && (
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    startIcon={<SaveIcon fontSize="small" />}
-                    sx={{
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      backgroundColor: headerColor,
-                    }}
-                  >
-                    Save Fee
-                  </Button>
-                )}
-              </Box>
-            </form>
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Fee Records: ${filteredFeeCatalog.length}`}
+            currentPage={feeCatalogPage}
+            totalPages={feeCatalogTotalPages}
+            onPageChange={setFeeCatalogPage}
+            showAddButton={showCreateActions}
+            addButtonLabel="+ Add Fee"
+            onAdd={openAddFeeCatalog}
+          />
 
-            <Divider sx={{ my: 3 }} />
-
-            <CleanTable
-              headers={[
-                "Order",
-                "Code",
-                "Name",
-                "Category",
-                "Fee Group",
-                "Fund Number",
-                "Status",
-                "Rates",
-                "Actions",
-              ]}
+          <Box sx={{ mt: 1, mb: 3 }}>
+            <PlainTable
+              headers={["#", "Order", "Code", "Name", "Category", "Fee Group", "Fund Number", "Status", "Rates", "Actions"]}
               showActionColumn={showActionColumn}
-              headerColor={headerColor}
+              borderColor={borderColor}
               emptyMessage="No dynamic fees found."
+              colSpanOverride={showActionColumn ? 10 : 9}
             >
-              {feeCatalog.map((fee) => (
+              {currentFeeCatalog.map((fee, index) => (
                 <TableRow key={fee.fee_id}>
-                  <TableCell>{fee.sort_order}</TableCell>
-                  <TableCell>{fee.fee_code}</TableCell>
-                  <TableCell>{fee.fee_name}</TableCell>
-                  <TableCell>{getFeeCategoryLabel(fee.fee_category)}</TableCell>
-                  <TableCell>{getFeeGroupLabel(fee)}</TableCell>
-                  <TableCell>{getAccountTypeLabel(fee)}</TableCell>
-                  <TableCell>
-                    <StatusChip active={Number(fee.is_active) === 1} />
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {feeCatalogIndexFirst + index + 1}
                   </TableCell>
-                  <TableCell>{fee.rate_count || 0}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{fee.sort_order}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{fee.fee_code}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{fee.fee_name}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {getFeeCategoryLabel(fee.fee_category)}
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{getFeeGroupLabel(fee)}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{getAccountTypeLabel(fee)}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    <Typography
+                      component="span"
+                      sx={{ fontWeight: 700, color: Number(fee.is_active) === 1 ? "green" : "#9E0000" }}
+                    >
+                      {Number(fee.is_active) === 1 ? "Active" : "Inactive"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{fee.rate_count || 0}</TableCell>
                   {showActionColumn && (
-                    <TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", width: "250px" }}>
                       <RowActions
                         canEdit={canEdit}
                         canDelete={canDelete}
-                        onEdit={() => handleFeeCatalogEdit(fee)}
+                        onEdit={() => openEditFeeCatalog(fee)}
                         onDelete={() => handleFeeCatalogDelete(fee)}
                       />
                     </TableCell>
                   )}
                 </TableRow>
               ))}
-            </CleanTable>
-          </Card>
+            </PlainTable>
+          </Box>
 
-          <Card sx={cardSx(borderColor)}>
-            <SectionHeading
-              icon={<PriceChangeIcon />}
-              title="Fee Rates"
-              subtitle="Set the amount a fee charges per branch, curriculum scope, and year level."
-              accentColor={headerColor}
-            />
-            <form onSubmit={handleFeeRateSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Typography sx={fieldLabelSx}>FEE</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="fee_id"
-                    value={feeRateForm.fee_id}
-                    onChange={handleFeeRateChange}
-                    size="small"
-                    fullWidth
-                    required
-                  >
-                    <option value="">Select Fee</option>
-                    {feeCatalog.map((fee) => (
-                      <option key={fee.fee_id} value={fee.fee_id}>
-                        {fee.fee_code} - {fee.fee_name}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={6} sm={3} md={2}>
-                  <Typography sx={fieldLabelSx}>AMOUNT</Typography>
-                  <TextField
-                    name="amount"
-                    type="number"
-                    value={feeRateFormIsTuition ? 0 : feeRateForm.amount}
-                    onChange={handleFeeRateChange}
-                    size="small"
-                    fullWidth
-                    required={!feeRateFormIsTuition}
-                    disabled={feeRateFormIsTuition}
-                    helperText={
-                      feeRateFormIsTuition
-                        ? "Computed from enrolled subjects"
-                        : ""
-                    }
-                    inputProps={{
-                      inputMode: "numeric",
-                      pattern: "[0-9]*",
-                      step: 1,
-                      min: 0,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={6} sm={3} md={3}>
-                  <Typography sx={fieldLabelSx}>YEAR LEVEL</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="applied_to"
-                    value={feeRateForm.applied_to}
-                    onChange={handleFeeRateChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={0}>All Year Level</option>
-                    {yearLevelOptions.map((level) => (
-                      <option
-                        key={level.year_level_id}
-                        value={level.year_level_id}
-                      >
-                        {level.year_level_description}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography sx={fieldLabelSx}>BRANCH</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="branch_id"
-                    value={feeRateForm.branch_id}
-                    onChange={handleFeeRateChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value="">All Branches</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.branch}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Fee Records: ${filteredFeeCatalog.length}`}
+            currentPage={feeCatalogPage}
+            totalPages={feeCatalogTotalPages}
+            onPageChange={setFeeCatalogPage}
+            showAddButton={false}
+          />
 
-                <Grid item xs={6} sm={4} md={3}>
-                  <Typography sx={fieldLabelSx}>SCOPE</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="applies_to_all"
-                    value={feeRateForm.applies_to_all}
-                    onChange={handleFeeRateChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={1}>All Curricula</option>
-                    <option value={0}>Specific Curriculum</option>
-                  </TextField>
-                </Grid>
-                {Number(feeRateForm.applies_to_all) === 0 && (
-                  <Grid item xs={12} sm={8} md={6}>
-                    <Typography sx={fieldLabelSx}>
-                      DEPARTMENT CURRICULUM
-                    </Typography>
-                    <TextField
-                      select
-                      SelectProps={{ native: true }}
-                      name="dprtmnt_curriculum_id"
-                      value={feeRateForm.dprtmnt_curriculum_id}
-                      onChange={handleFeeRateChange}
-                      size="small"
-                      fullWidth
-                      required
-                    >
-                      <option value="">Select Curriculum</option>
-                      {curriculumOptions.map((item) => (
-                        <option
-                          key={item.dprtmnt_curriculum_id}
-                          value={item.dprtmnt_curriculum_id}
-                        >
-                          {item.dprtmnt_name} - ({item.program_code}){" "}
-                          {item.program_description} {item.major || ""} -{" "}
-                          {item.year_description}
-                        </option>
-                      ))}
-                    </TextField>
-                  </Grid>
-                )}
-                <Grid item xs={6} sm={4} md={3}>
-                  <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="is_active"
-                    value={feeRateForm.is_active}
-                    onChange={handleFeeRateChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={1}>Active</option>
-                    <option value={0}>Inactive</option>
-                  </TextField>
-                </Grid>
-              </Grid>
+          <SectionHeader
+            titleColor={titleColor}
+            title="Fee Rates"
+            search={searchFeeRates}
+            onSearchChange={setSearchFeeRates}
+            placeholder="Search Fee / Branch"
+          />
 
-              <Box sx={{ mt: 2, textAlign: "right" }}>
-                {showCreateActions && (
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    startIcon={<SaveIcon fontSize="small" />}
-                    sx={{
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      backgroundColor: headerColor,
-                    }}
-                  >
-                    Add Rate
-                  </Button>
-                )}
-              </Box>
-            </form>
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Rate Records: ${filteredFeeRates.length}`}
+            currentPage={feeRatePage}
+            totalPages={feeRateTotalPages}
+            onPageChange={setFeeRatePage}
+            showAddButton={showCreateActions}
+            addButtonLabel="+ Add Rate"
+            onAdd={openAddFeeRate}
+          />
 
-            <Divider sx={{ my: 3 }} />
-
-            <CleanTable
-              headers={[
-                "ID",
-                "Fee",
-                "Amount",
-                "Year Level",
-                "Scope / Department Curriculum",
-                "Branch",
-                "Status",
-                "Actions",
-              ]}
+          <Box sx={{ mt: 1, mb: 3 }}>
+            <PlainTable
+              headers={["#", "Fee", "Amount", "Year Level", "Scope / Department Curriculum", "Branch", "Status", "Actions"]}
               showActionColumn={showActionColumn}
-              headerColor={headerColor}
+              borderColor={borderColor}
               emptyMessage="No fee rates found."
+              colSpanOverride={showActionColumn ? 8 : 7}
             >
-              {feeRates.map((rate, index) => (
+              {currentFeeRates.map((rate, index) => (
                 <TableRow key={rate.fee_rate_id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {feeRateIndexFirst + index + 1}
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                     {rate.fee_code} - {rate.fee_name}
                   </TableCell>
-                  <TableCell>
-                    {isBaseComputedTuitionFee(rate)
-                      ? "Computed from subjects"
-                      : Number(rate.amount || 0).toLocaleString()}
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {isBaseComputedTuitionFee(rate) ? "Computed from subjects" : Number(rate.amount || 0).toLocaleString()}
                   </TableCell>
-                  <TableCell>{getAppliedToLabel(rate.applied_to)}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {getAppliedToLabel(rate.applied_to)}
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                     {Number(rate.applies_to_all) === 1
                       ? "All Curricula"
                       : `${rate.dprtmnt_name || ""} - ${rate.program_code || ""} ${rate.year_description || ""}`}
                   </TableCell>
-                  <TableCell>{getBranchLabel(rate.branch_id)}</TableCell>
-                  <TableCell>
-                    <StatusChip active={Number(rate.is_active) === 1} />
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {getBranchLabel(rate.branch_id)}
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    <Typography
+                      component="span"
+                      sx={{ fontWeight: 700, color: Number(rate.is_active) === 1 ? "green" : "#9E0000" }}
+                    >
+                      {Number(rate.is_active) === 1 ? "Active" : "Inactive"}
+                    </Typography>
                   </TableCell>
                   {showActionColumn && (
-                    <TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", width: "250px" }}>
                       <RowActions
                         canEdit={canEdit}
                         canDelete={canDelete}
-                        onEdit={() => handleFeeRateEdit(rate)}
+                        onEdit={() => openEditFeeRate(rate)}
                         onDelete={() => handleFeeRateDelete(rate)}
                       />
                     </TableCell>
                   )}
                 </TableRow>
               ))}
-            </CleanTable>
-          </Card>
+            </PlainTable>
+          </Box>
+
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Rate Records: ${filteredFeeRates.length}`}
+            currentPage={feeRatePage}
+            totalPages={feeRateTotalPages}
+            onPageChange={setFeeRatePage}
+            showAddButton={false}
+          />
         </Box>
       )}
 
       {/* ================================================================ */}
-      {/* TAB 1 — SCHOLARSHIP TYPES + RULES                                 */}
+      {/* TAB 1 — SCHOLARSHIP TYPES + SCHOLARSHIP FEES                     */}
       {/* ================================================================ */}
       {activeTab === 1 && (
         <Box>
-          <Card sx={cardSx(borderColor)}>
-            <SectionHeading
-              icon={<SchoolIcon />}
-              title="Scholarship Types"
-              subtitle="Define the scholarships available to students."
-              accentColor={headerColor}
-            />
-            <form onSubmit={handleScholarshipSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={4}>
-                  <Typography sx={fieldLabelSx}>SCHOLARSHIP CODE</Typography>
-                  <TextField
-                    name="scholarship_code"
-                    value={scholarshipForm.scholarship_code}
-                    onChange={handleScholarshipChange}
-                    size="small"
-                    required
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Typography sx={fieldLabelSx}>SCHOLARSHIP NAME</Typography>
-                  <TextField
-                    name="scholarship_name"
-                    value={scholarshipForm.scholarship_name}
-                    onChange={handleScholarshipChange}
-                    size="small"
-                    required
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="scholarship_status"
-                    value={scholarshipForm.scholarship_status}
-                    onChange={handleScholarshipChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={1}>Active</option>
-                    <option value={0}>Inactive</option>
-                  </TextField>
-                </Grid>
-              </Grid>
+          <SectionHeader
+            titleColor={titleColor}
+            title="Scholarship Types"
+            search={searchScholarshipTypes}
+            onSearchChange={setSearchScholarshipTypes}
+            placeholder="Search Scholarship Code / Name"
+          />
 
-              <Box sx={{ mt: 2, textAlign: "right" }}>
-                {showCreateActions && (
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    sx={{
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      backgroundColor: headerColor,
-                    }}
-                  >
-                    <>
-                      <SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save
-                    </>
-                  </Button>
-                )}
-              </Box>
-            </form>
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Scholarship Records: ${filteredScholarshipTypes.length}`}
+            currentPage={scholarshipTypePage}
+            totalPages={scholarshipTypeTotalPages}
+            onPageChange={setScholarshipTypePage}
+            showAddButton={showCreateActions}
+            addButtonLabel="+ Add Scholarship"
+            onAdd={openAddScholarship}
+          />
 
-            <Divider sx={{ my: 3 }} />
-
-            <CleanTable
-              headers={[
-                "#",
-                "Scholarship Code",
-                "Scholarship Name",
-                "Status",
-                "Created At",
-                "Actions",
-              ]}
+          <Box sx={{ mt: 1, mb: 3 }}>
+            <PlainTable
+              headers={["#", "Scholarship Code", "Scholarship Name", "Status", "Created At", "Actions"]}
               showActionColumn={showActionColumn}
-              headerColor={headerColor}
+              borderColor={borderColor}
               emptyMessage="No scholarship types found."
+              colSpanOverride={showActionColumn ? 6 : 5}
             >
-              {scholarshipTypes.map((item, index) => (
+              {currentScholarshipTypes.map((item, index) => (
                 <TableRow key={item.id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{item.scholarship_code || "-"}</TableCell>
-                  <TableCell>{item.scholarship_name}</TableCell>
-                  <TableCell>
-                    <StatusChip
-                      active={Number(item.scholarship_status) === 1}
-                    />
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {scholarshipTypeIndexFirst + index + 1}
                   </TableCell>
-                  <TableCell>
-                    {item.created_at
-                      ? new Date(
-                          Number(item.created_at) * 1000,
-                        ).toLocaleString()
-                      : "-"}
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {item.scholarship_code || "-"}
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {item.scholarship_name}
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    <Typography
+                      component="span"
+                      sx={{ fontWeight: 700, color: Number(item.scholarship_status) === 1 ? "green" : "#9E0000" }}
+                    >
+                      {Number(item.scholarship_status) === 1 ? "Active" : "Inactive"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                    {item.created_at ? new Date(Number(item.created_at) * 1000).toLocaleString() : "-"}
                   </TableCell>
                   {showActionColumn && (
-                    <TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", width: "250px" }}>
                       <RowActions
                         canEdit={canEdit}
                         canDelete={canDelete}
-                        onEdit={() => handleScholarshipEdit(item)}
+                        onEdit={() => openEditScholarship(item)}
                         onDelete={() => handleScholarshipDelete(item.id)}
                       />
                     </TableCell>
                   )}
                 </TableRow>
               ))}
-            </CleanTable>
-          </Card>
+            </PlainTable>
+          </Box>
 
-          <Card sx={cardSx(borderColor)}>
-            <SectionHeading
-              icon={<RuleIcon />}
-              title="Scholarship Fees"
-              subtitle="Assign scholarship discounts to fee rates by year level, school year, and semester."
-              accentColor={headerColor}
-            />
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Scholarship Records: ${filteredScholarshipTypes.length}`}
+            currentPage={scholarshipTypePage}
+            totalPages={scholarshipTypeTotalPages}
+            onPageChange={setScholarshipTypePage}
+            showAddButton={false}
+          />
 
-            <Box
-              sx={{
-                mb: 2.5,
-                p: 2,
-                borderRadius: "10px",
-                backgroundColor: "#f6f8fa",
-                border: "1px solid #eef0f3",
-              }}
-            >
-              <Grid container spacing={2} alignItems="flex-end">
-                <Grid item xs={12} md={6}>
-                  <Typography sx={fieldLabelSx}>
-                    STEP 1 · SELECT SCHOLARSHIP
-                  </Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    value={selectedScholarshipForRules}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setSelectedScholarshipForRules(next);
-                      setScholarshipRuleForm((prev) => ({
-                        ...prev,
-                        scholarship_id: next,
-                      }));
-                      setEditingScholarshipRuleId(null);
-                      fetchScholarshipRules(next);
-                    }}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value="">-- Select --</option>
-                    {scholarshipTypes.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.scholarship_code ? `${s.scholarship_code} - ` : ""}
-                        {s.scholarship_name}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography
-                    sx={{ fontSize: "0.78rem", color: "text.secondary" }}
-                  >
-                    Choose a scholarship above, then assign the fee rate it
-                    discounts.
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Box>
+          <SectionHeader
+            titleColor={titleColor}
+            title="Scholarship Fees"
+            extra={
+              <FormControl size="small" sx={{ minWidth: 320 }}>
+                <Select
+                  value={selectedScholarshipForRules}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSelectedScholarshipForRules(next);
+                    fetchScholarshipRules(next);
+                  }}
+                  displayEmpty
+                  size="small"
+                >
+                  <MenuItem value="">
+                    <em>-- Select a Scholarship --</em>
+                  </MenuItem>
+                  {scholarshipTypes.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.scholarship_code ? `${s.scholarship_code} - ` : ""}
+                      {s.scholarship_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            }
+          />
 
-            <form onSubmit={handleScholarshipRuleSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <Typography sx={fieldLabelSx}>FEE RATE</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="fee_rate_id"
-                    value={scholarshipRuleForm.fee_rate_id}
-                    onChange={handleScholarshipRuleChange}
-                    size="small"
-                    fullWidth
-                    required
-                  >
-                    <option value="">Select Fee Rate</option>
-                    {scholarshipFeeRateOptions.map((rate) => (
-                      <option
-                        key={`${isComputedTuitionRate(rate) ? "computed" : "rate"}-${rate.fee_rate_id}`}
-                        value={rate.fee_rate_id}
-                      >
-                        {getFeeRateOptionLabel(rate)}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography sx={fieldLabelSx}>DISCOUNT TYPE</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="discount_type"
-                    value={scholarshipRuleForm.discount_type}
-                    onChange={handleScholarshipRuleChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={0}>Full Discount</option>
-                    <option value={1}>Percentage</option>
-                    <option value={2}>Number</option>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography sx={fieldLabelSx}>DISCOUNT VALUE</Typography>
-                  <TextField
-                    name="discount_value"
-                    type="text"
-                    value={scholarshipRuleForm.discount_value}
-                    onChange={handleScholarshipRuleChange}
-                    size="small"
-                    fullWidth
-                    disabled={Number(scholarshipRuleForm.discount_type) === 0}
-                    required={Number(scholarshipRuleForm.discount_type) !== 0}
-                    placeholder={
-                      Number(scholarshipRuleForm.discount_type) === 0
-                        ? "Full Discount"
-                        : ""
-                    }
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <Typography sx={fieldLabelSx}>STATUS</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="status"
-                    value={scholarshipRuleForm.status}
-                    onChange={handleScholarshipRuleChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={1}>Active</option>
-                    <option value={0}>Inactive</option>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <Typography sx={fieldLabelSx}>YEAR LEVEL</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="year_level_id"
-                    value={scholarshipRuleForm.year_level_id}
-                    onChange={handleScholarshipRuleChange}
-                    size="small"
-                    fullWidth
-                  >
-                    <option value={0}>All</option>
-                    {scholarshipRuleOptions.yearLevels.map((yl) => (
-                      <option key={yl.year_level_id} value={yl.year_level_id}>
-                        {yl.year_level_description}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={6}>
-                  <Typography sx={fieldLabelSx}>SCHOOL YEAR</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="school_year_id"
-                    value={scholarshipRuleForm.school_year_id}
-                    onChange={handleScholarshipRuleChange}
-                    size="small"
-                    fullWidth
-                    required
-                  >
-                    <option value="">Select School Year</option>
-                    {scholarshipRuleOptions.schoolYears.map((sy) => (
-                      <option key={sy.year_id} value={sy.year_id}>
-                        {formatScholarshipAcademicYear(sy) || sy.year_id}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6} md={6}>
-                  <Typography sx={fieldLabelSx}>SEMESTER</Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="semester_id"
-                    value={scholarshipRuleForm.semester_id}
-                    onChange={handleScholarshipRuleChange}
-                    size="small"
-                    fullWidth
-                    required
-                  >
-                    <option value="">Select Semester</option>
-                    {scholarshipRuleOptions.semesters.map((sem) => (
-                      <option key={sem.semester_id} value={sem.semester_id}>
-                        {sem.semester_description}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-              </Grid>
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Scholarship Fee Records: ${scholarshipRules.length}`}
+            currentPage={scholarshipRulePage}
+            totalPages={scholarshipRuleTotalPages}
+            onPageChange={setScholarshipRulePage}
+            showAddButton={showCreateActions}
+            addButtonLabel="+ Add Scholarship Fee"
+            onAdd={openAddScholarshipRule}
+          />
 
-              <Box sx={{ mt: 2, textAlign: "right" }}>
-                {(showCreateActions ||
-                  (editingScholarshipRuleId && canEdit)) && (
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    sx={{
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      backgroundColor: headerColor,
-                    }}
-                  >
-                    {editingScholarshipRuleId ? (
-                      "Update Fee"
-                    ) : (
-                      <>
-                        <SaveIcon fontSize="small" sx={{ mr: 0.5 }} /> Save
-                      </>
-                    )}
-                  </Button>
-                )}
-                {editingScholarshipRuleId && (
-                  <Button
-                    onClick={resetScholarshipRuleForm}
-                    color="error"
-                    variant="outlined"
-                    startIcon={<CloseIcon fontSize="small" />}
-                    sx={{ ml: 2, textTransform: "none", borderRadius: "8px" }}
-                  >
-                    Cancel
-                  </Button>
-                )}
-              </Box>
-            </form>
-
-            <Divider sx={{ my: 3 }} />
-
-            <CleanTable
-              headers={[
-                "#",
-                "Fee Rate",
-                "Discount",
-                "Year Level",
-                "School Year",
-                "Semester",
-                "Status",
-                "Actions",
-              ]}
-              showActionColumn={showActionColumn}
-              headerColor={headerColor}
-              emptyMessage={
-                selectedScholarshipForRules
-                  ? "No scholarship fees found."
-                  : "Select a scholarship to manage fees."
-              }
-              colSpanOverride={showActionColumn ? 8 : 7}
-            >
-              {selectedScholarshipForRules &&
-                scholarshipRules.map((rule, index) => (
+          <Box sx={{ mt: 1, mb: 3 }}>
+            {!selectedScholarshipForRules ? (
+              <PlainTable
+                headers={["#", "Fee Rate", "Discount", "Year Level", "School Year", "Semester", "Status", "Actions"]}
+                showActionColumn={showActionColumn}
+                borderColor={borderColor}
+                emptyMessage="Select a scholarship to manage fees."
+                colSpanOverride={showActionColumn ? 8 : 7}
+              />
+            ) : (
+              <PlainTable
+                headers={["#", "Fee Rate", "Discount", "Year Level", "School Year", "Semester", "Status", "Actions"]}
+                showActionColumn={showActionColumn}
+                borderColor={borderColor}
+                emptyMessage="No scholarship fees found."
+                colSpanOverride={showActionColumn ? 8 : 7}
+              >
+                {currentScholarshipRules.map((rule, index) => (
                   <TableRow key={rule.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{getScholarshipFeeRateLabel(rule)}</TableCell>
-                    <TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                      {scholarshipRuleIndexFirst + index + 1}
+                    </TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                      {getScholarshipFeeRateLabel(rule)}
+                    </TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                       {getScholarshipDiscountDisplayLabel(rule)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                       {getScholarshipYearLevelLabel(rule.year_level_id)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                       {getScholarshipSchoolYearLabel(rule.school_year_id)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
                       {getScholarshipSemesterLabel(rule.semester_id)}
                     </TableCell>
-                    <TableCell>
-                      <StatusChip active={Number(rule.status) === 1} />
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>
+                      <Typography
+                        component="span"
+                        sx={{ fontWeight: 700, color: Number(rule.status) === 1 ? "green" : "#9E0000" }}
+                      >
+                        {Number(rule.status) === 1 ? "Active" : "Inactive"}
+                      </Typography>
                     </TableCell>
                     {showActionColumn && (
-                      <TableCell>
+                      <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", width: "250px" }}>
                         <RowActions
                           canEdit={canEdit}
                           canDelete={canDelete}
-                          onEdit={() => handleScholarshipRuleEdit(rule)}
+                          onEdit={() => openEditScholarshipRule(rule)}
                           onDelete={() => handleScholarshipRuleDelete(rule.id)}
                         />
                       </TableCell>
                     )}
                   </TableRow>
                 ))}
-            </CleanTable>
-          </Card>
+              </PlainTable>
+            )}
+          </Box>
+
+          <PaginationBar
+            headerColor={headerColor}
+            borderColor={borderColor}
+            totalLabel={`Total Scholarship Fee Records: ${scholarshipRules.length}`}
+            currentPage={scholarshipRulePage}
+            totalPages={scholarshipRuleTotalPages}
+            onPageChange={setScholarshipRulePage}
+            showAddButton={false}
+          />
         </Box>
       )}
 
       {/* ================================================================ */}
-      {/* DIALOGS (unchanged logic, lightly restyled)                       */}
+      {/* MODALS — Add / Edit (Department Registration style)              */}
       {/* ================================================================ */}
 
-      {/* Fee Groups — CRUD modal, opened from the Fee Catalog header */}
+      {/* Fee Catalog — Add / Edit */}
+      <Dialog
+        open={feeCatalogModalOpen}
+        onClose={closeFeeCatalogModal}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
+      >
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          {feeCatalogEditMode ? "Edit Fee" : "Add New Fee"}
+          <IconButton onClick={closeFeeCatalogModal} sx={{ color: "white" }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Fee Code:</Typography>
+                <TextField
+                  name="fee_code"
+                  value={feeCatalogForm.fee_code}
+                  onChange={handleFeeCatalogChange}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Fee Name:</Typography>
+                <TextField
+                  name="fee_name"
+                  value={feeCatalogForm.fee_name}
+                  onChange={handleFeeCatalogChange}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography fontWeight="bold" mb={1}>Category:</Typography>
+                <Select
+                  name="fee_category"
+                  value={feeCatalogForm.fee_category}
+                  onChange={handleFeeCatalogChange}
+                  fullWidth
+                >
+                  {feeCategoryOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={6} sm={4}>
+                <Typography fontWeight="bold" mb={1}>Display Order:</Typography>
+                <TextField
+                  name="sort_order"
+                  type="number"
+                  value={feeCatalogForm.sort_order}
+                  onChange={handleFeeCatalogChange}
+                  fullWidth
+                  inputProps={{ min: 1, step: 1 }}
+                />
+              </Grid>
+              <Grid item xs={6} sm={4}>
+                <Typography fontWeight="bold" mb={1}>Status:</Typography>
+                <Select name="is_active" value={feeCatalogForm.is_active} onChange={handleFeeCatalogChange} fullWidth>
+                  <MenuItem value={1}>Active</MenuItem>
+                  <MenuItem value={0}>Inactive</MenuItem>
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Fee Group:</Typography>
+                <Select name="fee_group" value={feeCatalogForm.fee_group} onChange={handleFeeCatalogChange} displayEmpty fullWidth>
+                  <MenuItem value="">
+                    <em>Select a fee group</em>
+                  </MenuItem>
+                  {feeGroups.map((item) => (
+                    <MenuItem key={item.id} value={item.id}>
+                      {item.description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Fund Number:</Typography>
+                <Select
+                  name="account_type"
+                  value={feeCatalogForm.account_type}
+                  onChange={handleFeeCatalogChange}
+                  displayEmpty
+                  fullWidth
+                >
+                  <MenuItem value="">
+                    <em>Select a fund number</em>
+                  </MenuItem>
+                  {accountTypes.map((item) => (
+                    <MenuItem key={item.id} value={item.id}>
+                      {item.description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button color="error" variant="outlined" sx={{ textTransform: "none", fontWeight: 600 }} onClick={closeFeeCatalogModal}>
+            Cancel
+          </Button>
+          <Button variant="contained" sx={{ px: 4, fontWeight: 600, textTransform: "none" }} onClick={handleSaveFeeCatalog}>
+            <SaveIcon fontSize="small" style={{ marginRight: 6 }} />
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Fee Rate — Add / Edit */}
+      <Dialog
+        open={feeRateModalOpen}
+        onClose={closeFeeRateModal}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
+      >
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          {feeRateEditMode ? "Edit Fee Rate" : "Add New Fee Rate"}
+          <IconButton onClick={closeFeeRateModal} sx={{ color: "white" }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Fee:</Typography>
+                <Select name="fee_id" value={feeRateForm.fee_id} onChange={handleFeeRateChange} displayEmpty fullWidth required>
+                  <MenuItem value="">
+                    <em>Select a fee</em>
+                  </MenuItem>
+                  {feeCatalog.map((fee) => (
+                    <MenuItem key={fee.fee_id} value={fee.fee_id}>
+                      {fee.fee_code} - {fee.fee_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Amount:</Typography>
+                <TextField
+                  name="amount"
+                  type="number"
+                  value={feeRateFormIsTuition ? 0 : feeRateForm.amount}
+                  onChange={handleFeeRateChange}
+                  fullWidth
+                  required={!feeRateFormIsTuition}
+                  disabled={feeRateFormIsTuition}
+                  helperText={feeRateFormIsTuition ? "Computed from enrolled subjects" : ""}
+                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*", step: 1, min: 0 }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Year Level:</Typography>
+                <Select name="applied_to" value={feeRateForm.applied_to} onChange={handleFeeRateChange} fullWidth>
+                  <MenuItem value={0}>All Year Level</MenuItem>
+                  {yearLevelOptions.map((level) => (
+                    <MenuItem key={level.year_level_id} value={level.year_level_id}>
+                      {level.year_level_description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Branch:</Typography>
+                <Select name="branch_id" value={feeRateForm.branch_id} onChange={handleFeeRateChange} displayEmpty fullWidth>
+                  <MenuItem value="">All Branches</MenuItem>
+                  {branches.map((branch) => (
+                    <MenuItem key={branch.id} value={branch.id}>
+                      {branch.branch}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Scope:</Typography>
+                <Select name="applies_to_all" value={feeRateForm.applies_to_all} onChange={handleFeeRateChange} fullWidth>
+                  <MenuItem value={1}>All Curricula</MenuItem>
+                  <MenuItem value={0}>Specific Curriculum</MenuItem>
+                </Select>
+              </Grid>
+              {Number(feeRateForm.applies_to_all) === 0 && (
+                <Grid item xs={12}>
+                  <Typography fontWeight="bold" mb={1}>Department Curriculum:</Typography>
+                  <Select
+                    name="dprtmnt_curriculum_id"
+                    value={feeRateForm.dprtmnt_curriculum_id}
+                    onChange={handleFeeRateChange}
+                    displayEmpty
+                    fullWidth
+                    required
+                  >
+                    <MenuItem value="">
+                      <em>Select curriculum</em>
+                    </MenuItem>
+                    {curriculumOptions.map((item) => (
+                      <MenuItem key={item.dprtmnt_curriculum_id} value={item.dprtmnt_curriculum_id}>
+                        {item.dprtmnt_name} - ({item.program_code}) {item.program_description} {item.major || ""} -{" "}
+                        {item.year_description}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Grid>
+              )}
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Status:</Typography>
+                <Select name="is_active" value={feeRateForm.is_active} onChange={handleFeeRateChange} fullWidth>
+                  <MenuItem value={1}>Active</MenuItem>
+                  <MenuItem value={0}>Inactive</MenuItem>
+                </Select>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button color="error" variant="outlined" sx={{ textTransform: "none", fontWeight: 600 }} onClick={closeFeeRateModal}>
+            Cancel
+          </Button>
+          <Button variant="contained" sx={{ px: 4, fontWeight: 600, textTransform: "none" }} onClick={handleSaveFeeRate}>
+            <SaveIcon fontSize="small" style={{ marginRight: 6 }} />
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Scholarship Type — Add / Edit */}
+      <Dialog
+        open={scholarshipModalOpen}
+        onClose={closeScholarshipModal}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
+      >
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          {scholarshipEditMode ? "Edit Scholarship Type" : "Add New Scholarship Type"}
+          <IconButton onClick={closeScholarshipModal} sx={{ color: "white" }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <Typography fontWeight="bold">Scholarship Code:</Typography>
+            <TextField name="scholarship_code" value={scholarshipForm.scholarship_code} onChange={handleScholarshipChange} fullWidth required />
+
+            <Typography fontWeight="bold">Scholarship Name:</Typography>
+            <TextField name="scholarship_name" value={scholarshipForm.scholarship_name} onChange={handleScholarshipChange} fullWidth required />
+
+            <Typography fontWeight="bold">Status:</Typography>
+            <Select name="scholarship_status" value={scholarshipForm.scholarship_status} onChange={handleScholarshipChange} fullWidth>
+              <MenuItem value={1}>Active</MenuItem>
+              <MenuItem value={0}>Inactive</MenuItem>
+            </Select>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button color="error" variant="outlined" sx={{ textTransform: "none", fontWeight: 600 }} onClick={closeScholarshipModal}>
+            Cancel
+          </Button>
+          <Button variant="contained" sx={{ px: 4, fontWeight: 600, textTransform: "none" }} onClick={handleSaveScholarship}>
+            <SaveIcon fontSize="small" style={{ marginRight: 6 }} />
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Scholarship Fee (rule) — Add / Edit */}
+      <Dialog
+        open={scholarshipRuleModalOpen}
+        onClose={closeScholarshipRuleModal}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
+      >
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          {scholarshipRuleEditMode ? "Edit Scholarship Fee" : "Add New Scholarship Fee"}
+          <IconButton onClick={closeScholarshipRuleModal} sx={{ color: "white" }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Fee Rate:</Typography>
+                <Select
+                  name="fee_rate_id"
+                  value={scholarshipRuleForm.fee_rate_id}
+                  onChange={handleScholarshipRuleChange}
+                  displayEmpty
+                  fullWidth
+                  required
+                >
+                  <MenuItem value="">
+                    <em>Select fee rate</em>
+                  </MenuItem>
+                  {scholarshipFeeRateOptions.map((rate) => (
+                    <MenuItem
+                      key={`${isComputedTuitionRate(rate) ? "computed" : "rate"}-${rate.fee_rate_id}`}
+                      value={rate.fee_rate_id}
+                    >
+                      {getFeeRateOptionLabel(rate)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <Typography fontWeight="bold" mb={1}>Discount Type:</Typography>
+                <Select
+                  name="discount_type"
+                  value={scholarshipRuleForm.discount_type}
+                  onChange={handleScholarshipRuleChange}
+                  fullWidth
+                >
+                  <MenuItem value={0}>Full Discount</MenuItem>
+                  <MenuItem value={1}>Percentage</MenuItem>
+                  <MenuItem value={2}>Number</MenuItem>
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <Typography fontWeight="bold" mb={1}>Discount Value:</Typography>
+                <TextField
+                  name="discount_value"
+                  type="text"
+                  value={scholarshipRuleForm.discount_value}
+                  onChange={handleScholarshipRuleChange}
+                  fullWidth
+                  disabled={Number(scholarshipRuleForm.discount_type) === 0}
+                  required={Number(scholarshipRuleForm.discount_type) !== 0}
+                  placeholder={Number(scholarshipRuleForm.discount_type) === 0 ? "Full Discount" : ""}
+                  inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography fontWeight="bold" mb={1}>Year Level:</Typography>
+                <Select
+                  name="year_level_id"
+                  value={scholarshipRuleForm.year_level_id}
+                  onChange={handleScholarshipRuleChange}
+                  fullWidth
+                >
+                  <MenuItem value={0}>All</MenuItem>
+                  {scholarshipRuleOptions.yearLevels.map((yl) => (
+                    <MenuItem key={yl.year_level_id} value={yl.year_level_id}>
+                      {yl.year_level_description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography fontWeight="bold" mb={1}>School Year:</Typography>
+                <Select
+                  name="school_year_id"
+                  value={scholarshipRuleForm.school_year_id}
+                  onChange={handleScholarshipRuleChange}
+                  displayEmpty
+                  fullWidth
+                  required
+                >
+                  <MenuItem value="">
+                    <em>Select school year</em>
+                  </MenuItem>
+                  {scholarshipRuleOptions.schoolYears.map((sy) => (
+                    <MenuItem key={sy.year_id} value={sy.year_id}>
+                      {formatScholarshipAcademicYear(sy) || sy.year_id}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography fontWeight="bold" mb={1}>Semester:</Typography>
+                <Select
+                  name="semester_id"
+                  value={scholarshipRuleForm.semester_id}
+                  onChange={handleScholarshipRuleChange}
+                  displayEmpty
+                  fullWidth
+                  required
+                >
+                  <MenuItem value="">
+                    <em>Select semester</em>
+                  </MenuItem>
+                  {scholarshipRuleOptions.semesters.map((sem) => (
+                    <MenuItem key={sem.semester_id} value={sem.semester_id}>
+                      {sem.semester_description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography fontWeight="bold" mb={1}>Status:</Typography>
+                <Select name="status" value={scholarshipRuleForm.status} onChange={handleScholarshipRuleChange} fullWidth>
+                  <MenuItem value={1}>Active</MenuItem>
+                  <MenuItem value={0}>Inactive</MenuItem>
+                </Select>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button color="error" variant="outlined" sx={{ textTransform: "none", fontWeight: 600 }} onClick={closeScholarshipRuleModal}>
+            Cancel
+          </Button>
+          <Button variant="contained" sx={{ px: 4, fontWeight: 600, textTransform: "none" }} onClick={handleScholarshipRuleSave}>
+            <SaveIcon fontSize="small" style={{ marginRight: 6 }} />
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm scholarship-fee update */}
+      <Dialog
+        open={scholarshipRuleUpdateDialogOpen}
+        onClose={() => setScholarshipRuleUpdateDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
+      >
+        <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+          Confirm Update
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Typography>Do you want to save the updated scholarship fee?</Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button color="error" variant="outlined" onClick={() => setScholarshipRuleUpdateDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button color="primary" variant="contained" onClick={executeScholarshipRuleUpdate}>
+            Yes, Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Fee Groups modal (nested small CRUD) */}
       <Dialog
         open={feeGroupsModalOpen}
         onClose={() => setFeeGroupsModalOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 460 },
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <CategoryIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Fee Groups
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                Group fees together for reporting and display
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={() => setFeeGroupsModalOpen(false)}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          Fee Groups
+          <IconButton onClick={() => setFeeGroupsModalOpen(false)} sx={{ color: "white" }}>
+            <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+        <DialogContent sx={{ p: 3 }}>
           <form onSubmit={handleFeeGroupSubmit}>
-            <Typography
-              sx={{
-                fontWeight: 600,
-                fontSize: "0.72rem",
-                letterSpacing: "0.04em",
-                color: "text.secondary",
-                mb: 0.5,
-                pt: 2.5,
-              }}
-            >
-              DESCRIPTION
-            </Typography>
-            <Stack direction="row" spacing={1.5}>
+            <Typography fontWeight="bold" mb={1}>Description:</Typography>
+            <Box sx={{ display: "flex", gap: 1.5 }}>
               <TextField
                 name="description"
                 value={feeGroupForm.description}
                 onChange={handleFeeGroupChange}
-                size="small"
                 fullWidth
                 required
                 inputProps={{ maxLength: 60 }}
               />
               {showCreateActions && (
-                <Button
-                  type="submit"
-                  variant="contained"
-                  sx={{
-                    textTransform: "none",
-                    borderRadius: "8px",
-                    backgroundColor: headerColor,
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <Button type="submit" variant="contained" sx={{ whiteSpace: "nowrap" }}>
                   <SaveIcon fontSize="small" />
                 </Button>
               )}
-            </Stack>
+            </Box>
           </form>
 
-          <Divider sx={{ my: 3 }} />
-
-          <CleanTable
-            headers={["#", "Description", "Actions"]}
-            showActionColumn={showActionColumn}
-            headerColor={headerColor}
-            emptyMessage="No fee groups found."
-          >
-            {feeGroups.map((item, index) => (
-              <TableRow key={item.id}>
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{item.description}</TableCell>
-                {showActionColumn && (
-                  <TableCell>
-                    <RowActions
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                      onEdit={() => handleFeeGroupEdit(item)}
-                      onDelete={() => handleFeeGroupDelete(item)}
-                    />
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </CleanTable>
+          <Box sx={{ mt: 3 }}>
+            <PlainTable
+              headers={["#", "Description", "Actions"]}
+              showActionColumn={showActionColumn}
+              borderColor={borderColor}
+              emptyMessage="No fee groups found."
+            >
+              {feeGroups.map((item, index) => (
+                <TableRow key={item.id}>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{index + 1}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{item.description}</TableCell>
+                  {showActionColumn && (
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", width: "250px" }}>
+                      <RowActions
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        onEdit={() => handleFeeGroupEdit(item)}
+                        onDelete={() => handleFeeGroupDelete(item)}
+                      />
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </PlainTable>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
-          <Button
-            onClick={() => setFeeGroupsModalOpen(false)}
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
-          >
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button variant="outlined" onClick={() => setFeeGroupsModalOpen(false)} sx={{ textTransform: "none" }}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Fund Numbers — CRUD modal, opened from the Fee Catalog header */}
+      {/* Fund Numbers modal (nested small CRUD) */}
       <Dialog
         open={accountTypesModalOpen}
         onClose={() => setAccountTypesModalOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 460 },
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <AccountBalanceIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Fund Numbers
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                Classify fees by the fund number they post to
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={() => setAccountTypesModalOpen(false)}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          Fund Numbers
+          <IconButton onClick={() => setAccountTypesModalOpen(false)} sx={{ color: "white" }}>
+            <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+        <DialogContent sx={{ p: 3 }}>
           <form onSubmit={handleAccountTypeSubmit}>
-            <Typography
-              sx={{
-                fontWeight: 600,
-                fontSize: "0.72rem",
-                letterSpacing: "0.04em",
-                color: "text.secondary",
-                mb: 0.5,
-                pt: 2.5,
-              }}
-            >
-              DESCRIPTION
-            </Typography>
-            <Stack direction="row" spacing={1.5}>
+            <Typography fontWeight="bold" mb={1}>Description:</Typography>
+            <Box sx={{ display: "flex", gap: 1.5 }}>
               <TextField
                 name="description"
                 value={accountTypeForm.description}
                 onChange={handleAccountTypeChange}
-                size="small"
                 fullWidth
                 required
                 inputProps={{ maxLength: 60 }}
               />
               {showCreateActions && (
-                <Button
-                  type="submit"
-                  variant="contained"
-                  sx={{
-                    textTransform: "none",
-                    borderRadius: "8px",
-                    backgroundColor: headerColor,
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <Button type="submit" variant="contained" sx={{ whiteSpace: "nowrap" }}>
                   <SaveIcon fontSize="small" />
                 </Button>
               )}
-            </Stack>
+            </Box>
           </form>
 
-          <Divider sx={{ my: 3 }} />
-
-          <CleanTable
-            headers={["#", "Description", "Actions"]}
-            showActionColumn={showActionColumn}
-            headerColor={headerColor}
-            emptyMessage="No fund numbers found."
-          >
-            {accountTypes.map((item, index) => (
-              <TableRow key={item.id}>
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{item.description}</TableCell>
-                {showActionColumn && (
-                  <TableCell>
-                    <RowActions
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                      onEdit={() => handleAccountTypeEdit(item)}
-                      onDelete={() => handleAccountTypeDelete(item)}
-                    />
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </CleanTable>
+          <Box sx={{ mt: 3 }}>
+            <PlainTable
+              headers={["#", "Description", "Actions"]}
+              showActionColumn={showActionColumn}
+              borderColor={borderColor}
+              emptyMessage="No fund numbers found."
+            >
+              {accountTypes.map((item, index) => (
+                <TableRow key={item.id}>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{index + 1}</TableCell>
+                  <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center" }}>{item.description}</TableCell>
+                  {showActionColumn && (
+                    <TableCell sx={{ border: `1px solid ${borderColor}`, textAlign: "center", width: "250px" }}>
+                      <RowActions
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        onEdit={() => handleAccountTypeEdit(item)}
+                        onDelete={() => handleAccountTypeDelete(item)}
+                      />
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </PlainTable>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5 }}>
-          <Button
-            onClick={() => setAccountTypesModalOpen(false)}
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
-          >
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button variant="outlined" onClick={() => setAccountTypesModalOpen(false)} sx={{ textTransform: "none" }}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={feeCatalogEditDialogOpen}
-        onClose={closeFeeCatalogEditDialog}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", md: 860 },
-          },
-        }}
-      >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <EditIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Edit Fee
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                Update the selected fee catalog entry
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={closeFeeCatalogEditDialog}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <form onSubmit={handleFeeCatalogEditSubmit}>
-          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Grid container spacing={2} sx={{ mt: 0.5 }}>
-              <Grid item xs={12} md={4}>
-                <Typography sx={fieldLabelSx}>FEE CODE</Typography>
-                <TextField
-                  name="fee_code"
-                  value={feeCatalogEditForm.fee_code}
-                  onChange={handleFeeCatalogEditChange}
-                  size="small"
-                  fullWidth
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={8}>
-                <Typography sx={fieldLabelSx}>FEE NAME</Typography>
-                <TextField
-                  name="fee_name"
-                  value={feeCatalogEditForm.fee_name}
-                  onChange={handleFeeCatalogEditChange}
-                  size="small"
-                  fullWidth
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Typography sx={fieldLabelSx}>CATEGORY</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="fee_category"
-                  value={feeCatalogEditForm.fee_category}
-                  onChange={handleFeeCatalogEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  {feeCategoryOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Typography sx={fieldLabelSx}>FEE GROUP</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="fee_group"
-                  value={feeCatalogEditForm.fee_group}
-                  onChange={handleFeeCatalogEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  <option value="">Select Fee Group</option>
-                  {feeGroups.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.description}
-                    </option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Typography sx={fieldLabelSx}>FUND NUMBER</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="account_type"
-                  value={feeCatalogEditForm.account_type}
-                  onChange={handleFeeCatalogEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  <option value="">Select Fund Number</option>
-                  {accountTypes.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.description}
-                    </option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>ORDER</Typography>
-                <TextField
-                  name="sort_order"
-                  type="number"
-                  value={feeCatalogEditForm.sort_order}
-                  onChange={handleFeeCatalogEditChange}
-                  size="small"
-                  fullWidth
-                  inputProps={{ min: 1, step: 1 }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>STATUS</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="is_active"
-                  value={feeCatalogEditForm.is_active}
-                  onChange={handleFeeCatalogEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  <option value={1}>Active</option>
-                  <option value={0}>Inactive</option>
-                </TextField>
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button
-              onClick={closeFeeCatalogEditDialog}
-              color="error"
-              variant="outlined"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="warning"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
-              Update Fee
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-
+      {/* Fee Group — Edit */}
       <Dialog
         open={feeGroupEditDialogOpen}
         onClose={closeFeeGroupEditDialog}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 460 },
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <CategoryIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Edit Fee Group
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                Update the selected fee group
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={closeFeeGroupEditDialog}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          Edit Fee Group
+          <IconButton onClick={closeFeeGroupEditDialog} sx={{ color: "white" }}>
+            <CloseIcon />
           </IconButton>
         </DialogTitle>
         <form onSubmit={handleFeeGroupEditSubmit}>
-          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography fontWeight="bold" mb={1}>Description:</Typography>
             <TextField
               name="description"
               value={feeGroupEditForm.description}
               onChange={handleFeeGroupEditChange}
-              size="small"
               fullWidth
               required
               inputProps={{ maxLength: 60 }}
             />
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button
-              onClick={closeFeeGroupEditDialog}
-              color="error"
-              variant="outlined"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
+          <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+            <Button color="error" variant="outlined" onClick={closeFeeGroupEditDialog}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="warning"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
-              Update Fee Group
+            <Button type="submit" variant="contained">
+              <SaveIcon fontSize="small" style={{ marginRight: 6 }} />
+              Save
             </Button>
           </DialogActions>
         </form>
       </Dialog>
 
+      {/* Fund Number — Edit */}
       <Dialog
         open={accountTypeEditDialogOpen}
         onClose={closeAccountTypeEditDialog}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 460 },
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <AccountBalanceIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Edit Fund Number
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                Update the selected fund number
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={closeAccountTypeEditDialog}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
+        <DialogTitle
+          sx={{
+            background: headerColor,
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1.1rem",
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          Edit Fund Number
+          <IconButton onClick={closeAccountTypeEditDialog} sx={{ color: "white" }}>
+            <CloseIcon />
           </IconButton>
         </DialogTitle>
         <form onSubmit={handleAccountTypeEditSubmit}>
-          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Typography sx={fieldLabelSx}>DESCRIPTION</Typography>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography fontWeight="bold" mb={1}>Description:</Typography>
             <TextField
               name="description"
               value={accountTypeEditForm.description}
               onChange={handleAccountTypeEditChange}
-              size="small"
               fullWidth
               required
               inputProps={{ maxLength: 60 }}
             />
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button
-              onClick={closeAccountTypeEditDialog}
-              color="error"
-              variant="outlined"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
+          <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+            <Button color="error" variant="outlined" onClick={closeAccountTypeEditDialog}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="warning"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
-              Update Fund Number
+            <Button type="submit" variant="contained">
+              <SaveIcon fontSize="small" style={{ marginRight: 6 }} />
+              Save
             </Button>
           </DialogActions>
         </form>
       </Dialog>
 
-      <Dialog
-        open={feeRateEditDialogOpen}
-        onClose={closeFeeRateEditDialog}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", md: 860 },
-          },
-        }}
-      >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <PriceChangeIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Edit Fee Rate
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                Update the selected fee rate details
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={closeFeeRateEditDialog}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <form onSubmit={handleFeeRateEditSubmit}>
-          <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-            <Grid container spacing={2} sx={{ mt: 0.5 }}>
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>FEE</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="fee_id"
-                  value={feeRateEditForm.fee_id}
-                  onChange={handleFeeRateEditChange}
-                  size="small"
-                  fullWidth
-                  required
-                >
-                  <option value="">Select Fee</option>
-                  {feeCatalog.map((fee) => (
-                    <option key={fee.fee_id} value={fee.fee_id}>
-                      {fee.fee_code} - {fee.fee_name}
-                    </option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>AMOUNT</Typography>
-                <TextField
-                  name="amount"
-                  type="number"
-                  value={feeRateEditFormIsTuition ? 0 : feeRateEditForm.amount}
-                  onChange={handleFeeRateEditChange}
-                  size="small"
-                  fullWidth
-                  required={!feeRateEditFormIsTuition}
-                  disabled={feeRateEditFormIsTuition}
-                  helperText={
-                    feeRateEditFormIsTuition
-                      ? "Computed from enrolled subjects"
-                      : ""
-                  }
-                  inputProps={{
-                    inputMode: "numeric",
-                    pattern: "[0-9]*",
-                    step: 1,
-                    min: 0,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>YEAR LEVEL</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="applied_to"
-                  value={feeRateEditForm.applied_to}
-                  onChange={handleFeeRateEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  <option value={0}>All Year Level</option>
-                  {yearLevelOptions.map((level) => (
-                    <option
-                      key={level.year_level_id}
-                      value={level.year_level_id}
-                    >
-                      {level.year_level_description}
-                    </option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>SCOPE</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="applies_to_all"
-                  value={feeRateEditForm.applies_to_all}
-                  onChange={handleFeeRateEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  <option value={1}>All Curricula</option>
-                  <option value={0}>Specific Curriculum</option>
-                </TextField>
-              </Grid>
-              {Number(feeRateEditForm.applies_to_all) === 0 && (
-                <Grid item xs={12}>
-                  <Typography sx={fieldLabelSx}>
-                    DEPARTMENT CURRICULUM
-                  </Typography>
-                  <TextField
-                    select
-                    SelectProps={{ native: true }}
-                    name="dprtmnt_curriculum_id"
-                    value={feeRateEditForm.dprtmnt_curriculum_id}
-                    onChange={handleFeeRateEditChange}
-                    size="small"
-                    fullWidth
-                    required
-                  >
-                    <option value="">Select Curriculum</option>
-                    {curriculumOptions.map((item) => (
-                      <option
-                        key={item.dprtmnt_curriculum_id}
-                        value={item.dprtmnt_curriculum_id}
-                      >
-                        {item.dprtmnt_name} - ({item.program_code}){" "}
-                        {item.program_description} {item.major || ""} -{" "}
-                        {item.year_description}
-                      </option>
-                    ))}
-                  </TextField>
-                </Grid>
-              )}
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>BRANCH</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="branch_id"
-                  value={feeRateEditForm.branch_id}
-                  onChange={handleFeeRateEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  <option value="">All Branches</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.branch}
-                    </option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography sx={fieldLabelSx}>STATUS</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="is_active"
-                  value={feeRateEditForm.is_active}
-                  onChange={handleFeeRateEditChange}
-                  size="small"
-                  fullWidth
-                >
-                  <option value={1}>Active</option>
-                  <option value={0}>Inactive</option>
-                </TextField>
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-            <Button
-              onClick={closeFeeRateEditDialog}
-              color="error"
-              variant="outlined"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="warning"
-              sx={{ textTransform: "none", borderRadius: "8px" }}
-            >
-              Update Rate
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
+      {/* ================================================================ */}
+      {/* DELETE CONFIRMATIONS (Department Registration style)             */}
+      {/* ================================================================ */}
 
       <Dialog
         open={feeCatalogDeleteDialogOpen}
@@ -3654,264 +2827,32 @@ const TOSF = () => {
         }}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 460 },
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <DeleteIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Delete Fee
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                This action cannot be undone
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
+        <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+          Delete Fee
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Typography sx={{ mb: 2 }}>
+            Are you sure you want to delete <b>{selectedFeeCatalog?.fee_name || "this fee"}</b>?
+          </Typography>
+          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>
+            Deleting this fee will permanently remove it, and all fee rate records connected to it will also be deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+          <Button
+            color="error"
+            variant="outlined"
             onClick={() => {
               setFeeCatalogDeleteDialogOpen(false);
               setSelectedFeeCatalog(null);
             }}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText
-            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
-          >
-            Are you sure you want to delete{" "}
-            {selectedFeeCatalog?.fee_name || "this fee"}? This is dangerous
-            because all rate records connected to this fee will also be deleted.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-          <Button
-            onClick={() => {
-              setFeeCatalogDeleteDialogOpen(false);
-              setSelectedFeeCatalog(null);
-            }}
-            color="error"
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
           >
             Cancel
           </Button>
-          <Button
-            onClick={executeFeeCatalogDelete}
-            color="error"
-            sx={{ textTransform: "none" }}
-          >
-            Delete Fee
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={feeGroupDeleteDialogOpen}
-        onClose={() => {
-          setFeeGroupDeleteDialogOpen(false);
-          setSelectedFeeGroup(null);
-        }}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 420 },
-          },
-        }}
-      >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <DeleteIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Delete Fee Group
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                This action cannot be undone
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={() => {
-              setFeeGroupDeleteDialogOpen(false);
-              setSelectedFeeGroup(null);
-            }}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText
-            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
-          >
-            Are you sure you want to delete{" "}
-            {selectedFeeGroup?.description || "this fee group"}? This action
-            cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-          <Button
-            onClick={() => {
-              setFeeGroupDeleteDialogOpen(false);
-              setSelectedFeeGroup(null);
-            }}
-            color="error"
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={executeFeeGroupDelete}
-            color="error"
-            sx={{ textTransform: "none" }}
-          >
-            Delete Fee Group
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={accountTypeDeleteDialogOpen}
-        onClose={() => {
-          setAccountTypeDeleteDialogOpen(false);
-          setSelectedAccountType(null);
-        }}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 420 },
-          },
-        }}
-      >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <DeleteIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Delete Fund Number
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                This action cannot be undone
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={() => {
-              setAccountTypeDeleteDialogOpen(false);
-              setSelectedAccountType(null);
-            }}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText
-            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
-          >
-            Are you sure you want to delete Fund Number:{" "}
-            <b>{selectedAccountType?.description || "this fund number"}</b>?
-            This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
-          <Button
-            onClick={() => {
-              setAccountTypeDeleteDialogOpen(false);
-              setSelectedAccountType(null);
-            }}
-            color="error"
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={executeAccountTypeDelete}
-            color="error"
-            sx={{ textTransform: "none" }}
-          >
-            Delete Fund Number
+          <Button color="error" variant="contained" onClick={executeFeeCatalogDelete}>
+            Yes, Delete
           </Button>
         </DialogActions>
       </Dialog>
@@ -3924,185 +2865,102 @@ const TOSF = () => {
         }}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            ...verificationDialogPaperSx,
-            minWidth: { xs: "92vw", sm: 420 },
-          },
-        }}
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={verificationDialogTitleSx}>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                width: 40,
-                height: 40,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-              }}
-            >
-              <DeleteIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography
-                fontWeight="bold"
-                fontSize={16}
-                color="white"
-                lineHeight={1.2}
-              >
-                Delete Fee Rate
-              </Typography>
-              <Typography
-                fontSize={12}
-                color="rgba(255,255,255,0.8)"
-                lineHeight={1.2}
-              >
-                This action cannot be undone
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton
-            onClick={() => {
-              setFeeRateDeleteDialogOpen(false);
-              setSelectedFeeRate(null);
-            }}
-            sx={verificationDialogCloseSx}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
+        <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+          Delete Fee Rate
         </DialogTitle>
-        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
-          <DialogContentText
-            sx={{ fontSize: 13, color: "#555", lineHeight: 1.55, pt: 2.5 }}
-          >
-            Are you sure you want to delete this fee rate? This action cannot be
-            undone.
-          </DialogContentText>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Typography sx={{ mb: 2 }}>Are you sure you want to delete this fee rate?</Typography>
+          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>
+            This action cannot be undone.
+          </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3, pt: 1.5, gap: 1 }}>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
           <Button
-            onClick={() => {
-              setFeeRateDeleteDialogOpen(false);
-              setSelectedFeeRate(null);
-            }}
             color="error"
             variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
+            onClick={() => {
+              setFeeRateDeleteDialogOpen(false);
+              setSelectedFeeRate(null);
+            }}
           >
             Cancel
           </Button>
-          <Button
-            onClick={executeFeeRateDelete}
-            color="error"
-            sx={{ textTransform: "none" }}
-          >
-            Delete Rate
+          <Button color="error" variant="contained" onClick={executeFeeRateDelete}>
+            Yes, Delete
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-
       <Dialog
-        open={scholarshipUpdateDialogOpen}
-        onClose={resetScholarshipEditForm}
+        open={feeGroupDeleteDialogOpen}
+        onClose={() => {
+          setFeeGroupDeleteDialogOpen(false);
+          setSelectedFeeGroup(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          Edit Scholarship Type
+        <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+          Delete Fee Group
         </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 1 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
-                <Typography sx={fieldLabelSx}>SCHOLARSHIP CODE</Typography>
-                <TextField
-                  name="scholarship_code"
-                  value={scholarshipEditForm.scholarship_code}
-                  onChange={(e) =>
-                    setScholarshipEditForm((prev) => ({
-                      ...prev,
-                      [e.target.name]: e.target.value,
-                    }))
-                  }
-                  size="small"
-                  required
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Typography sx={fieldLabelSx}>SCHOLARSHIP NAME</Typography>
-                <TextField
-                  name="scholarship_name"
-                  value={scholarshipEditForm.scholarship_name}
-                  onChange={(e) =>
-                    setScholarshipEditForm((prev) => ({
-                      ...prev,
-                      [e.target.name]: e.target.value,
-                    }))
-                  }
-                  size="small"
-                  required
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Typography sx={fieldLabelSx}>STATUS</Typography>
-                <TextField
-                  select
-                  SelectProps={{ native: true }}
-                  name="scholarship_status"
-                  value={scholarshipEditForm.scholarship_status}
-                  onChange={(e) =>
-                    setScholarshipEditForm((prev) => ({
-                      ...prev,
-                      scholarship_status: Number(e.target.value),
-                    }))
-                  }
-                  size="small"
-                  fullWidth
-                >
-                  <option value={1}>Active</option>
-                  <option value={0}>Inactive</option>
-                </TextField>
-              </Grid>
-            </Grid>
-          </Box>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Typography sx={{ mb: 2 }}>
+            Are you sure you want to delete <b>{selectedFeeGroup?.description || "this fee group"}</b>?
+          </Typography>
+          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>This action cannot be undone.</Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
           <Button
-            onClick={resetScholarshipEditForm}
             color="error"
             variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
+            onClick={() => {
+              setFeeGroupDeleteDialogOpen(false);
+              setSelectedFeeGroup(null);
+            }}
           >
             Cancel
           </Button>
+          <Button color="error" variant="contained" onClick={executeFeeGroupDelete}>
+            Yes, Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={accountTypeDeleteDialogOpen}
+        onClose={() => {
+          setAccountTypeDeleteDialogOpen(false);
+          setSelectedAccountType(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
+      >
+        <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+          Delete Fund Number
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Typography sx={{ mb: 2 }}>
+            Are you sure you want to delete <b>{selectedAccountType?.description || "this fund number"}</b>?
+          </Typography>
+          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
           <Button
-            onClick={async () => {
-              await saveScholarshipEdit();
+            color="error"
+            variant="outlined"
+            onClick={() => {
+              setAccountTypeDeleteDialogOpen(false);
+              setSelectedAccountType(null);
             }}
-            variant="contained"
-            color="warning"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
           >
-            Save Changes
+            Cancel
+          </Button>
+          <Button color="error" variant="contained" onClick={executeAccountTypeDelete}>
+            Yes, Delete
           </Button>
         </DialogActions>
       </Dialog>
@@ -4113,62 +2971,30 @@ const TOSF = () => {
           setScholarshipDeleteDialogOpen(false);
           setSelectedScholarshipId(null);
         }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete Confirmation</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ pt: 2.5 }}>
-            Are you sure you want to delete this scholarship type? This action
-            cannot be undone.
-          </DialogContentText>
+        <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+          Delete Scholarship Type
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Typography sx={{ mb: 2 }}>Are you sure you want to delete this scholarship type?</Typography>
+          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>This action cannot be undone.</Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
           <Button
+            color="error"
+            variant="outlined"
             onClick={() => {
               setScholarshipDeleteDialogOpen(false);
               setSelectedScholarshipId(null);
             }}
-            color="error"
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
           >
             Cancel
           </Button>
-          <Button
-            onClick={executeScholarshipDelete}
-            color="error"
-            sx={{ textTransform: "none" }}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={scholarshipRuleUpdateDialogOpen}
-        onClose={() => setScholarshipRuleUpdateDialogOpen(false)}
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>Confirm Update</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Do you want to save the updated scholarship fee?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => setScholarshipRuleUpdateDialogOpen(false)}
-            color="error"
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={executeScholarshipRuleUpdate}
-            variant="contained"
-            color="warning"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
-          >
-            Yes, Update
+          <Button color="error" variant="contained" onClick={executeScholarshipDelete}>
+            Yes, Delete
           </Button>
         </DialogActions>
       </Dialog>
@@ -4179,35 +3005,44 @@ const TOSF = () => {
           setScholarshipRuleDeleteDialogOpen(false);
           setSelectedScholarshipRuleId(null);
         }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", boxShadow: 6 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete Confirmation</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ pt: 2.5 }}>
-            Are you sure you want to delete this scholarship fee? This action
-            cannot be undone.
-          </DialogContentText>
+        <DialogTitle sx={{ background: headerColor, color: "#fff", fontWeight: 700, fontSize: "1.2rem", py: 2 }}>
+          Delete Scholarship Fee
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Typography sx={{ mb: 2 }}>Are you sure you want to delete this scholarship fee?</Typography>
+          <Typography sx={{ color: "#d32f2f", fontSize: "0.95rem" }}>This action cannot be undone.</Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
           <Button
+            color="error"
+            variant="outlined"
             onClick={() => {
               setScholarshipRuleDeleteDialogOpen(false);
               setSelectedScholarshipRuleId(null);
             }}
-            color="error"
-            variant="outlined"
-            sx={{ textTransform: "none", borderRadius: "8px" }}
           >
             Cancel
           </Button>
-          <Button
-            onClick={executeScholarshipRuleDelete}
-            color="error"
-            sx={{ textTransform: "none" }}
-          >
-            Delete
+          <Button color="error" variant="contained" onClick={executeScholarshipRuleDelete}>
+            Yes, Delete
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: "100%" }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
