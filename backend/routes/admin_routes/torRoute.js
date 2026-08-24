@@ -56,15 +56,15 @@ const uploadSignatoryImage = multer({ storage });
 
 const VALID_ROLES = ["prepared_by", "checked_by", "registrar"];
 
-/* ---------------------------------------------------------------------- */
-/*  TOR SETTINGS (remarks, admission credentials, footer notes)           */
-/* ---------------------------------------------------------------------- */
-
 // GET current TOR settings (single row, id = 1)
 router.get("/tor-settings", async (req, res) => {
   try {
     const [rows] = await db3.query(
-      "SELECT * FROM tor_settings WHERE id = 1 LIMIT 1",
+      `SELECT id, remarks, admission_credentials, credits_note, institution_note,
+              institution_website,
+              DATE_FORMAT(graduation_date, '%Y-%m-%d') AS graduation_date,
+              updated_by, updated_at
+       FROM tor_settings WHERE id = 1 LIMIT 1`,
     );
     res.json({ success: true, data: rows[0] || null });
   } catch (err) {
@@ -82,6 +82,7 @@ router.put("/tor-settings", CanEdit, async (req, res) => {
       credits_note,
       institution_note,
       institution_website,
+      graduation_date, // ✅ NEW
     } = req.body;
 
     const { actorId } = getAuditActor(req);
@@ -93,6 +94,7 @@ router.put("/tor-settings", CanEdit, async (req, res) => {
            credits_note = ?,
            institution_note = ?,
            institution_website = ?,
+           graduation_date = ?,
            updated_by = ?
        WHERE id = 1`,
       [
@@ -101,6 +103,7 @@ router.put("/tor-settings", CanEdit, async (req, res) => {
         credits_note ?? null,
         institution_note ?? null,
         institution_website ?? null,
+        graduation_date ?? null, // ✅ NEW
         actorId,
       ],
     );
@@ -120,6 +123,8 @@ router.put("/tor-settings", CanEdit, async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+
 
 /* ---------------------------------------------------------------------- */
 /*  TOR SIGNATORIES (Prepared By / Checked By / Registrar)                */

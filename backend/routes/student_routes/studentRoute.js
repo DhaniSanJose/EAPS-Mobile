@@ -14,38 +14,12 @@ const {
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ==========================================
-// REGISTRAR SCOPE HELPERS
-// Restricts which students a registrar / enrollment officer can see,
-// based on registrar_scope_table (employee_id, dprtmnt_id, program_id).
-// A registrar with no rows in that table sees nothing (fail closed),
-// rather than defaulting to "see everyone".
-// ==========================================
+const ACADEMIC_PROGRAM_LABELS = {
+  0: "Undergraduate",
+  1: "Graduate",
+  2: "TechVoc",
+};
 
-// Every student's "current" program/department, derived the same way the
-// rest of this file already does it: latest enrolled_subject term ->
-// curriculum_table.program_id + dprtmnt_curriculum_table.dprtmnt_id.
-const STUDENT_CURRENT_PROGRAM_SQL = `
-  SELECT
-    ranked.student_number,
-    ranked.dprtmnt_id,
-    ranked.program_id
-  FROM (
-    SELECT
-      es.student_number,
-      dct.dprtmnt_id,
-      cct.program_id,
-      ROW_NUMBER() OVER (
-        PARTITION BY es.student_number
-        ORDER BY sy.year_id DESC, sy.semester_id DESC, es.id DESC
-      ) AS rn
-    FROM enrolled_subject es
-    INNER JOIN active_school_year_table sy ON sy.id = es.active_school_year_id
-    INNER JOIN curriculum_table cct ON cct.curriculum_id = es.curriculum_id
-    INNER JOIN dprtmnt_curriculum_table dct ON dct.curriculum_id = cct.curriculum_id
-  ) ranked
-  WHERE ranked.rn = 1
-`;
 
 async function getRegistrarScope(employee_id) {
   const [rows] = await db3.query(
@@ -2334,9 +2308,11 @@ router.get("/student-qr-information/:student_number", async (req, res) => {
     }
 
     // 3) Program/curriculum for display (latest enrollment record on file, regardless of term)
+    // ✅ FIXED — now also pulls pgt.academic_program so Undergrad/Graduate/TechVoc
+    // can be resolved into a label below, same as the TOR QR route already does.
     const [curriculumRows] = await db3.query(
       `
-      SELECT pgt.program_code, pgt.program_description, pgt.major, es.curriculum_id
+      SELECT pgt.program_code, pgt.program_description, pgt.major, pgt.academic_program, es.curriculum_id
       FROM enrolled_subject es
       LEFT JOIN curriculum_table ct ON ct.curriculum_id = es.curriculum_id
       LEFT JOIN program_table pgt ON pgt.program_id = ct.program_id
@@ -2347,7 +2323,18 @@ router.get("/student-qr-information/:student_number", async (req, res) => {
       [studentNumber],
     );
 
-    // 4) Active school year — now also resolves AY + semester labels
+    // ✅ NEW — attach the resolved academic_program_label the same way
+    // evaluateGraduationEligibility() and /tor-qr-information do, so the
+    // frontend's getAcademicProgramMeta() has something to read.
+    const program = curriculumRows[0]
+      ? {
+          ...curriculumRows[0],
+          academic_program_label:
+            ACADEMIC_PROGRAM_LABELS[curriculumRows[0].academic_program] ?? "Unknown",
+        }
+      : null;
+
+    // 4) Active school year — resolves AY + semester labels
     // (e.g. "AY 2026-2027" / "1st Semester") instead of just the raw
     // active_school_year_id, by joining year_table + semester_table.
     const [[activeYear]] = await db3.query(
@@ -2472,11 +2459,9 @@ router.get("/student-qr-information/:student_number", async (req, res) => {
         full_name: fullName,
         profile_image: student.profile_img || null,
       },
-      program: curriculumRows[0] || null,
+      program, // ✅ now includes academic_program + academic_program_label
       account_status: accountRows[0].status,
       active_school_year: activeYear || null,
-      // New: ready-to-display AY + semester strings, e.g.
-      // school_year_label: "AY 2026-2027", semester_label: "1st Semester"
       school_year_label: schoolYearLabel,
       semester_label: semesterLabel,
       enrolled_status: enrolledStatus,

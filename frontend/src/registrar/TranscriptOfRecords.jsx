@@ -23,6 +23,7 @@ import {
   DialogActions,
   IconButton,
   Switch,
+
   FormControlLabel,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -52,6 +53,7 @@ import Act from "../assets/act.png";
 import Iaf from "../assets/iaf.png";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import PhotoCaptureDialog from "../components/PhotoCaptureDialog";
+import SaveIcon from "@mui/icons-material/Save";
 
 const cleanSuggestionValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -118,15 +120,6 @@ const formatStudentFullName = (student) => {
     student.name_extension ??
     student.suffix
   );
-
-  /*
-   * TOR format:
-   * LAST NAME, FIRST NAME MIDDLE NAME EXTENSION
-   *
-   * Examples:
-   * MONTANO, MARK ANTHONY
-   * MONTANO, MARK ANTHONY JR.
-   */
 
   const nameParts = [
     firstName,
@@ -464,6 +457,7 @@ const TranscriptOfRecords = () => {
         setCreditsNote(data.credits_note ?? "");
         setInstitutionNote(data.institution_note ?? "");
         setInstitutionWebsite(data.institution_website ?? "");
+        setGraduationDate(data.graduation_date ?? ""); // ✅ NEW
       }
     } catch (err) {
       console.error("Failed to fetch TOR settings:", err);
@@ -639,22 +633,29 @@ const TranscriptOfRecords = () => {
   const gradingSystemFirstHalf = gradingSystemRows.slice(0, gradingSystemHalf);
   const gradingSystemSecondHalf = gradingSystemRows.slice(gradingSystemHalf);
 
-  // ---- Graduation date (not covered by torRoute.txt — kept local for now) ----
-  const GRADUATION_DATE_STORAGE_KEY = "tor_graduation_date";
-  const [graduationDate, setGraduationDate] = useState(() => {
-    try {
-      return localStorage.getItem(GRADUATION_DATE_STORAGE_KEY) || "";
-    } catch (err) {
-      return "";
-    }
-  });
+  const [graduationDate, setGraduationDate] = useState("");
+  const [savingGraduationDate, setSavingGraduationDate] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+
   const handleGraduationDateChange = (e) => {
-    const value = e.target.value;
-    setGraduationDate(value);
+    setGraduationDate(e.target.value); // local only — click Save to persist
+  };
+
+  const handleSaveGraduationDate = async () => {
+    setSavingGraduationDate(true);
     try {
-      localStorage.setItem(GRADUATION_DATE_STORAGE_KEY, value);
+      await saveTorSettings({ graduation_date: graduationDate || null });
+      setSnackbarSeverity("success");
+      setSnackbarMessage("Date of graduation saved.");
+      setOpenSnackbar(true);
     } catch (err) {
       console.error("Failed to save graduation date:", err);
+      setSnackbarSeverity("warning");
+      setSnackbarMessage("Failed to save date of graduation.");
+      setOpenSnackbar(true);
+    } finally {
+      setSavingGraduationDate(false);
     }
   };
 
@@ -1571,6 +1572,12 @@ ${subjectsTableHtml}
       return;
     }
 
+    if (!studentData?.student_number) {
+      setSnackbarMessage("Please search and select a student first.");
+      setOpenSnackbar(true);
+      return;
+    }
+
     let allPagesHtml;
     try {
       allPagesHtml = paginatedSubjects
@@ -1581,6 +1588,51 @@ ${subjectsTableHtml}
       setSnackbarMessage("Failed to prepare the Transcript of Records for download.");
       setOpenSnackbar(true);
       return;
+    }
+
+    // ✅ NEW — Clicking Download TOR is the trigger that officially records
+    // graduation. The backend re-runs the same "passed every final-term
+    // subject" check and, if eligible, upserts a row into
+    // student_graduation_table (keyed by student_number, so re-downloading
+    // just refreshes the date instead of duplicating). GWA/honor is
+    // intentionally left out — not required here. This does NOT block the
+    // PDF from generating either way.
+    try {
+      const markGraduateRes = await axios.post(
+        `${API_BASE_URL}/api/mark-graduate/${studentData.student_number}`,
+        {
+          verified_by: employeeID,
+          graduation_date: graduationDate || undefined,
+          remarks: remarks || undefined,
+        },
+        {
+          headers: getFlatAuditHeaders({
+            "x-employee-id": employeeID,
+            "x-page-id": pageId,
+          }),
+        },
+      );
+
+      if (markGraduateRes.data?.success) {
+        setSnackbarSeverity("success");
+        setSnackbarMessage(
+          `Recorded as an official graduate (${formattedDate(
+            markGraduateRes.data.graduation_date,
+          )}). This now shows on the verification QR.`,
+        );
+        setOpenSnackbar(true);
+      }
+    } catch (err) {
+      if (err.response?.status === 409) {
+        // Student hasn't passed every final-term subject yet — don't block
+        // the TOR download, just don't mark them as an official graduate.
+        console.warn(
+          "Not yet eligible for graduation record:",
+          err.response.data?.message,
+        );
+      } else {
+        console.error("Failed to record graduation:", err);
+      }
     }
 
     try {
@@ -2886,39 +2938,58 @@ ${subjectsTableHtml}
                       />
                     </TableCell>
 
-                    {/* Global, page-level control — rendered once and vertically
-                        centered across every row via rowSpan, not per signature */}
-                    {index === 0 && (
-                      <TableCell
-                        rowSpan={paginatedSignatures.length}
-                        sx={{
-                          border: `1px solid ${borderColor}`,
-                          textAlign: "center",
-                          verticalAlign: "middle",
-                          color: titleColor,
-                          padding: "4px 6px",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            width: "100%",
-                          }}
-                        >
-                          <LocalizationProvider dateAdapter={AdapterDayjs}>
-                            <Box sx={{ width: 190 }}>
-                              <DateField
-                                label="Date of Graduation"
-                                value={graduationDate}
-                                onChange={handleGraduationDateChange}
-                                slotProps={{ textField: { size: "small", fullWidth: true } }}
-                              />
-                            </Box>
-                          </LocalizationProvider>
-                        </Box>
-                      </TableCell>
-                    )}
+                  {index === 0 && (
+  <TableCell
+    rowSpan={paginatedSignatures.length}
+    sx={{
+      border: `1px solid ${borderColor}`,
+      textAlign: "center",
+      verticalAlign: "middle",
+      color: titleColor,
+      padding: "4px 6px",
+    }}
+  >
+    <Box
+      sx={{
+        display: "flex",
+        flexWrap: "nowrap",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 1,
+        width: "100%",
+      }}
+    >
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <Box sx={{ width: 190, flexShrink: 0 }}>
+          <DateField
+            label="Date of Graduation"
+            value={graduationDate}
+            onChange={handleGraduationDateChange}
+            slotProps={{ textField: { size: "small", fullWidth: true } }}
+          />
+        </Box>
+      </LocalizationProvider>
+
+      <Button
+        onClick={handleSaveGraduationDate}
+        disabled={savingGraduationDate}
+        variant="contained"
+        size="small"
+        startIcon={<SaveIcon fontSize="small" />}
+        sx={{
+          textTransform: "none",
+          fontWeight: "bold",
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          width: "150px",
+          height: "40px"
+        }}
+      >
+        {savingGraduationDate ? "Saving..." : "Save"}
+      </Button>
+    </Box>
+  </TableCell>
+)}
 
 
                   </TableRow>

@@ -5,16 +5,29 @@ import { Box, Typography, Chip, CircularProgress, Divider, Avatar, Stack } from 
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import SearchOffIcon from "@mui/icons-material/SearchOff";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import axios from "axios";
 import { SettingsContext } from "../App";
 import EaristLogo from "../assets/EaristLogo.png";
 import API_BASE_URL from "../apiConfig";
 
-// PUBLIC PAGE — deliberately NOT wrapped in <ProtectedRoute>.
-// This is the single page a scanned TOR QR code links to. It replaces the
-// old two-page split (GraduateVerification + TorQrInformation) — one route,
-// one component, one backend check (/api/verify-graduate).
-//   <Route path="/tor_qr_information/:student_number" element={<TorQrInformation />} />
+// academic_program: 0 = Undergraduate, 1 = Graduate, 2 = TechVoc (see program_table.academic_program)
+const ACADEMIC_PROGRAM_STYLES = {
+    0: { label: "Undergraduate", bg: "#e3f2fd", color: "#1565c0" },
+    1: { label: "Graduate", bg: "#f3e5f5", color: "#6a1b9a" },
+    2: { label: "TechVoc", bg: "#fff3e0", color: "#e65100" },
+};
+
+const getAcademicProgramMeta = (result) => {
+    const code = result?.program?.academic_program;
+    const apiLabel = result?.program?.academic_program_label;
+
+    if (apiLabel) {
+        return { ...(ACADEMIC_PROGRAM_STYLES[code] || { bg: "#eceff1", color: "#455a64" }), label: apiLabel };
+    }
+    if (code === null || code === undefined) return null;
+    return ACADEMIC_PROGRAM_STYLES[code] || { label: "Unknown", bg: "#eceff1", color: "#455a64" };
+};
 
 const TorQrInformation = () => {
     const { student_number } = useParams();
@@ -76,6 +89,7 @@ const TorQrInformation = () => {
 
     const logoSrc = assets.logoUrl || EaristLogo;
     const companyName = branding.companyName || "";
+    const academicProgramMeta = getAcademicProgramMeta(result);
 
     return (
         <Box
@@ -224,6 +238,24 @@ const TorQrInformation = () => {
                                 >
                                     {result.is_graduate ? "VERIFIED GRADUATE" : "NOT A VERIFIED GRADUATE"}
                                 </Typography>
+
+                                {/* Only shown once the registrar has actually confirmed graduation
+                                    via /api/mark-graduate — this is the persisted date, not a guess. */}
+                                {result.officially_recorded && result.graduation_date && (
+                                    <Typography sx={{ mt: 0.25, fontSize: { xs: 12, sm: 12.5 }, fontWeight: 600, color: "#2e7d32", textAlign: "center" }}>
+                                        Graduated on{" "}
+                                        {new Date(result.graduation_date).toLocaleDateString("en-US", {
+                                            year: "numeric",
+                                            month: "long",
+                                            day: "numeric",
+                                        })}
+                                    </Typography>
+                                )}
+                                {result.is_graduate && result.officially_recorded === false && (
+                                    <Typography sx={{ mt: 0.25, fontSize: { xs: 11, sm: 11.5 }, fontStyle: "italic", color: "#888", textAlign: "center" }}>
+                                        Eligible, pending official registrar confirmation
+                                    </Typography>
+                                )}
                                 {result.reason && (
                                     <Typography sx={{ mt: 0.5, fontSize: { xs: 12, sm: 12.5 }, color: "#888", textAlign: "center", px: 2 }}>
                                         {result.reason}
@@ -254,9 +286,26 @@ const TorQrInformation = () => {
 
                             {result.program?.program_description && (
                                 <Box sx={{ mb: 2 }}>
-                                    <Typography sx={{ fontSize: { xs: 11, sm: 12 }, color: "#999", textTransform: "uppercase", fontWeight: 600 }}>
-                                        Program
-                                    </Typography>
+                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.25, flexWrap: "wrap" }}>
+                                        <Typography sx={{ fontSize: { xs: 11, sm: 12 }, color: "#999", textTransform: "uppercase", fontWeight: 600 }}>
+                                            Program
+                                        </Typography>
+                                        {academicProgramMeta && (
+                                            <Chip
+                                                size="small"
+                                                icon={<WorkspacePremiumIcon sx={{ fontSize: 14 }} />}
+                                                label={academicProgramMeta.label}
+                                                sx={{
+                                                    backgroundColor: academicProgramMeta.bg,
+                                                    color: academicProgramMeta.color,
+                                                    fontWeight: 700,
+                                                    fontSize: { xs: 10, sm: 10.5 },
+                                                    height: 20,
+                                                    "& .MuiChip-icon": { color: academicProgramMeta.color },
+                                                }}
+                                            />
+                                        )}
+                                    </Stack>
                                     <Typography sx={{ fontSize: { xs: 13, sm: 14 }, wordBreak: "break-word" }}>
                                         {result.program.program_description}
                                         {result.program.major ? ` — ${result.program.major}` : ""}

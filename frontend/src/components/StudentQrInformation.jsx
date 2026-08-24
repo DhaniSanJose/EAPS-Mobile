@@ -5,17 +5,32 @@ import { Box, Typography, Chip, CircularProgress, Divider, Avatar, Stack } from 
 import SearchOffIcon from "@mui/icons-material/SearchOff";
 import CancelIcon from "@mui/icons-material/Cancel";
 import SchoolIcon from "@mui/icons-material/School";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import axios from "axios";
 import { SettingsContext } from "../App";
 import EaristLogo from "../assets/EaristLogo.png";
 import API_BASE_URL from "../apiConfig";
 
-// PUBLIC PAGE — deliberately NOT wrapped in <ProtectedRoute>.
-// This is the page the regular Student QR code links to.
-//   <Route path="/student_qr_information/:student_number" element={<StudentQrInformation />} />
-// It shows identity + whether the student is CURRENTLY ENROLLED for the
-// active term, plus the subjects they're taking if so. This is distinct
-// from TorQrInformation, which verifies graduate status instead.
+// academic_program: 0 = Undergraduate, 1 = Graduate, 2 = TechVoc (see program_table.academic_program)
+const ACADEMIC_PROGRAM_STYLES = {
+    0: { label: "Undergraduate", bg: "#e3f2fd", color: "#1565c0" },
+    1: { label: "Graduate", bg: "#f3e5f5", color: "#6a1b9a" },
+    2: { label: "TechVoc", bg: "#fff3e0", color: "#e65100" },
+};
+
+// Prefer a label the API already computed; otherwise map the raw
+// academic_program code ourselves. Returns null if neither is present so
+// the chip simply doesn't render (e.g. backend hasn't been updated yet).
+const getAcademicProgramMeta = (result) => {
+    const code = result?.program?.academic_program;
+    const apiLabel = result?.program?.academic_program_label;
+
+    if (apiLabel) {
+        return { ...(ACADEMIC_PROGRAM_STYLES[code] || { bg: "#eceff1", color: "#455a64" }), label: apiLabel };
+    }
+    if (code === null || code === undefined) return null;
+    return ACADEMIC_PROGRAM_STYLES[code] || { label: "Unknown", bg: "#eceff1", color: "#455a64" };
+};
 
 const StudentQrInformation = () => {
     const { student_number } = useParams();
@@ -62,6 +77,7 @@ const StudentQrInformation = () => {
     const logoSrc = assets.logoUrl || EaristLogo;
     const companyName = branding.companyName || "";
     const isEnrolled = result?.enrolled_status === 1;
+    const academicProgramMeta = getAcademicProgramMeta(result);
 
     return (
         <Box
@@ -242,9 +258,26 @@ const StudentQrInformation = () => {
 
                             {result.program?.program_description && (
                                 <Box sx={{ mb: 2 }}>
-                                    <Typography sx={{ fontSize: { xs: 11, sm: 12 }, color: "#999", textTransform: "uppercase", fontWeight: 600 }}>
-                                        Program
-                                    </Typography>
+                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.25, flexWrap: "wrap" }}>
+                                        <Typography sx={{ fontSize: { xs: 11, sm: 12 }, color: "#999", textTransform: "uppercase", fontWeight: 600 }}>
+                                            Program
+                                        </Typography>
+                                        {academicProgramMeta && (
+                                            <Chip
+                                                size="small"
+                                                icon={<WorkspacePremiumIcon sx={{ fontSize: 14 }} />}
+                                                label={academicProgramMeta.label}
+                                                sx={{
+                                                    backgroundColor: academicProgramMeta.bg,
+                                                    color: academicProgramMeta.color,
+                                                    fontWeight: 700,
+                                                    fontSize: { xs: 10, sm: 10.5 },
+                                                    height: 20,
+                                                    "& .MuiChip-icon": { color: academicProgramMeta.color },
+                                                }}
+                                            />
+                                        )}
+                                    </Stack>
                                     <Typography sx={{ fontSize: { xs: 13, sm: 14 }, wordBreak: "break-word" }}>
                                         {result.program.program_description}
                                         {result.program.major ? ` — ${result.program.major}` : ""}
