@@ -72,6 +72,9 @@ import DateField from "../components/DateField";
 import FormalExample from "../assets/formalexample.png";
 import AdminECATApplicationForm from "./AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "./AdminOfficeOfTheRegistrar";
+import AdminPersonalDataForm from "./AdminPersonalDataForm";
+import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
+import SaveIcon from "@mui/icons-material/Save";
 
 const cleanApplicantValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -106,9 +109,6 @@ const getApplicantSuggestionValue = (applicant) =>
   cleanApplicantValue(applicant?.applicant_number) ||
   formatApplicantSuggestionName(applicant) ||
   cleanApplicantValue(applicant?.emailAddress);
-import AdminPersonalDataForm from "./AdminPersonalDataForm";
-import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
-import SaveIcon from "@mui/icons-material/Save";
 
 const AdmissionPersonalInformation = () => {
   useAuditMac();

@@ -27,6 +27,7 @@ import AdminECATApplicationForm from "../admission/AdminECATApplicationForm";
 import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
+import SaveIcon from '@mui/icons-material/Save';
 
 const ApplicantAdminEducationalAttainment = () => {
     useAccountAuditMac();
@@ -927,21 +928,22 @@ const ApplicantAdminEducationalAttainment = () => {
                 >
                     PRINTABLE DOCUMENTS
                 </h1>
-                <Button
-                    variant="contained"
-                    onClick={handleManualSave}
-                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
-                    sx={{
-                        position: "absolute",
-                        right: 16,
-                        backgroundColor: mainButtonColor,
-                        textTransform: "none",
-                        fontWeight: "bold",
-                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
-                    }}
-                >
-                    {saving ? "Saving..." : "Save Changes"}
-                </Button>
+                 <Button
+                     variant="contained"
+                     onClick={handleManualSave}
+                     startIcon={<SaveIcon />}
+                     disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                     sx={{
+                       position: "absolute",
+                       right: 16,
+           
+                       textTransform: "none",
+                       fontWeight: "bold",
+           
+                     }}
+                   >
+                     {saving ? "Saving..." : "Save Changes"}
+                   </Button>
             </Box>
 
 

@@ -1423,7 +1423,7 @@ router.post("/student/upload", upload.single("file"), async (req, res) => {
     const year = new Date().getFullYear();
     const ext = path.extname(req.file.originalname).toLowerCase();
 
-    const filename = `${applicant_number}_${shortLabel}_${year}${ext}`;
+   const filename = `${student_number}_${shortLabel}_${year}${ext}`;
     const uploadDir = path.join(__dirname, "uploads");
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 

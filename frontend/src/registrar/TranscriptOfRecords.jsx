@@ -667,6 +667,26 @@ const TranscriptOfRecords = () => {
     });
   };
 
+  const formatScoreRange = (min, max) => {
+    if (min === null || min === undefined || min === "") {
+      if (max === null || max === undefined || max === "") {
+        return "";
+      }
+    }
+
+    const roundNum = (v) =>
+      v === null || v === undefined || v === "" ? null : Math.round(Number(v));
+
+    const roundedMin = roundNum(min);
+    const roundedMax = roundNum(max);
+
+    if (roundedMin === null && roundedMax === null) return "";
+    if (roundedMin === null) return `${roundedMax}`;
+    if (roundedMax === null) return `${roundedMin}`;
+
+    return `${roundedMin}-${roundedMax}`;
+  };
+
   const todayDate = new Date().toLocaleDateString("en-US", {
     day: "2-digit",
     month: "long",
@@ -1247,110 +1267,110 @@ const TranscriptOfRecords = () => {
     const hideOnSecurityPaper = printOnSecurityPaper ? "visibility:hidden;" : "";
 
     const headerHtml = `
-    <div style="position:relative; width:80rem; margin:0 auto;">
-      <div style="position:absolute; top:0; right:0; display:flex; flex-direction:column; align-items:center; z-index:2;">
-        <div style="display:flex; align-items:center; gap:4px;">
-          <img src="${logoDataUris.act || Act}" alt="ACT" style="width:50px; height:50px; object-fit:contain; display:block;" />
-          <img src="${logoDataUris.ukas || Ukas}" alt="UKAS" style="width:50px; height:50px; object-fit:contain; display:block;" />
-          <img src="${logoDataUris.iaf || Iaf}" alt="IAF" style="width:50px; height:50px; object-fit:contain; display:block;" />
-        </div>
-        <div style="font-size:11px; text-align:center; margin-top:20px; line-height:1.2; font-family:Arial, sans-serif;">
-          ${(shortTerm || "").toUpperCase()} FORM NO. I-A<br/>
-          REVISED 2025
-        </div>
+  <div style="position:relative; width:80rem; margin:0 auto;">
+    <div style="position:absolute; top:0; right:0; display:flex; flex-direction:column; align-items:center; z-index:2;">
+      <div style="display:flex; align-items:center; gap:4px;">
+        <img src="${logoDataUris.act || Act}" alt="ACT" style="width:50px; height:50px; object-fit:contain; display:block;" />
+        <img src="${logoDataUris.ukas || Ukas}" alt="UKAS" style="width:50px; height:50px; object-fit:contain; display:block;" />
+        <img src="${logoDataUris.iaf || Iaf}" alt="IAF" style="width:50px; height:50px; object-fit:contain; display:block;" />
       </div>
-
-      <div style="display:flex; align-items:center; justify-content:center; margin-top: -20px;">
-        <div style="display:flex; align-items:center; gap:0.5rem; margin-left:-10rem; padding-right:3rem;">
-          <img src="${logoDataUris.bagongPilipinas || BagongPilipinasLogo}" alt="Bagong Pilipinas" style="width:8.5rem; height:8rem; display:block;" />
-          <img src="${logoSrc}" alt="Logo" style="width:8rem; height:8rem; border-radius:50%; display:block; ${hideOnSecurityPaper}" />
-        </div>
-        <div style="text-align:center; ${hideOnSecurityPaper}">
-          <div style="font-family:Arial, sans-serif; font-size:13px;">Republic of the Philippines</div>
-     ${name ? `
-  <div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:uppercase;">${firstLine.toUpperCase()}</div>
-  ${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:uppercase;">${secondLine.toUpperCase()}</div>` : ""}
-` : ""}
-          ${allBranchNames ? `
-            <div style="font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-top:-2px;">
-              ${allBranchNames}
-            </div>
-          ` : ""}
-          <div style="font-family:Arial, sans-serif; font-size:13px;">${campusAddress || ""}</div>
-        </div>
-      </div>
-
-      <div style="text-align:center; margin-top: 30px; font-size:1.6rem; letter-spacing:-1px; font-weight:500; ${hideOnSecurityPaper}">
-        OFFICE OF THE REGISTRAR
-      </div>
-      <div style="text-align:center; margin-top:-0.5rem; font-size:2.75rem; letter-spacing:-1px; font-weight:600; ${hideOnSecurityPaper}">
-        OFFICIAL TRANSCRIPT OF RECORDS
+      <div style="font-size:11px; text-align:center; margin-top:20px; line-height:1.2; font-family:Arial, sans-serif;">
+        ${(shortTerm || "").toUpperCase()} FORM NO. I-A<br/>
+        REVISED 2025
       </div>
     </div>
-  `;
+
+    <div style="display:flex; align-items:center; justify-content:center; margin-top: -20px;">
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-left:-10rem; padding-right:3rem;">
+        <img src="${logoDataUris.bagongPilipinas || BagongPilipinasLogo}" alt="Bagong Pilipinas" style="width:8.5rem; height:8rem; display:block;" />
+        <img src="${logoSrc}" alt="Logo" style="width:8rem; height:8rem; border-radius:50%; display:block; ${hideOnSecurityPaper}" />
+      </div>
+      <div style="text-align:center; ${hideOnSecurityPaper}">
+        <div style="font-family:Arial, sans-serif; font-size:13px;">Republic of the Philippines</div>
+   ${name ? `
+<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:uppercase;">${firstLine.toUpperCase()}</div>
+${secondLine ? `<div style="line-height:1; font-size:1.6rem; letter-spacing:-1px; font-weight:600; font-family:'Arial'; text-transform:uppercase;">${secondLine.toUpperCase()}</div>` : ""}
+` : ""}
+        ${allBranchNames ? `
+          <div style="font-size:14px; font-weight:bold; letter-spacing:0.5px; margin-top:-2px;">
+            ${allBranchNames}
+          </div>
+        ` : ""}
+        <div style="font-family:Arial, sans-serif; font-size:13px;">${campusAddress || ""}</div>
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-top: 30px; font-size:1.6rem; letter-spacing:-1px; font-weight:500; ${hideOnSecurityPaper}">
+      OFFICE OF THE REGISTRAR
+    </div>
+    <div style="text-align:center; margin-top:-0.5rem; font-size:2.75rem; letter-spacing:-1px; font-weight:600; ${hideOnSecurityPaper}">
+      OFFICIAL TRANSCRIPT OF RECORDS
+    </div>
+  </div>
+`;
 
     // ── Student info + photo ──
     const infoRow = (label, value) => `
-    <div style="display:flex; height:20px; align-items:center; font-size:20px; letter-spacing:-1px; margin-top:2px;">
-      <span style="width:15rem;">${label}</span>
-      <span style="width:1rem;">:</span>
-      <span style="font-weight:500; margin-left:0.3rem;">${value || ""}</span>
-    </div>
-  `;
+  <div style="display:flex; height:20px; align-items:center; font-size:20px; letter-spacing:-1px; margin-top:2px;">
+    <span style="width:15rem;">${label}</span>
+    <span style="width:1rem;">:</span>
+    <span style="font-weight:500; margin-left:0.3rem;">${value || ""}</span>
+  </div>
+`;
 
     const studentInfoHtml = `
-    <div style="display:flex; margin-top:1rem; width:80rem; margin-left:auto; margin-right:auto; border-bottom:solid black 1px; padding-bottom:0.5rem;">
-      <div style="flex:1 1 auto;">
-        <div style="display:flex; align-items:center; font-size:22px; font-weight:600; letter-spacing:-1px;">
-          <span style="width:15rem;">NAME</span>
-          <span style="width:1rem;">:</span>
-          <span style="margin-left:0.3rem;">${studentName}</span>
-        </div>
-        ${infoRow("DATE OF BIRTH", formattedDate(studentData.birthOfDate))}
-        ${infoRow("ADMISSION CREDENTIALS", admissionCredentials)}
-        ${infoRow("LAST SCHOOL ATTENDED", studentData.schoolLastAttended1)}
-        ${infoRow("DATE GRADUATED", formatYearGraduatedRange(studentData.yearGraduated1))}
-        ${infoRow("STUDENT NUMBER", studentData.student_number)}
-        ${infoRow("DEGREE/TITLE EARNED", degreeTitle)}
-        ${infoRow("MAJOR", major)}
-        ${infoRow("DATE OF GRADUATION", dateIssuedDisplay)}
+  <div style="display:flex; margin-top:1rem; width:80rem; margin-left:auto; margin-right:auto; border-bottom:solid black 1px; padding-bottom:0.5rem;">
+    <div style="flex:1 1 auto;">
+      <div style="display:flex; align-items:center; font-size:22px; font-weight:600; letter-spacing:-1px;">
+        <span style="width:15rem;">NAME</span>
+        <span style="width:1rem;">:</span>
+        <span style="margin-left:0.3rem;">${studentName}</span>
       </div>
-    <div style="flex:0 0 225px; margin-left:1rem;">
-  <div style="text-align:center; font-size:14px; font-weight:600; margin-bottom:4px; letter-spacing:0.3px; ${hideOnSecurityPaper}">
- ${documentNumbers[pageIndex] || ""}
-  </div>
-  ${photoSrc
+      ${infoRow("DATE OF BIRTH", formattedDate(studentData.birthOfDate))}
+      ${infoRow("ADMISSION CREDENTIALS", admissionCredentials)}
+      ${infoRow("LAST SCHOOL ATTENDED", studentData.schoolLastAttended1)}
+      ${infoRow("DATE GRADUATED", formatYearGraduatedRange(studentData.yearGraduated1))}
+      ${infoRow("STUDENT NUMBER", studentData.student_number)}
+      ${infoRow("DEGREE/TITLE EARNED", degreeTitle)}
+      ${infoRow("MAJOR", major)}
+      ${infoRow("DATE OF GRADUATION", dateIssuedDisplay)}
+    </div>
+  <div style="flex:0 0 225px; margin-left:1rem;">
+<div style="text-align:center; font-size:14px; font-weight:600; margin-bottom:4px; letter-spacing:0.3px; ${hideOnSecurityPaper}">
+${documentNumbers[pageIndex] || ""}
+</div>
+${photoSrc
         ? `<img src="${photoSrc}" style="width:225px; height:225px; object-fit:cover; border:1px solid black; display:block;" />`
         : `<div style="width:225px; height:225px; border:1px solid black;"></div>`
       }
-      </div>
     </div>
-  `;
+  </div>
+`;
     // ── Subjects table (div-based, no table/flex hybrid) ──
     const tableHeaderHtml = `
-    <div style="display:flex; height:65px; align-items:center; border-bottom:solid 1px black; font-weight:600; font-size:20px;">
-      <div style="width:13rem; text-align:center;">TERM</div>
-      <div style="width:38rem; text-align:center; letter-spacing:-1px;">
-        SUBJECTS<br/>
-        <span style="font-weight:600;">CODE NUMBER WITH DESCRIPTIVE TITLE</span>
-      </div>
-      <div style="width:13rem; text-align:center;">
-        GRADES
-        <div style="display:flex; margin-top:2px;">
-          <div style="width:6rem; text-align:center;">FINAL</div>
-          <div style="width:7rem; text-align:center;">RE-EXAM</div>
-        </div>
-      </div>
-      <div style="width:7rem; text-align:center;">CREDITS</div>
-      <div style="width:8.9rem; text-align:center;">REMARKS</div>
+  <div style="display:flex; height:65px; align-items:center; border-bottom:solid 1px black; font-weight:600; font-size:20px;">
+    <div style="width:13rem; text-align:center;">TERM</div>
+    <div style="width:38rem; text-align:center; letter-spacing:-1px;">
+      SUBJECTS<br/>
+      <span style="font-weight:600;">CODE NUMBER WITH DESCRIPTIVE TITLE</span>
     </div>
-  `;
+    <div style="width:13rem; text-align:center;">
+      GRADES
+      <div style="display:flex; margin-top:2px;">
+        <div style="width:6rem; text-align:center;">FINAL</div>
+        <div style="width:7rem; text-align:center;">RE-EXAM</div>
+      </div>
+    </div>
+    <div style="width:7rem; text-align:center;">CREDITS</div>
+    <div style="width:8.9rem; text-align:center;">REMARKS</div>
+  </div>
+`;
 
     const programRowHtml = `
-    <div style="text-decoration:underline; text-underline-offset:3px; font-weight:500; letter-spacing:-1px; padding-left:1.5rem; font-size:20px;">
-      ${degreeTitle}
-    </div>
-  `;
+  <div style="text-decoration:underline; text-underline-offset:3px; font-weight:500; letter-spacing:-1px; padding-left:1.5rem; font-size:20px;">
+    ${degreeTitle}
+  </div>
+`;
 
     let subjectRowsHtml = "";
     pageGroups.forEach((group) => {
@@ -1369,180 +1389,180 @@ const TranscriptOfRecords = () => {
                   p.en_remarks === 4 ? "Dropped" : "";
 
         subjectRowsHtml += `
-        <div style="display:flex; align-items:flex-start; line-height:22px;">
-          <div style="width:13rem; display:flex; flex-direction:column; align-items:flex-start;">
-            ${!group.isContinuation && index === 0 ? `
-              <span style="font-size:18px; text-align:center; width:13rem; font-weight:500;">${convertSemester(p)}</span>              <span style="font-size:17px; text-align:center; width:13rem; font-weight:500;">${p.current_year} - ${p.next_year}</span>
-            ` : ""}
-          </div>
-          <div style="display:flex; width:38rem; line-height:22px;">
-            <span style="width:9.5rem; flex:0 0 9.5rem; font-size:18px; letter-spacing:-0.5px;">${p.course_code || ""}</span>
-            <span style="flex:1 1 auto; font-size:18px; letter-spacing:-0.5px;">${p.course_description ? p.course_description.toUpperCase() : ""} ${componentLabel}</span>
-          </div>
-          <div style="width:13rem; display:flex; align-items:center;">
-            <div style="width:6rem; text-align:center; font-size:18px;">${finalGrade}</div>
-            <div style="width:7rem; text-align:center; font-size:18px;"></div>
-          </div>
-          <div style="width:7rem; text-align:center; font-size:18px;">${totalUnits}</div>
-          <div style="width:8.9rem; text-align:center; font-size:18px;">${remarks}</div>
-        </div>
-      `;
+  <div style="display:flex; align-items:flex-start; line-height:22px;">
+    <div style="width:13rem; position:relative;">
+      ${!group.isContinuation && index === 0 ? `
+        <span style="display:block; font-size:18px; text-align:center; width:13rem; font-weight:500; line-height:22px;">${convertSemester(p)}</span>
+        <span style="position:absolute; top:22px; left:0; font-size:17px; text-align:center; width:13rem; font-weight:500; line-height:22px;">${p.current_year} - ${p.next_year}</span>
+      ` : ""}
+    </div>
+    <div style="display:flex; width:38rem; line-height:22px;">
+      <span style="width:9.5rem; flex:0 0 9.5rem; font-size:18px; letter-spacing:-0.5px;">${p.course_code || ""}</span>
+      <span style="flex:1 1 auto; font-size:18px; letter-spacing:-0.5px;">${p.course_description ? p.course_description.toUpperCase() : ""} ${componentLabel}</span>
+    </div>
+    <div style="width:13rem; display:flex; align-items:center;">
+      <div style="width:6rem; text-align:center; font-size:18px;">${finalGrade}</div>
+      <div style="width:7rem; text-align:center; font-size:18px;"></div>
+    </div>
+    <div style="width:7rem; text-align:center; font-size:18px;">${totalUnits}</div>
+    <div style="width:8.9rem; text-align:center; font-size:18px;">${remarks}</div>
+  </div>
+`;
       });
     });
 
     const isLastPage = pageIndex === paginatedSubjects.length - 1;
     const nothingFollowsHtml = isLastPage
       ? `
-      <div style="text-align:center; font-size:17px; font-weight:600; white-space:normal; overflow:visible; line-height:1.3; word-break:break-word;">
-      <span style="font-size:14px;">${repeatShortTermWithSpaces(shortTerm)} xxx</span>
+    <div style="text-align:center; font-size:17px; margin-top: 25px; font-weight:600; white-space:normal; overflow:visible; line-height:1.3; word-break:break-word;">
+    <span style="font-size:14px;">${repeatShortTermWithSpaces(shortTerm)} xxx</span>
 &nbsp;NOTHING FOLLOWS&nbsp;
 <span style="font-size:14px;">xxx ${repeatShortTermWithSpaces(shortTerm)}</span>
-      </div>
-    `
+    </div>
+  `
       : `
-      <div style="text-align:center; border-top:dashed 1px black; font-size:17px; font-weight:600;">
-        - continued on next page -
-      </div>
-    `;
-
-    const subjectsTableHtml = `
-    <div style="margin-top:0.5rem; width:80rem; margin-left:auto; margin-right:auto; border-top:solid black 1px;">
-      ${tableHeaderHtml}
-      ${programRowHtml}
-      ${subjectRowsHtml}
-      ${nothingFollowsHtml}
+    <div style="text-align:center; border-top:dashed 1px black; font-size:17px; font-weight:600;">
+      - continued on next page -
     </div>
   `;
 
-    const gradeCol = (rows, width) => `
-  <div style="display:flex; flex-direction:column; align-items:flex-start; width:${width};">
-    ${rows.map((r) => `<div style="font-size:16px; letter-spacing:-1px;">${r}</div>`).join("")}
+    const subjectsTableHtml = `
+  <div style="margin-top:0.5rem; width:80rem; margin-left:auto; margin-right:auto; border-top:solid black 1px;">
+    ${tableHeaderHtml}
+    ${programRowHtml}
+    ${subjectRowsHtml}
+    ${nothingFollowsHtml}
   </div>
 `;
 
+    const gradeCol = (rows, width) => `
+<div style="display:flex; flex-direction:column; align-items:flex-start; width:${width};">
+  ${rows.map((r) => `<div style="font-size:16px; letter-spacing:-1px;">${r}</div>`).join("")}
+</div>
+`;
+
     const gradingSystemHtml = `
-  <div style="display:flex; height:145px; border-top:solid 1px black; font-size:18px; align-items:flex-start; padding-top:3px;">
-    <div style="width:13rem;">GRADING SYSTEM</div>
-    ${gradeCol(gradingSystemFirstHalf.map((r) => r.equivalent_grade), "4.5rem")}
-    ${gradeCol(gradingSystemFirstHalf.map((r) => `(${r.min_score}-${r.max_score})`), "6.5rem")}
-    ${gradeCol(gradingSystemFirstHalf.map((r) => r.descriptive_rating), "15.5rem")}
-    ${gradeCol(gradingSystemSecondHalf.map((r) => r.equivalent_grade), "4.5rem")}
-    ${gradeCol(gradingSystemSecondHalf.map((r) => `(${r.min_score}-${r.max_score})`), "14rem")}
-    ${gradeCol(gradingSystemSecondHalf.map((r) => r.descriptive_rating), "22rem")}
-  </div>
+<div style="display:flex; height:145px; border-top:solid 1px black; font-size:18px; align-items:flex-start; padding-top:3px;">
+  <div style="width:13rem;">GRADING SYSTEM</div>
+  ${gradeCol(gradingSystemFirstHalf.map((r) => r.equivalent_grade), "4.5rem")}
+  ${gradeCol(gradingSystemFirstHalf.map((r) => `(${formatScoreRange(r.min_score, r.max_score)})`), "6.5rem")}
+  ${gradeCol(gradingSystemFirstHalf.map((r) => r.descriptive_rating), "15.5rem")}
+  ${gradeCol(gradingSystemSecondHalf.map((r) => r.equivalent_grade), "4.5rem")}
+  ${gradeCol(gradingSystemSecondHalf.map((r) => `(${formatScoreRange(r.min_score, r.max_score)})`), "14rem")}
+  ${gradeCol(gradingSystemSecondHalf.map((r) => r.descriptive_rating), "22rem")}
+</div>
 `;
 
     const pageRemarksText = getPageRemarksText(isLastPage, degreeTitle);
 
     const creditsNoteHtml = `
-    <div style="padding-left:2rem; height:30px; border-bottom:solid 1px black; font-size:18px; display:flex; align-items:center;">
-      <span>${creditsNote}</span>
-    </div>
-    <div style="padding-left:2rem; height:60px; border-bottom:solid 1px black; font-size:17px; padding-top:5px;">
-      <span style="font-size:18px; letter-spacing:-0.8px;">${(companyName || "").toUpperCase()}</span>
-      <span style="letter-spacing:-0.8px;"> ${institutionNote}</span>
-    </div>
-    <div style="padding-left:1rem; height:60px; border-top:solid 1px black; border-bottom:solid 1px black; font-size:18px; padding-top:4px;">
-      <span style="font-weight:600;">REMARKS: </span>
-      <span style="font-weight:400;">${pageRemarksText}</span>
-    </div>
-    <div style="padding-left:1rem; height:35px; font-size:18px; padding-top:3px;">
-      <span>DATE ISSUED: </span><span>${dateIssuedDisplay}</span>
-    </div>
-  `;
-
-    const signatureBlock = (label, signature) => `
-  <div style="width:20rem; text-align:center;">
-    <span style="font-size:18px; letter-spacing:-0.8px;">${label}</span>
-    <div style="margin-top:0.3rem; text-align:center;">
-      ${signature?.signature_image
-        ? `<img src="${getSignatureImageSrc(signature)}" style="width:16rem; height:4rem; object-fit:contain; display:block; margin:0 auto -0.2rem;" />`
-        : `<div style="width:16rem; height:4rem; margin:0 auto;"></div>`
-      }
-      <span style="display:block; font-size:18px; font-weight:500; letter-spacing:-1px; white-space:normal; word-break:break-word; line-height:1.15; max-width:19rem; margin:0 auto;">
-        ${signature?.full_name?.toUpperCase() || ""}
-      </span>
-    </div>
+  <div style="padding-left:2rem; height:30px; border-bottom:solid 1px black; font-size:18px; display:flex; align-items:center;">
+    <span>${creditsNote}</span>
+  </div>
+  <div style="padding-left:2rem; height:60px; border-bottom:solid 1px black; font-size:17px; padding-top:5px;">
+    <span style="font-size:18px; letter-spacing:-0.8px;">${(companyName || "").toUpperCase()}</span>
+    <span style="letter-spacing:-0.8px;"> ${institutionNote}</span>
+  </div>
+  <div style="padding-left:1rem; height:60px; border-top:solid 1px black; border-bottom:solid 1px black; font-size:18px; padding-top:4px;">
+    <span style="font-weight:600;">REMARKS: </span>
+    <span style="font-weight:400;">${pageRemarksText}</span>
+  </div>
+  <div style="padding-left:1rem; height:35px; font-size:18px; padding-top:3px;">
+    <span>DATE ISSUED: </span><span>${dateIssuedDisplay}</span>
   </div>
 `;
 
+    const signatureBlock = (label, signature) => `
+<div style="width:20rem; text-align:center;">
+  <span style="font-size:18px; letter-spacing:-0.8px;">${label}</span>
+  <div style="margin-top:0.3rem; text-align:center;">
+    ${signature?.signature_image
+        ? `<img src="${getSignatureImageSrc(signature)}" style="width:16rem; height:4rem; object-fit:contain; display:block; margin:0 auto -0.2rem;" />`
+        : `<div style="width:16rem; height:4rem; margin:0 auto;"></div>`
+      }
+    <span style="display:block; font-size:18px; font-weight:500; letter-spacing:-1px; white-space:normal; word-break:break-word; line-height:1.15; max-width:19rem; margin:0 auto;">
+      ${signature?.full_name?.toUpperCase() || ""}
+    </span>
+  </div>
+</div>
+`;
+
     const registrarBlock = `
-  <div style="width:21rem; text-align:center; display:flex; flex-direction:column; align-items:center;">
-    ${torSignatories.registrar?.signature_image
+<div style="width:21rem; text-align:center; display:flex; flex-direction:column; align-items:center;">
+  ${torSignatories.registrar?.signature_image
         ? `<img src="${getSignatureImageSrc(torSignatories.registrar)}" style="width:11rem; height:2.7rem; object-fit:contain; display:block; margin-bottom:-0.2rem;" />`
         : `<div style="width:11rem; height:2.7rem; margin-bottom:-0.2rem;"></div>`
       }
-    <span style="font-size:22px; letter-spacing:-1px; white-space:normal; word-break:break-word; max-width:20rem; line-height:1.15;">${torSignatories.registrar?.full_name?.toUpperCase() || ""}</span>
-    <span style="font-size:18px; letter-spacing:-1px;">REGISTRAR</span>
-  </div>
+  <span style="font-size:22px; letter-spacing:-1px; white-space:normal; word-break:break-word; max-width:20rem; line-height:1.15;">${torSignatories.registrar?.full_name?.toUpperCase() || ""}</span>
+  <span style="font-size:18px; letter-spacing:-1px;">REGISTRAR</span>
+</div>
 `;
 
     const verificationQrBlock = torQrStatus.has_qr && torQrStatus.tor_qr_image_url
       ? `
-  <div style="width:8rem; text-align:center; display:flex; flex-direction:column; align-items:center; margin-left:auto;">
-    <img src="${API_BASE_URL}${torQrStatus.tor_qr_image_url}" alt="Scan to verify this Transcript of Records" style="width:6.5rem; height:6.5rem; object-fit:contain; display:block;" />
-    <span style="font-size:11px; letter-spacing:-0.3px; margin-top:0.2rem; line-height:1.1;">SCAN TO VERIFY</span>
-  </div>
+<div style="width:8rem; text-align:center; display:flex; flex-direction:column; align-items:center; margin-left:auto;">
+  <img src="${API_BASE_URL}${torQrStatus.tor_qr_image_url}" alt="Scan to verify this Transcript of Records" style="width:6.5rem; height:6.5rem; object-fit:contain; display:block;" />
+  <span style="font-size:11px; letter-spacing:-0.3px; margin-top:0.2rem; line-height:1.1;">SCAN TO VERIFY</span>
+</div>
 `
       : "";
 
     const signaturesHtml = `
-  <div style="display:flex; padding-left:0.8rem; height:8rem; border-bottom:solid black 1px; align-items:flex-start;">
+<div style="display:flex; padding-left:0.8rem; height:8rem; border-bottom:solid black 1px; align-items:flex-start;">
 <div style="width:8rem; height:8rem; position:relative; text-align:center; font-size:12px; font-style:italic;">
-  <div style="position:absolute; bottom:0.5rem; left:60%; transform:translateX(-50%); z-index:0;">
-    <span style="white-space:nowrap; display:block;">NOT VALID WITHOUT OFFICIAL</span>
-    <span style="white-space:nowrap; display:block;">SEAL OF THE INSTITUTE</span>
-  </div>
+<div style="position:absolute; bottom:0.5rem; left:60%; transform:translateX(-50%); z-index:0;">
+  <span style="white-space:nowrap; display:block;">NOT VALID WITHOUT OFFICIAL</span>
+  <span style="white-space:nowrap; display:block;">SEAL OF THE INSTITUTE</span>
 </div>
-    <div style="width:3rem;"></div>
-    ${signatureBlock("PREPARED BY:", torSignatories.prepared_by)}
-    ${signatureBlock("CHECKED BY:", torSignatories.checked_by)}
-    ${registrarBlock}
-    ${verificationQrBlock}
-  </div>
+</div>
+  <div style="width:3rem;"></div>
+  ${signatureBlock("PREPARED BY:", torSignatories.prepared_by)}
+  ${signatureBlock("CHECKED BY:", torSignatories.checked_by)}
+  ${registrarBlock}
+  ${verificationQrBlock}
+</div>
 `;
 
     const allCampusAddressesHtml = `
-  <div style="width:80rem; margin-left:auto; margin-right:auto; padding-top:0.5rem; display:flex; align-items:center; justify-content:center; white-space:nowrap;">
-    ${institutionWebsite ? `
-      <span style="font-size:13px; font-weight:700; letter-spacing:0.3px;">
-        ${institutionWebsite}
-        ${branches.filter((b) => b?.address || b?.branch_address || b?.campus_address).length > 0
+<div style="width:80rem; margin-left:auto; margin-right:auto; padding-top:0.5rem; display:flex; align-items:center; justify-content:center; white-space:nowrap;">
+  ${institutionWebsite ? `
+    <span style="font-size:13px; font-weight:700; letter-spacing:0.3px;">
+      ${institutionWebsite}
+      ${branches.filter((b) => b?.address || b?.branch_address || b?.campus_address).length > 0
           ? `<span style="margin:0 0.75rem; font-weight:400;">|</span>`
           : ""
         }
-      </span>
-    ` : ""}
-    ${branches
+    </span>
+  ` : ""}
+  ${branches
         .filter((b) => b?.address || b?.branch_address || b?.campus_address)
         .map(
           (b, index, arr) => `
-        <span style="font-size:14px; letter-spacing:-0.3px; line-height:1.3;">
-          <span style="font-weight:700;">${(b.branch || b.branch_name || "").toUpperCase()}:</span>
-          ${b.address || b.branch_address || b.campus_address}
-          ${index < arr.length - 1 ? `<span style="margin:0 0.75rem; font-weight:400;">|</span>` : ""}
-        </span>
-      `,
+      <span style="font-size:14px; letter-spacing:-0.3px; line-height:1.3;">
+        <span style="font-weight:700;">${(b.branch || b.branch_name || "").toUpperCase()}:</span>
+        ${b.address || b.branch_address || b.campus_address}
+        ${index < arr.length - 1 ? `<span style="margin:0 0.75rem; font-weight:400;">|</span>` : ""}
+      </span>
+    `,
         )
         .join("")}
-  </div>
+</div>
 `;
 
     return `
 <div class="tor-page">
-  ${headerHtml}
-  ${studentInfoHtml}
-  ${subjectsTableHtml}
-  <div style="width:80rem; margin-left:auto; margin-right:auto; margin-top:0.4rem;">
-    ${gradingSystemHtml}
-    ${creditsNoteHtml}
-    ${signaturesHtml}
-    ${allCampusAddressesHtml}
-  </div>
+${headerHtml}
+${studentInfoHtml}
+${subjectsTableHtml}
+<div style="width:80rem; margin-left:auto; margin-right:auto; margin-top:0.4rem;">
+  ${gradingSystemHtml}
+  ${creditsNoteHtml}
+  ${signaturesHtml}
+  ${allCampusAddressesHtml}
+</div>
 </div>
 `;
   };
-
 
   const handleExportTorPdf = async () => {
     if (paginatedSubjects.length === 0) {
@@ -1848,6 +1868,8 @@ const TranscriptOfRecords = () => {
 
     return text;
   };
+
+
 
   const repeatShortTermWithSpaces = (value, times = 12) => {
     if (value === null || value === undefined) {
@@ -3844,26 +3866,17 @@ const TranscriptOfRecords = () => {
                                       <td
                                         style={{
                                           width: "13rem",
-
                                           fontWeight: "400",
-                                          display: "flex",
-                                          flexDirection: "column",
-                                          justifyContent: compactTermLabel
-                                            ? "center"
-                                            : "center",
-                                          alignItems: "flex-start",
-                                          position: "relative",
+                                          position: "relative", // anchor for the year line below
                                           lineHeight: compactTermLabel ? "18px" : "22px",
-                                          paddingTop: index === 0 ? "0" : "0",
                                         }}
                                       >
                                         {!group.isContinuation && index === 0 && (
                                           <>
                                             <span
                                               style={{
-                                                fontSize: compactTermLabel
-                                                  ? "17px"
-                                                  : "18px",
+                                                display: "block",
+                                                fontSize: compactTermLabel ? "17px" : "18px",
                                                 textAlign: "center",
                                                 width: "14rem",
                                                 fontWeight: "500",
@@ -3874,13 +3887,10 @@ const TranscriptOfRecords = () => {
                                             </span>
                                             <span
                                               style={{
-                                                fontSize: compactTermLabel
-                                                  ? "16px"
-                                                  : "17px",
-                                                marginTop: compactTermLabel ? 0 : "3rem",
-                                                position: compactTermLabel
-                                                  ? "static"
-                                                  : "absolute",
+                                                position: "absolute",
+                                                top: compactTermLabel ? "18px" : "22px", // exactly one row's own line-height, not an arbitrary "3rem"
+                                                left: 0,
+                                                fontSize: compactTermLabel ? "16px" : "17px",
                                                 textAlign: "center",
                                                 width: "13.5rem",
                                                 fontWeight: "500",
@@ -4038,6 +4048,7 @@ const TranscriptOfRecords = () => {
                               display: "flex",
                               height: "auto",
                               lineHeight: 1,
+                              marginTop: "15px"
 
                             }}
                           >
@@ -4166,7 +4177,7 @@ const TranscriptOfRecords = () => {
                                 <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "6.5rem" }}>
                                   {gradingSystemFirstHalf.map((row, i) => (
                                     <div key={`gs-score-1-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}>
-                                      ({row.min_score}-{row.max_score})
+                                      ({formatScoreRange(row.min_score, row.max_score)})
                                     </div>
                                   ))}
                                 </td>
@@ -4193,7 +4204,7 @@ const TranscriptOfRecords = () => {
                                 <td style={{ display: "flex", flexDirection: "column", alignItems: "start", width: "14rem" }}>
                                   {gradingSystemSecondHalf.map((row, i) => (
                                     <div key={`gs-score-2-${row.id}`} style={{ margin: "-1px", fontWeight: "400", fontSize: "16px", letterSpacing: "-2px", paddingTop: i === 0 ? "3px" : 0 }}>
-                                      ({row.min_score}-{row.max_score})
+                                      ({formatScoreRange(row.min_score, row.max_score)})
                                     </div>
                                   ))}
                                 </td>
@@ -4212,7 +4223,7 @@ const TranscriptOfRecords = () => {
                                   display: "flex",
                                   paddingLeft: "2rem",
                                   height: "35px",
-                                  marginTop: "5px",
+                                  marginTop: "10px",
                                   borderBottom: "solid 1px black",
                                 }}
                               >
@@ -4533,7 +4544,7 @@ const TranscriptOfRecords = () => {
                               <tr
                                 style={{
                                   display: "flex",
-                                  alignItems: "center",  
+                                  alignItems: "center",
                                   justifyContent: "center",
                                   marginTop: "0.4rem",
                                   paddingTop: "0.3rem",

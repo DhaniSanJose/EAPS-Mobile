@@ -777,30 +777,40 @@ const StudentOnlineRequirementsAdmin = () => {
     reader.readAsDataURL(file);
   };
 
-  // Resolves the user_accounts.id needed by /api/update_student/:user_id.
-  // selectedPerson / person (from student_with_number /
-  // student_upload_documents_superadmin) likely don't carry this field —
-  // only your GET /students route selects "ua.id AS user_id". So fall back
-  // to that route, matched by student_number, if it's missing.
-  const resolveTargetUserId = async () => {
-    const direct = selectedPerson?.user_id || person?.user_id;
-    if (direct) return direct;
+ const resolveTargetUserId = async () => {
+  const direct = selectedPerson?.user_id || person?.user_id;
+  if (direct) return direct;
 
-    const studentNumber =
-      selectedPerson?.student_number || person?.student_number;
-    if (!studentNumber) return null;
+  const targetPersonId = selectedPerson?.person_id || person?.person_id;
 
+  if (targetPersonId) {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/students`);
-      const match = res.data.find(
-        (s) => String(s.student_number) === String(studentNumber),
+      const res = await axios.get(
+        `${API_BASE_URL}/api/get_user_account_id/${targetPersonId}`,
       );
-      return match?.user_id || null;
+      if (res.data?.user_account_id) return res.data.user_account_id;
     } catch (err) {
-      console.error("Could not resolve user_id from /api/students:", err);
-      return null;
+      if (err.response?.status !== 404) {
+        console.error("Error resolving user_account_id:", err);
+      }
     }
-  };
+  }
+
+  const studentNumber =
+    selectedPerson?.student_number || person?.student_number;
+  if (!studentNumber) return null;
+
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/students`);
+    const match = res.data.find(
+      (s) => String(s.student_number) === String(studentNumber),
+    );
+    return match?.user_id || null;
+  } catch (err) {
+    console.error("Could not resolve user_id from /api/students:", err);
+    return null;
+  }
+};
 
   const [photoVersion, setPhotoVersion] = useState(Date.now());
 

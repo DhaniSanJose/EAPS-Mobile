@@ -22,7 +22,7 @@ import AdminOfficeOfTheRegistrar from "../admission/AdminOfficeOfTheRegistrar";
 import AdminPersonalDataForm from "../admission/AdminPersonalDataForm";
 import ApplicantServicesSurvey from "../applicant/ApplicantServicesSurvey";
 
-
+import SaveIcon from '@mui/icons-material/Save';
 import API_BASE_URL from "../apiConfig";
 import EaristLogo from "../assets/EaristLogo.png";
 import { getAuditConfig } from "../utils/auditEvents";
@@ -897,21 +897,22 @@ const ApplicantAdminOtherInformation = () => {
                 >
                     PRINTABLE DOCUMENTS
                 </h1>
-                <Button
-                    variant="contained"
-                    onClick={handleManualSave}
-                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
-                    sx={{
+                  <Button
+                      variant="contained"
+                      onClick={handleManualSave}
+                      startIcon={<SaveIcon />}
+                      disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                      sx={{
                         position: "absolute",
                         right: 16,
-                        backgroundColor: mainButtonColor,
+            
                         textTransform: "none",
                         fontWeight: "bold",
-                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
-                    }}
-                >
-                    {saving ? "Saving..." : "Save Changes"}
-                </Button>
+            
+                      }}
+                    >
+                      {saving ? "Saving..." : "Save Changes"}
+                    </Button>
             </Box>
 
 

@@ -28,7 +28,7 @@ import { getAuditConfig } from "../utils/auditEvents";
 import useAccountAuditMac from "./useAccountAuditMac";
 import DateField from "../components/DateField";
 import { Snackbar, Alert } from "@mui/material";
-
+import SaveIcon from '@mui/icons-material/Save';
 const ApplicantAdminHealthMedicalRecords = () => {
     useAccountAuditMac();
 
@@ -929,21 +929,22 @@ const ApplicantAdminHealthMedicalRecords = () => {
                 >
                     PRINTABLE DOCUMENTS
                 </h1>
-                <Button
-                    variant="contained"
-                    onClick={handleManualSave}
-                    disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
-                    sx={{
-                        position: "absolute",
-                        right: 16,
-                        backgroundColor: mainButtonColor,
-                        textTransform: "none",
-                        fontWeight: "bold",
-                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
-                    }}
-                >
-                    {saving ? "Saving..." : "Save Changes"}
-                </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleManualSave}
+                        startIcon={<SaveIcon />}
+                        disabled={saving || !(selectedPerson?.person_id || queryPersonId || person?.person_id || userID)}
+                        sx={{
+                          position: "absolute",
+                          right: 16,
+              
+                          textTransform: "none",
+                          fontWeight: "bold",
+              
+                        }}
+                      >
+                        {saving ? "Saving..." : "Save Changes"}
+                      </Button>
             </Box>
 
 

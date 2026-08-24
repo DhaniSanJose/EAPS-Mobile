@@ -387,6 +387,10 @@ const StudentAdminPersonalInformation = () => {
     }
   };
 
+
+  const [explicitSelection, setExplicitSelection] = useState(false);
+
+
   useEffect(() => {
     let consumedFlag = false;
 
@@ -728,12 +732,32 @@ const StudentAdminPersonalInformation = () => {
     message: "",
     severity: "success",
   });
+
+
   const handleCloseSnackbar = () =>
     setSnackbar((prev) => ({ ...prev, open: false }));
 
   const MAX_SIZE = 2 * 1024 * 1024;
 
   const resolveTargetUserId = async () => {
+    const targetPersonId = person?.person_id;
+
+    // Primary: direct lookup by person_id
+    if (targetPersonId) {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/get_user_account_id/${targetPersonId}`,
+        );
+        if (res.data?.user_account_id) return res.data.user_account_id;
+      } catch (err) {
+        // 404 just means no direct match — fall through to student_number lookup
+        if (err.response?.status !== 404) {
+          console.error("Error resolving user_account_id:", err);
+        }
+      }
+    }
+
+    // Fallback: match by student_number against /api/students
     if (!person?.student_number) return null;
     try {
       const res = await axios.get(`${API_BASE_URL}/api/students`);
@@ -746,6 +770,7 @@ const StudentAdminPersonalInformation = () => {
       return null;
     }
   };
+
 
   const handleUpload = async () => {
     if (!selectedFile) {

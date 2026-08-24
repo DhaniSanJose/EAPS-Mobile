@@ -26,15 +26,16 @@ import StudentECATApplicationForm from "../student/StudentECATApplicationForm";
 import StudentPersonalDataForm from "../student/StudentPersonalDataForm";
 import StudentOfficeOfTheRegistrar from "../student/StudentOfficeOfTheRegistrar";
 import StudentServicesSurvey from "../student/StudentServicesSurvey";
+import SaveIcon from '@mui/icons-material/Save';
 
 const StudentAdminFamilyBackground = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
-  const colors = settings?.colors || {};
-  const branding = settings?.branding || {};
-  const assets = settings?.assets || {};
-  const headerColor = colors.header || "#1976d2";
+    const colors = settings?.colors || {};
+    const branding = settings?.branding || {};
+    const assets = settings?.assets || {};
+    const headerColor = colors.header || "#1976d2";
 
     const [titleColor, setTitleColor] = useState("#000000");
     const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -221,7 +222,7 @@ const StudentAdminFamilyBackground = () => {
         }
     };
 
-
+    const [explicitSelection, setExplicitSelection] = useState(false);
 
     useEffect(() => {
         let consumedFlag = false;
@@ -893,13 +894,14 @@ const StudentAdminFamilyBackground = () => {
                     variant="contained"
                     onClick={handleManualSave}
                     disabled={saving || !userID}
+                    startIcon={<SaveIcon />}
                     sx={{
                         position: "absolute",
                         right: 16,
-                        backgroundColor: mainButtonColor,
+
                         textTransform: "none",
                         fontWeight: "bold",
-                        "&:hover": { backgroundColor: mainButtonColor, opacity: 0.9 },
+
                     }}
                 >
                     {saving ? "Saving..." : "Save Changes"}
