@@ -13,7 +13,14 @@ import API_BASE_URL from "../apiConfig";
 
 const CertificateOfRegistration = forwardRef(
   (
-    { student_number, person_id, preload, containerId, onReady },
+    {
+      student_number,
+      person_id,
+      preload,
+      containerId,
+      onReady,
+      suppressNotifications = false,
+    },
     divToPrintRef,
   ) => {
     const settings = useContext(SettingsContext);
@@ -31,6 +38,7 @@ const CertificateOfRegistration = forwardRef(
     });
 
     const showSnackbar = (message, severity) => {
+      if (suppressNotifications) return;
       setSnack({ open: true, message, severity });
     };
     const handleSnackClose = (_, reason) => {
@@ -161,6 +169,8 @@ const CertificateOfRegistration = forwardRef(
     const [approvedBySignatureMissing, setApprovedBySignatureMissing] =
       useState(false);
     const [qrCodeMissing, setQrCodeMissing] = useState(false);
+    const [qrCodePathIndex, setQrCodePathIndex] = useState(0);
+    const [qrCodeSrc, setQrCodeSrc] = useState("");
     const approvedBySignature =
       typeof approvedBy?.signature_image === "string"
         ? approvedBy.signature_image.trim()
@@ -178,6 +188,8 @@ const CertificateOfRegistration = forwardRef(
 
     useEffect(() => {
       setQrCodeMissing(false);
+      setQrCodePathIndex(0);
+      setQrCodeSrc("");
     }, [student_number]);
 
     useEffect(() => {
@@ -310,6 +322,7 @@ const CertificateOfRegistration = forwardRef(
       courses: false,
       enrolled: false,
       tosf: false,
+      qr: false,
     });
 
     useEffect(() => {
@@ -348,6 +361,7 @@ const CertificateOfRegistration = forwardRef(
         courses: false,
         enrolled: false,
         tosf: false,
+        qr: false,
       });
       setEnrolled([]);
       setCourses([]);
@@ -732,7 +746,8 @@ const CertificateOfRegistration = forwardRef(
         dataLoaded.student &&
         dataLoaded.courses &&
         dataLoaded.enrolled &&
-        dataLoaded.tosf;
+        dataLoaded.tosf &&
+        dataLoaded.qr;
 
       if (allDataLoaded && onReady && student_number) {
         // Student profile must be present before export snapshot.
@@ -847,7 +862,61 @@ const CertificateOfRegistration = forwardRef(
         return label.toUpperCase().includes("UNIFAST");
       })?.scholarship_code ||
       (savedUnifast ? "UNIFAST-FHE" : "");
-    const showFreeTuitionStamp = savedUnifast;
+    const isUnifastScholarship =
+      savedUnifast || /UNIFAST/i.test(String(scholarshipDiscountValue || ""));
+    const showFreeTuitionStamp = isUnifastScholarship;
+    const qrCodePaths = student_number
+      ? [
+          `${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`,
+          `${API_BASE_URL}/uploads/StudentQRCodeGenerated/${student_number}_qrcode.png`,
+        ]
+      : [];
+
+    useEffect(() => {
+      let cancelled = false;
+
+      setQrCodeMissing(false);
+      setQrCodePathIndex(0);
+      setQrCodeSrc("");
+      setDataLoaded((prev) => ({ ...prev, qr: false }));
+
+      if (!student_number?.trim()) {
+        setDataLoaded((prev) => ({ ...prev, qr: true }));
+        return () => {
+          cancelled = true;
+        };
+      }
+
+      const tryQrPath = (index) => {
+        const nextSrc = qrCodePaths[index];
+        if (!nextSrc) {
+          if (!cancelled) {
+            setQrCodeMissing(true);
+            setDataLoaded((prev) => ({ ...prev, qr: true }));
+          }
+          return;
+        }
+
+        const image = new Image();
+        image.onload = () => {
+          if (cancelled) return;
+          setQrCodePathIndex(index);
+          setQrCodeSrc(nextSrc);
+          setDataLoaded((prev) => ({ ...prev, qr: true }));
+        };
+        image.onerror = () => {
+          if (cancelled) return;
+          tryQrPath(index + 1);
+        };
+        image.src = nextSrc;
+      };
+
+      tryQrPath(0);
+
+      return () => {
+        cancelled = true;
+      };
+    }, [student_number]);
 
     const totalCourseUnits = enrolled.reduce(
       (sum, item) => sum + toWholeUnit(item.course_unit),
@@ -1001,9 +1070,13 @@ const CertificateOfRegistration = forwardRef(
                   .certificate-wrapper {
                     width: calc((210mm + 6.5rem) * 44 / 42 + 3rem);
                     min-height: 297mm;
+                    padding: var(--cor-print-margin, 0 0.25in);
                   }
                   .fee-table-con {
                     width: 100% !important;
+                  }
+                  .Box {
+                    display: none;
                   }
                 }
               `}
@@ -1021,17 +1094,6 @@ const CertificateOfRegistration = forwardRef(
                     tableLayout: "fixed",
                   }}
                 >
-                  <style>
-                    {`
-                  @media print {
-                    .Box {
-                      display: none;
-                    }
-
-                  }
-                `}
-                  </style>
-
                   <tbody>
                     <tr>
                       <td
@@ -1123,7 +1185,6 @@ const CertificateOfRegistration = forwardRef(
                                   }}
                                 />
                               </td>
-
                               <td
                                 style={{
                                   width: "60%",
@@ -1231,7 +1292,6 @@ const CertificateOfRegistration = forwardRef(
                         </table>
                       </td>
                     </tr>
-
                     <tr>
                       <td
                         colSpan={10}
@@ -1254,7 +1314,6 @@ const CertificateOfRegistration = forwardRef(
                           <span style={{ color: "red" }}></span>
                         </b>
                       </td>
-
                       <td
                         colSpan={30}
                         style={{
@@ -1340,7 +1399,6 @@ const CertificateOfRegistration = forwardRef(
                         </b>
                       </td>
                     </tr>
-
                     <tr>
                       <td
                         colSpan={15}
@@ -1371,7 +1429,6 @@ const CertificateOfRegistration = forwardRef(
                         )}
                       </td>
                     </tr>
-
                     <tr>
                       <td
                         colSpan={15}
@@ -1417,7 +1474,6 @@ const CertificateOfRegistration = forwardRef(
                         )}
                       </td>
                     </tr>
-
                     <tr>
                       <td
                         colSpan={15}
@@ -1471,7 +1527,6 @@ const CertificateOfRegistration = forwardRef(
                         )}
                       </td>
                     </tr>
-
                     <tr>
                       <td
                         colSpan={15}
@@ -1516,7 +1571,6 @@ const CertificateOfRegistration = forwardRef(
                         )}
                       </td>
                     </tr>
-
                     <tr>
                       <td
                         colSpan={44}
@@ -1533,9 +1587,6 @@ const CertificateOfRegistration = forwardRef(
                         )}
                       </td>
                     </tr>
-
-                    {/*----------------------------------------------------------------------------------------------------------------------------------*/}
-
                     <tr>
                       <td
                         colSpan={5}
@@ -1988,9 +2039,6 @@ const CertificateOfRegistration = forwardRef(
                         </td>
                       </tr>
                     ))}
-
-                    {/*----------------------------------------------------------------------------------------------------------------------------------*/}
-
                     <tr>
                       <td
                         colSpan={12}
@@ -2110,7 +2158,6 @@ const CertificateOfRegistration = forwardRef(
                         }}
                       ></td>
                     </tr>
-
                     <tr
                       colSpan={12}
                       style={{
@@ -3913,9 +3960,15 @@ const CertificateOfRegistration = forwardRef(
                                 height: "150px",
                                 display: "block",
                               }}
-                              src={`${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`}
+                              src={qrCodeSrc || qrCodePaths[qrCodePathIndex]}
                               alt=""
-                              onError={() => setQrCodeMissing(true)}
+                              onError={() => {
+                                if (qrCodePathIndex < qrCodePaths.length - 1) {
+                                  setQrCodePathIndex((index) => index + 1);
+                                  return;
+                                }
+                                setQrCodeMissing(true);
+                              }}
                             />
                             <span
                               style={{
@@ -3975,20 +4028,22 @@ const CertificateOfRegistration = forwardRef(
           </div>
         </div>
 
-        <Snackbar
-          open={snack.open}
-          autoHideDuration={4000}
-          onClose={handleSnackClose}
-          anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          <Alert
+        {!suppressNotifications && (
+          <Snackbar
+            open={snack.open}
+            autoHideDuration={4000}
             onClose={handleSnackClose}
-            severity={snack.severity || "info"}
-            variant="filled"
+            anchorOrigin={{ vertical: "top", horizontal: "right" }}
           >
-            {snack.message}
-          </Alert>
-        </Snackbar>
+            <Alert
+              onClose={handleSnackClose}
+              severity={snack.severity || "info"}
+              variant="filled"
+            >
+              {snack.message}
+            </Alert>
+          </Snackbar>
+        )}
       </Container>
     );
   },
