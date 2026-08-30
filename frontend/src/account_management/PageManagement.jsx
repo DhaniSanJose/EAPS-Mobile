@@ -24,6 +24,9 @@ import {
     Tooltip,
     Snackbar,
     Alert,
+    FormControl,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import API_BASE_URL from "../apiConfig";
 import EaristLogo from "../assets/EaristLogo.png";
@@ -47,10 +50,10 @@ const PageManagement = () => {
     useAccountAuditMac();
 
     const settings = useContext(SettingsContext);
-  const colors = settings?.colors || {};
-  const branding = settings?.branding || {};
-  const assets = settings?.assets || {};
-  const headerColor = colors.header || "#1976d2";
+    const colors = settings?.colors || {};
+    const branding = settings?.branding || {};
+    const assets = settings?.assets || {};
+    const headerColor = colors.header || "#1976d2";
 
     const [titleColor, setTitleColor] = useState("#000000");
     const [subtitleColor, setSubtitleColor] = useState("#555555");
@@ -171,6 +174,10 @@ const PageManagement = () => {
 
     const mainColor = "#7E0000";
 
+    // ✅ NEW: pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 100;
+
     useEffect(() => {
         fetchPages();
     }, []);
@@ -184,6 +191,17 @@ const PageManagement = () => {
             console.error("Error fetching pages:", error);
         }
     };
+
+    // ✅ NEW: reset to page 1 whenever the underlying data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [pages.length]);
+
+    // ✅ NEW: pagination derived values
+    const totalPages = Math.max(1, Math.ceil(pages.length / itemsPerPage));
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentPages = pages.slice(indexOfFirstItem, indexOfLastItem);
 
     const [pageIdInput, setPageIdInput] = useState("");
 
@@ -379,6 +397,180 @@ const PageManagement = () => {
         }
     });
 
+    // ✅ NEW: reusable pagination bar (used above and below the table)
+    const renderPaginationBar = () => (
+        <TableContainer component={Paper} sx={{ width: "100%" }}>
+            <Table size="small" >
+                <TableHead sx={{ backgroundColor: "#6D2323", color: "white" }}>
+                    <TableRow>
+                        <TableCell
+                            colSpan={4}
+                            sx={{
+                                border: `1px solid ${borderColor}`,
+                                py: 0.5,
+                                backgroundColor: headerColor,
+                                color: "white",
+                            }}
+                        >
+                            <Box
+                                display="flex"
+                                justifyContent="space-between"
+                                alignItems="center"
+                                flexWrap="wrap"
+                                gap={1}
+                                sx={{ height: "50px" }}
+                            >
+                                <Typography fontSize="14px" fontWeight="bold" color="white">
+                                    Total Pages Records: {pages.length}
+                                </Typography>
+                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                    <Button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                        variant="outlined"
+                                        size="small"
+                                        sx={{
+                                            minWidth: 80,
+                                            color: "white",
+                                            borderColor: "white",
+                                            backgroundColor: "transparent",
+                                            "&:hover": {
+                                                borderColor: "white",
+                                                backgroundColor: "rgba(255,255,255,0.1)",
+                                            },
+                                            "&.Mui-disabled": {
+                                                color: "white",
+                                                borderColor: "white",
+                                                backgroundColor: "transparent",
+                                                opacity: 1,
+                                            },
+                                        }}
+                                    >
+                                        First
+                                    </Button>
+
+                                    <Button
+                                        onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        variant="outlined"
+                                        size="small"
+                                        sx={{
+                                            minWidth: 80,
+                                            color: "white",
+                                            borderColor: "white",
+                                            backgroundColor: "transparent",
+                                            "&:hover": {
+                                                borderColor: "white",
+                                                backgroundColor: "rgba(255,255,255,0.1)",
+                                            },
+                                            "&.Mui-disabled": {
+                                                color: "white",
+                                                borderColor: "white",
+                                                backgroundColor: "transparent",
+                                                opacity: 1,
+                                            },
+                                        }}
+                                    >
+                                        Prev
+                                    </Button>
+
+                                    <FormControl size="small" sx={{ minWidth: 80 }}>
+                                        <Select
+                                            value={currentPage}
+                                            onChange={(e) => setCurrentPage(Number(e.target.value))}
+                                            displayEmpty
+                                            sx={{
+                                                fontSize: "12px",
+                                                height: 36,
+                                                color: "white",
+                                                border: "1px solid white",
+                                                backgroundColor: "transparent",
+                                                ".MuiOutlinedInput-notchedOutline": {
+                                                    borderColor: "white",
+                                                },
+                                                "&:hover .MuiOutlinedInput-notchedOutline": {
+                                                    borderColor: "white",
+                                                },
+                                                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                                    borderColor: "white",
+                                                },
+                                                "& svg": { color: "white" },
+                                            }}
+                                            MenuProps={{
+                                                PaperProps: {
+                                                    sx: { maxHeight: 200, backgroundColor: "#fff" },
+                                                },
+                                            }}
+                                        >
+                                            {Array.from({ length: totalPages }, (_, i) => (
+                                                <MenuItem key={i + 1} value={i + 1}>
+                                                    Page {i + 1}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+
+                                    <Typography fontSize="11px" color="white">
+                                        of {totalPages} page{totalPages > 1 ? "s" : ""}
+                                    </Typography>
+
+                                    <Button
+                                        onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        variant="outlined"
+                                        size="small"
+                                        sx={{
+                                            minWidth: 80,
+                                            color: "white",
+                                            borderColor: "white",
+                                            backgroundColor: "transparent",
+                                            "&:hover": {
+                                                borderColor: "white",
+                                                backgroundColor: "rgba(255,255,255,0.1)",
+                                            },
+                                            "&.Mui-disabled": {
+                                                color: "white",
+                                                borderColor: "white",
+                                                backgroundColor: "transparent",
+                                                opacity: 1,
+                                            },
+                                        }}
+                                    >
+                                        Next
+                                    </Button>
+
+                                    <Button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages}
+                                        variant="outlined"
+                                        size="small"
+                                        sx={{
+                                            minWidth: 80,
+                                            color: "white",
+                                            borderColor: "white",
+                                            backgroundColor: "transparent",
+                                            "&:hover": {
+                                                borderColor: "white",
+                                                backgroundColor: "rgba(255,255,255,0.1)",
+                                            },
+                                            "&.Mui-disabled": {
+                                                color: "white",
+                                                borderColor: "white",
+                                                backgroundColor: "transparent",
+                                                opacity: 1,
+                                            },
+                                        }}
+                                    >
+                                        Last
+                                    </Button>
+                                </Box>
+                            </Box>
+                        </TableCell>
+                    </TableRow>
+                </TableHead>
+            </Table>
+        </TableContainer>
+    );
 
     return (
         <Box sx={{ height: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 1, backgroundColor: "transparent", mt: 1, padding: 2 }}>
@@ -426,30 +618,34 @@ const PageManagement = () => {
 
             <div style={{ height: "30px" }}></div>
 
+
+            {renderPaginationBar()}
+
+
             {/* Pages Table */}
             <Paper
                 elevation={4}
                 sx={{
-                    border: `1px solid ${borderColor}`,
+
                     overflow: "hidden",
                     backgroundColor: "#ffffff",
                 }}
             >
                 <TableContainer>
                     <Table>
-                        <TableHead sx={{ backgroundColor: headerColor || "#1976d2", }}>
+                        <TableHead sx={{ backgroundColor: "#f5f5f5", }}>
                             <TableRow>
-                                <TableCell sx={{ color: "white", fontWeight: "bold", border: `1px solid ${borderColor}`, }}>#</TableCell>
-                                <TableCell sx={{ color: "white", fontWeight: "bold", border: `1px solid ${borderColor}`, }}>Page Description</TableCell>
-                                <TableCell sx={{ color: "white", fontWeight: "bold", border: `1px solid ${borderColor}`, }}>Page Group</TableCell>
-                                <TableCell align="center" sx={{ color: "white", fontWeight: "bold", border: `1px solid ${borderColor}`, }}>
+                                <TableCell sx={{ color: "black", fontWeight: "bold", border: `1px solid ${borderColor}` }}>#</TableCell>
+                                <TableCell sx={{ color: "black", fontWeight: "bold", border: `1px solid ${borderColor}` }}>Page Description</TableCell>
+                                <TableCell sx={{ color: "black", fontWeight: "bold", border: `1px solid ${borderColor}` }}>Page Group</TableCell>
+                                <TableCell align="center" sx={{ color: "black", fontWeight: "bold", border: `1px solid ${borderColor}` }}>
                                     Actions
                                 </TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {pages.length > 0 ? (
-                                pages.map((page, i) => (
+                            {currentPages.length > 0 ? (
+                                currentPages.map((page, i) => (
                                     <TableRow
                                         key={page.id}
                                         sx={{
@@ -466,38 +662,35 @@ const PageManagement = () => {
                                             {page.page_group}
                                         </TableCell>
                                         <TableCell
-                                            align="center"
-                                            sx={{
-                                                borderBottom: `1px solid ${borderColor}`,
-                                                display: "flex",
-                                                justifyContent: "center",
-                                                alignItems: "center",
-                                                gap: "10px",
-                                            }}
-                                        >
-                                            {canEdit && (
-                                                <Button
-                                                    variant="contained"
-                                                    size="small"
-                                                    sx={{
-                                                        backgroundColor: "green",
-                                                        color: "white",
-                                                        borderRadius: "5px",
-                                                        padding: "8px 14px",
-                                                        width: "100px",
-                                                        height: "40px",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        justifyContent: "center",
-                                                        gap: "5px",
-                                                    }}
-                                                    onClick={() => handleEdit(page)}
-                                                >
-                                                    <EditIcon fontSize="small" /> Edit
-                                                </Button>
-                                            )}
 
-                                            {/* <Button
+                                            align="center"
+                                            sx={{ border: `1px solid ${borderColor}` }}
+                                        >
+                                            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px" }}>
+
+                                                {canEdit && (
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        sx={{
+                                                            backgroundColor: "green",
+                                                            color: "white",
+                                                            borderRadius: "5px",
+                                                            padding: "8px 14px",
+                                                            width: "100px",
+                                                            height: "40px",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            gap: "5px",
+                                                        }}
+                                                        onClick={() => handleEdit(page)}
+                                                    >
+                                                        <EditIcon fontSize="small" /> Edit
+                                                    </Button>
+                                                )}
+
+                                                {/* <Button
                                                 variant="contained"
                                                 size="small"
                                                 sx={{
@@ -516,12 +709,14 @@ const PageManagement = () => {
                                             >
                                                 <DeleteIcon fontSize="small" /> Delete
                                             </Button> */}
+                                            </Box>
+
                                         </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                                    <TableCell colSpan={4} align="center" >
                                         <Typography color="text.secondary">No pages found.</Typography>
                                     </TableCell>
                                 </TableRow>
@@ -530,6 +725,9 @@ const PageManagement = () => {
                     </Table>
                 </TableContainer>
             </Paper>
+
+
+            {renderPaginationBar()}
 
             {/* Add/Edit Dialog */}
             <Dialog

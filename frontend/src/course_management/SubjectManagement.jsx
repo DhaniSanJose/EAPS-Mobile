@@ -52,7 +52,6 @@ const getCourseSearchText = (course) =>
   [
     course?.course_code,
     course?.course_description,
-
     course?.course_unit,
   ]
     .map(cleanSearchValue)
@@ -63,7 +62,18 @@ const getCourseSuggestionValue = (course) =>
   cleanSearchValue(course?.course_code) ||
   cleanSearchValue(course?.course_description);
 
-const CoursePanel = () => {
+// ✅ NEW: default/blank filter state, reused for initial state + reset button
+const initialFilters = {
+  subject_type_id: "",
+  category_type_id: "",
+  has_prereq: "",
+  has_coreq: "",
+  is_academic_achiever: "",
+  is_latin: "",
+  is_gwa_included: "",
+};
+
+const CourseManagement = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -96,6 +106,11 @@ const CoursePanel = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
+  // ✅ NEW: filter state + subject/category type option lists for the filter dropdowns
+  const [filters, setFilters] = useState(initialFilters);
+  const [subjectTypes, setSubjectTypes] = useState([]);
+  const [categoryTypes, setCategoryTypes] = useState([]);
+
   const [course, setCourse] = useState({
     course_code: "",
     course_description: "",
@@ -111,14 +126,12 @@ const CoursePanel = () => {
     is_gwa_included: 1,
   });
 
-
   const [courseList, setCourseList] = useState([]);
   const [honorRules, setHonorRules] = useState([]);
 
   const [feeRules, setFeeRules] = useState([]);
   const [selectedGlobalFees, setSelectedGlobalFees] = useState([]);
 
-  // ✅ ADD PERMISSION STATES
   const [canCreate, setCanCreate] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
@@ -186,7 +199,12 @@ const CoursePanel = () => {
     fetchHonorRules();
   }, []);
 
-  // ✅ UPDATED checkAccess
+  // ✅ NEW: load subject/category type option lists for the filter bar
+  useEffect(() => {
+    fetchSubjectTypes();
+    fetchCategoryTypes();
+  }, []);
+
   const checkAccess = async (employeeID) => {
     try {
       const response = await axios.get(
@@ -223,10 +241,9 @@ const CoursePanel = () => {
       const response = await axios.get(`${API_BASE_URL}/api/course_list`);
       const data = response.data.map((item) => ({
         ...item,
-
         is_academic_achiever: item.is_academic_achiever ?? 1,
         is_latin: item.is_latin ?? 1,
-        is_gwa_included: item.is_gwa_included ?? 1, // ✅ new
+        is_gwa_included: item.is_gwa_included ?? 1,
       }));
       setCourseList(data);
     } catch (err) {
@@ -252,6 +269,26 @@ const CoursePanel = () => {
     }
   };
 
+  // ✅ NEW
+  const fetchSubjectTypes = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/subject-types`);
+      setSubjectTypes(res.data || []);
+    } catch (err) {
+      console.error("Error fetching subject types:", err);
+    }
+  };
+
+  // ✅ NEW
+  const fetchCategoryTypes = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/category-types`);
+      setCategoryTypes(res.data || []);
+    } catch (err) {
+      console.error("Error fetching category types:", err);
+    }
+  };
+
   const programFees = feeRules.filter(
     (fee) =>
       Number(fee.applies_to_all) === 1 &&
@@ -271,12 +308,59 @@ const CoursePanel = () => {
     .filter((fee) => selectedGlobalFees.includes(fee.fee_rule_id))
     .reduce((sum, fee) => sum + Number(fee.amount), 0);
 
-  const filteredCourses = courseList.filter((c) =>
-    [c.course_description, c.course_code, c.course_unit?.toString()]
+  // ✅ UPDATED: search text match + all filter-bar criteria combined
+  const filteredCourses = courseList.filter((c) => {
+    const matchesSearch = [
+      c.course_description,
+      c.course_code,
+      c.course_unit?.toString(),
+    ]
       .join(" ")
       .toLowerCase()
-      .includes(searchQuery.toLowerCase()),
-  );
+      .includes(searchQuery.toLowerCase());
+
+    const matchesSubjectType =
+      filters.subject_type_id === "" ||
+      String(c.subject_type_id) === String(filters.subject_type_id);
+
+    const matchesCategoryType =
+      filters.category_type_id === "" ||
+      String(c.category_type_id) === String(filters.category_type_id);
+
+    const hasPrereqValue = !!(c.prereq && String(c.prereq).trim());
+    const matchesPrereq =
+      filters.has_prereq === "" ||
+      (filters.has_prereq === "yes" ? hasPrereqValue : !hasPrereqValue);
+
+    const hasCoreqValue = !!(c.corequisite && String(c.corequisite).trim());
+    const matchesCoreq =
+      filters.has_coreq === "" ||
+      (filters.has_coreq === "yes" ? hasCoreqValue : !hasCoreqValue);
+
+    const matchesAcademicAchiever =
+      filters.is_academic_achiever === "" ||
+      Number(c.is_academic_achiever) === Number(filters.is_academic_achiever);
+
+    const matchesLatin =
+      filters.is_latin === "" ||
+      Number(c.is_latin) === Number(filters.is_latin);
+
+    const matchesGwa =
+      filters.is_gwa_included === "" ||
+      Number(c.is_gwa_included) === Number(filters.is_gwa_included);
+
+    return (
+      matchesSearch &&
+      matchesSubjectType &&
+      matchesCategoryType &&
+      matchesPrereq &&
+      matchesCoreq &&
+      matchesAcademicAchiever &&
+      matchesLatin &&
+      matchesGwa
+    );
+  });
+
   const courseSuggestions =
     searchQuery.trim().length >= 2
       ? courseList
@@ -303,9 +387,10 @@ const CoursePanel = () => {
     indexOfLastItem,
   );
 
+  // ✅ UPDATED: also reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, filters]);
 
   const handleChangesForEverything = (e) => {
     const { name, value } = e.target;
@@ -329,7 +414,6 @@ const CoursePanel = () => {
     setSnack((prev) => ({ ...prev, open: false }));
   };
 
-  // ✅ UPDATED handleAddingCourse
   const handleAddingCourse = async () => {
     if (!course.course_code || !course.course_description) {
       showSnack("Please fill all fields", "warning");
@@ -370,6 +454,7 @@ const CoursePanel = () => {
         category_type_name: "",
         is_academic_achiever: 1,
         is_latin: 1,
+        is_gwa_included: 1,
       });
 
       showSnack("Course successfully added!", "success");
@@ -383,7 +468,6 @@ const CoursePanel = () => {
     }
   };
 
-  // ✅ UPDATED handleEdit
   const handleEdit = (item) => {
     if (!canEdit) {
       showSnack("You do not have permission to edit this item", "error");
@@ -410,7 +494,6 @@ const CoursePanel = () => {
     setOpenCourseDialog(true);
   };
 
-  // ✅ UPDATED handleUpdateCourse
   const handleUpdateCourse = async () => {
     if (!editId) {
       showSnack("Invalid course selected.", "error");
@@ -456,6 +539,7 @@ const CoursePanel = () => {
         category_type_name: "",
         is_academic_achiever: 1,
         is_latin: 1,
+        is_gwa_included: 1,
       });
     } catch (error) {
       showSnack(
@@ -465,7 +549,6 @@ const CoursePanel = () => {
     }
   };
 
-  // ✅ UPDATED handleDelete
   const handleDelete = async (id) => {
     if (!canDelete) {
       showSnack("You do not have permission to delete this item", "error");
@@ -488,7 +571,6 @@ const CoursePanel = () => {
     }
   };
 
-  // ✅ UPDATED handleCourseImport
   const handleCourseImport = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -574,10 +656,8 @@ const CoursePanel = () => {
     },
   };
 
-  // 🔒 Disable right-click
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 🔒 Block DevTools shortcuts + Ctrl+P silently
   document.addEventListener("keydown", (e) => {
     const isBlockedKey =
       e.key === "F12" ||
@@ -622,7 +702,7 @@ const CoursePanel = () => {
             fontSize: "36px",
           }}
         >
-          COURSE PANEL
+     SUBJECT MANAGEMENT
         </Typography>
 
         <Box
@@ -762,6 +842,231 @@ const CoursePanel = () => {
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
+      <br />
+      <br />
+
+<TableContainer
+  component={Paper}
+  sx={{
+    width: "100%",
+    border: `1px solid ${borderColor}`,
+
+  }}
+>
+  <Table size="small">
+    <TableHead
+      sx={{
+        backgroundColor: headerColor,
+      }}
+    >
+      <TableRow>
+        <TableCell
+          colSpan={20}
+          sx={{
+            py: 0.5,
+            backgroundColor: headerColor,
+            color: "white",
+          }}
+        >
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap="wrap"
+            gap={1}
+            sx={{ height: "50px" }}
+          >
+            {/* LEFT SIDE */}
+            <Typography fontSize="14px" fontWeight="bold" color="white">
+            Subject Filters:
+            </Typography>
+
+            {/* RIGHT SIDE — all controls grouped together */}
+            <Box
+              display="flex"
+              alignItems="center"
+              gap={1}
+              flexWrap="wrap"
+            >
+             {showCreateActions && (
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    setEditMode(false);
+                    setCourse({
+                      course_code: "",
+                      course_description: "",
+                      course_unit: "",
+                      lec_unit: "",
+                      lab_unit: "",
+                      subject_type_id: "",
+                      subject_type_name: "",
+                      category_type_id: "",
+                      category_type_name: "",
+                      is_academic_achiever: 1,
+                      is_latin: 1,
+                      is_gwa_included: 1,
+                    });
+                    setOpenCourseDialog(true);
+                  }}
+                  sx={{
+                    backgroundColor: "#1976d2",
+                    color: "#fff",
+                    fontWeight: "bold",
+                    borderRadius: "8px",
+                    width: "250px",
+                    textTransform: "none",
+                    px: 2,
+                    mr: "15px",
+                    "&:hover": {
+                      backgroundColor: "#1565c0",
+                    },
+                  }}
+                >
+                  + Add Course
+                </Button>
+              )}
+        
+            </Box>
+          </Box>
+        </TableCell>
+      </TableRow>
+    </TableHead>
+  </Table>
+</TableContainer>
+
+
+
+<Box
+  sx={{
+    display: "flex",
+    alignItems: "center",
+    gap: 1.5,
+    flexWrap: "wrap",
+    mb: 2,
+    p: 1.5,
+    border: "1px solid #ddd",
+    borderRadius: "8px",
+    backgroundColor: "#fafafa",
+  }}
+>
+  <Typography sx={{ fontWeight: "bold", fontSize: 14 }}>
+    Filters:
+  </Typography>
+
+  <FormControl size="small" sx={{ minWidth: 170 }}>
+    <Select
+      displayEmpty
+      value={filters.subject_type_id}
+      onChange={(e) =>
+        setFilters((prev) => ({ ...prev, subject_type_id: e.target.value }))
+      }
+    >
+      <MenuItem value="">Subject Type: All</MenuItem>
+      {subjectTypes.map((st) => (
+        <MenuItem key={st.subject_type_id} value={st.subject_type_id}>
+          {st.subject_type_name}
+        </MenuItem>
+      ))}
+    </Select>
+  </FormControl>
+
+  <FormControl size="small" sx={{ minWidth: 170 }}>
+    <Select
+      displayEmpty
+      value={filters.category_type_id}
+      onChange={(e) =>
+        setFilters((prev) => ({ ...prev, category_type_id: e.target.value }))
+      }
+    >
+      <MenuItem value="">Category: All</MenuItem>
+      {categoryTypes.map((ct) => (
+        <MenuItem key={ct.category_type_id} value={ct.category_type_id}>
+          {ct.category_type_name}
+        </MenuItem>
+      ))}
+    </Select>
+  </FormControl>
+
+  <FormControl size="small" sx={{ minWidth: 160 }}>
+    <Select
+      displayEmpty
+      value={filters.has_prereq}
+      onChange={(e) =>
+        setFilters((prev) => ({ ...prev, has_prereq: e.target.value }))
+      }
+    >
+      <MenuItem value="">Prereq: All</MenuItem>
+      <MenuItem value="yes">Has Prereq</MenuItem>
+      <MenuItem value="no">No Prereq</MenuItem>
+    </Select>
+  </FormControl>
+
+  <FormControl size="small" sx={{ minWidth: 170 }}>
+    <Select
+      displayEmpty
+      value={filters.has_coreq}
+      onChange={(e) =>
+        setFilters((prev) => ({ ...prev, has_coreq: e.target.value }))
+      }
+    >
+      <MenuItem value="">Corequisite: All</MenuItem>
+      <MenuItem value="yes">Has Corequisite</MenuItem>
+      <MenuItem value="no">No Corequisite</MenuItem>
+    </Select>
+  </FormControl>
+
+  <FormControl size="small" sx={{ minWidth: 190 }}>
+    <Select
+      displayEmpty
+      value={filters.is_academic_achiever}
+      onChange={(e) =>
+        setFilters((prev) => ({
+          ...prev,
+          is_academic_achiever: e.target.value,
+        }))
+      }
+    >
+      <MenuItem value="">Academic Achiever: All</MenuItem>
+      <MenuItem value={1}>YES</MenuItem>
+      <MenuItem value={0}>NO</MenuItem>
+    </Select>
+  </FormControl>
+
+  <FormControl size="small" sx={{ minWidth: 160 }}>
+    <Select
+      displayEmpty
+      value={filters.is_latin}
+      onChange={(e) =>
+        setFilters((prev) => ({ ...prev, is_latin: e.target.value }))
+      }
+    >
+      <MenuItem value="">Latin Honor: All</MenuItem>
+      <MenuItem value={1}>YES</MenuItem>
+      <MenuItem value={0}>NO</MenuItem>
+    </Select>
+  </FormControl>
+
+  <FormControl size="small" sx={{ minWidth: 200 }}>
+    <Select
+      displayEmpty
+      value={filters.is_gwa_included}
+      onChange={(e) =>
+        setFilters((prev) => ({
+          ...prev,
+          is_gwa_included: e.target.value,
+        }))
+      }
+    >
+      <MenuItem value="">Included in GWA: All</MenuItem>
+      <MenuItem value={1}>YES</MenuItem>
+      <MenuItem value={0}>NO</MenuItem>
+    </Select>
+  </FormControl>
+
+</Box>
+
+
       <br />
       <br />
 
@@ -914,67 +1219,7 @@ const CoursePanel = () => {
                       Next
                     </Button>
 
-                    <Button
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={currentPage === totalPages}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        minWidth: 80,
-                        color: "white",
-                        borderColor: "white",
-                        backgroundColor: "transparent",
-                        "&:hover": {
-                          borderColor: "white",
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                        },
-                        "&.Mui-disabled": {
-                          color: "white",
-                          borderColor: "white",
-                          backgroundColor: "transparent",
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      Last
-                    </Button>
-                    {showCreateActions && (
-                      <Button
-                        variant="contained"
-                        onClick={() => {
-                          setEditMode(false);
-                          setCourse({
-                            course_code: "",
-                            course_description: "",
-                            course_unit: "",
-                            lec_unit: "",
-                            lab_unit: "",
-                            subject_type_id: "",
-                            subject_type_name: "",
-                            category_type_id: "",
-                            category_type_name: "",
-                            is_academic_achiever: 1,
-                            is_latin: 1,
-                          });
-                          setOpenCourseDialog(true);
-                        }}
-                        sx={{
-                          backgroundColor: "#1976d2",
-                          color: "#fff",
-                          fontWeight: "bold",
-                          borderRadius: "8px",
-                          width: "250px",
-                          textTransform: "none",
-                          px: 2,
-                          mr: "15px",
-                          "&:hover": {
-                            backgroundColor: "#1565c0",
-                          },
-                        }}
-                      >
-                        + Add Course
-                      </Button>
-                    )}
+              
                   </Box>
                 </Box>
               </TableCell>
@@ -1048,8 +1293,6 @@ const CoursePanel = () => {
                   <td style={styles.tableCell}>{c.course_unit}</td>
                   <td style={styles.tableCell}>{c.subject_type_name}</td>
                   <td style={styles.tableCell}>{c.category_type_name}</td>
-
-
 
                   <td style={styles.tableCell}>
                     {Number(c.is_academic_achiever) === 1 ? "YES" : "NO"}
@@ -1449,6 +1692,30 @@ const CoursePanel = () => {
               />
             </Grid>
 
+            {/* ✅ NEW: Lec Unit and Lab Unit, placed before Course Unit */}
+            <Grid item xs={12} md={4}>
+              <Typography fontWeight="bold">Lec Unit</Typography>
+              <TextField
+                fullWidth
+                label="Lec Unit"
+                name="lec_unit"
+                type="number"
+                value={course.lec_unit}
+                onChange={handleChangesForEverything}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Typography fontWeight="bold">Lab Unit</Typography>
+              <TextField
+                fullWidth
+                label="Lab Unit"
+                name="lab_unit"
+                type="number"
+                value={course.lab_unit}
+                onChange={handleChangesForEverything}
+              />
+            </Grid>
 
             <Grid item xs={12} md={4}>
               <Typography fontWeight="bold">Course Unit</Typography>
@@ -1499,7 +1766,6 @@ const CoursePanel = () => {
                 onSnack={showSnack}
               />
             </Grid>
-
 
             <Grid item xs={12} md={6}>
               <Typography fontWeight="bold">Academic Achiever</Typography>
@@ -1594,4 +1860,4 @@ const CoursePanel = () => {
   );
 };
 
-export default CoursePanel;
+export default CourseManagement;

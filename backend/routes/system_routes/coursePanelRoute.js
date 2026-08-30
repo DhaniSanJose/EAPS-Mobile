@@ -36,9 +36,6 @@ const insertCoursePanelAuditLog = async ({ req, action, message }) => {
 };
 
 /* ===================== GET COURSE LIST ===================== */
-// ✅ FIXED: now LEFT JOINs subject_type_table / category_type_table so
-// subject_type_name and category_type_name actually come back — without
-// this, the frontend table has nothing to render in those two columns.
 router.get("/course_list", async (req, res) => {
   const query = `
     SELECT
@@ -72,8 +69,8 @@ router.post("/adding_course", CanCreate, async (req, res) => {
     lab_unit,
     prereq,
     corequisite,
-    subject_type_id,   // ✅ NEW
-    category_type_id,  // ✅ NEW
+    subject_type_id,
+    category_type_id,
     is_academic_achiever,
     is_latin,
     is_gwa_included
@@ -96,7 +93,6 @@ router.post("/adding_course", CanCreate, async (req, res) => {
     const lec = parseFloat(lec_unit) || 0;
     const lab = parseFloat(lab_unit) || 0;
 
-    // ✅ Falls back to Regular (1) / ACADEMIC (1) if the picker was left empty
     const subjectTypeId = subject_type_id ? Number(subject_type_id) : 1;
     const categoryTypeId = category_type_id ? Number(category_type_id) : 1;
 
@@ -133,7 +129,6 @@ router.post("/adding_course", CanCreate, async (req, res) => {
         is_gwa_included ?? 1,
       ]
     );
-
 
     if (rows.length > 0) {
       return res.status(400).json({
@@ -174,7 +169,6 @@ router.post("/adding_course", CanCreate, async (req, res) => {
       ]
     );
 
-
     const { actorId, actorRole } = getAuditActor(req);
     const roleLabel = formatAuditActorRole(actorRole);
     await insertCoursePanelAuditLog({
@@ -201,8 +195,8 @@ router.put("/update_course/:id", CanEdit, async (req, res) => {
     lab_unit,
     prereq,
     corequisite,
-    subject_type_id,   // ✅ NEW
-    category_type_id,  // ✅ NEW
+    subject_type_id,
+    category_type_id,
     is_academic_achiever,
     is_latin,
     is_gwa_included
@@ -220,7 +214,6 @@ router.put("/update_course/:id", CanEdit, async (req, res) => {
 
     const current = currentRows[0];
 
-    // Same normalization as adding
     const normalizeCode = (code) =>
       (code || "")
         .replace(/[^A-Za-z0-9-_\. ]/g, "")
@@ -238,7 +231,6 @@ router.put("/update_course/:id", CanEdit, async (req, res) => {
       ? normalizeDescription(course_description)
       : normalizeDescription(current.course_description);
 
-    // ✅ Keep existing value when the picker wasn't touched, don't blank it out
     const final_subject_type_id =
       subject_type_id !== undefined && subject_type_id !== ""
         ? Number(subject_type_id)
@@ -249,8 +241,8 @@ router.put("/update_course/:id", CanEdit, async (req, res) => {
         ? Number(category_type_id)
         : current.category_type_id;
 
-const [rows] = await db3.query(
-  `SELECT course_id FROM course_table 
+    const [rows] = await db3.query(
+      `SELECT course_id FROM course_table 
    WHERE course_code = ?
    AND course_description = ?
    AND course_unit = ?
@@ -262,35 +254,33 @@ const [rows] = await db3.query(
    AND (is_latin <=> ?)
    AND (is_gwa_included <=> ?)
    AND course_id != ?`,
-  [
-    final_course_code,
-    final_course_desc,
-    course_unit !== undefined && course_unit !== ""
-      ? parseFloat(course_unit)
-      : current.course_unit,
-    lec_unit !== undefined && lec_unit !== ""
-      ? parseFloat(lec_unit)
-      : current.lec_unit,
-    lab_unit !== undefined && lab_unit !== ""
-      ? parseFloat(lab_unit)
-      : current.lab_unit,
-    prereq ?? current.prereq,
-    corequisite ?? current.corequisite,
-    is_academic_achiever ?? current.is_academic_achiever,
-    is_latin ?? current.is_latin,
-    is_gwa_included ?? current.is_gwa_included,
-    id,
-  ]
-);
+      [
+        final_course_code,
+        final_course_desc,
+        course_unit !== undefined && course_unit !== ""
+          ? parseFloat(course_unit)
+          : current.course_unit,
+        lec_unit !== undefined && lec_unit !== ""
+          ? parseFloat(lec_unit)
+          : current.lec_unit,
+        lab_unit !== undefined && lab_unit !== ""
+          ? parseFloat(lab_unit)
+          : current.lab_unit,
+        prereq ?? current.prereq,
+        corequisite ?? current.corequisite,
+        is_academic_achiever ?? current.is_academic_achiever,
+        is_latin ?? current.is_latin,
+        is_gwa_included ?? current.is_gwa_included,
+        id,
+      ]
+    );
 
-
-    
     if (rows.length > 0) {
       return res.status(400).json({ message: "The course already exists" });
     }
 
-  await db3.query(
-  `UPDATE course_table SET
+    await db3.query(
+      `UPDATE course_table SET
     course_code = ?,
     course_description = ?,
     course_unit = ?,
@@ -304,24 +294,24 @@ const [rows] = await db3.query(
     is_latin = ?,
     is_gwa_included = ?
   WHERE course_id = ?`,
-  [
-    final_course_code,
-    final_course_desc,
-    course_unit !== undefined && course_unit !== ""
-      ? parseFloat(course_unit)
-      : current.course_unit,
-    lec_unit !== undefined ? parseFloat(lec_unit) : current.lec_unit,
-    lab_unit !== undefined ? parseFloat(lab_unit) : current.lab_unit,
-    prereq !== undefined ? prereq : current.prereq,
-    corequisite !== undefined ? corequisite : current.corequisite,
-    final_subject_type_id,
-    final_category_type_id,
-    is_academic_achiever ?? current.is_academic_achiever,
-    is_latin ?? current.is_latin,
-    is_gwa_included ?? current.is_gwa_included,
-    id,
-  ]
-);
+      [
+        final_course_code,
+        final_course_desc,
+        course_unit !== undefined && course_unit !== ""
+          ? parseFloat(course_unit)
+          : current.course_unit,
+        lec_unit !== undefined ? parseFloat(lec_unit) : current.lec_unit,
+        lab_unit !== undefined ? parseFloat(lab_unit) : current.lab_unit,
+        prereq !== undefined ? prereq : current.prereq,
+        corequisite !== undefined ? corequisite : current.corequisite,
+        final_subject_type_id,
+        final_category_type_id,
+        is_academic_achiever ?? current.is_academic_achiever,
+        is_latin ?? current.is_latin,
+        is_gwa_included ?? current.is_gwa_included,
+        id,
+      ]
+    );
 
     const { actorId, actorRole } = getAuditActor(req);
     const roleLabel = formatAuditActorRole(actorRole);

@@ -29,8 +29,8 @@ export const ADMISSION_ROOM_ASSIGNMENT_TABS = [
     iconKey: "people",
   },
   {
-    label: "Subject Management",
-    to: "/applicant_exam_subjects",
+    label: "Exam Subject Management",
+    to: "/exam_subject_management",
     iconKey: "school",
   },
   {

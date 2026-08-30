@@ -732,7 +732,7 @@ const ProgramTagging = () => {
           variant="h4"
           sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}
         >
-          PROGRAM TAGGING
+          PROGRAM TAGGING MANAGEMENT
         </Typography>
 
         <Box
@@ -876,6 +876,7 @@ const ProgramTagging = () => {
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
       <br />
+      <br />
 
       <div style={styles.container}>
         <TableContainer
@@ -915,7 +916,7 @@ const ProgramTagging = () => {
                       fontWeight="bold"
                       color="white"
                     >
-                      Tagged Program Filter:
+                      Tagged Program Filters:
                     </Typography>
 
                     {/* RIGHT SIDE */}
@@ -969,12 +970,7 @@ const ProgramTagging = () => {
             </TableHead>
           </Table>
         </TableContainer>
-        <div
-          style={{
-            ...styles.displaySection,
-            border: `1px solid ${borderColor}`,
-          }}
-        >
+      
           <ProgramTaggingFilter
             curriculumList={curriculumList}
             yearLevelList={yearLevelList}
@@ -990,9 +986,7 @@ const ProgramTagging = () => {
           />
 
 
-        </div>
-        <br />
-
+      <br />
 
 
 
@@ -2068,8 +2062,8 @@ const styles = {
     display: "flex",
     flexDirection: "column", // 👈 TOP & BOTTOM
     gap: "30px",
-    width: "95%",
-    margin: "30px auto",
+    width: "100%",
+
   },
   formSection: {
     width: "100%", // 👈 instead of minWidth: "48%"

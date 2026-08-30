@@ -15,7 +15,6 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
   Snackbar,
   Alert,
   Chip,
@@ -24,7 +23,6 @@ import {
   Tooltip,
 } from "@mui/material";
 import {
-  Search as SearchIcon,
   PersonAdd as EnrollIcon,
   PersonRemove as UnenrollIcon,
   GroupAdd as EnrollAllIcon,
@@ -385,31 +383,44 @@ const NSTPTagging = () => {
     });
   };
 
-  // ── Search — fetches both panels so tagged students appear immediately ────
-  const handleSearch = async () => {
+  // ✅ AUTO-SEARCH: fires whenever section/year-level/school-year/semester change,
+  // no manual Search button needed
+  useEffect(() => {
     if (!selectedSection || !activeSYID) {
-      setSnackbar({
-        open: true,
-        message: "Please select all fields before searching.",
-        severity: "warning",
-      });
+      setAllSectionStudents([]);
+      setTaggedStudents([]);
+      setTaggedNumbers(new Set());
+      setSearched(false);
       return;
     }
-    setSearching(true);
-    try {
-      await Promise.all([fetchSectionStudents(), fetchTaggedStudents()]);
-      setSearched(true);
-    } catch (err) {
-      console.error("Search error:", err);
-      setSnackbar({
-        open: true,
-        message: "Failed to fetch students.",
-        severity: "error",
-      });
-    } finally {
-      setSearching(false);
-    }
-  };
+
+    let cancelled = false;
+
+    const runAutoSearch = async () => {
+      setSearching(true);
+      try {
+        await Promise.all([fetchSectionStudents(), fetchTaggedStudents()]);
+        if (!cancelled) setSearched(true);
+      } catch (err) {
+        console.error("Search error:", err);
+        if (!cancelled) {
+          setSnackbar({
+            open: true,
+            message: "Failed to fetch students.",
+            severity: "error",
+          });
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    };
+
+    runAutoSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSection, activeSYID, selectedYearLevel]);
 
   // ── Enroll / Unenroll ─────────────────────────────────────────────────────
   const [actionLoading, setActionLoading] = useState(false);
@@ -672,188 +683,153 @@ const NSTPTagging = () => {
           >
             <TableRow>
               <TableCell sx={{ color: "white", textAlign: "Center" }}>
-                Application Date
+         NSTP Filters:
               </TableCell>
             </TableRow>
           </TableHead>
         </Table>
       </TableContainer>
 
-      <Paper
-        elevation={0}
+      {/* ── Filter bar — matches CoursePanel's filter UI/UX ──────────────── */}
+      <Box
         sx={{
-          border: `1px solid ${borderColor}`,
-
-          p: 2.5,
-          mb: 3,
-          backgroundColor: "#fff",
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          flexWrap: "wrap",
+          mb: 2,
+          p: 1.5,
+          border: "1px solid #ddd",
+          borderRadius: "8px",
+          backgroundColor: "#fafafa",
         }}
       >
-        <Typography
-          sx={{
-            fontSize: "12px",
-            fontWeight: 600,
-            color: "#888",
-            letterSpacing: "0.08em",
-            mb: 1.5,
-            textTransform: "uppercase",
-          }}
-        >
-          Filter
+        <Typography sx={{ fontWeight: "bold", fontSize: 14 }}>
+          Filters:
         </Typography>
 
-        <Box
-          sx={{
-            display: "flex",
-            gap: 2,
-            flexWrap: "wrap",
-            alignItems: "flex-end",
-          }}
-        >
-          {/* Department Section — coerce to string to fix MUI value mismatch */}
-          <FormControl size="small" sx={{ minWidth: 220, flex: "1 1 220px" }}>
-            <InputLabel>Department</InputLabel>
-            <Select
-              value={String(selectedDepartment || "")}
-              label="Department"
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-            >
-              <MenuItem value="">All Departments</MenuItem>
-              {departments.map((dept) => (
-                <MenuItem key={dept.dprtmnt_id} value={String(dept.dprtmnt_id)}>
-                  {dept.dprtmnt_name} ({dept.dprtmnt_code})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: 300, flex: "1 1 300px" }}>
-            <InputLabel>Curriculum</InputLabel>
-            <Select
-              value={String(selectedCurriculum || "")}
-              label="Curriculum"
-              onChange={(e) => setSelectedCurriculum(e.target.value)}
-            >
-              <MenuItem value="">All Active Curriculums</MenuItem>
-              {filteredCurriculums.map((curriculum) => (
-                <MenuItem
-                  key={`${curriculum.curriculum_id}-${curriculum.dprtmnt_id || "all"}`}
-                  value={String(curriculum.curriculum_id)}
-                >
-                  {formatSchoolYear(curriculum.year_description)} - ({curriculum.program_code}){" "}
-                  {curriculum.program_description}
-                  {curriculum.major ? ` (${curriculum.major})` : ""}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel>Year Level</InputLabel>
-            <Select
-              value={String(selectedYearLevel || "")}
-              label="Year Level"
-              onChange={(e) => setSelectedYearLevel(e.target.value)}
-            >
-              <MenuItem value="">All Year Levels</MenuItem>
-              {yearLevels.map((yearLevel) => (
-                <MenuItem
-                  key={yearLevel.year_level_id}
-                  value={String(yearLevel.year_level_id)}
-                >
-                  {yearLevel.year_level_description}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: 260, flex: "1 1 260px" }}>
-            <InputLabel>Department Section</InputLabel>
-            <Select
-              value={String(selectedSection || "")}
-              label="Department Section"
-              onChange={(e) => setSelectedSection(e.target.value)}
-            >
-              <MenuItem value="">
-                Select a Department Section
-              </MenuItem>
-              {filteredDepartmentSections.map((sec) => {
-                const val = String(sec.department_section_id ?? "");
-                return (
-                  <MenuItem key={val} value={val}>
-                    {sec.program_code} {sec.major ? `(${sec.major})` : ""} —{" "}
-                    {sec.section_description}
-                  </MenuItem>
-                );
-              })}
-            </Select>
-          </FormControl>
-
-          {/* School Year */}
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel>School Year</InputLabel>
-            <Select
-              value={selectedYear}
-              label="School Year"
-              onChange={(e) => setSelectedYear(e.target.value)}
-            >
-              <MenuItem value="" disabled>
-                Select Year
-              </MenuItem>
-              {visibleSchoolYears.map((yr) => (
-                <MenuItem key={yr.year_id} value={yr.year_id}>
-                  {yr.current_year} – {yr.next_year}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Semester */}
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel>Semester</InputLabel>
-            <Select
-              value={selectedSemester}
-              label="Semester"
-              onChange={(e) => setSelectedSemester(e.target.value)}
-            >
-              <MenuItem value="" disabled>
-                Select Semester
-              </MenuItem>
-              {semesters.map((sem) => (
-                <MenuItem key={sem.semester_id} value={sem.semester_id}>
-                  {sem.semester_description}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Search Button */}
-          <Button
-            variant="contained"
-            startIcon={
-              searching ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <SearchIcon />
-              )
-            }
-            disabled={searching}
-            onClick={handleSearch}
-            sx={{
-              backgroundColor: mainButtonColor,
-              color: "#fff",
-              fontWeight: 600,
-              height: "40px",
-              px: 3,
-              borderRadius: "8px",
-              textTransform: "none",
-              "&:hover": { backgroundColor: mainButtonColor, opacity: 0.88 },
-            }}
+        {/* Department */}
+        <FormControl size="small" sx={{ minWidth: 190 }}>
+          <Select
+            displayEmpty
+            value={String(selectedDepartment || "")}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
           >
-            {searching ? "Searching…" : "Search"}
-          </Button>
-        </Box>
-      </Paper>
+            <MenuItem value="">Department: All</MenuItem>
+            {departments.map((dept) => (
+              <MenuItem key={dept.dprtmnt_id} value={String(dept.dprtmnt_id)}>
+                {dept.dprtmnt_name} ({dept.dprtmnt_code})
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Curriculum */}
+        <FormControl size="small" sx={{ minWidth: 260 }}>
+          <Select
+            displayEmpty
+            value={String(selectedCurriculum || "")}
+            onChange={(e) => setSelectedCurriculum(e.target.value)}
+          >
+            <MenuItem value="">Curriculum: All</MenuItem>
+            {filteredCurriculums.map((curriculum) => (
+              <MenuItem
+                key={`${curriculum.curriculum_id}-${curriculum.dprtmnt_id || "all"}`}
+                value={String(curriculum.curriculum_id)}
+              >
+                {formatSchoolYear(curriculum.year_description)} - ({curriculum.program_code}){" "}
+                {curriculum.program_description}
+                {curriculum.major ? ` (${curriculum.major})` : ""}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Year Level */}
+        <FormControl size="small" sx={{ minWidth: 170 }}>
+          <Select
+            displayEmpty
+            value={String(selectedYearLevel || "")}
+            onChange={(e) => setSelectedYearLevel(e.target.value)}
+          >
+            <MenuItem value="">Year Level: All</MenuItem>
+            {yearLevels.map((yearLevel) => (
+              <MenuItem
+                key={yearLevel.year_level_id}
+                value={String(yearLevel.year_level_id)}
+              >
+                {yearLevel.year_level_description}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Department Section */}
+        <FormControl size="small" sx={{ minWidth: 240 }}>
+          <Select
+            displayEmpty
+            value={String(selectedSection || "")}
+            onChange={(e) => setSelectedSection(e.target.value)}
+          >
+            <MenuItem value="">Section: Select a Department Section</MenuItem>
+            {filteredDepartmentSections.map((sec) => {
+              const val = String(sec.department_section_id ?? "");
+              return (
+                <MenuItem key={val} value={val}>
+                  {sec.program_code} {sec.major ? `(${sec.major})` : ""} —{" "}
+                  {sec.section_description}
+                </MenuItem>
+              );
+            })}
+          </Select>
+        </FormControl>
+
+        {/* School Year */}
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <Select
+            displayEmpty
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+          >
+            <MenuItem value="" disabled>
+              School Year
+            </MenuItem>
+            {visibleSchoolYears.map((yr) => (
+              <MenuItem key={yr.year_id} value={yr.year_id}>
+                {yr.current_year} – {yr.next_year}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Semester */}
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <Select
+            displayEmpty
+            value={selectedSemester}
+            onChange={(e) => setSelectedSemester(e.target.value)}
+          >
+            <MenuItem value="" disabled>
+              Semester
+            </MenuItem>
+            {semesters.map((sem) => (
+              <MenuItem key={sem.semester_id} value={sem.semester_id}>
+                {sem.semester_description}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* ✅ Replaces the Search button — small inline loading indicator only */}
+        {searching && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, ml: 0.5 }}>
+            <CircularProgress size={16} />
+            <Typography sx={{ fontSize: 12, color: "#666" }}>
+              Loading students…
+            </Typography>
+          </Box>
+        )}
+      </Box>
 
       {/* ── NSTP Type Selector + Enroll All / Unenroll All ───────────────── */}
       <Box
@@ -1046,7 +1022,7 @@ const NSTPTagging = () => {
                       >
                         {searched
                           ? "No students found in this section"
-                          : "Search a section to load students"}
+                          : "Select a section to load students"}
                       </TableCell>
                     </TableRow>
                   ) : (

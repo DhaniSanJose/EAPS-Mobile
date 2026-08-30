@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState, useContext } from "react";
 import { SettingsContext } from "../App";
-import { Box, Typography, Select, MenuItem } from "@mui/material";
+import { Box, Typography, FormControl, Select, MenuItem, Button } from "@mui/material";
 
 const ProgramTaggingFilter = ({
   curriculumList,
@@ -20,8 +20,6 @@ const ProgramTaggingFilter = ({
 }) => {
   const settings = useContext(SettingsContext);
 
-  const colors = settings?.colors || {};
-  const borderColor = colors.border || "#000000";
   const branches = settings?.branches || [];
   const [selectedCampus, setSelectedCampus] = useState("");
   const [selectedAcademicProgram, setSelectedAcademicProgram] = useState("");
@@ -90,24 +88,28 @@ const ProgramTaggingFilter = ({
     applyFilter();
   }, [selectedCurriculum, selectedYearLevel, selectedSemester, taggedPrograms]);
 
+
   return (
     <Box
       sx={{
-        border: `1px solid ${borderColor}`,
-        borderRadius: 2,
-        p: 3,
         display: "flex",
-        gap: 2,
+        alignItems: "center",
+        gap: 1.5,
         flexWrap: "wrap",
+        p: 1.5,
+        border: "1px solid #ddd",
+        borderRadius: "8px",
         backgroundColor: "#fafafa",
       }}
     >
+      <Typography sx={{ fontWeight: "bold", fontSize: 14 }}>
+        Filters:
+      </Typography>
+
       {/* CAMPUS */}
-      <Box sx={{ minWidth: 220, flex: 1,}}>
-        <Typography sx={{ fontWeight: "bold", mb: 1, fontSize: 14 }}>Campus</Typography>
+      <FormControl size="small" sx={{ minWidth: 170 }}>
         <Select
-          fullWidth
-          size="small"
+          displayEmpty
           value={selectedCampus}
           onChange={(e) => {
             setSelectedCampus(e.target.value);
@@ -117,23 +119,19 @@ const ProgramTaggingFilter = ({
             setSelectedSemester("");
           }}
         >
-          <MenuItem value="">
-            <em>All Campuses</em>
-          </MenuItem>
+          <MenuItem value="">Campus: All</MenuItem>
           {branches.map((b) => (
             <MenuItem key={b.id} value={b.id}>
               {b.branch}
             </MenuItem>
           ))}
         </Select>
-      </Box>
+      </FormControl>
 
       {/* ACADEMIC PROGRAM */}
-      <Box sx={{ minWidth: 220, flex: 1 }}>
-        <Typography sx={{ fontWeight: "bold", mb: 1, fontSize: 14 }}>Academic Program</Typography>
+      <FormControl size="small" sx={{ minWidth: 190 }}>
         <Select
-          fullWidth
-          size="small"
+          displayEmpty
           value={selectedAcademicProgram}
           onChange={(e) => {
             setSelectedAcademicProgram(e.target.value);
@@ -143,21 +141,17 @@ const ProgramTaggingFilter = ({
           }}
           disabled={!selectedCampus}
         >
-          <MenuItem value="">
-            <em>All Programs</em>
-          </MenuItem>
+          <MenuItem value="">Academic Program: All</MenuItem>
           <MenuItem value="0">Undergraduate</MenuItem>
           <MenuItem value="1">Graduate</MenuItem>
           <MenuItem value="2">Techvoc</MenuItem>
         </Select>
-      </Box>
+      </FormControl>
 
       {/* CURRICULUM */}
-      <Box sx={{ minWidth: 220, flex: 1 }}>
-        <Typography sx={{ fontWeight: "bold", mb: 1, fontSize: 14 }}>Curriculum</Typography>
+      <FormControl size="small" sx={{ minWidth: 220 }}>
         <Select
-          fullWidth
-          size="small"
+          displayEmpty
           value={selectedCurriculum}
           onChange={(e) => {
             setSelectedCurriculum(e.target.value);
@@ -166,9 +160,7 @@ const ProgramTaggingFilter = ({
           }}
           disabled={!selectedAcademicProgram}
         >
-          <MenuItem value="">
-            <em>All Curriculums</em>
-          </MenuItem>
+          <MenuItem value="">Curriculum: All</MenuItem>
           {filteredCurriculumList.map((c) => (
             <MenuItem key={c.curriculum_id} value={c.curriculum_id}>
               {formatSchoolYear(c.year_description)}: ({c.program_code}) – {c.program_description}
@@ -176,49 +168,43 @@ const ProgramTaggingFilter = ({
             </MenuItem>
           ))}
         </Select>
-      </Box>
+      </FormControl>
 
       {/* YEAR LEVEL */}
-      <Box sx={{ minWidth: 220, flex: 1 }}>
-        <Typography sx={{ fontWeight: "bold", mb: 1, fontSize: 14 }}>Year Level</Typography>
+      <FormControl size="small" sx={{ minWidth: 170 }}>
         <Select
-          fullWidth
-          size="small"
+          displayEmpty
           value={selectedYearLevel}
           onChange={(e) => setSelectedYearLevel(e.target.value)}
           disabled={!selectedCurriculum}
         >
-          <MenuItem value="">
-            <em>All Year Levels</em>
-          </MenuItem>
+          <MenuItem value="">Year Level: All</MenuItem>
           {filteredYearLevels.map((y) => (
             <MenuItem key={y.year_level_id} value={y.year_level_id}>
               {y.year_level_description}
             </MenuItem>
           ))}
         </Select>
-      </Box>
+      </FormControl>
 
       {/* SEMESTER */}
-      <Box sx={{ minWidth: 220, flex: 1,  }}>
-        <Typography sx={{ fontWeight: "bold", mb: 1, fontSize: 14 }}>Semester</Typography>
+      <FormControl size="small" sx={{ minWidth: 170 }}>
         <Select
-          fullWidth
-          size="small"
+          displayEmpty
           value={selectedSemester}
           onChange={(e) => setSelectedSemester(e.target.value)}
           disabled={!selectedCurriculum}
         >
-          <MenuItem value="">
-            <em>All Semesters</em>
-          </MenuItem>
+          <MenuItem value="">Semester: All</MenuItem>
           {filteredSemesters.map((s) => (
             <MenuItem key={s.semester_id} value={s.semester_id}>
               {s.semester_description}
             </MenuItem>
           ))}
         </Select>
-      </Box>
+      </FormControl>
+
+  
     </Box>
   );
 };

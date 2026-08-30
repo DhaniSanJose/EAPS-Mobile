@@ -20,7 +20,7 @@ import { useMemo } from "react";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const ProgramPayment = () => {
+const CurriculumFeeManagement = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
@@ -766,7 +766,7 @@ const ProgramPayment = () => {
             fontSize: "36px",
           }}
         >
-          PROGRAM PAYMENT
+         CURRICULUM FEE MANAGEMENT
         </Typography>
       </Box>
 
@@ -1684,4 +1684,4 @@ const ProgramPayment = () => {
   );
 };
 
-export default ProgramPayment;
+export default CurriculumFeeManagement;

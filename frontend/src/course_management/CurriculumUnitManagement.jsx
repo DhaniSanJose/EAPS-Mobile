@@ -5,27 +5,27 @@ import API_BASE_URL from "../apiConfig";
 import {
   Box,
   Typography,
-  Snackbar,
-  Alert,
   FormControl,
   InputLabel,
+  Snackbar,
+  Alert,
   Select,
   MenuItem,
   TextField,
 } from "@mui/material";
-import LoadingOverlay from "../components/LoadingOverlay";
 import Unauthorized from "../components/Unauthorized";
+import LoadingOverlay from "../components/LoadingOverlay";
 import { Autocomplete } from "@mui/material";
 import { getFlatAuditHeaders } from "../utils/auditEvents";
 import useAuditMac from "../utils/useAuditMac";
 
-const Prerequisite = () => {
+const CurriculumUnitManagement = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
   const colors = settings?.colors || {};
-  const titleColor = colors.title || "#000";
-  const borderColor = colors.border || "#000";
+  const titleColor = colors.title || "#000000";
+  const borderColor = colors.border || "#000000";
   const headerColor = colors.header || "#1976d2";
   const branches = settings?.branches || [];
 
@@ -33,58 +33,81 @@ const Prerequisite = () => {
   const [selectedCurriculum, setSelectedCurriculum] = useState("");
   const [taggedPrograms, setTaggedPrograms] = useState([]);
 
-  // editable prereqs
   const [editedCourseReqs, setEditedCourseReqs] = useState({});
+
+  const [userID, setUserID] = useState("");
+  const [user, setUser] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [hasAccess, setHasAccess] = useState(null);
+  const [canEdit, setCanEdit] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [employeeID, setEmployeeID] = useState("");
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("email");
+    const storedRole = localStorage.getItem("role");
+    const storedID = localStorage.getItem("person_id");
+    const storedEmployeeID = localStorage.getItem("employee_id");
+
+    if (storedUser && storedRole && storedID) {
+      setUser(storedUser);
+      setUserRole(storedRole);
+      setUserID(storedID);
+      setEmployeeID(storedEmployeeID);
+
+      if (storedRole === "registrar") {
+        checkAccess(storedEmployeeID);
+      } else {
+        window.location.href = "/login";
+      }
+    } else {
+      window.location.href = "/login";
+    }
+  }, []);
+
+  const checkAccess = async (employeeID) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
+      );
+      const allowed = response.data?.page_privilege === 1;
+      setHasAccess(allowed);
+      setCanEdit(allowed && Number(response.data?.can_edit) === 1);
+    } catch (error) {
+      console.error("Error checking access:", error);
+      setHasAccess(false);
+      setCanEdit(false);
+      if (error.response && error.response.data.message) {
+        console.log(error.response.data.message);
+      } else {
+        console.log("An unexpected error occurred.");
+      }
+      setLoading(false);
+    }
+  };
+
+  const pageId = 113;
+  const getAuditConfig = () => ({
+    headers: {
+      ...getFlatAuditHeaders(),
+      "x-employee-id": employeeID || localStorage.getItem("employee_id") || "",
+      "x-page-id": pageId,
+      "x-audit-actor-id":
+        employeeID ||
+        localStorage.getItem("employee_id") ||
+        localStorage.getItem("email") ||
+        "unknown",
+      "x-audit-actor-role":
+        userRole || localStorage.getItem("role") || "registrar",
+    },
+  });
 
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "success",
   });
-
-  const [hasAccess, setHasAccess] = useState(null);
-  const [canEdit, setCanEdit] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const getAuditConfig = () => ({
-    headers: {
-      ...getFlatAuditHeaders(),
-      "x-employee-id": localStorage.getItem("employee_id") || "",
-      "x-page-id": pageId,
-      "x-audit-actor-id":
-        localStorage.getItem("employee_id") ||
-        localStorage.getItem("email") ||
-        "unknown",
-      "x-audit-actor-role": localStorage.getItem("role") || "registrar",
-    },
-  });
-  const pageId = 112; // 🔁 change if needed
-
-  /* ===================== AUTH ===================== */
-  useEffect(() => {
-    const role = localStorage.getItem("role");
-    const employeeID = localStorage.getItem("employee_id");
-
-    if (role !== "registrar") {
-      window.location.href = "/login";
-      return;
-    }
-
-    checkAccess(employeeID);
-  }, []);
-
-  const checkAccess = async (employeeID) => {
-    try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`,
-      );
-      const allowed = res.data?.page_privilege === 1;
-      setHasAccess(allowed);
-      setCanEdit(allowed && Number(res.data?.can_edit) === 1);
-    } catch {
-      setHasAccess(false);
-      setCanEdit(false);
-    }
-  };
 
   /* ===================== DATA ===================== */
   useEffect(() => {
@@ -103,6 +126,80 @@ const Prerequisite = () => {
       new Map(res.data.map((item) => [item.program_tagging_id, item])).values(),
     );
     setTaggedPrograms(unique);
+  };
+
+  /* ===================== EDIT HANDLERS ===================== */
+  const handleReqChange = (id, field, value) => {
+    if (!canEdit) {
+      setSnackbar({
+        open: true,
+        message: "You do not have permission to edit program units",
+        severity: "error",
+      });
+      return;
+    }
+    setEditedCourseReqs((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value === "" ? null : Number(value),
+      },
+    }));
+  };
+
+  const handleSaveSemester = async (courses) => {
+    if (!canEdit) {
+      setSnackbar({
+        open: true,
+        message: "You do not have permission to edit program units",
+        severity: "error",
+      });
+      return;
+    }
+    try {
+      const updates = {};
+
+      // group edits by course_id
+      for (const c of courses) {
+        const edited = editedCourseReqs[c.program_tagging_id];
+        if (!edited) continue;
+
+        updates[c.course_id] = {
+          lec_unit:
+            edited.lec_unit !== undefined ? edited.lec_unit : c.lec_unit,
+          lab_unit:
+            edited.lab_unit !== undefined ? edited.lab_unit : c.lab_unit,
+          course_unit:
+            edited.course_unit !== undefined
+              ? edited.course_unit
+              : c.course_unit,
+        };
+      }
+
+      // save once per course
+      for (const courseId of Object.keys(updates)) {
+        await axios.put(
+          `${API_BASE_URL}/api/update_course/${courseId}`,
+          updates[courseId],
+          getAuditConfig(),
+        );
+      }
+
+      setEditedCourseReqs({});
+      fetchTaggedPrograms();
+      setSnackbar({
+        open: true,
+        message: "Saved successfully!",
+        severity: "success",
+      });
+    } catch (err) {
+      console.error(err);
+      setSnackbar({
+        open: true,
+        message: "Save failed",
+        severity: "error",
+      });
+    }
   };
 
   /* ===================== GROUP YEAR → SEM ===================== */
@@ -126,74 +223,22 @@ const Prerequisite = () => {
 
   const data = groupedData();
 
-  /* ===================== HANDLERS ===================== */
-  const handleReqChange = (id, field, value) => {
-    if (!canEdit) {
-      setSnackbar({
-        open: true,
-        message: "You do not have permission to edit prerequisites",
-        severity: "error",
-      });
-      return;
-    }
-    setEditedCourseReqs((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleSaveSemester = async (courses) => {
-    if (!canEdit) {
-      setSnackbar({
-        open: true,
-        message: "You do not have permission to edit prerequisites",
-        severity: "error",
-      });
-      return;
-    }
-    try {
-      for (const course of courses) {
-        const edited = editedCourseReqs[course.program_tagging_id];
-        if (!edited) continue;
-
-        await axios.put(
-          `${API_BASE_URL}/api/update_course_requirements/${course.course_id}`,
-          {
-            prereq: edited.prereq ?? course.prereq ?? null,
-
-            corequisite: edited.corequisite ?? course.corequisite ?? null,
-          },
-          getAuditConfig(),
-        );
-      }
-
-      setSnackbar({
-        open: true,
-        message: "Requirements saved successfully!",
-        severity: "success",
-      });
-
-      setEditedCourseReqs({});
-      fetchTaggedPrograms();
-    } catch (err) {
-      console.error(err);
-      setSnackbar({
-        open: true,
-        message: "Failed to save requirements",
-        severity: "error",
-      });
-    }
-  };
-
   const selectedCurriculumName =
     curriculumList.find((c) => c.curriculum_id === selectedCurriculum)
       ?.program_description +
       (curriculumList.find((c) => c.curriculum_id === selectedCurriculum)?.major
-        ? ` ${curriculumList.find((c) => c.curriculum_id === selectedCurriculum)?.major}`
+        ? ` ${
+            curriculumList.find((c) => c.curriculum_id === selectedCurriculum)
+              ?.major
+          }`
         : "") || "";
+
+  const formatSchoolYear = (yearDesc) => {
+    if (!yearDesc) return "";
+    const startYear = Number(yearDesc);
+    if (isNaN(startYear)) return yearDesc; // safe fallback
+    return `${startYear} - ${startYear + 1}`;
+  };
 
   const [filteredPrograms, setFilteredPrograms] = useState([]);
 
@@ -274,26 +319,12 @@ const Prerequisite = () => {
     return acc;
   }, {});
 
-  const formatSchoolYear = (yearDesc) => {
-    if (!yearDesc) return "";
-    const startYear = Number(yearDesc);
-    if (isNaN(startYear)) return yearDesc;
-    return `${startYear} - ${startYear + 1}`;
-  };
-
-  const getBranchLabel = (branchId) => {
-    const branch = branches.find(
-      (item) => Number(item.id) === Number(branchId),
-    );
-    return branch?.branch || "�";
-  };
-
   const formatYearLabel = (year) => {
-    return yearLabelMap[year] || year;
+    return `${yearLabelMap[year] || year} - (${year})`;
   };
 
   if (loading || hasAccess === null) {
-    return <LoadingOverlay open={true} message="Loading..." />;
+    return <LoadingOverlay open={loading} message="Loading..." />;
   }
 
   if (!hasAccess) {
@@ -311,6 +342,7 @@ const Prerequisite = () => {
   const cellStyle = {
     border: `1px solid ${borderColor}`,
     padding: "8px",
+    textAlign: "center",
   };
 
   // 🔒 Disable right-click
@@ -362,12 +394,11 @@ const Prerequisite = () => {
             fontSize: "36px",
           }}
         >
-          PREREQUISITE
+          PROGRAM UNITS
         </Typography>
       </Box>
 
       <hr style={{ border: "1px solid #ccc", width: "100%" }} />
-      <br />
       <br />
 
       <Typography fontWeight={500}>Select Campus:</Typography>
@@ -469,7 +500,7 @@ const Prerequisite = () => {
                 backgroundColor: "#fafafa",
               }}
             >
-              {/* ===== CURRICULUM HEADER (ONCE PER YEAR) ===== */}
+              {/* CURRICULUM HEADER */}
               <Typography
                 variant="h4"
                 sx={{
@@ -493,7 +524,7 @@ const Prerequisite = () => {
                 : {selectedCurriculumName}
               </Typography>
 
-              {/* ===== SEMESTER TABLES ===== */}
+              {/* SEMESTERS */}
               <Box
                 sx={{
                   display: "grid",
@@ -504,7 +535,7 @@ const Prerequisite = () => {
                 {Object.keys(data[year])
                   .sort((a, b) => semesterOrder[a] - semesterOrder[b])
                   .map((sem) => {
-                    const semesterCourses = data[year][sem];
+                    const courses = data[year][sem];
 
                     return (
                       <Box
@@ -527,11 +558,10 @@ const Prerequisite = () => {
                             }}
                           >
                             <thead>
-                              {/* YEAR + SEMESTER */}
+                              {/* YEAR + SEM */}
                               <tr>
-                                {/* YEAR (LEFT) */}
                                 <th
-                                  colSpan={3}
+                                  colSpan={4}
                                   style={{
                                     backgroundColor: "#f5f5f5",
                                     borderLeft: `1px solid ${borderColor}`,
@@ -540,16 +570,15 @@ const Prerequisite = () => {
                                     padding: "10px",
                                     fontWeight: "bold",
                                     textAlign: "left",
-                                    color: titleColor,
                                     fontSize: "21px",
+                                    color: titleColor,
                                   }}
                                 >
                                   {formatYearLabel(year)}
                                 </th>
 
-                                {/* SEMESTER (RIGHT) */}
                                 <th
-                                  colSpan={3}
+                                  colSpan={4}
                                   style={{
                                     backgroundColor: "#f5f5f5",
                                     borderRight: `1px solid ${borderColor}`,
@@ -557,50 +586,53 @@ const Prerequisite = () => {
                                     borderBottom: `1px solid ${borderColor}`,
                                     padding: "10px",
                                     fontWeight: "bold",
+                                    textAlign: "right",
                                     fontSize: "21px",
                                     color: titleColor,
-                                    textAlign: "right",
                                   }}
                                 >
                                   {sem}
                                 </th>
                               </tr>
 
-                              {/* COLUMN HEADERS */}
                               <tr>
                                 <th style={headerStyle}>#</th>
                                 <th style={headerStyle}>COURSE CODE</th>
                                 <th style={headerStyle}>COURSE DESCRIPTION</th>
-
-                                <th style={headerStyle}>CREDITED UNITS</th>
-                                <th style={headerStyle}>PREREQUISITES</th>
-
-                                <th style={headerStyle}>COREQUISITE</th>
+                                <th style={headerStyle}>PREREQUISITE</th>
+                                <th style={headerStyle}>LEC</th>
+                                <th style={headerStyle}>LAB</th>
+                                <th style={headerStyle}>CREDIT</th>
+                                <th style={headerStyle}>TUITION</th>
                               </tr>
                             </thead>
 
                             <tbody>
-                              {semesterCourses.map((course, index) => (
+                              {courses.map((c, index) => (
                                 <tr
-                                  key={course.program_tagging_id}
+                                  key={c.program_tagging_id}
                                   style={{
                                     backgroundColor:
                                       index % 2 === 0 ? "#ffffff" : "lightgray",
                                   }}
                                 >
+                                  <td style={cellStyle}>{index + 1}</td>
+                                  <td style={cellStyle}>{c.course_code}</td>
                                   <td
                                     style={{
                                       ...cellStyle,
                                       textAlign: "center",
                                     }}
                                   >
-                                    {index + 1}
+                                    {c.course_description}
                                   </td>
-                                  <td style={cellStyle}>
-                                    {course.course_code}
-                                  </td>
-                                  <td style={cellStyle}>
-                                    {course.course_description}
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    {c.prereq}
                                   </td>
 
                                   <td
@@ -609,29 +641,24 @@ const Prerequisite = () => {
                                       textAlign: "center",
                                     }}
                                   >
-                                    {course.course_unit}
-                                  </td>
-
-                                  <td style={cellStyle}>
                                     <input
-                                      type="text"
+                                      type="number"
                                       readOnly={!canEdit}
                                       value={
-                                        editedCourseReqs[
-                                          course.program_tagging_id
-                                        ]?.prereq ??
-                                        course.prereq ??
-                                        ""
+                                        editedCourseReqs[c.program_tagging_id]
+                                          ?.lec_unit ??
+                                        c.lec_unit ??
+                                        0
                                       }
                                       onChange={(e) =>
                                         handleReqChange(
-                                          course.program_tagging_id,
-                                          "prereq",
+                                          c.program_tagging_id,
+                                          "lec_unit",
                                           e.target.value,
                                         )
                                       }
                                       style={{
-                                        width: "100%",
+                                        width: "90px",
                                         padding: "6px",
                                         border: "1px solid #ccc",
                                         borderRadius: 4,
@@ -640,98 +667,151 @@ const Prerequisite = () => {
                                     />
                                   </td>
 
-                                  <td style={cellStyle}>
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                    }}
+                                  >
                                     <input
-                                      type="text"
+                                      type="number"
                                       readOnly={!canEdit}
                                       value={
-                                        editedCourseReqs[
-                                          course.program_tagging_id
-                                        ]?.corequisite ??
-                                        course.corequisite ??
-                                        ""
+                                        editedCourseReqs[c.program_tagging_id]
+                                          ?.lab_unit ??
+                                        c.lab_unit ??
+                                        0
                                       }
                                       onChange={(e) =>
                                         handleReqChange(
-                                          course.program_tagging_id,
-                                          "corequisite",
+                                          c.program_tagging_id,
+                                          "lab_unit",
                                           e.target.value,
                                         )
                                       }
                                       style={{
-                                        width: "100%",
+                                        width: "90px",
                                         padding: "6px",
                                         border: "1px solid #ccc",
                                         borderRadius: 4,
                                         textAlign: "right",
                                       }}
                                     />
+                                  </td>
+
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    <input
+                                      type="number"
+                                      readOnly={!canEdit}
+                                      value={
+                                        editedCourseReqs[c.program_tagging_id]
+                                          ?.course_unit ??
+                                        c.course_unit ??
+                                        0
+                                      }
+                                      onChange={(e) =>
+                                        handleReqChange(
+                                          c.program_tagging_id,
+                                          "course_unit",
+                                          e.target.value,
+                                        )
+                                      }
+                                      style={{
+                                        width: "90px",
+                                        padding: "6px",
+                                        border: "1px solid #ccc",
+                                        borderRadius: 4,
+                                        textAlign: "right",
+                                      }}
+                                    />
+                                  </td>
+
+                                  <td
+                                    style={{
+                                      ...cellStyle,
+                                      textAlign: "center",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    {c.course_unit ?? 0}
                                   </td>
                                 </tr>
                               ))}
 
-                              {/* ===== TOTAL ROW ===== */}
-                              {/* ===== TOTAL ROW ===== */}
-
+                              {/* TOTAL */}
                               <tr
                                 style={{
                                   fontWeight: "bold",
                                   backgroundColor: "#f0f0f0",
                                 }}
                               >
-                                <td style={cellStyle} colSpan={2}>
+                                <td colSpan={4} style={cellStyle}>
                                   TOTAL
                                 </td>
-
-                                <td
-                                  style={{ ...cellStyle, textAlign: "center" }}
-                                ></td>
-
-                                {/* TOTAL UNITS */}
                                 <td
                                   style={{ ...cellStyle, textAlign: "center" }}
                                 >
-                                  {semesterCourses.reduce(
-                                    (sum, course) =>
-                                      sum + Number(course.course_unit || 0),
+                                  {courses.reduce(
+                                    (sum, c) =>
+                                      sum +
+                                      Number(
+                                        editedCourseReqs[c.program_tagging_id]
+                                          ?.lec_unit ??
+                                          c.lec_unit ??
+                                          0,
+                                      ),
                                     0,
                                   )}
                                 </td>
-
-                                {/* TOTAL PREREQ 1 */}
                                 <td
                                   style={{ ...cellStyle, textAlign: "center" }}
                                 >
-                                  {semesterCourses.reduce((count, course) => {
-                                    const value =
-                                      editedCourseReqs[
-                                        course.program_tagging_id
-                                      ]?.prereq ??
-                                      course.prereq ??
-                                      "";
-                                    return (
-                                      count + (value.trim() !== "" ? 1 : 0)
-                                    );
-                                  }, 0)}
+                                  {courses.reduce(
+                                    (sum, c) =>
+                                      sum +
+                                      Number(
+                                        editedCourseReqs[c.program_tagging_id]
+                                          ?.lab_unit ??
+                                          c.lab_unit ??
+                                          0,
+                                      ),
+                                    0,
+                                  )}
                                 </td>
-
-                                {/* TOTAL PREREQ 2 */}
-
-                                {/* TOTAL COREQUISITE */}
                                 <td
                                   style={{ ...cellStyle, textAlign: "center" }}
                                 >
-                                  {semesterCourses.reduce((count, course) => {
-                                    const value =
-                                      editedCourseReqs[
-                                        course.program_tagging_id
-                                      ]?.corequisite ??
-                                      course.corequisite ??
-                                      "";
-                                    return (
-                                      count + (value.trim() !== "" ? 1 : 0)
-                                    );
-                                  }, 0)}
+                                  {courses.reduce(
+                                    (sum, c) =>
+                                      sum +
+                                      Number(
+                                        editedCourseReqs[c.program_tagging_id]
+                                          ?.course_unit ??
+                                          c.course_unit ??
+                                          0,
+                                      ),
+                                    0,
+                                  )}
+                                </td>
+                                <td
+                                  style={{ ...cellStyle, textAlign: "center" }}
+                                >
+                                  {courses.reduce(
+                                    (sum, c) =>
+                                      sum +
+                                      Number(
+                                        editedCourseReqs[c.program_tagging_id]
+                                          ?.course_unit ??
+                                          c.course_unit ??
+                                          0,
+                                      ),
+                                    0,
+                                  )}
                                 </td>
                               </tr>
                             </tbody>
@@ -741,7 +821,7 @@ const Prerequisite = () => {
                         {/* SAVE BUTTON */}
                         {canEdit && (
                           <button
-                            onClick={() => handleSaveSemester(semesterCourses)}
+                            onClick={() => handleSaveSemester(courses)}
                             style={{
                               marginTop: 10,
                               padding: "6px 14px",
@@ -778,4 +858,4 @@ const Prerequisite = () => {
   );
 };
 
-export default Prerequisite;
+export default CurriculumUnitManagement;

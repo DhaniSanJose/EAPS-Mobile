@@ -66,7 +66,7 @@ const getCurriculumSuggestionValue = (item) =>
   cleanSearchValue(item?.program_description) ||
   cleanSearchValue(item?.year_description);
 
-const CurriculumPanel = () => {
+const CurriculumManagement = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
 
@@ -634,7 +634,7 @@ const CurriculumPanel = () => {
             mb: 2,
           }}
         >
-          CURRICULUM PANEL
+          CURRICULUM MANAGEMENT
         </Typography>
 
         <Box
@@ -1427,4 +1427,4 @@ const CurriculumPanel = () => {
   );
 };
 
-export default CurriculumPanel;
+export default CurriculumManagement;

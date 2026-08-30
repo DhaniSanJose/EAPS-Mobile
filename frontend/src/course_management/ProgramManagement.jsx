@@ -51,7 +51,7 @@ const getProgramSuggestionValue = (program) =>
   cleanSearchValue(program?.program_code) ||
   cleanSearchValue(program?.program_description);
 
-const ProgramPanel = () => {
+const ProgramManagement = () => {
   useAuditMac();
   const settings = useContext(SettingsContext);
   const colors = settings?.colors || {};
@@ -537,7 +537,7 @@ const ProgramPanel = () => {
           variant="h4"
           sx={{ fontWeight: "bold", color: titleColor, fontSize: "36px" }}
         >
-          PROGRAM PANEL
+          PROGRAM MANAGEMENT
         </Typography>
         <Box
           sx={{
@@ -1396,4 +1396,4 @@ const ProgramPanel = () => {
   );
 };
 
-export default ProgramPanel;
+export default ProgramManagement;

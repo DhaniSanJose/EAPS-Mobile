@@ -34,12 +34,25 @@ import ProtectedRoute, { isTokenValid } from "./components/ProtectedRoute";
 import API_BASE_URL from "./apiConfig";
 import { refreshRegistrarCurriculumId } from "./utils/registrarCurriculumRestriction";
 
+// ============================================================
+// STATIC (NON-LAZY) IMPORTS
+// ============================================================
+
+// ACCOUNT MANAGEMENT
 import StudentAccounts from "./account_management/StudentAccounts";
+
+// ADMISSION
 import ApplicationProcessAdmin from "./admission/ApplicationProcessAdmin";
+
+// ENROLLMENT MANAGEMENT
 import CollegeCourseTaggingSummer from "./enrollment_management/CollegeCourseTaggingSummer";
 import CollegeStudentList from "./enrollment_management/CollegeStudentList";
 import CollegeStudentGradeFile from "./enrollment_management/CollegeStudentGradeFile";
+
+// REGISTRAR
 import RegistrarStudentGradeFile from "./registrar/RegistrarStudentGradeFile";
+
+// SYSTEM MANAGEMENT
 import GradeConversionAdmin from "./system_management/GradeConversionAdmin";
 import HonorsReport from "./system_management/HonorsReport";
 
@@ -139,6 +152,13 @@ const hasRequiredSettings = (settings) =>
     settings?.branding?.companyName,
   );
 
+// ============================================================
+// LAZY-LOADED IMPORTS (grouped by module/folder)
+// ============================================================
+
+// ------------------------------------------------------------
+// ACCOUNT MANAGEMENT
+// ------------------------------------------------------------
 const UploadApplicants = lazy(
   () => import("./account_management/UploadApplicants"),
 );
@@ -162,9 +182,6 @@ const RegisterStudent = lazy(
 const RegistrarResetPassword = lazy(
   () => import("./account_management/RegistrarResetPassword"),
 );
-const StudentGradeFile = lazy(
-  () => import("./system_management/StudentGradeFile"),
-);
 const ApplicantAdminPersonalInformation = lazy(
   () => import("./account_management/ApplicantAdminPersonalInformation"),
 );
@@ -185,9 +202,6 @@ const SuperAdminApplicantResetPassword = lazy(
 );
 const SuperAdminStudentResetPassword = lazy(
   () => import("./account_management/SuperAdminStudentResetPassword"),
-);
-const ExamAttendanceScanner = lazy(
-  () => import("./admission/ExamAttendanceScanner"),
 );
 const SuperAdminFacultyResetPassword = lazy(
   () => import("./account_management/SuperAdminFacultyResetPassword"),
@@ -237,13 +251,19 @@ const StudentEditPermissions5 = lazy(
 const UserPageAccess = lazy(
   () => import("./account_management/UserPageAccess"),
 );
+
+// ------------------------------------------------------------
+// ADMISSION
+// ------------------------------------------------------------
+const ExamAttendanceScanner = lazy(
+  () => import("./admission/ExamAttendanceScanner"),
+);
 const AdmissionFormProcess = lazy(
   () => import("./admission/AdmissionFormProcess"),
 );
 const EmptyAdmissionFormProcess = lazy(
   () => import("./admission/EmptyAdmissionFormProcess"),
 );
-
 const AdmissionPersonalInformation = lazy(
   () => import("./admission/AdmissionPersonalInformation"),
 );
@@ -274,8 +294,8 @@ const AdmissionScheduleTile = lazy(
 const AdmissionAnnouncement = lazy(
   () => import("./admission/AdmissionAnnouncement"),
 );
-const ApplicantExamSubjects = lazy(
-  () => import("./admission/ApplicantExamSubjects"),
+const ExamSubjectManagement = lazy(
+  () => import("./admission/ExamSubjectManagement"),
 );
 const AdmissionApplicantList = lazy(
   () => import("./admission/AdmissionApplicantList"),
@@ -301,9 +321,6 @@ const ProctorApplicantList = lazy(
 const ExaminationPermitChangeCourse = lazy(
   () => import("./admission/ExaminationPermitChangeCourse"),
 );
-const RoomRegistration = lazy(
-  () => import("./system_management/RoomRegistration"),
-);
 const AdmissionOnlineRequirements = lazy(
   () => import("./admission/AdmissionOnlineRequirements"),
 );
@@ -316,6 +333,10 @@ const VerifyDocumentScheduleManagement = lazy(
 const VerifyDocumentRoomAssignment = lazy(
   () => import("./admission/VerifyDocumentRoomAssignment"),
 );
+
+// ------------------------------------------------------------
+// APPLICANT
+// ------------------------------------------------------------
 const ApplicantServicesSurvey = lazy(
   () => import("./applicant/ApplicantServicesSurvey"),
 );
@@ -363,6 +384,10 @@ const PersonalDataForm = lazy(() => import("./applicant/PersonalDataForm"));
 const ApplicantOnlineRequirements = lazy(
   () => import("./applicant/ApplicantOnlineRequirements"),
 );
+
+// ------------------------------------------------------------
+// COMPONENTS
+// ------------------------------------------------------------
 const Login = lazy(() => import("./components/Login"));
 const AnnouncementSlider = lazy(
   () => import("./components/AnnouncementSlider"),
@@ -382,19 +407,28 @@ const RegistrarForgotPassword = lazy(
 );
 const TorQrInformation = lazy(() => import("./components/TorQrInformation"));
 const StudentQrInformation = lazy(() => import("./components/StudentQrInformation"));
+const ExamAttendanceQrInformation = lazy(() => import("./components/ExamAttendanceQrInformation"));
 const SideBar = lazy(() => import("./components/Sidebar"));
 const Unauthorized = lazy(() => import("./components/Unauthorized"));
-const CoursePanel = lazy(() => import("./course_management/CoursePanel"));
-const CurriculumPanel = lazy(
-  () => import("./course_management/CurriculumPanel"),
-);
 
+// ------------------------------------------------------------
+// COURSE MANAGEMENT
+// ------------------------------------------------------------
+const SubjectManagement = lazy(() => import("./course_management/SubjectManagement"));
+const AcademicSubjectManagement = lazy(() => import("./course_management/AcademicSubjectManagement"));
+const CurriculumManagement = lazy(
+  () => import("./course_management/CurriculumManagement"),
+);
 const NSTPTagging = lazy(() => import("./course_management/NSTPTagging"));
-const Prerequisite = lazy(() => import("./course_management/Prerequisite"));
-const ProgramPanel = lazy(() => import("./course_management/ProgramPanel"));
-const ProgramPayment = lazy(() => import("./course_management/ProgramPayment"));
-const ProgramTagging = lazy(() => import("./course_management/ProgramTagging"));
-const ProgramUnit = lazy(() => import("./course_management/ProgramUnit"));
+const CurriculumRequirementsManagement = lazy(() => import("./course_management/CurriculumRequirementsManagement"));
+const ProgramManagement = lazy(() => import("./course_management/ProgramManagement"));
+const CurriculumFeeManagement = lazy(() => import("./course_management/CurriculumFeeManagement"));
+const ProgramTaggingManagement = lazy(() => import("./course_management/ProgramTaggingManagement"));
+const CurriculumUnitManagement = lazy(() => import("./course_management/CurriculumUnitManagement"));
+
+// ------------------------------------------------------------
+// DEPARTMENT MANAGEMENT
+// ------------------------------------------------------------
 const DepartmentCurriculumPanel = lazy(
   () => import("./department_management/DepartmentCurriculumPanel"),
 );
@@ -416,16 +450,25 @@ const SlotMonitoring = lazy(
 const SectionSlotManagement = lazy(
   () => import("./department_management/SectionSlotManagement"),
 );
+const CollegeScheduleChecker = lazy(
+  () => import("./department_management/CollegeScheduleChecker"),
+);
+const ScheduleChecker = lazy(
+  () => import("./department_management/ScheduleChecker"),
+);
+const WorkloadManagement = lazy(
+  () => import("./department_management/WorkloadManagement"),
+);
+
+// ------------------------------------------------------------
+// ENROLLMENT MANAGEMENT
+// ------------------------------------------------------------
 const ApplicantListCollege = lazy(
   () => import("./enrollment_management/ApplicantListCollege"),
 );
 const CollegeEntranceExamScore = lazy(
   () => import("./enrollment_management/CollegeEntranceExamScore"),
 );
-const RegistrarEntranceExamScore = lazy(
-  () => import("./registrar/RegistrarEntranceExamScore"),
-);
-
 const CollegeQualifyingInterviewRoomAssignment = lazy(
   () =>
     import("./enrollment_management/CollegeQualifyingInterviewRoomAssignment"),
@@ -471,9 +514,6 @@ const CollegeQualifyingInterviewerApplicantList = lazy(
 const CollegeQualifyingInterviewExamScore = lazy(
   () => import("./enrollment_management/CollegeQualifyingInterviewExamScore"),
 );
-const RegistrarQualifyingInterviewExamScore = lazy(
-  () => import("./registrar/RegistrarQualifyingInterviewExamScore"),
-);
 const ApplicantCollegePersonalInformation = lazy(
   () => import("./enrollment_management/ApplicantCollegePersonalInformation"),
 );
@@ -492,9 +532,6 @@ const ApplicantCollegeOtherInformation = lazy(
 const ApplicantOnlineRequirementsCollege = lazy(
   () => import("./enrollment_management/ApplicantOnlineRequirementsCollege"),
 );
-const ApplicantOnlineRequirementsRegistrar = lazy(
-  () => import("./registrar/ApplicantOnlineRequirementsRegistrar"),
-);
 const CollegeSearchCertificateOfRegistration = lazy(
   () =>
     import("./enrollment_management/CollegeSearchCertificateOfRegistration"),
@@ -502,6 +539,10 @@ const CollegeSearchCertificateOfRegistration = lazy(
 const CollegeStudentNumbering = lazy(
   () => import("./enrollment_management/CollegeStudentNumbering"),
 );
+
+// ------------------------------------------------------------
+// FACULTY
+// ------------------------------------------------------------
 const FacultyEvaluation = lazy(() => import("./faculty/FacultyEvaluation"));
 const FacultyMasterList = lazy(() => import("./faculty/FacultyMasterlist"));
 const FacultyResetPassword = lazy(
@@ -509,6 +550,10 @@ const FacultyResetPassword = lazy(
 );
 const FacultyWorkload = lazy(() => import("./faculty/FacultyWorkload"));
 const GradingSheet = lazy(() => import("./faculty/GradingSheet"));
+
+// ------------------------------------------------------------
+// MEDICAL MANAGEMENT
+// ------------------------------------------------------------
 const DentalAssessment = lazy(
   () => import("./medical_management/DentalAssessment"),
 );
@@ -543,6 +588,10 @@ const MedicalRequirementsForm = lazy(
 const PhysicalNeuroExam = lazy(
   () => import("./medical_management/PhysicalNeuroExam"),
 );
+
+// ------------------------------------------------------------
+// PAGES
+// ------------------------------------------------------------
 const AccountDashboard = lazy(() => import("./pages/AccountDashboard"));
 const AdmissionDashboardPanel = lazy(
   () => import("./pages/AdmissionDashboard"),
@@ -561,10 +610,11 @@ const RegistrarDashboard = lazy(() => import("./pages/RegistrarDashboard"));
 const ScheduleFilterer = lazy(() => import("./pages/SchedulePlottingFilter"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const SystemDashboardPanel = lazy(() => import("./pages/SystemDashboard"));
+
+// ------------------------------------------------------------
+// REGISTRAR
+// ------------------------------------------------------------
 const RegistrarClassList = lazy(() => import("./registrar/RegistrarClassList"));
-const CollegeScheduleChecker = lazy(
-  () => import("./department_management/CollegeScheduleChecker"),
-);
 const CORExportingModule = lazy(() => import("./registrar/CORExportingModule"));
 const CORExportRender = lazy(() => import("./registrar/CORExportRender"));
 const RegistrarCourseTagging = lazy(
@@ -575,6 +625,15 @@ const RegistrarCourseTaggingSummer = lazy(
 );
 const GradingEvaluationForRegistrar = lazy(
   () => import("./registrar/GradingEvaluationForRegistrar"),
+);
+const RegistrarEntranceExamScore = lazy(
+  () => import("./registrar/RegistrarEntranceExamScore"),
+);
+const RegistrarQualifyingInterviewExamScore = lazy(
+  () => import("./registrar/RegistrarQualifyingInterviewExamScore"),
+);
+const ApplicantOnlineRequirementsRegistrar = lazy(
+  () => import("./registrar/ApplicantOnlineRequirementsRegistrar"),
 );
 const ApplicantRegistrarPersonalInformation = lazy(
   () => import("./registrar/ApplicantRegistrarPersonalInformation"),
@@ -607,9 +666,6 @@ const StudentRegistrarOtherInformation = lazy(
   () => import("./registrar/StudentRegistrarOtherInformation"),
 );
 const ReportOfGrade = lazy(() => import("./registrar/ReportOfGrade"));
-const ScheduleChecker = lazy(
-  () => import("./department_management/ScheduleChecker"),
-);
 const SearchCertificateOfRegistration = lazy(
   () => import("./registrar/SearchCertificateOfRegistration"),
 );
@@ -628,6 +684,10 @@ const ApplicantListRegistrar = lazy(
 const TranscriptOfRecords = lazy(
   () => import("./registrar/TranscriptOfRecords"),
 );
+
+// ------------------------------------------------------------
+// STUDENT
+// ------------------------------------------------------------
 const CertificateOfRegistration = lazy(
   () => import("./student/CertificateOfRegistration"),
 );
@@ -692,6 +752,16 @@ const StudentCurriculumSubjects = lazy(
   () => import("./student/StudentCurriculumSubjects"),
 );
 const StudentHistory = lazy(() => import("./student/StudentHistory"));
+
+// ------------------------------------------------------------
+// SYSTEM MANAGEMENT
+// ------------------------------------------------------------
+const RoomRegistration = lazy(
+  () => import("./system_management/RoomRegistration"),
+);
+const StudentGradeFile = lazy(
+  () => import("./system_management/StudentGradeFile"),
+);
 const AdminBranches = lazy(
   () => import("./system_management/AdminBranchesManagement"),
 );
@@ -734,9 +804,10 @@ const StudentScholarshipList = lazy(
 const TOSFCrud = lazy(() => import("./system_management/TOSFCrud"));
 const YearLevelPanel = lazy(() => import("./system_management/YearLevelPanel"));
 const YearPanel = lazy(() => import("./system_management/YearPanel"));
-const WorkloadManagement = lazy(
-  () => import("./department_management/WorkloadManagement"),
-);
+
+// ============================================================
+// END OF LAZY IMPORTS
+// ============================================================
 
 function App() {
   const getCachedSettings = () => {
@@ -1486,34 +1557,50 @@ function App() {
                         }
                       />
                       <Route
+                        path="/subject_management"
+                        element={
+                          <ProtectedRoute>
+                            <SubjectManagement />
+                          </ProtectedRoute>
+                        }
+                      />
+                          <Route
                         path="/course_management"
                         element={
                           <ProtectedRoute>
-                            <CourseManagement />
+                            <SubjectManagement />
                           </ProtectedRoute>
                         }
                       />
                       <Route
-                        path="/program_tagging"
+                        path="/program_tagging_management"
                         element={
                           <ProtectedRoute>
-                            <ProgramTagging />
+                            <ProgramTaggingManagement />
                           </ProtectedRoute>
                         }
                       />
                       <Route
-                        path="/course_panel"
+                        path="/subject_management"
                         element={
                           <ProtectedRoute>
-                            <CoursePanel />
+                            <SubjectManagement />
+                          </ProtectedRoute>
+                        }
+                      />
+                        <Route
+                        path="/course_tagged"
+                        element={
+                          <ProtectedRoute>
+                            <AcademicSubjectManagement />
                           </ProtectedRoute>
                         }
                       />
                       <Route
-                        path="/program_panel"
+                        path="/program_management"
                         element={
                           <ProtectedRoute>
-                            <ProgramPanel />
+                            <ProgramManagement />
                           </ProtectedRoute>
                         }
                       />
@@ -1527,10 +1614,10 @@ function App() {
                         }
                       />
                       <Route
-                        path="/curriculum_panel"
+                        path="/curriculum_management"
                         element={
                           <ProtectedRoute>
-                            <CurriculumPanel />
+                            <CurriculumManagement />
                           </ProtectedRoute>
                         }
                       />
@@ -1859,10 +1946,10 @@ function App() {
                         }
                       />
                       <Route
-                        path="/applicant_exam_subjects"
+                        path="/exam_subject_management"
                         element={
                           <ProtectedRoute>
-                            <ApplicantExamSubjects />
+                            <ExamSubjectManagement />
                           </ProtectedRoute>
                         }
                       />
@@ -2827,26 +2914,26 @@ function App() {
                         }
                       />
                       <Route
-                        path="/program_payment"
+                        path="/curriculum_fee_management"
                         element={
                           <ProtectedRoute>
-                            <ProgramPayment />
+                            <CurriculumFeeManagement />
                           </ProtectedRoute>
                         }
                       />
                       <Route
-                        path="/prerequisite"
+                        path="/curriculum_requirements_management"
                         element={
                           <ProtectedRoute>
-                            <Prerequisite />
+                            <CurriculumRequirementsManagement />
                           </ProtectedRoute>
                         }
                       />
                       <Route
-                        path="/program_unit"
+                        path="/curriculum_unit_management"
                         element={
                           <ProtectedRoute>
-                            <ProgramUnit />
+                            <CurriculumUnitManagement />
                           </ProtectedRoute>
                         }
                       />
@@ -2966,7 +3053,7 @@ function App() {
                         path="/applicant_profile/:applicantNumber"
                         element={<ApplicantProfile />}
                       />
-                    
+
                       <Route
                         path="/registrar_exam_permit"
                         element={
@@ -3025,6 +3112,8 @@ function App() {
                       />
                       <Route path="/student_qr_information/:student_number"
                         element={<StudentQrInformation />} />
+                      <Route path="/exam-attendance-info/:applicant_number" 
+                      element={<ExamAttendanceQrInformation />} />
                       <Route
                         path="/section_slot_monitoring"
                         element={
