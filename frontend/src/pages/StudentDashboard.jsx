@@ -64,7 +64,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const navigate = useNavigate();
   const settings = useContext(SettingsContext);
 
-  // ðŸ“± Responsive breakpoint helpers (reactive to viewport, unlike raw window.innerWidth reads)
   const isMobile = useMediaQuery("(max-width:600px)");
   const isTablet = useMediaQuery("(max-width:960px)");
 
@@ -286,7 +285,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
   const total = courseCount?.initial_course || 0;
   const displayedStatusTotal = passed + failed + incomplete + dropped;
 
-  // percentages (normalize values to 0â€“100)
+
   const statusRingBase = displayedStatusTotal || total;
   const statusSlices = [
     { value: passed, color: "#75a843" },
@@ -559,7 +558,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           semOrder: Number(t.semester_id) || 0,
           gwa: t.units > 0 ? t.total / t.units : null,
         }))
-        // Ascending now: 1st Yr Sem 1 â†’ ... â†’ 4th Yr Sem 2, reads like a timeline
+        // Ascending: 1st Yr Sem 1 -> ... -> 4th Yr Sem 2, reads like a timeline
         .sort((a, b) => a.yearOrder - b.yearOrder || a.semOrder - b.semOrder);
 
       setTermGwaList(list);
@@ -583,7 +582,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
         });
         setHolidays(lookup);
       } catch (err) {
-        console.error("âŒ Failed to fetch PH holidays:", err);
+        console.error("Failed to fetch PH holidays:", err);
         setHolidays({});
       }
     };
@@ -663,10 +662,8 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       formData.append("profile_picture", file);
       formData.append("person_id", person_id);
 
-      // âœ… Upload image using same backend API
       await axios.post(`${API_BASE_URL}/api/update_student`, formData);
 
-      // âœ… Refresh profile info to display the new image
       const updated = await axios.get(
         `${API_BASE_URL}/api/person_data/${person_id}/${role}`,
       );
@@ -678,7 +675,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
       const baseUrl = `${API_BASE_URL}/uploads/Student1by1/${updated.data.profile_image}`;
       setProfileImage(`${baseUrl}?t=${Date.now()}`);
     } catch (error) {
-      console.error("âŒ Upload failed:", error);
+      console.error("Upload failed:", error);
     }
   };
 
@@ -691,7 +688,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
           const trimmed = line.trim();
           if (!trimmed) return <div key={i} style={{ height: "6px" }} />;
 
-          const bulletMatch = trimmed.match(/^([â€¢\*\-â€“])\s+(.*)/);
+          const bulletMatch = trimmed.match(/^([•\*\-–])\s+(.*)/);
           if (bulletMatch) {
             return (
               <div
@@ -710,7 +707,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     fontSize: "14px",
                   }}
                 >
-                  
+                  •
                 </span>
                 <span
                   style={{
@@ -725,7 +722,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
             );
           }
 
-          const subBulletMatch = line.match(/^[\s\t]+([â€¢\*\-â€“])\s+(.*)/);
+        const subBulletMatch = line.match(/^[\s\t]+([•*\-–])\s+(.*)/);
           if (subBulletMatch) {
             return (
               <div
@@ -745,7 +742,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                     fontSize: "12px",
                   }}
                 >
-                  â—¦
+                  •
                 </span>
                 <span
                   style={{
@@ -885,11 +882,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
     },
   ];
 
-  // ðŸ”’ Disable right-click and block DevTools shortcuts.
-  // Moved into a useEffect with cleanup so listeners aren't re-added on every render
-  // (the original code attached a brand-new listener on every single render, which
-  // leaks memory and gets worse the longer a session runs â€” especially costly on
-  // memory-constrained mobile/tablet browsers).
+
   useEffect(() => {
     const handleContextMenu = (e) => e.preventDefault();
     const handleKeyDown = (e) => {
@@ -1696,7 +1689,7 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                             lineHeight: 1,
                           }}
                         >
-                          {t.gwa !== null ? t.gwa.toFixed(3) : "â€”"}
+                          {t.gwa !== null ? t.gwa.toFixed(3) : ""}
                         </Typography>
                       </Box>
                     ))}
@@ -2251,7 +2244,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                 background: "#111",
               }}
             >
-              {/* LEFT â€” image */}
               {announcements[lightboxIndex].file_path && (
                 <div
                   style={{
@@ -2287,7 +2279,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                 </div>
               )}
 
-              {/* RIGHT â€” details */}
               <div
                 style={{
                   flex: 1,
@@ -2305,7 +2296,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   scrollbarColor: "rgba(255,255,255,0.2) transparent",
                 }}
               >
-                {/* Close button â€” top of details panel */}
                 <IconButton
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2351,7 +2341,6 @@ const StudentDashboard = ({ profileImage, setProfileImage }) => {
                   }}
                 />
 
-                {/* Content */}
                 {/* Content */}
                 <div style={{ flex: 1 }}>
                   <FormattedContent

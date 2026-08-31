@@ -26,6 +26,7 @@ import {
   TableCell,
   TableContainer,
   Paper,
+  FormControlLabel,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import {
@@ -223,7 +224,7 @@ const DepartmentSectionFormDialog = memo(
           <Typography fontWeight="bold" mb={1}>
             Year Level
           </Typography>
-          <FormControl fullWidth>
+          <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel id="year-level-label">Year Level</InputLabel>
             <Select
               labelId="year-level-label"
@@ -246,6 +247,40 @@ const DepartmentSectionFormDialog = memo(
               ))}
             </Select>
           </FormControl>
+
+          <Typography fontWeight="bold" mb={1}>
+            Max Slots
+          </Typography>
+          <TextField
+            fullWidth
+            type="number"
+            inputProps={{ min: 0 }}
+            value={form.max_slots ?? 0}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const parsed = raw === "" ? "" : Math.max(0, Number(raw));
+              setForm((prev) => ({
+                ...prev,
+                max_slots: parsed,
+              }));
+            }}
+            sx={{ mb: 2 }}
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={Number(form.is_open_for_self_enrollment) === 1}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    is_open_for_self_enrollment: e.target.checked ? 1 : 0,
+                  }))
+                }
+              />
+            }
+            label="Open for Self-Enrollment"
+          />
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
@@ -276,6 +311,8 @@ const EMPTY_FORM = {
   curriculum_id: "",
   section_id: "",
   year_level_id: "",
+  max_slots: 0,
+  is_open_for_self_enrollment: 1,
 };
 
 const DepartmentSectionGrid = memo(
@@ -289,6 +326,7 @@ const DepartmentSectionGrid = memo(
     onEdit,
     onDelete,
     onToggleStatus,
+    onToggleSelfEnrollment,
   }) => (
     <Box
       sx={{
@@ -393,44 +431,83 @@ const DepartmentSectionGrid = memo(
                       borderTop:
                         idx === 0 ? "none" : `1px solid ${borderColor}`,
                       gap: 1,
+                      flexWrap: "wrap",
                       backgroundColor: idx % 2 === 0 ? "#ffffff" : "lightgray",
                     }}
                   >
-                    <Box sx={{ flex: 1 }}>
+                    <Box sx={{ flex: 1, minWidth: 140 }}>
                       <Typography fontSize="13px" fontWeight="500">
                         {ds.section_description}
                       </Typography>
                       <Typography fontSize="11px" color="text.secondary">
                         {ds.year_level_description || "No year level"}
                       </Typography>
+                      <Typography fontSize="11px" color="text.secondary">
+                        Max Slots: {ds.max_slots ?? 0}
+                      </Typography>
                     </Box>
 
                     <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        gap: 0,
+                      }}
                     >
-                      <Switch
-                        size="small"
-                        checked={Number(ds.dsstat) === 1}
-                        onChange={(e) =>
-                          onToggleStatus(
-                            ds.department_section_id,
-                            e.target.checked ? 1 : 0,
-                          )
-                        }
-                        disabled={!canEdit}
-                      />
-                      <Typography
-                        fontSize="11px"
-                        sx={{
-                          minWidth: 44,
-                          color:
-                            Number(ds.dsstat) === 1
-                              ? "success.main"
-                              : "text.disabled",
-                        }}
-                      >
-                        {Number(ds.dsstat) === 1 ? "Active" : "Inactive"}
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Switch
+                          size="small"
+                          checked={Number(ds.dsstat) === 1}
+                          onChange={(e) =>
+                            onToggleStatus(
+                              ds.department_section_id,
+                              e.target.checked ? 1 : 0,
+                            )
+                          }
+                          disabled={!canEdit}
+                        />
+                        <Typography
+                          fontSize="11px"
+                          sx={{
+                            minWidth: 44,
+                            color:
+                              Number(ds.dsstat) === 1
+                                ? "success.main"
+                                : "text.disabled",
+                          }}
+                        >
+                          {Number(ds.dsstat) === 1 ? "Active" : "Inactive"}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Switch
+                          size="small"
+                          checked={Number(ds.is_open_for_self_enrollment) === 1}
+                          onChange={(e) =>
+                            onToggleSelfEnrollment(
+                              ds.department_section_id,
+                              e.target.checked ? 1 : 0,
+                            )
+                          }
+                          disabled={!canEdit}
+                        />
+                        <Typography
+                          fontSize="11px"
+                          sx={{
+                            minWidth: 90,
+                            color:
+                              Number(ds.is_open_for_self_enrollment) === 1
+                                ? "success.main"
+                                : "text.disabled",
+                          }}
+                        >
+                          {Number(ds.is_open_for_self_enrollment) === 1
+                            ? "Self-Enroll: Open"
+                            : "Self-Enroll: Closed"}
+                        </Typography>
+                      </Box>
                     </Box>
 
                     <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -670,11 +747,16 @@ const DepartmentSection = () => {
         const sectionDesc = (ds.section_description || "").toLowerCase();
         const yearLevelDesc = (ds.year_level_description || "").toLowerCase();
         const status = ds.dsstat === 1 ? "active" : "inactive";
+        const selfEnrollStatus =
+          Number(ds.is_open_for_self_enrollment) === 1
+            ? "open self-enrollment"
+            : "closed self-enrollment";
         return (
           programLabel.includes(search) ||
           sectionDesc.includes(search) ||
           yearLevelDesc.includes(search) ||
-          status.includes(search)
+          status.includes(search) ||
+          selfEnrollStatus.includes(search)
         );
       });
 
@@ -734,7 +816,14 @@ const DepartmentSection = () => {
         curriculum_id: formData.curriculum_id,
         section_id: formData.section_id,
         year_level_id: formData.year_level_id,
+        max_slots:
+          formData.max_slots === "" || formData.max_slots == null
+            ? 0
+            : Number(formData.max_slots),
         dsstat: overrides.dsstat ?? 0,
+        is_open_for_self_enrollment:
+          overrides.is_open_for_self_enrollment ??
+          (Number(formData.is_open_for_self_enrollment) === 0 ? 0 : 1),
         program_code: curriculum?.program_code || "",
         program_description: curriculum?.program_description || "",
         major: curriculum?.major || "",
@@ -891,6 +980,9 @@ const DepartmentSection = () => {
           curriculum_id: section.curriculum_id ?? "",
           section_id: section.section_id ?? "",
           year_level_id: section.year_level_id ?? "",
+          max_slots: section.max_slots ?? 0,
+          is_open_for_self_enrollment:
+            Number(section.is_open_for_self_enrollment) === 0 ? 0 : 1,
         },
       });
     },
@@ -939,6 +1031,53 @@ const DepartmentSection = () => {
         setSnackbar({
           open: true,
           message: err.response?.data?.message || "Failed to update status.",
+          severity: "error",
+        });
+      }
+    },
+    [canEdit, departmentSections, employeeID, userRole],
+  );
+
+  const handleToggleSelfEnrollment = useCallback(
+    async (departmentSectionId, value) => {
+      if (value === null) return;
+      if (!canEdit) {
+        setSnackbar({
+          open: true,
+          message: "You do not have permission to edit items on this page.",
+          severity: "error",
+        });
+        return;
+      }
+
+      const previousSections = departmentSections;
+      setDepartmentSections((prev) =>
+        prev.map((row) =>
+          String(row.department_section_id) === String(departmentSectionId)
+            ? { ...row, is_open_for_self_enrollment: value }
+            : row,
+        ),
+      );
+
+      try {
+        await axios.put(
+          `${API_BASE_URL}/api/department_section/${departmentSectionId}/self_enrollment`,
+          { is_open_for_self_enrollment: value },
+          { headers: getPermissionHeaders() },
+        );
+        setSnackbar({
+          open: true,
+          message: `Self-enrollment ${value === 1 ? "opened" : "closed"} successfully!`,
+          severity: "success",
+        });
+      } catch (err) {
+        setDepartmentSections(previousSections);
+        console.error(err);
+        setSnackbar({
+          open: true,
+          message:
+            err.response?.data?.message ||
+            "Failed to update self-enrollment setting.",
           severity: "error",
         });
       }
@@ -1293,6 +1432,7 @@ const DepartmentSection = () => {
           onEdit={openEditDepartmentSection}
           onDelete={handleDeleteRequest}
           onToggleStatus={handleToggleStatus}
+          onToggleSelfEnrollment={handleToggleSelfEnrollment}
         />
 
         {filteredGroupedEntries.length === 0 && (
@@ -1539,6 +1679,9 @@ const DepartmentSection = () => {
               <Typography fontSize="14px">
                 <strong>Year Level:</strong>{" "}
                 {deleteTarget.year_level_description || "—"}
+              </Typography>
+              <Typography fontSize="14px">
+                <strong>Max Slots:</strong> {deleteTarget.max_slots ?? 0}
               </Typography>
             </Box>
           )}

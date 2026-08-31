@@ -2384,6 +2384,7 @@ const SideBar = ({
                     collapsed={effectiveCollapsed}
                     onNavClick={handleNavClick}
                   />
+               
                   <NavItem
                     to="/student_faculty_evaluation"
                     icon={AssignmentTurnedInIcon}

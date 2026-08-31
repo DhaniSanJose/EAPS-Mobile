@@ -1279,6 +1279,29 @@ router.post("/login", async (req, res) => {
     }
 
     // ── TOTP enabled — has secret → ask for current code ──────────────────
+    // NEW: also issue a loginSetupId here (previously this only happened
+    // in the "no secret yet" branch above). Without it, a returning user
+    // who deleted/lost their authenticator entry had NO way to get a new
+    // QR code — the frontend had nothing to call /login-totp-setup with.
+    // This is safe to hand out at this point because the user has already
+    // proven identity via a correct password just above; it does not by
+    // itself change any stored secret — /login-totp-setup only PREPARES a
+    // new pending secret, and /verify-login-totp only PERSISTS it if the
+    // user explicitly opts into "regenerate" and then proves the new code.
+    Object.keys(otpStore).forEach((key) => {
+      if (otpStore[key]?.email === user.email && otpStore[key]?.loginSetup) {
+        delete otpStore[key];
+      }
+    });
+    const loginSetupId = crypto.randomUUID();
+    otpStore[loginSetupId] = {
+      email: user.email,
+      source: user.source,
+      loginSetup: true,
+      totpSecret: null, // only populated if the user asks to regenerate
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    };
+
     await insertLoginAuditLog({
       actorId,
       role: user.role,
@@ -1290,6 +1313,7 @@ router.post("/login", async (req, res) => {
       ...loginPayload,
       requireTotpSetup: false,
       requireTotp: true,
+      loginSetupId,
       message: "Enter the code from Google Authenticator.",
     });
 
@@ -1397,8 +1421,9 @@ router.post("/verify-login-totp", async (req, res) => {
     const now = Date.now();
 
     if (isSetup) {
-      // ── First-time setup: verify against the pending secret, keyed by
-      //    the unique loginSetupId issued at /login (not by email). ──────
+      // ── First-time setup OR regeneration after losing the app entry:
+      //    verify against the pending secret, keyed by the unique
+      //    loginSetupId issued at /login (not by email). ──────────────
       if (!loginSetupId) {
         return res.status(400).json({
           success: false,
@@ -1448,7 +1473,9 @@ router.post("/verify-login-totp", async (req, res) => {
         });
       }
 
-      // Code is correct — persist the secret to DB
+      // Code is correct — persist the secret to DB. This intentionally
+      // OVERWRITES any existing totp_secret, which is exactly what a
+      // "lost my authenticator app" regeneration needs to do.
       const tableSource = stored.source || source || "user";
       if (tableSource === "prof") {
         await db3.query(

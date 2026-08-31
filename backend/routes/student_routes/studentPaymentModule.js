@@ -256,24 +256,24 @@ router.get("/student-assessment/:person_id", async (req, res) => {
 
         const totalTuition = tuitionFee + nstpFee;
         const grandTotal = totalTuition + miscellaneousFee;
-     const storedAssessment = Number(
-  matriculationPayment?.total_tosf ??
-    unifastPayment?.total_tosf ??
-    grandTotal,
-);
-const storedPayment = unifastPayment
-  ? storedAssessment
-  : totalPaidAmount;
-const discountAmount = Math.max(grandTotal - storedAssessment, 0);
+        const storedAssessment = Number(
+          matriculationPayment?.total_tosf ??
+          unifastPayment?.total_tosf ??
+          grandTotal,
+        );
+        const storedPayment = unifastPayment
+          ? storedAssessment
+          : totalPaidAmount;
+        const discountAmount = Math.max(grandTotal - storedAssessment, 0);
 
-// ✅ Fixed: fall back to assessment - actual payments when there's no
-// matriculation record to source a balance from
-const storedBalance = unifastPayment
-  ? 0
-  : matriculationPayment
-    ? paymentBalance
-    : Math.max(storedAssessment - totalPaidAmount, 0);
-   
+        // ✅ Fixed: fall back to assessment - actual payments when there's no
+        // matriculation record to source a balance from
+        const storedBalance = unifastPayment
+          ? 0
+          : matriculationPayment
+            ? paymentBalance
+            : Math.max(storedAssessment - totalPaidAmount, 0);
+
         const paymentType = unifastPayment
           ? "UNIFAST"
           : matriculationPayment
@@ -307,8 +307,8 @@ const storedBalance = unifastPayment
           scholarship: unifastPayment
             ? "UNIFAST"
             : matriculationPayment?.scholarship_name ||
-              matriculationPayment?.matriculation_remark ||
-              "",
+            matriculationPayment?.matriculation_remark ||
+            "",
           payment: storedPayment,
           payment_total: totalPaidAmount,
           balance: storedBalance,

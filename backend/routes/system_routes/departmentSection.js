@@ -45,7 +45,8 @@ const getDepartmentSectionLabel = async (departmentSectionId) => {
   const [[details]] = await db3.query(
     `SELECT y.year_description, p.program_code, p.program_description, p.major,
             st.description AS section_description,
-            yl.year_level_description
+            yl.year_level_description,
+            dst.max_slots, dst.is_open_for_self_enrollment
      FROM dprtmnt_section_table dst
      INNER JOIN curriculum_table c ON dst.curriculum_id = c.curriculum_id
      INNER JOIN year_table y ON c.year_id = y.year_id
@@ -70,7 +71,11 @@ const getDepartmentSectionLabel = async (departmentSectionId) => {
     ? ` (${details.year_level_description})`
     : "";
 
-  return `${programLabel} - ${details.section_description}${yearLevelLabel}`;
+  const slotsLabel = ` [Max Slots: ${details.max_slots ?? 0}, Self-Enrollment: ${
+    Number(details.is_open_for_self_enrollment) === 1 ? "Open" : "Closed"
+  }]`;
+
+  return `${programLabel} - ${details.section_description}${yearLevelLabel}${slotsLabel}`;
 };
 
 // ACTIVE CURRICULUM
@@ -241,13 +246,24 @@ router.get("/section_table/:dprtmnt_id", async (req, res) => {
 
 // DEPARTMENT SECTION - CREATE
 router.post("/department_section", CanCreate, async (req, res) => {
-  const { curriculum_id, section_id, year_level_id } = req.body;
+  const {
+    curriculum_id,
+    section_id,
+    year_level_id,
+    max_slots,
+    is_open_for_self_enrollment,
+  } = req.body;
 
   if (!curriculum_id || !section_id || !year_level_id) {
     return res
       .status(400)
       .json({ error: "Curriculum ID, Section ID, and Year Level are required" });
   }
+
+  // max_slots defaults to 0, is_open_for_self_enrollment defaults to 1 (matches table defaults)
+  const safeMaxSlots = Number.isFinite(Number(max_slots)) ? Number(max_slots) : 0;
+  const safeSelfEnrollment =
+    Number(is_open_for_self_enrollment) === 0 ? 0 : 1;
 
   try {
     const [existing] = await db3.query(
@@ -265,11 +281,18 @@ router.post("/department_section", CanCreate, async (req, res) => {
     }
 
     const query = `
-      INSERT INTO dprtmnt_section_table (curriculum_id, section_id, year_level_id, dsstat)
-      VALUES (?, ?, ?, 0)
+      INSERT INTO dprtmnt_section_table
+        (curriculum_id, section_id, year_level_id, max_slots, dsstat, is_open_for_self_enrollment)
+      VALUES (?, ?, ?, ?, 0, ?)
     `;
 
-    const [result] = await db3.query(query, [curriculum_id, section_id, year_level_id]);
+    const [result] = await db3.query(query, [
+      curriculum_id,
+      section_id,
+      year_level_id,
+      safeMaxSlots,
+      safeSelfEnrollment,
+    ]);
 
     const [[details]] = await db3.query(
       `SELECT y.year_description, p.program_code, st.description AS section_description,
@@ -294,7 +317,9 @@ router.post("/department_section", CanCreate, async (req, res) => {
     await insertDepartmentSectionAuditLog({
       req,
       action: "DEPARTMENT_SECTION_CREATE",
-      message: `${roleLabel} (${actorId}) created department section ${curriculumLabel} - ${sectionLabel}${yearLevelLabel}.`,
+      message: `${roleLabel} (${actorId}) created department section ${curriculumLabel} - ${sectionLabel}${yearLevelLabel} [Max Slots: ${safeMaxSlots}, Self-Enrollment: ${
+        safeSelfEnrollment === 1 ? "Open" : "Closed"
+      }].`,
     });
 
     res.status(201).json({
@@ -312,13 +337,23 @@ router.post("/department_section", CanCreate, async (req, res) => {
 // DEPARTMENT SECTION - UPDATE
 router.put("/department_section/:id", CanEdit, async (req, res) => {
   const { id } = req.params;
-  const { curriculum_id, section_id, year_level_id } = req.body;
+  const {
+    curriculum_id,
+    section_id,
+    year_level_id,
+    max_slots,
+    is_open_for_self_enrollment,
+  } = req.body;
 
   if (!curriculum_id || !section_id || !year_level_id) {
     return res
       .status(400)
       .json({ error: "Curriculum ID, Section ID, and Year Level are required" });
   }
+
+  const safeMaxSlots = Number.isFinite(Number(max_slots)) ? Number(max_slots) : 0;
+  const safeSelfEnrollment =
+    Number(is_open_for_self_enrollment) === 0 ? 0 : 1;
 
   try {
     const [existing] = await db3.query(
@@ -339,9 +374,9 @@ router.put("/department_section/:id", CanEdit, async (req, res) => {
 
     const [result] = await db3.query(
       `UPDATE dprtmnt_section_table
-       SET curriculum_id = ?, section_id = ?, year_level_id = ?
+       SET curriculum_id = ?, section_id = ?, year_level_id = ?, max_slots = ?, is_open_for_self_enrollment = ?
        WHERE id = ?`,
-      [curriculum_id, section_id, year_level_id, id],
+      [curriculum_id, section_id, year_level_id, safeMaxSlots, safeSelfEnrollment, id],
     );
 
     if (result.affectedRows === 0) {
@@ -406,6 +441,8 @@ router.get("/department_section", async (req, res) => {
         dst.id as department_section_id,
         dst.dsstat,
         dst.year_level_id,
+        dst.max_slots,
+        dst.is_open_for_self_enrollment,
         ylt.year_level_description,
         pt.program_code,
         pt.program_description,
@@ -436,6 +473,7 @@ router.get("/department_section", async (req, res) => {
   }
 });
 
+// DEPARTMENT SECTION - TOGGLE ACTIVE/INACTIVE STATUS
 router.put(
   "/department_section/:id/status",
   CanEdit,
@@ -483,6 +521,63 @@ router.put(
       });
     } catch (err) {
       console.error("Error updating status:", err);
+
+      res.status(500).json({
+        error: "Internal Server Error",
+        details: err.message,
+      });
+    }
+  }
+);
+
+// DEPARTMENT SECTION - TOGGLE SELF-ENROLLMENT AVAILABILITY
+router.put(
+  "/department_section/:id/self_enrollment",
+  CanEdit,
+  async (req, res) => {
+    const { id } = req.params;
+    const { is_open_for_self_enrollment } = req.body;
+
+    if (is_open_for_self_enrollment !== 0 && is_open_for_self_enrollment !== 1) {
+      return res.status(400).json({
+        message: "Invalid self-enrollment value.",
+      });
+    }
+
+    try {
+      const beforeLabel = await getDepartmentSectionLabel(id);
+
+      const [result] = await db3.query(
+        `
+        UPDATE dprtmnt_section_table
+        SET is_open_for_self_enrollment = ?
+        WHERE id = ?
+        `,
+        [is_open_for_self_enrollment, id]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          message: "Department section not found.",
+        });
+      }
+
+      const { actorId, actorRole } = getAuditActor(req);
+      const roleLabel = formatAuditActorRole(actorRole);
+
+      await insertDepartmentSectionAuditLog({
+        req,
+        action: "DEPARTMENT_SECTION_SELF_ENROLLMENT_UPDATE",
+        message: `${roleLabel} (${actorId}) set self-enrollment of ${beforeLabel} to ${
+          is_open_for_self_enrollment === 1 ? "Open" : "Closed"
+        }.`,
+      });
+
+      res.status(200).json({
+        message: "Self-enrollment setting updated successfully.",
+      });
+    } catch (err) {
+      console.error("Error updating self-enrollment setting:", err);
 
       res.status(500).json({
         error: "Internal Server Error",

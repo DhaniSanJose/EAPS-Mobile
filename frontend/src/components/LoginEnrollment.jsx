@@ -96,6 +96,12 @@ const TotpLoginModal = ({
   const [qrScale, setQrScale] = useState(1);
   const [totpCode, setTotpCode] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState("");
+  // NEW: true once the user has asked to regenerate their QR because they
+  // lost/deleted the entry in their authenticator app. This reuses the same
+  // "isSetup" verification path as first-time setup (which overwrites
+  // totp_secret in the DB), so no separate identity flow is needed — the
+  // user already proved identity via password on /login.
+  const [regenerating, setRegenerating] = useState(false);
   const inputRefs = useRef([]);
 
   const isSetupFlow = loginData?.requireTotpSetup === true;
@@ -115,6 +121,7 @@ const TotpLoginModal = ({
     setError("");
     setShowManualKey(false);
     setQrScale(1);
+    setRegenerating(false);
 
     if (isSetupFlow) {
       setStep("loading_qr");
@@ -165,6 +172,44 @@ const TotpLoginModal = ({
     if (e.key === "Enter") handleVerifyAndRegister();
   };
 
+  // NEW: called from the "Lost access to your authenticator?" link on the
+  // verify screen for RETURNING users (isSetupFlow === false). Unlike the
+  // old "Back to QR code" button, this actually calls the backend to fetch
+  // a brand-new QR — it doesn't just flip local UI state. Requires the
+  // backend to issue a loginSetupId on every /login response where TOTP is
+  // required (not just the first-ever-login/no-secret-yet branch).
+  const handleRegenerateQr = () => {
+    if (!loginData?.loginSetupId) {
+      setError(
+        "Can't regenerate right now — please log in again to get a fresh setup reference."
+      );
+      return;
+    }
+    setRegenerating(true);
+    setError("");
+    setStep("loading_qr");
+    axios
+      .post(`${API_BASE_URL}/api/login-totp-setup`, {
+        loginSetupId: loginData.loginSetupId,
+        email: loginData.email,
+        source: loginData.source || "user",
+      })
+      .then((res) => {
+        if (res.data.success) {
+          setQrDataUrl(res.data.qrDataUrl);
+          setManualKey(res.data.manualKey);
+          setStep("scan");
+        } else {
+          setError(res.data.message || "Failed to generate QR code.");
+          setStep("verify");
+        }
+      })
+      .catch((err) => {
+        setError(err.response?.data?.message || "Failed to generate setup.");
+        setStep("verify");
+      });
+  };
+
   const handleVerifyAndRegister = async () => {
     const totpToken = totpCode.join("");
     if (!/^\d{6}$/.test(totpToken)) {
@@ -179,7 +224,10 @@ const TotpLoginModal = ({
         loginSetupId: loginData.loginSetupId,
         email: loginData.email,
         token: totpToken,
-        isSetup: isSetupFlow,
+        // Regenerating counts as a setup verification too — it needs to
+        // persist the newly generated secret to the DB, overwriting the
+        // old (deleted-from-the-app) one.
+        isSetup: isSetupFlow || regenerating,
         source: loginData.source || "user",
         audit_log_db: "db3",
         ...getLoginMacPayload(),
@@ -245,11 +293,15 @@ const TotpLoginModal = ({
               </Box>
               <Box>
                 <Typography fontWeight={700} fontSize={isMobile ? 15 : 17} color="white" lineHeight={1.2}>
-                  {step === "scan" ? "Set Up Google Authenticator" : "Enter Authenticator Code"}
+                  {step === "scan"
+                    ? (regenerating ? "Re-link Google Authenticator" : "Set Up Google Authenticator")
+                    : "Enter Authenticator Code"}
                 </Typography>
                 <Typography fontSize={12} color="rgba(255,255,255,0.85)" lineHeight={1.3}>
                   {step === "scan"
-                    ? "One-time setup — Step 1 of 2"
+                    ? (regenerating
+                        ? "Scan this new QR code with your authenticator app"
+                        : "One-time setup — Step 1 of 2")
                     : "Step 2 of 2 — Confirm & complete registration"}
                 </Typography>
 
@@ -302,6 +354,20 @@ const TotpLoginModal = ({
             }}>
               {/* LEFT: Instructions */}
               <Box sx={{ flex: 1.15, minWidth: 0, width: "100%" }}>
+                {regenerating && (
+                  <Box sx={{
+                    bgcolor: "#fff8e1",
+                    border: "1px solid #f5c542",
+                    borderRadius: "10px",
+                    p: 1.5,
+                    mb: 2,
+                  }}>
+                    <Typography fontSize={12.5} color="#5d4a00" lineHeight={1.5}>
+                      Your old authenticator entry for this account will stop working
+                      once you finish scanning and confirming this new code.
+                    </Typography>
+                  </Box>
+                )}
                 <Box
                   sx={{
                     bgcolor: "#f8f9ff",
@@ -621,22 +687,47 @@ const TotpLoginModal = ({
                 {step === "submitting" ? "Nirerehistro…" : "I-verify at Tapusin ang Pagpaparehistro"}
               </Typography>
 
-              {/* Back to QR scan */}
-              <Button
-                fullWidth
-                color="error"
-                variant="outlined"
-                onClick={() => { setStep("scan"); setError(""); }}
-                disabled={step === "submitting"}
-                sx={{
-                  fontWeight: 600, fontSize: "13px",
-                  borderRadius: "12px", py: 1.25,
-                  textTransform: "none", color: "#555",
+              {/* Back to QR scan — only valid during first-time setup, where
+                  a pending (not-yet-persisted) secret already exists for
+                  loginSetupId and can just be re-displayed. */}
+              {isSetupFlow && (
+                <Button
+                  fullWidth
+                  color="error"
+                  variant="outlined"
+                  onClick={() => { setStep("scan"); setError(""); }}
+                  disabled={step === "submitting"}
+                  sx={{
+                    fontWeight: 600, fontSize: "13px",
+                    borderRadius: "12px", py: 1.25,
+                    textTransform: "none", color: "#555",
+                  }}
+                >
+                  ← Back to QR code
+                </Button>
+              )}
 
-                }}
-              >
-                ← Back to QR code
-              </Button>
+              {/* Lost access — for RETURNING users who already have a
+                  totp_secret saved but deleted the entry from their app.
+                  Actually calls the backend to generate + persist a fresh
+                  secret, instead of the old dead-end local step flip. */}
+              {!isSetupFlow && step === "verify" && (
+                <Typography fontSize={16} color="#888" textAlign="center" sx={{ mt: 1.5 }}>
+                  Lost access to your authenticator app?{" "}
+                  <button
+                    type="button"
+                    onClick={handleRegenerateQr}
+                    style={{
+                      background: "none", border: "none", padding: 0,
+                      color: mainButtonColor, fontWeight: 600,
+                      cursor: "pointer", textDecoration: "underline",
+                      font: "inherit",
+                    }}
+                  >
+                    Get a new QR code
+                  </button>
+                </Typography>
+              )}
 
             </>
           )}
