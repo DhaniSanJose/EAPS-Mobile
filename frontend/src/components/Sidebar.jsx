@@ -253,7 +253,7 @@ function buildStyles(
   transition:max-width .3s cubic-bezier(.22,1,.36,1), opacity .18s ease, transform .28s ease, padding .34s cubic-bezier(.22,1,.36,1);
 }
 .sb-item {
-  display:flex; align-items:flex-start;
+  display:flex; align-items:center;
   gap:${effectiveCollapsed ? "0" : "10px"};
   padding:${effectiveCollapsed ? "3px 0" : "8px 10px"};
   border-radius:8px; cursor:pointer;
@@ -286,7 +286,7 @@ function buildStyles(
 }
 .sb-sub-item { padding-left:${effectiveCollapsed ? "0" : "20px"}; }
 .sb-group-btn {
-  display:flex; align-items:flex-start;
+  display:flex; align-items:center;
   gap:${effectiveCollapsed ? "0" : "10px"};
   width:100%; padding:${effectiveCollapsed ? "3px 0" : "8px 10px"};
   border-radius:8px; border:none; background:transparent; cursor:pointer;
@@ -959,6 +959,7 @@ const SideBar = ({
       ],
     },
   ];
+
   const enrollmentMenuGroups = [
     {
       key: "enrollmentOfficer",
@@ -1761,13 +1762,7 @@ const SideBar = ({
           link: "/user_page_access",
           icon: Security,
           page_id: 72,
-        },
-        {
-          title: "Page Table",
-          link: "/page_crud",
-          icon: TableChart,
-          page_id: 72,
-        },
+        },  
       ],
     },
     {
@@ -1813,6 +1808,7 @@ const SideBar = ({
     system: systemMenuGroups,
     account: accountMenuGroups,
   };
+  
   const managementItems = [
     {
       key: "admission",

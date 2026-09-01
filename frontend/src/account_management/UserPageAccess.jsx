@@ -28,6 +28,8 @@ import {
   DialogActions,
   Switch,
   IconButton,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import Unauthorized from "../components/Unauthorized";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -44,6 +46,218 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 const PROTECTED_PAGE_ID = 69;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Maps each page_id to the menu-group label it belongs to in the sidebar
+// (admissionMenuGroups, enrollmentMenuGroups, medicalMenuGroups, etc).
+// This is what powers the "Filter by Group" dropdown in the Edit Access modal,
+// so the filter options match the app's actual navigation groups rather than
+// whatever free-text is stored in each page's `page_group` column.
+//
+// NOTE: a handful of page_ids are reused across more than one menu group in
+// the source config (e.g. 171, 167, 116, 114, 72). Where that happens, the
+// id is assigned to the group listed here and the conflicting duplicate is
+// left commented out below it - update if a different group should win.
+// ─────────────────────────────────────────────────────────────────────────
+const PAGE_ID_TO_GROUP = {
+  // Admission Management
+  7: "Admission Management",
+  1: "Admission Management",
+  61: "Admission Management",
+  115: "Admission Management",
+  11: "Admission Management",
+  48: "Admission Management",
+  8: "Admission Management",
+  118: "Admission Management",
+  120: "Admission Management",
+  9: "Admission Management",
+  33: "Admission Management",
+  171: "Admission Management", // also appears as Department Management's "Workload Management" - see below
+  145: "Admission Management",
+  98: "Admission Management",
+  139: "Admission Management",
+  172: "Admission Management",
+
+  // Enrollment Management
+  6: "Enrollment Management",
+  43: "Enrollment Management",
+  49: "Enrollment Management",
+  151: "Enrollment Management",
+  12: "Enrollment Management",
+  37: "Enrollment Management",
+  137: "Enrollment Management",
+  124: "Enrollment Management",
+  141: "Enrollment Management",
+  125: "Enrollment Management",
+  152: "Enrollment Management",
+  170: "Enrollment Management",
+  10: "Enrollment Management",
+  36: "Enrollment Management",
+
+  // Medical & Dental Management
+  24: "Medical & Dental Management",
+  25: "Medical & Dental Management",
+  30: "Medical & Dental Management",
+  31: "Medical & Dental Management",
+  19: "Medical & Dental Management",
+  32: "Medical & Dental Management",
+
+  // Registrar's Office
+  80: "Registrar's Office",
+  161: "Registrar's Office",
+  160: "Registrar's Office",
+  168: "Registrar's Office",
+  169: "Registrar's Office",
+  59: "Registrar's Office",
+  104: "Registrar's Office",
+  38: "Registrar's Office",
+  106: "Registrar's Office",
+  153: "Registrar's Office",
+  174: "Registrar's Office",
+  50: "Registrar's Office",
+  105: "Registrar's Office",
+  62: "Registrar's Office",
+  15: "Registrar's Office",
+  17: "Registrar's Office",
+  140: "Registrar's Office",
+  117: "Registrar's Office",
+
+  // Course Management
+  34: "Course Management",
+  18: "Course Management",
+  16: "Course Management",
+  35: "Course Management",
+  111: "Course Management",
+  113: "Course Management",
+  112: "Course Management",
+  148: "Course Management",
+
+  // Department Management
+  53: "Department Management",
+  20: "Department Management",
+  21: "Department Management",
+  22: "Department Management",
+  149: "Department Management",
+  123: "Department Management",
+  107: "Department Management",
+  108: "Department Management",
+  // 171: "Department Management", // dup of Admission Management's 171 - Admission Management wins above
+
+  // Room Management
+  52: "Room Management",
+
+  // Requirements Management
+  51: "Requirements Management",
+
+  // Profile & Settings
+  74: "Profile & Settings",
+  138: "Profile & Settings",
+
+  // Academic Configuration
+  144: "Academic Configuration",
+  14: "Academic Configuration",
+  126: "Academic Configuration",
+  146: "Academic Configuration",
+
+  // Communication
+  67: "Communication",
+  66: "Communication",
+
+  // Slot Configuration
+  110: "Slot Configuration",
+
+  // Section Management
+  57: "Section Management",
+  167: "Section Management", // dup of Registrar's Office's 167 - Section Management wins here
+
+  // Semester Management
+  58: "Semester Management",
+
+  // Year Management
+  63: "Year Management",
+  64: "Year Management",
+  55: "Year Management",
+
+  // Evaluation Management
+  23: "Evaluation Management",
+
+  // Payment Management
+  116: "Payment Management", // also appears as Scholarship Management's "Student Scholarship List" - see below
+  122: "Payment Management",
+  121: "Payment Management",
+  99: "Payment Management",
+
+  // Scholarship Management
+  // 116: "Scholarship Management", // dup of Payment Management's 116 - Payment Management wins above
+
+  // System Logs
+  154: "System Logs",
+
+  // Account Management
+  70: "Account Management",
+  71: "Account Management",
+  143: "Account Management",
+  147: "Account Management",
+
+  // Faculty Management
+  109: "Faculty Management",
+
+  // Applicant Management
+  75: "Applicant Management",
+  84: "Applicant Management",
+  142: "Applicant Management",
+  166: "Applicant Management",
+
+  // Student Management
+  86: "Student Management",
+  150: "Student Management",
+  155: "Student Management",
+  156: "Student Management",
+  157: "Student Management",
+  158: "Student Management",
+  159: "Student Management",
+  114: "Student Management",
+
+  // Access Control
+  72: "Access Control",
+
+  // Password Management
+  81: "Password Management",
+  91: "Password Management",
+  82: "Password Management",
+  83: "Password Management",
+  73: "Password Management",
+};
+
+// Display order for the "Filter by Group" dropdown - mirrors sidebar order
+const ACCESS_GROUP_ORDER = [
+  "Admission Management",
+  "Enrollment Management",
+  "Medical & Dental Management",
+  "Registrar's Office",
+  "Course Management",
+  "Department Management",
+  "Room Management",
+  "Requirements Management",
+  "Profile & Settings",
+  "Academic Configuration",
+  "Communication",
+  "Slot Configuration",
+  "Section Management",
+  "Semester Management",
+  "Year Management",
+  "Evaluation Management",
+  "Payment Management",
+  "Scholarship Management",
+  "System Logs",
+  "Reset Password",
+  "Account Management",
+  "Faculty Management",
+  "Applicant Management",
+  "Student Management",
+  "Access Control",
+  "Password Management",
+];
 
 const UserPageAccess = () => {
   useAccountAuditMac();
@@ -86,6 +300,10 @@ const UserPageAccess = () => {
   const [editPages, setEditPages] = useState([]);
   const [createAccessSearch, setCreateAccessSearch] = useState("");
   const [editAccessSearch, setEditAccessSearch] = useState("");
+  // Tab state for the "Edit Access" modal (0 = Pages With Access, 1 = Pages Without Access)
+  const [accessTab, setAccessTab] = useState(0);
+  // Page-group filter for the "Edit Access" modal - applies to whichever tab is active
+  const [pageGroupFilter, setPageGroupFilter] = useState("");
   const [accessConfirmDialog, setAccessConfirmDialog] = useState({
     open: false,
     title: "",
@@ -205,6 +423,8 @@ const UserPageAccess = () => {
       setPages(allPages);
       setSelectedUser(user); // ✅ full user object
       setPageAccess(accessMap);
+      setAccessTab(0);
+      setPageGroupFilter("");
 
       setOpenModal(true);
     } catch {
@@ -425,6 +645,22 @@ const UserPageAccess = () => {
     editAccessSearch,
   );
 
+  // Split the selected user's pages into "has access" / "no access" buckets
+  const pagesWithAccess = pages.filter((p) => pageAccess[p.id]?.access);
+  const pagesWithoutAccess = pages.filter((p) => !pageAccess[p.id]?.access);
+
+  // Distinct menu-group labels available for the current user's pages, for the group filter dropdown
+  const availablePageGroups = ACCESS_GROUP_ORDER.filter((label) =>
+    pages.some((p) => PAGE_ID_TO_GROUP[p.id] === label),
+  );
+
+  // Group-filtered versions of the two buckets above - the same filter applies to whichever tab is active
+  const matchesGroupFilter = (p) =>
+    !pageGroupFilter || PAGE_ID_TO_GROUP[p.id] === pageGroupFilter;
+
+  const filteredPagesWithAccess = pagesWithAccess.filter(matchesGroupFilter);
+  const filteredPagesWithoutAccess = pagesWithoutAccess.filter(matchesGroupFilter);
+
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
 
@@ -526,7 +762,7 @@ const UserPageAccess = () => {
     const pageLabel = getPageLabel(targetPageId);
 
     confirmAccessChange({
-      requiresConfirm: isProtectedPage(targetPageId),
+      requiresConfirm: isRevoke || isProtectedPage(targetPageId),
       title: isRevoke ? "Revoke Page Access" : "Modify Page Access",
       message: isRevoke
         ? `Are you sure you want to revoke ${employeeName}'s access to ${pageLabel}?`
@@ -1039,6 +1275,27 @@ const UserPageAccess = () => {
         message: "Failed to remove all access",
       });
     }
+  };
+
+  const requestRevokeAllAccess = () => {
+    if (!selectedUser) return;
+    if (!canDelete) {
+      setSnack({
+        open: true,
+        severity: "error",
+        message: "You do not have permission to revoke page access",
+      });
+      return;
+    }
+
+    const employeeName = formatEmployeeName(selectedUser);
+
+    confirmAccessChange({
+      requiresConfirm: true,
+      title: "Revoke All Page Access",
+      message: `Are you sure you want to revoke ALL of ${employeeName}'s page access? This will remove access to every page except ${getProtectedPageLabel()}, which must be changed individually.`,
+      onConfirm: () => revokeAllAccess(),
+    });
   };
 
   const handleUserBulkPermission = async (permissionKey, enabled) => {
@@ -1821,139 +2078,317 @@ const UserPageAccess = () => {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent dividers sx={{ maxHeight: "70vh" }}>
-          <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} mb={2}>
+        <DialogContent dividers sx={{ maxHeight: "75vh" }}>
+          {/* ─────────── TABS + GROUP FILTER (filter applies to whichever tab is active) ─────────── */}
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap="wrap"
+            gap={2}
+            sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
+          >
+            <Tabs
+              value={accessTab}
+              onChange={(e, newValue) => setAccessTab(newValue)}
+              sx={{
+                minHeight: 40,
+                "& .MuiTab-root": { minHeight: 40, fontWeight: 600, textTransform: "none" },
+              }}
+            >
+              <Tab
+                icon={<LockOpenIcon fontSize="small" />}
+                iconPosition="start"
+                label={`Pages With Access (${pagesWithAccess.length})`}
+              />
+              <Tab
+                icon={<LockIcon fontSize="small" />}
+                iconPosition="start"
+                label={`Pages Without Access (${pagesWithoutAccess.length})`}
+              />
+            </Tabs>
 
-            {/* Left: Grant All / Remove All */}
-            <Box display="flex" gap={1.5}>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<LockOpenIcon />}
-                onClick={grantAllAccess}
-                disabled={!canCreate}
-                sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-              >
-                Grant All Access
-              </Button>
-              <Button
-                variant="contained"
-                color="warning"
-                startIcon={<LockIcon />}
-                onClick={revokeAllAccess}
-                disabled={!canDelete}
-                sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-              >
-                Remove All Access
-              </Button>
-            </Box>
-
-            {/* Right: Per-permission bulk buttons */}
-            <Box display="flex" gap={1} flexWrap="wrap" justifyContent="flex-end">
-              {Object.entries(permissionLabels).map(([permissionKey, label]) => (
-                <React.Fragment key={permissionKey}>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    color="success"
-                    onClick={() => handleUserBulkPermission(permissionKey, true)}
-                    disabled={!canManageUserPermissions(permissionKey)}
-                    sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                  >
-                    Grant All {label}
-                  </Button>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    color="error"
-                    onClick={() => handleUserBulkPermission(permissionKey, false)}
-                    disabled={!canManageUserPermissions(permissionKey)}
-                    sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                  >
-                    Close All {label}
-                  </Button>
-                </React.Fragment>
-              ))}
+            <Box display="flex" alignItems="center" gap={1} sx={{ pb: 1 }}>
+              <FormControl size="small" sx={{ minWidth: 260 }}>
+                <InputLabel id="page-group-filter-label">Filter by Group</InputLabel>
+                <Select
+                  labelId="page-group-filter-label"
+                  label="Filter by Group"
+                  value={pageGroupFilter}
+                  onChange={(e) => setPageGroupFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Groups</MenuItem>
+                  {availablePageGroups.map((group) => (
+                    <MenuItem key={group} value={group}>
+                      {group}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {pageGroupFilter && (
+                <Button
+                  size="small"
+                  onClick={() => setPageGroupFilter("")}
+                  sx={{ textTransform: "none" }}
+                >
+                  Clear Filter
+                </Button>
+              )}
             </Box>
           </Box>
 
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-            Bulk close and remove actions skip {getProtectedPageLabel()} (Page {PROTECTED_PAGE_ID}).
-            Change that page using its row switches only.
-          </Typography>
+          {/* ─────────── TAB PANEL: PAGES WITH ACCESS ─────────── */}
+          {accessTab === 0 && (
+            <Box>
+              <Box
+                display="flex"
+                justifyContent="flex-end"
+                alignItems="center"
+                flexWrap="wrap"
+                gap={1}
+                mb={1}
+              >
+                <Button
+                  variant="contained"
+                  color="warning"
+                  size="small"
+                  startIcon={<LockIcon />}
+                  onClick={requestRevokeAllAccess}
+                  disabled={!canDelete || pagesWithAccess.length === 0}
+                  sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+                >
+                  Remove All Access
+                </Button>
+              </Box>
 
-          <Paper sx={{ border: `1px solid ${borderColor}` }}>
-            <TableContainer>
-              <Table>
-                <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
-                  <TableRow>
-                    {["#", "Page Description", "Page Group", "Access", "CREATE", "EDIT", "DELETE"].map((header) => (
-                      <TableCell
-                        key={header}
-                        sx={{
-                          color: "white",
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          border: `1px solid ${borderColor}`,
-                        }}
-                      >
-                        {header}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {pages.map((p, i) => (
-                    <TableRow
-                      key={p.id}
-                      sx={{ "&:hover": { backgroundColor: "#f5f5f5" }, transition: "background-color 0.2s" }}
+              <Box
+                display="flex"
+                justifyContent="flex-end"
+                gap={1}
+                flexWrap="wrap"
+                mb={1}
+              >
+                {Object.entries(permissionLabels).map(([permissionKey, label]) => (
+                  <React.Fragment key={permissionKey}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="success"
+                      onClick={() => handleUserBulkPermission(permissionKey, true)}
+                      disabled={
+                        !canManageUserPermissions(permissionKey) ||
+                        pagesWithAccess.length === 0
+                      }
+                      sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
                     >
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.id}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-                          {Number(p.id) === PROTECTED_PAGE_ID && (
-                            <LockIcon fontSize="small" color="warning" titleAccess="Protected page (ID 69)" />
-                          )}
-                          {p.page_description}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>{p.page_group}</TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={pageAccess[p.id]?.access || false}
-                          onChange={() => requestToggleChange(p.id, pageAccess[p.id]?.access || false)}
-                          disabled={
-                            pageAccess[p.id]?.access ? !canDelete : !canCreate
-                          }
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={pageAccess[p.id]?.can_create || false}
-                          onChange={() => requestPermissionToggle(p.id, "can_create")}
-                          disabled={!canManageUserPermissions("can_create")}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={pageAccess[p.id]?.can_edit || false}
-                          onChange={() => requestPermissionToggle(p.id, "can_edit")}
-                          disabled={!canManageUserPermissions("can_edit")}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
-                        <Switch
-                          checked={pageAccess[p.id]?.can_delete || false}
-                          onChange={() => requestPermissionToggle(p.id, "can_delete")}
-                          disabled={!canManageUserPermissions("can_delete")}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+                      Grant All {label}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="error"
+                      onClick={() => handleUserBulkPermission(permissionKey, false)}
+                      disabled={
+                        !canManageUserPermissions(permissionKey) ||
+                        pagesWithAccess.length === 0
+                      }
+                      sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+                    >
+                      Close All {label}
+                    </Button>
+                  </React.Fragment>
+                ))}
+              </Box>
+
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                Bulk close and remove actions skip {getProtectedPageLabel()} (Page{" "}
+                {PROTECTED_PAGE_ID}). Change that page using its row switches only.
+              </Typography>
+
+              <Paper sx={{ border: `1px solid ${borderColor}` }}>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead sx={{ backgroundColor: headerColor || "#1976d2" }}>
+                      <TableRow>
+                        {["#", "Page Description", "Access", "CREATE", "EDIT", "DELETE"].map(
+                          (header) => (
+                            <TableCell
+                              key={header}
+                              sx={{
+                                color: "white",
+                                textAlign: "center",
+                                fontWeight: "bold",
+                                border: `1px solid ${borderColor}`,
+                              }}
+                            >
+                              {header}
+                            </TableCell>
+                          ),
+                        )}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredPagesWithAccess.map((p) => (
+                        <TableRow
+                          key={p.id}
+                          sx={{
+                            "&:hover": { backgroundColor: "#f5f5f5" },
+                            transition: "background-color 0.2s",
+                          }}
+                        >
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            {p.id}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                              {Number(p.id) === PROTECTED_PAGE_ID && (
+                                <LockIcon fontSize="small" color="warning" titleAccess="Protected page (ID 69)" />
+                              )}
+                              {p.page_description}
+                            </Box>
+                          </TableCell>    
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            <Switch
+                              checked={pageAccess[p.id]?.access || false}
+                              onChange={() =>
+                                requestToggleChange(p.id, pageAccess[p.id]?.access || false)
+                              }
+                              disabled={!canDelete}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            <Switch
+                              checked={pageAccess[p.id]?.can_create || false}
+                              onChange={() => requestPermissionToggle(p.id, "can_create")}
+                              disabled={!canManageUserPermissions("can_create")}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            <Switch
+                              checked={pageAccess[p.id]?.can_edit || false}
+                              onChange={() => requestPermissionToggle(p.id, "can_edit")}
+                              disabled={!canManageUserPermissions("can_edit")}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            <Switch
+                              checked={pageAccess[p.id]?.can_delete || false}
+                              onChange={() => requestPermissionToggle(p.id, "can_delete")}
+                              disabled={!canManageUserPermissions("can_delete")}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {filteredPagesWithAccess.length === 0 && (
+                        <TableRow>
+                          <TableCell align="center" colSpan={7}>
+                            {pagesWithAccess.length === 0
+                              ? "No pages granted yet."
+                              : "No pages match this filter."}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
+
+          {/* ─────────── TAB PANEL: PAGES WITHOUT ACCESS ─────────── */}
+          {accessTab === 1 && (
+            <Box>
+              <Box
+                display="flex"
+                justifyContent="flex-end"
+                alignItems="center"
+                flexWrap="wrap"
+                gap={1}
+                mb={1}
+              >
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  startIcon={<LockOpenIcon />}
+                  onClick={grantAllAccess}
+                  disabled={!canCreate || pagesWithoutAccess.length === 0}
+                  sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+                >
+                  Grant All Access
+                </Button>
+              </Box>
+
+              <Paper sx={{ border: `1px solid ${borderColor}` }}>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead sx={{ backgroundColor: "#9e9e9e" }}>
+                      <TableRow>
+                        {["#", "Page Description", "Access"].map((header) => (
+                          <TableCell
+                            key={header}
+                            sx={{
+                              color: "white",
+                              textAlign: "center",
+                              fontWeight: "bold",
+                              border: `1px solid ${borderColor}`,
+                            }}
+                          >
+                            {header}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredPagesWithoutAccess.map((p) => (
+                        <TableRow
+                          key={p.id}
+                          sx={{
+                            "&:hover": { backgroundColor: "#f5f5f5" },
+                            transition: "background-color 0.2s",
+                          }}
+                        >
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            {p.id}
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                              {Number(p.id) === PROTECTED_PAGE_ID && (
+                                <LockIcon fontSize="small" color="warning" titleAccess="Protected page (ID 69)" />
+                              )}
+                              {p.page_description}
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center", border: `1px solid ${borderColor}` }}>
+                            <Switch
+                              checked={pageAccess[p.id]?.access || false}
+                              onChange={() =>
+                                requestToggleChange(p.id, pageAccess[p.id]?.access || false)
+                              }
+                              disabled={!canCreate}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {filteredPagesWithoutAccess.length === 0 && (
+                        <TableRow>
+                          <TableCell align="center" colSpan={4}>
+                            {pagesWithoutAccess.length === 0
+                              ? "All pages have been granted."
+                              : "No pages match this filter."}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+          )}
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2 }}>

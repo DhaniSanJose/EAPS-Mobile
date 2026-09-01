@@ -462,7 +462,7 @@ const CourseManagement = () => {
       fetchCourses();
     } catch (err) {
       showSnack(
-        err.response?.data?.message || "Failed to add course.",
+        err.response?.data?.message || "Failed to Add Subject.",
         "error",
       );
     }
@@ -818,7 +818,7 @@ const CourseManagement = () => {
               }}
             >
               <FaFileExcel style={{ marginRight: 8 }} />
-              {importingXlsx ? "Importing..." : "Import Course"}
+              {importingXlsx ? "Importing..." : "Import Subject"}
             </Button>
           )}
           <Button
@@ -923,7 +923,7 @@ const CourseManagement = () => {
                     },
                   }}
                 >
-                  + Add Course
+                  + Add Subject
                 </Button>
               )}
         
@@ -1663,16 +1663,15 @@ const CourseManagement = () => {
             mb: 2,
           }}
         >
-          {editMode ? "Edit Course" : "Add New Course"}
+          {editMode ? "Edit Subject" : "Add New Subject"}
         </DialogTitle>
 
         <DialogContent sx={{ p: 3 }}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
-              <Typography fontWeight="bold">Course Code</Typography>
+              <Typography fontWeight="bold">Subject Code</Typography>
               <TextField
                 fullWidth
-                label="Course Code"
                 name="course_code"
                 required
                 value={course.course_code}
@@ -1681,10 +1680,9 @@ const CourseManagement = () => {
             </Grid>
 
             <Grid item xs={12} md={8}>
-              <Typography fontWeight="bold">Course Description</Typography>
+              <Typography fontWeight="bold">Subject Description</Typography>
               <TextField
                 fullWidth
-                label="Course Description"
                 name="course_description"
                 required
                 value={course.course_description}
@@ -1697,7 +1695,6 @@ const CourseManagement = () => {
               <Typography fontWeight="bold">Lec Unit</Typography>
               <TextField
                 fullWidth
-                label="Lec Unit"
                 name="lec_unit"
                 type="number"
                 value={course.lec_unit}
@@ -1709,7 +1706,6 @@ const CourseManagement = () => {
               <Typography fontWeight="bold">Lab Unit</Typography>
               <TextField
                 fullWidth
-                label="Lab Unit"
                 name="lab_unit"
                 type="number"
                 value={course.lab_unit}
@@ -1718,10 +1714,9 @@ const CourseManagement = () => {
             </Grid>
 
             <Grid item xs={12} md={4}>
-              <Typography fontWeight="bold">Course Unit</Typography>
+              <Typography fontWeight="bold">Subject Unit</Typography>
               <TextField
                 fullWidth
-                label="Course Unit"
                 name="course_unit"
                 type="number"
                 value={course.course_unit}

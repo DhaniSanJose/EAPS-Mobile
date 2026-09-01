@@ -456,7 +456,7 @@ const Dashboard = ({ profileImage, setProfileImage }) => {
       color: "#A3C4F3",
     },
     {
-      label: "Total Registrar",
+      label: "Total Administrators",
       value: registrarCount,
       icon: <AdminPanelSettingsIcon fontSize="large" />,
       color: "#FFD8A9",

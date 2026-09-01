@@ -49,7 +49,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://192.168.50.211:5173",
   "http://136.239.248.62:5173",
-  "http://192.168.50.54:5173",
+  "http://192.168.50.64:5173",
   "http://192.168.1.9:5173",
 ];
 
@@ -257,7 +257,6 @@ app.use("/api", downloadableFormsRoute);
 app.use("/api", changeCourseFormRoute);
 app.use("/api", controlNumberRoute);
 
-
 const uploadPath = path.join(__dirname, "uploads");
 
 app.use("/uploads", express.static(uploadPath));
@@ -271,39 +270,6 @@ if (!fs.existsSync(signatureDir))
 
 if (!fs.existsSync(torSignatoriesDir)) 
   fs.mkdirSync(torSignatoriesDir, { recursive: true });
-
-// Multer setup
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "public/uploads/");
-  },
-  filename: async function (req, file, cb) {
-    const person_id = req.body.person_id;
-    const requirements_id = req.body.requirements_id;
-
-    // Get requirement label from DB
-    const [reqRows] = await db.query(
-      "SELECT description FROM requirements_table WHERE id = ?",
-      [requirements_id],
-    );
-    const description = reqRows[0]?.description || "Unknown";
-    const shortLabel = getShortLabel(description);
-
-    // Get applicant_number using person_id
-    const [applicantRows] = await db.query(
-      "SELECT applicant_number FROM applicant_numbering_table WHERE person_id = ?",
-      [person_id],
-    );
-    const applicant_number =
-      applicantRows[0]?.applicant_number || `PID${person_id}`;
-
-    const timestamp = new Date().getFullYear();
-    const ext = path.extname(file.originalname);
-
-    const filename = `${applicant_number}_${shortLabel}_${timestamp}${ext}`;
-    cb(null, filename);
-  },
-});
 
 // ---------------- PROFILE UPLOAD (Registrar) ----------------
 // Ito
