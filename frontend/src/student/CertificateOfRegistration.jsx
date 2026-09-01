@@ -125,6 +125,7 @@ const CertificateOfRegistration = forwardRef(
     const [approvedBySignatureMissing, setApprovedBySignatureMissing] =
       useState(false);
     const [qrCodeMissing, setQrCodeMissing] = useState(false);
+    const [qrCodePathIndex, setQrCodePathIndex] = useState(0);
     const approvedBySignature =
       typeof approvedBy?.signature_image === "string"
         ? approvedBy.signature_image.trim()
@@ -144,6 +145,7 @@ const CertificateOfRegistration = forwardRef(
 
     useEffect(() => {
       setQrCodeMissing(false);
+      setQrCodePathIndex(0);
     }, [effectiveStudentNumber]);
 
     useEffect(() => {
@@ -641,8 +643,15 @@ const CertificateOfRegistration = forwardRef(
       : data[0]?.matriculation_remark
         ? "Scholar"
         : "";
-    const showFreeTuitionStamp =
-      savedUnifast && /UNIFAST/i.test(String(scholarshipDiscountValue || ""));
+    const isUnifastScholarship =
+      savedUnifast || /UNIFAST/i.test(String(scholarshipDiscountValue || ""));
+    const showFreeTuitionStamp = isUnifastScholarship;
+    const qrCodePaths = effectiveStudentNumber
+      ? [
+          `${API_BASE_URL}/uploads/QrCodeGenerated/${effectiveStudentNumber}_qrcode.png`,
+          `${API_BASE_URL}/uploads/StudentQRCodeGenerated/${effectiveStudentNumber}_qrcode.png`,
+        ]
+      : [];
 
     const fetchTosf = async () => {
       try {
@@ -1318,7 +1327,9 @@ const CertificateOfRegistration = forwardRef(
                           .flex-container {
                             width: calc((210mm + 6.5rem) * 44 / 42 + 3rem);
                             min-height: 297mm;
-                            margin  
+                          }
+                          .certificate-wrapper {
+                            padding: var(--cor-print-margin, 0 0.25in);
                           }
                           .fee-table-con {
                             width: 100% !important;
@@ -4097,7 +4108,7 @@ const CertificateOfRegistration = forwardRef(
                                   objectFit: "contain",
                                   width: "250px",
                                   marginBottom: "0",
-                                  display: !student_number ? "none" : "block",
+                                  display: !effectiveStudentNumber ? "none" : "block",
                                   marginLeft: "auto",
                                   marginRight: "auto",
                                 }}
@@ -4105,8 +4116,8 @@ const CertificateOfRegistration = forwardRef(
                             ) : (
                               <div
                                 style={{
-                                  height: student_number ? "60px" : "0",
-                                  display: !student_number ? "none" : "block",
+                                  height: effectiveStudentNumber ? "60px" : "0",
+                                  display: !effectiveStudentNumber ? "none" : "block",
                                 }}
                               />
                             )}
@@ -4123,8 +4134,8 @@ const CertificateOfRegistration = forwardRef(
                             >
                               <div
                                 style={{
-                                  minHeight: student_number ? "14px" : "0",
-                                  display: !student_number ? "none" : "block",
+                                  minHeight: effectiveStudentNumber ? "14px" : "0",
+                                  display: !effectiveStudentNumber ? "none" : "block",
                                 }}
                               >
                                 {approvedBy?.full_name || ""}
@@ -4221,9 +4232,15 @@ const CertificateOfRegistration = forwardRef(
                                 height: "150px",
                                 display: "block",
                               }}
-                              src={`${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`}
+                              src={qrCodePaths[qrCodePathIndex]}
                               alt=""
-                              onError={() => setQrCodeMissing(true)}
+                              onError={() => {
+                                if (qrCodePathIndex < qrCodePaths.length - 1) {
+                                  setQrCodePathIndex((index) => index + 1);
+                                  return;
+                                }
+                                setQrCodeMissing(true);
+                              }}
                             />
                             <span
                               style={{

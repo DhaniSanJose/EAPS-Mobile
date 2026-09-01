@@ -511,6 +511,7 @@ const CertificateOfRegistration = forwardRef(
     const [isHaveComputerFees, setIsHaveComputerFees] = useState(0);
     const [isHaveLaboratory, setIsHaveLaboratory] = useState(0);
     const [qrCodeMissing, setQrCodeMissing] = useState(false);
+    const [qrCodePathIndex, setQrCodePathIndex] = useState(0);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmTarget, setConfirmTarget] = useState(null);
     const [savedUnifast, setSavedUnifast] = useState(false);
@@ -821,8 +822,15 @@ const CertificateOfRegistration = forwardRef(
         (item) => Number(item.id) === Number(selectedScholarshipId),
       )?.scholarship_code ||
       "";
-    const showFreeTuitionStamp =
-      savedUnifast && /UNIFAST/i.test(String(selectedScholarshipCode));
+    const isUnifastScholarship =
+      savedUnifast || /UNIFAST/i.test(String(selectedScholarshipCode || ""));
+    const showFreeTuitionStamp = isUnifastScholarship;
+    const qrCodePaths = student_number
+      ? [
+          `${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`,
+          `${API_BASE_URL}/uploads/StudentQRCodeGenerated/${student_number}_qrcode.png`,
+        ]
+      : [];
     const [curriculumOptions, setCurriculumOptions] = useState([]);
 
     useEffect(() => {
@@ -888,6 +896,7 @@ const CertificateOfRegistration = forwardRef(
 
     useEffect(() => {
       setQrCodeMissing(false);
+      setQrCodePathIndex(0);
     }, [student_number]);
 
     const [requestedData, setRequestedData] = useState({
@@ -1569,7 +1578,9 @@ const CertificateOfRegistration = forwardRef(
                   .flex-container {
                     width: calc((210mm + 6.5rem) * 44 / 42 + 3rem);
                     min-height: 297mm;
-                    margin  
+                  }
+                  .certificate-wrapper {
+                    padding: var(--cor-print-margin, 0 0.25in);
                   }
                   .fee-table-con {
                     width: 100% !important;
@@ -4597,9 +4608,15 @@ const CertificateOfRegistration = forwardRef(
                                 height: "150px",
                                 display: "block",
                               }}
-                              src={`${API_BASE_URL}/uploads/StudentQRCodeGenerated/${student_number}_qrcode.png`}
+                              src={qrCodePaths[qrCodePathIndex]}
                               alt=""
-                              onError={() => setQrCodeMissing(true)}
+                              onError={() => {
+                                if (qrCodePathIndex < qrCodePaths.length - 1) {
+                                  setQrCodePathIndex((index) => index + 1);
+                                  return;
+                                }
+                                setQrCodeMissing(true);
+                              }}
                             />
                             <span
                               style={{

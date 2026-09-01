@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import CertificateOfRegistration from "../components/CertificateOfRegistration";
 import API_BASE_URL from "../apiConfig";
 
+const COR_PDF_MARGIN = "0 0.25in";
+
 const CORExportRender = () => {
   const [searchParams] = useSearchParams();
   const jobId = searchParams.get("job_id") || "";
@@ -55,18 +57,26 @@ const CORExportRender = () => {
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
     const pageRect = page.getBoundingClientRect();
+    const pageStyle = window.getComputedStyle(page);
+    const paddingLeft = parseFloat(pageStyle.paddingLeft) || 0;
+    const paddingRight = parseFloat(pageStyle.paddingRight) || 0;
+    const paddingTop = parseFloat(pageStyle.paddingTop) || 0;
+    const paddingBottom = parseFloat(pageStyle.paddingBottom) || 0;
+    const availableWidth = pageRect.width - paddingLeft - paddingRight - 4;
+    const availableHeight = pageRect.height - paddingTop - paddingBottom - 4;
     const naturalWidth = Math.max(content.scrollWidth, content.offsetWidth, 1);
     const naturalHeight = Math.max(content.scrollHeight, content.offsetHeight, 1);
     const scale = Math.min(
       0.98,
-      (pageRect.width - 4) / naturalWidth,
-      (pageRect.height - 4) / naturalHeight,
+      availableWidth / naturalWidth,
+      availableHeight / naturalHeight,
     );
 
     content.style.transform = `scale(${scale})`;
     content.style.width = `${naturalWidth}px`;
-    // Center any leftover horizontal space instead of stretching.
-    content.style.left = `${Math.max(0, (pageRect.width - naturalWidth * scale) / 2)}px`;
+    // Center inside the printable area instead of stretching.
+    content.style.left = `${paddingLeft + Math.max(0, (availableWidth - naturalWidth * scale) / 2)}px`;
+    content.style.top = `${paddingTop}px`;
     window.__COR_SCALE = scale;
 
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -163,7 +173,9 @@ const CORExportRender = () => {
         background: "#ffffff",
         position: "relative",
         margin: 0,
-        padding: 0,
+        padding: COR_PDF_MARGIN,
+        boxSizing: "border-box",
+        "--cor-print-margin": "0mm",
       }}
     >
       <style>
@@ -200,6 +212,7 @@ const CORExportRender = () => {
             preload={preload}
             containerId="server-cor-export"
             onReady={handleReady}
+            suppressNotifications
           />
         ) : null}
       </div>

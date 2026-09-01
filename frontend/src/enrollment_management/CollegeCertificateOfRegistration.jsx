@@ -413,6 +413,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
     const scopeRevision = useRegistrarScopeRevision();
     const [selectedDepartment, setSelectedDepartment] = useState(null);
     const [qrCodeMissing, setQrCodeMissing] = useState(false);
+    const [qrCodePathIndex, setQrCodePathIndex] = useState(0);
     const [subjectCounts, setSubjectCounts] = useState({});
     const [year_Level_Description, setYearLevelDescription] = useState(null);
     const [major, setMajor] = useState(null);
@@ -589,6 +590,7 @@ const CertificateOfRegistrationForCollege = forwardRef(
     }, [selectedDepartment, scopeReady, adminData, scopeRevision]);
     useEffect(() => {
       setQrCodeMissing(false);
+      setQrCodePathIndex(0);
     }, [student_number]);
 
     const [gender, setGender] = useState(null);
@@ -926,8 +928,15 @@ const CertificateOfRegistrationForCollege = forwardRef(
         (item) => Number(item.id) === Number(selectedScholarshipId),
       )?.scholarship_code ||
       "";
-    const showFreeTuitionStamp =
-      savedUnifast && /UNIFAST/i.test(String(selectedScholarshipCode));
+    const isUnifastScholarship =
+      savedUnifast || /UNIFAST/i.test(String(selectedScholarshipCode || ""));
+    const showFreeTuitionStamp = isUnifastScholarship;
+    const qrCodePaths = student_number
+      ? [
+          `${API_BASE_URL}/uploads/QrCodeGenerated/${student_number}_qrcode.png`,
+          `${API_BASE_URL}/uploads/StudentQRCodeGenerated/${student_number}_qrcode.png`,
+        ]
+      : [];
 
     const fetchTosf = async () => {
       try {
@@ -1638,7 +1647,9 @@ const CertificateOfRegistrationForCollege = forwardRef(
                           .flex-container {
                             width: calc((210mm + 6.5rem) * 44 / 42 + 3rem);
                             min-height: 297mm;
-                            margin  
+                          }
+                          .certificate-wrapper {
+                            padding: var(--cor-print-margin, 0 0.25in);
                           }
                           .fee-table-con {
                             width: 100% !important;
@@ -4666,9 +4677,15 @@ const CertificateOfRegistrationForCollege = forwardRef(
                                 height: "150px",
                                 display: "block",
                               }}
-                              src={`${API_BASE_URL}/uploads/StudentQRCodeGenerated/${student_number}_qrcode.png`}
+                              src={qrCodePaths[qrCodePathIndex]}
                               alt=""
-                              onError={() => setQrCodeMissing(true)}
+                              onError={() => {
+                                if (qrCodePathIndex < qrCodePaths.length - 1) {
+                                  setQrCodePathIndex((index) => index + 1);
+                                  return;
+                                }
+                                setQrCodeMissing(true);
+                              }}
                             />
                             <span
                               style={{
