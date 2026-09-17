@@ -1,35 +1,13 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const { db, db3 } = require("../database/database");
 
 const router = express.Router();
 
-const JWT_SECRET = "your_secret_key";
-
-
-// =====================================================
-// 🔐 VERIFY TOKEN
-// =====================================================
+const { authenticateToken } = require("../../middleware/auth");
 
 function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    req.user = null;
-    return next();
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-  } catch (err) {
-    console.log("❌ Invalid token");
-    req.user = null;
-  }
-
-  next();
+  if (req.user) return next();
+  return authenticateToken(req, res, next);
 }
 
 

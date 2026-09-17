@@ -933,4 +933,49 @@ router.delete("/program-slots/reset/all", async (req, res) => {
   }
 });
 
+router.get("/applied_program", async (req, res) => {
+  try {
+    await ensureProgramSlotsEStatusColumn();
+
+    const [rows] = await db3.execute(`
+      SELECT
+        ct.curriculum_id,
+        ct.year_id,
+        yt.year_description,
+        yt.year_description AS current_year,
+        yt.year_description + 1 AS next_year,
+        pt.program_id,
+        pt.program_code,
+        pt.program_description,
+        pt.major,
+        pt.components,
+        pt.academic_program,
+        d.dprtmnt_id,
+        d.dprtmnt_name,
+        d.dept_number,
+        d.components,
+        COALESCE(ps.e_status, 0) AS e_status
+      FROM curriculum_table AS ct
+      INNER JOIN program_table AS pt ON pt.program_id = ct.program_id
+      INNER JOIN dprtmnt_curriculum_table AS dc ON ct.curriculum_id = dc.curriculum_id
+      INNER JOIN year_table AS yt ON ct.year_id = yt.year_id
+      INNER JOIN dprtmnt_table AS d ON dc.dprtmnt_id = d.dprtmnt_id
+      LEFT JOIN active_school_year_table AS asy ON asy.astatus = 1
+      LEFT JOIN admission.program_slots AS ps
+        ON ps.curriculum_id = ct.curriculum_id
+       AND ps.active_school_year_id = asy.id
+      WHERE ct.lock_status = 1
+    `);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "No curriculum data found" });
+    }
+
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching curriculum data:", error);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 module.exports = router;

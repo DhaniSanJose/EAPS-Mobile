@@ -10,6 +10,7 @@ const { insertAuditLogEnrollment, resolveAuditActor } = require("../../utils/aud
 const {
   getScopesForEmployees,
   buildEmployeeScopePayload,
+  ensureRegistrarScopeTable,
   formatScopesSummary,
 } = require("../../utils/registrarScopeService");
 const {
@@ -18,9 +19,20 @@ const {
   CanEdit,
   CanManageUserPagePermissions,
 } = require("../../middleware/pagePermissions");
+const {
+  notifyPageAccessGranted,
+  notifyPageAccessRevoked,
+  notifyPageAccessChanged,
+} = require("../../socket/socketService");
+const {
+  USER_PAGE_ACCESS_PAGE_ID,
+  hasGuaranteedUserPageAccess,
+  ensureGuaranteedUserPageAccess,
+  mergeGuaranteedUserPageAccess,
+  guaranteedUserPageAccessRow,
+} = require("../../utils/userPageAccessGuarantee");
 
 const router = express.Router();
-const PROTECTED_PAGE_ID = 69;
 
 router.use(async (req, res, next) => {
   try {
@@ -74,6 +86,26 @@ const getPageLabel = async (pageId) => {
     console.error("Page audit label lookup failed:", err);
     return `Page ${pageId}`;
   }
+};
+
+const normalizePageIds = (pageIds) => {
+  if (!Array.isArray(pageIds)) return null;
+  return [
+    ...new Set(
+      pageIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  ];
+};
+
+const formatPageScopeLabel = (pageIds, pageGroup) => {
+  const groupLabel = String(pageGroup || "").trim();
+  if (groupLabel) return groupLabel;
+  if (Array.isArray(pageIds) && pageIds.length > 0) {
+    return `${pageIds.length} selected page${pageIds.length === 1 ? "" : "s"}`;
+  }
+  return "all pages";
 };
 
 router.post("/pages", CanCreate, async (req, res) => {
@@ -175,11 +207,13 @@ router.delete("/pages/:id", CanDelete, async (req, res) => {
 router.get("/page_access/:userId", async (req, res) => {
   const { userId } = req.params;
   try {
+    await ensureGuaranteedUserPageAccess(userId);
     const [rows] = await db3.query(
       "SELECT * FROM page_access WHERE user_id = ?",
       [userId],
     );
-    res.json(rows);
+    const hasGuarantee = await hasGuaranteedUserPageAccess(userId);
+    res.json(mergeGuaranteedUserPageAccess(rows, userId, hasGuarantee));
   } catch (err) {
     console.error("Error fetching access:", err);
     res.status(500).json({ error: "Database error" });
@@ -210,6 +244,11 @@ router.post("/page_access/:userId/:pageId", CanCreate, async (req, res) => {
         action: "USER_PAGE_ACCESS_GRANT",
         message: `${roleLabel} (${actorId}) granted page access ${pageLabel} to User (${userId}).`,
       });
+      notifyPageAccessGranted(userId, {
+        page_id: pageId,
+        page_name: pageLabel,
+      });
+      await ensureGuaranteedUserPageAccess(userId);
       return res.json({ success: true, action: "updated" });
     }
 
@@ -229,6 +268,12 @@ router.post("/page_access/:userId/:pageId", CanCreate, async (req, res) => {
       message: `${roleLabel} (${actorId}) granted page access ${pageLabel} to User (${userId}).`,
     });
 
+    notifyPageAccessGranted(userId, {
+      page_id: pageId,
+      page_name: pageLabel,
+    });
+
+    await ensureGuaranteedUserPageAccess(userId);
     res.json({ success: true, action: "inserted" });
   } catch (err) {
     console.error("Error inserting access:", err);
@@ -286,11 +331,16 @@ router.post("/access-level/bulk-permission-audit", async (req, res) => {
 
 router.put("/page_access/:userId/bulk-permission", CanManageUserPagePermissions, async (req, res) => {
   const { userId } = req.params;
-  const { permission, enabled } = req.body;
+  const { permission, enabled, pageIds: rawPageIds, pageGroup } = req.body;
   const allowedPermissions = ["can_create", "can_edit", "can_delete"];
 
   if (!allowedPermissions.includes(permission)) {
     return res.status(400).json({ error: "Invalid permission" });
+  }
+
+  const pageIds = normalizePageIds(rawPageIds);
+  if (Array.isArray(pageIds) && pageIds.length === 0) {
+    return res.json({ success: true, affected: 0 });
   }
 
   let conn;
@@ -299,38 +349,42 @@ router.put("/page_access/:userId/bulk-permission", CanManageUserPagePermissions,
     conn = await db3.getConnection();
     await conn.beginTransaction();
 
-    if (Number(enabled) === 1) {
-      // Only enable permission on pages the user already has access to
-      await conn.query(
-        `UPDATE page_access
-         SET ${permission} = 1
-         WHERE user_id = ? AND page_privilege = 1`,
-        [userId],
-      );
-    } else {
-      // Only close permission on pages the user already has access to
-      await conn.query(
-        `UPDATE page_access
-         SET ${permission} = 0
-         WHERE user_id = ? AND page_privilege = 1 AND page_id != ?`,
-        [userId, PROTECTED_PAGE_ID],
-      );
-    }
+    const permissionValue = Number(enabled) === 1 ? 1 : 0;
+    const scopeSql = pageIds
+      ? `UPDATE page_access
+         SET ${permission} = ?
+         WHERE user_id = ? AND page_privilege = 1 AND page_id IN (?)`
+      : `UPDATE page_access
+         SET ${permission} = ?
+         WHERE user_id = ? AND page_privilege = 1`;
+    const scopeParams = pageIds
+      ? [permissionValue, userId, pageIds]
+      : [permissionValue, userId];
+
+    await conn.query(scopeSql, scopeParams);
 
     await conn.commit();
 
     const { actorId, actorRole } = getAuditActor(req);
     const roleLabel = formatAuditActorRole(actorRole);
     const actionLabel = permission.replace("can_", "").toUpperCase();
+    const scopeLabel = formatPageScopeLabel(pageIds, pageGroup);
     await insertAccountManagementAuditLog({
       req,
       action: Number(enabled) === 1
         ? `USER_PAGE_${actionLabel}_GRANT_ALL`
         : `USER_PAGE_${actionLabel}_CLOSE_ALL`,
       severity: Number(enabled) === 1 ? "INFO" : "WARN",
-      message: `${roleLabel} (${actorId}) ${Number(enabled) === 1 ? "granted" : "closed"} all ${actionLabel.toLowerCase()} permissions for User (${userId}).`,
+      message: `${roleLabel} (${actorId}) ${Number(enabled) === 1 ? "granted" : "closed"} ${actionLabel.toLowerCase()} permissions in ${scopeLabel} for User (${userId}).`,
     });
 
+    notifyPageAccessChanged(
+      userId,
+      Number(enabled) === 1 ? "granted" : "revoked",
+      { page_id: pageIds ? pageIds.join(",") : "all", page_name: `${actionLabel} permissions (${scopeLabel})` },
+    );
+
+    await ensureGuaranteedUserPageAccess(userId);
     res.json({ success: true });
   } catch (err) {
     if (conn) await conn.rollback();
@@ -380,6 +434,13 @@ router.put("/page_access/:userId/:pageId", CanManageUserPagePermissions, async (
         message: `${roleLabel} (${actorId}) updated page permissions ${pageLabel} for User (${userId}).`,
       });
 
+      notifyPageAccessChanged(
+        userId,
+        Number(page_privilege) === 1 ? "granted" : "revoked",
+        { page_id: pageId, page_name: pageLabel },
+      );
+
+      await ensureGuaranteedUserPageAccess(userId);
       return res.json({ success: true, action: "updated" });
     }
 
@@ -406,6 +467,13 @@ router.put("/page_access/:userId/:pageId", CanManageUserPagePermissions, async (
       message: `${roleLabel} (${actorId}) updated page permissions ${pageLabel} for User (${userId}).`,
     });
 
+    notifyPageAccessChanged(
+      userId,
+      Number(page_privilege) === 1 ? "granted" : "revoked",
+      { page_id: pageId, page_name: pageLabel },
+    );
+
+    await ensureGuaranteedUserPageAccess(userId);
     res.json({ success: true, action: "inserted" });
   } catch (err) {
     console.error("Error updating access:", err);
@@ -430,7 +498,12 @@ router.delete("/page_access/:userId/:pageId", CanDelete, async (req, res) => {
         severity: "WARN",
         message: `${roleLabel} (${actorId}) revoked page access ${pageLabel} from User (${userId}).`,
       });
+      notifyPageAccessRevoked(userId, {
+        page_id: pageId,
+        page_name: pageLabel,
+      });
     }
+    await ensureGuaranteedUserPageAccess(userId);
     res.json({ success: true, action: "deleted" });
   } catch (err) {
     console.error("Error deleting access:", err);
@@ -441,6 +514,14 @@ router.delete("/page_access/:userId/:pageId", CanDelete, async (req, res) => {
 router.get("/page_access/:userId/:pageId", async (req, res) => {
   const { userId, pageId } = req.params;
   try {
+    if (
+      Number(pageId) === USER_PAGE_ACCESS_PAGE_ID &&
+      (await hasGuaranteedUserPageAccess(userId))
+    ) {
+      await ensureGuaranteedUserPageAccess(userId);
+      return res.json(guaranteedUserPageAccessRow(userId));
+    }
+
     const [rows] = await db3.query(
       `SELECT
           pa.page_privilege,
@@ -472,11 +553,19 @@ router.get("/page_access/:userId/:pageId", async (req, res) => {
 });
 
 router.post("/page_access/grant-all", CanCreate, async (req, res) => {
-  const { userId } = req.body;
+  const { userId, pageIds: rawPageIds, pageGroup } = req.body;
+  const pageIds = normalizePageIds(rawPageIds);
 
   try {
-    // get all pages
-    const [pages] = await db3.query("SELECT id FROM page_table");
+    let pages;
+    if (pageIds) {
+      if (pageIds.length === 0) {
+        return res.json({ success: true, affected: 0 });
+      }
+      pages = pageIds.map((id) => ({ id }));
+    } else {
+      [pages] = await db3.query("SELECT id FROM page_table");
+    }
 
     if (!pages.length) {
       return res.json({ success: true });
@@ -507,12 +596,19 @@ router.post("/page_access/grant-all", CanCreate, async (req, res) => {
 
     const { actorId, actorRole } = getAuditActor(req);
     const roleLabel = formatAuditActorRole(actorRole);
+    const scopeLabel = formatPageScopeLabel(pageIds, pageGroup);
     await insertAccountManagementAuditLog({
       req,
       action: "USER_PAGE_ACCESS_GRANT_ALL",
-      message: `${roleLabel} (${actorId}) granted all page access to User (${userId}).`,
+      message: `${roleLabel} (${actorId}) granted page access in ${scopeLabel} to User (${userId}).`,
     });
 
+    notifyPageAccessGranted(userId, {
+      page_id: pageIds ? pageIds.join(",") : "all",
+      page_name: scopeLabel,
+    });
+
+    await ensureGuaranteedUserPageAccess(userId);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -521,23 +617,41 @@ router.post("/page_access/grant-all", CanCreate, async (req, res) => {
 });
 
 router.post("/page_access/revoke-all", CanDelete, async (req, res) => {
-  const { userId } = req.body;
+  const { userId, pageIds: rawPageIds, pageGroup } = req.body;
+  const pageIds = normalizePageIds(rawPageIds);
 
   try {
-    await db3.query(
-      "DELETE FROM page_access WHERE user_id = ? AND page_id != ?",
-      [userId, PROTECTED_PAGE_ID],
-    );
+    if (pageIds) {
+      if (pageIds.length === 0) {
+        return res.json({ success: true, affected: 0 });
+      }
+      await db3.query(
+        "DELETE FROM page_access WHERE user_id = ? AND page_id IN (?)",
+        [userId, pageIds],
+      );
+    } else {
+      await db3.query(
+        "DELETE FROM page_access WHERE user_id = ?",
+        [userId],
+      );
+    }
 
     const { actorId, actorRole } = getAuditActor(req);
     const roleLabel = formatAuditActorRole(actorRole);
+    const scopeLabel = formatPageScopeLabel(pageIds, pageGroup);
     await insertAccountManagementAuditLog({
       req,
       action: "USER_PAGE_ACCESS_REVOKE_ALL",
       severity: "WARN",
-      message: `${roleLabel} (${actorId}) revoked all page access from User (${userId}).`,
+      message: `${roleLabel} (${actorId}) revoked page access in ${scopeLabel} from User (${userId}).`,
     });
 
+    notifyPageAccessRevoked(userId, {
+      page_id: pageIds ? pageIds.join(",") : "all",
+      page_name: scopeLabel,
+    });
+
+    await ensureGuaranteedUserPageAccess(userId);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -567,7 +681,7 @@ router.get("/registrars", async (req, res) => {
       FROM user_accounts ua
       INNER JOIN access_table at ON ua.access_level = at.access_id
       LEFT JOIN dprtmnt_table d ON ua.dprtmnt_id = d.dprtmnt_id
-      WHERE ua.role = 'registrar'
+      WHERE ua.role IN ('administrator', 'superadmin', 'technical')
       ORDER BY ua.id DESC;
     `;
 
@@ -644,6 +758,51 @@ router.put("/update_registrar_status/:id", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+router.get("/employee/:employee_id", async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+    await ensureRegistrarScopeTable();
+
+    const [[userAccount]] = await db3.query(
+      `SELECT employee_id, dprtmnt_id
+       FROM user_accounts
+       WHERE employee_id = ?
+       LIMIT 1`,
+      [employee_id],
+    );
+
+    if (!userAccount) {
+      return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+
+    // get all page_ids assigned to this employee
+    const [rows] = await db3.query(
+      "SELECT page_id FROM page_access WHERE user_id = ?",
+      [employee_id],
+    );
+
+    const accessList = rows.map((r) => r.page_id);
+    const scopePayload = await buildEmployeeScopePayload(
+      userAccount.employee_id,
+      userAccount,
+    );
+
+    res.json({
+      success: true,
+      accessList,
+      employee_id: userAccount.employee_id,
+      dprtmnt_id: scopePayload.dprtmnt_id ?? userAccount.dprtmnt_id ?? null,
+      dprtmnt_ids: scopePayload.dprtmnt_ids,
+      curriculum_id: scopePayload.curriculum_id ?? null,
+      scopes: scopePayload.scopes,
+      allowed_curriculum_ids: scopePayload.allowed_curriculum_ids,
+    });
+  } catch (err) {
+    console.error("Error fetching employee access:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 

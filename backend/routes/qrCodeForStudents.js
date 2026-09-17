@@ -1,7 +1,69 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const QRCode = require('qrcode');
 const { db, db3 } = require('./database/database');
 
 const router = express.Router();
+
+const studentQrDirectory = path.join(
+  __dirname,
+  '..',
+  'uploads',
+  'StudentQRCodeGenerated',
+);
+
+const ensureStudentQrCode = async (studentNumber) => {
+  const qrFilename = `${studentNumber}_qrcode.png`;
+  const qrPath = path.join(studentQrDirectory, qrFilename);
+  const alreadyExists = fs.existsSync(qrPath);
+
+  await fs.promises.mkdir(studentQrDirectory, { recursive: true });
+
+  if (!alreadyExists) {
+    let frontendUrl = String(process.env.FRONTEND_URL || '').trim();
+    if (frontendUrl && !/^https?:\/\//i.test(frontendUrl)) {
+      frontendUrl = `http://${frontendUrl}`;
+    }
+    if (!frontendUrl) {
+      throw new Error('FRONTEND_URL is not configured');
+    }
+
+    await QRCode.toFile(
+      qrPath,
+      `${frontendUrl}/student_qr_information/${encodeURIComponent(studentNumber)}`,
+      { color: { dark: '#000', light: '#FFF' }, width: 300 },
+    );
+  }
+
+  return {
+    generated: !alreadyExists,
+    qr_code_url: `/uploads/StudentQRCodeGenerated/${encodeURIComponent(qrFilename)}`,
+  };
+};
+
+router.post('/students/:studentNumber/ensure-qr', async (req, res) => {
+  const studentNumber = String(req.params.studentNumber || '').trim();
+  if (!studentNumber || !/^[A-Za-z0-9_-]+$/.test(studentNumber)) {
+    return res.status(400).json({ success: false, message: 'Student number is required.' });
+  }
+
+  try {
+    const [students] = await db3.query(
+      'SELECT student_number FROM student_numbering_table WHERE student_number = ? LIMIT 1',
+      [studentNumber],
+    );
+    if (students.length === 0) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    const qr = await ensureStudentQrCode(studentNumber);
+    return res.json({ success: true, ...qr });
+  } catch (err) {
+    console.error(`Failed to ensure QR code for ${studentNumber}:`, err);
+    return res.status(500).json({ success: false, message: 'Unable to generate student QR code.' });
+  }
+});
 
 router.get("/student_qr_information/:student_number", async (req, res) => {
   const { student_number } = req.params;

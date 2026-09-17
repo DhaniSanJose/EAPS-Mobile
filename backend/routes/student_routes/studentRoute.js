@@ -1361,93 +1361,6 @@ router.put("/uploads/student/remarks/:upload_id", async (req, res) => {
   }
 });
 
-router.post("/student/upload", upload.single("file"), async (req, res) => {
-  const { requirements_id, person_id, remarks } = req.body;
-
-  if (!requirements_id || !person_id || !req.file) {
-    return res.status(400).json({ error: "Missing required fields or file" });
-  }
-
-  try {
-    const [[appInfo]] = await db3.query(
-      `
-      SELECT snt.student_number, pt.last_name, pt.first_name, pt.middle_name
-      FROM student_numbering_table snt
-      LEFT JOIN person_table pt ON snt.person_id = pt.person_id
-      WHERE snt.person_id = ?
-    `,
-      [person_id],
-    );
-
-    const student_number = appInfo?.student_number || "Unknown";
-    const fullName = `${appInfo?.last_name || ""}, ${appInfo?.first_name || ""} ${appInfo?.middle_name?.charAt(0) || ""}.`;
-
-    const [descRows] = await db3.query(
-      "SELECT description, short_label FROM requirements_table WHERE id = ?",
-      [requirements_id],
-    );
-
-    if (!descRows.length)
-      return res.status(404).json({ message: "Requirement not found" });
-
-    const { description, short_label } = descRows[0];
-
-    const shortLabel = short_label || "Unknown";
-
-    const year = new Date().getFullYear();
-    const ext = path.extname(req.file.originalname).toLowerCase();
-
-   const filename = `${student_number}_${shortLabel}_${year}${ext}`;
-    const uploadDir = path.join(__dirname, "uploads");
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-    const finalPath = path.join(uploadDir, filename);
-
-    const [existingFiles] = await db3.query(
-      `SELECT upload_id, file_path FROM requirement_uploads
-       WHERE person_id = ? AND requirements_id = ?`,
-      [person_id, requirements_id],
-    );
-
-    for (const file of existingFiles) {
-      const oldPath = path.join(__dirname, "uploads", file.file_path);
-
-      try {
-        await fs.promises.unlink(oldPath);
-      } catch (err) {
-        if (err.code !== "ENOENT")
-          console.warn("File delete warning:", err.message);
-      }
-
-      await db3.query("DELETE FROM requirement_uploads WHERE upload_id = ?", [
-        file.upload_id,
-      ]);
-    }
-
-    await fs.promises.writeFile(finalPath, req.file.buffer);
-
-    await db3.query(
-      `INSERT INTO requirement_uploads
-        (requirements_id, person_id, file_path, original_name, status, remarks)
-       VALUES (?, ?, ?, ?, 0, ?)`,
-      [
-        requirements_id,
-        person_id,
-        filename,
-        req.file.originalname,
-        remarks || null,
-      ],
-    );
-
-    res.status(201).json({ message: " Upload successful" });
-  } catch (err) {
-    console.error("Upload error:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to save upload", details: err.message });
-  }
-});
-
 router.get("/person/student/:storedID", async (req, res) => {
   const id = req.params.storedID;
 
@@ -2294,18 +2207,14 @@ router.get("/student-qr-information/:student_number", async (req, res) => {
 
     const student = studentRows[0];
 
-    // 2) GATE: must have a portal account (mirrors the TOR QR gate)
+    // 2) Portal accounts are optional for QR verification.
+    // A student may already have a valid student record/COR before a portal
+    // account is created, so do not reject the QR lookup when the account is
+    // missing. Keep the account status when available for display/auditing.
     const [accountRows] = await db3.query(
       `SELECT id, status FROM user_accounts WHERE person_id = ? AND role = 'student' LIMIT 1`,
       [student.person_id],
     );
-
-    if (accountRows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "This student does not have a portal account yet.",
-      });
-    }
 
     // 3) Program/curriculum for display (latest enrollment record on file, regardless of term)
     // ✅ FIXED — now also pulls pgt.academic_program so Undergrad/Graduate/TechVoc
@@ -2460,7 +2369,7 @@ router.get("/student-qr-information/:student_number", async (req, res) => {
         profile_image: student.profile_img || null,
       },
       program, // ✅ now includes academic_program + academic_program_label
-      account_status: accountRows[0].status,
+      account_status: accountRows[0]?.status || null,
       active_school_year: activeYear || null,
       school_year_label: schoolYearLabel,
       semester_label: semesterLabel,

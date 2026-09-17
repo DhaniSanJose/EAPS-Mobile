@@ -251,7 +251,7 @@ router.get("/get_active_curriculum", async (req, res) => {
 });
 
 router.put("/update-active-curriculum", async (req, res) => {
-  const { studentId, departmentSectionId } = req.body;
+  const { studentId, departmentSectionId, active_school_year_id } = req.body;
 
   if (!studentId || !departmentSectionId) {
     return res
@@ -259,16 +259,15 @@ router.put("/update-active-curriculum", async (req, res) => {
       .json({ error: "studentId and departmentSectionId are required" });
   }
 
-  const fetchCurriculumQuery = `
-    SELECT curriculum_id
-    FROM dprtmnt_section_table
-    WHERE id = ?
-  `;
-
   try {
-    const [curriculumResult] = await db3.query(fetchCurriculumQuery, [
-      departmentSectionId,
-    ]);
+    const [curriculumResult] = await db3.query(
+      `
+      SELECT curriculum_id
+      FROM dprtmnt_section_table
+      WHERE id = ?
+      `,
+      [departmentSectionId],
+    );
 
     if (curriculumResult.length === 0) {
       return res.status(404).json({ error: "Section not found" });
@@ -276,16 +275,74 @@ router.put("/update-active-curriculum", async (req, res) => {
 
     const curriculumId = curriculumResult[0].curriculum_id;
 
-    const updateQuery = `
-      UPDATE student_status_table 
-      SET active_curriculum = ? 
+    let activeSchoolYearId = active_school_year_id;
+    if (!activeSchoolYearId) {
+      const [yearResult] = await db3.query(
+        `SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1`,
+      );
+      if (yearResult.length === 0) {
+        return res.status(404).json({ error: "No active school year found" });
+      }
+      activeSchoolYearId = yearResult[0].id;
+    }
+
+    const [[statusRow]] = await db3.query(
+      `
+      SELECT active_curriculum
+      FROM student_status_table
       WHERE student_number = ?
-    `;
-    const result = await db3.query(updateQuery, [curriculumId, studentId]);
-    const data = result[0];
-    console.log(data);
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [studentId],
+    );
+    // Keep student_status.active_curriculum unchanged (home section is not a curriculum shift).
+    const studentCurriculumId = statusRow?.active_curriculum ?? null;
+
+    // Fill section only on enrolled subjects that still have no section.
+    // Subjects already tagged to a section (including other-section enrollments) stay put.
+    const curriculumIds = [
+      ...new Set(
+        [studentCurriculumId, curriculumId].filter(
+          (id) => id != null && String(id).trim() !== "",
+        ),
+      ),
+    ];
+
+    let remappedEnrolledSubjects = 0;
+    if (curriculumIds.length > 0) {
+      const [remapResult] = await db3.query(
+        `
+        UPDATE enrolled_subject
+        SET department_section_id = ?
+        WHERE student_number = ?
+          AND active_school_year_id = ?
+          AND curriculum_id IN (${curriculumIds.map(() => "?").join(", ")})
+          AND (department_section_id IS NULL OR department_section_id = 0)
+        `,
+        [departmentSectionId, studentId, activeSchoolYearId, ...curriculumIds],
+      );
+      remappedEnrolledSubjects = remapResult.affectedRows || 0;
+    } else {
+      const [remapResult] = await db3.query(
+        `
+        UPDATE enrolled_subject
+        SET department_section_id = ?
+        WHERE student_number = ?
+          AND active_school_year_id = ?
+          AND (department_section_id IS NULL OR department_section_id = 0)
+        `,
+        [departmentSectionId, studentId, activeSchoolYearId],
+      );
+      remappedEnrolledSubjects = remapResult.affectedRows || 0;
+    }
+
     res.status(200).json({
-      message: "Active curriculum updated successfully",
+      message: "Home section updated successfully",
+      curriculumId: studentCurriculumId,
+      sectionCurriculumId: curriculumId,
+      activeCurriculumChanged: false,
+      remappedEnrolledSubjects,
     });
   } catch (err) {
     console.error("Error updating active curriculum:", err);

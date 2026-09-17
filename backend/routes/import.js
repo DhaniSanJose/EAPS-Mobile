@@ -1,5 +1,8 @@
 const express = require("express");
 const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const QRCode = require("qrcode");
 const XLSX = require("xlsx");
 const { db, db3 } = require("./database/database");
 const { CanCreate } = require("../middleware/pagePermissions");
@@ -25,6 +28,60 @@ const {
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+/** Build a scannable frontend URL for student QR payloads. */
+const getFrontendBaseUrl = () => {
+  let frontendUrl = (process.env.FRONTEND_URL || "").trim();
+  if (!frontendUrl) {
+    const host = (process.env.DB_HOST_LOCAL || "localhost").trim();
+    frontendUrl = `${host}:5173`;
+  }
+  if (frontendUrl && !/^https?:\/\//i.test(frontendUrl)) {
+    frontendUrl = `http://${frontendUrl}`;
+  }
+  return frontendUrl.replace(/\/$/, "");
+};
+
+/**
+ * Ensure Student + TOR QR images exist after migration grade import.
+ * Matches paths used by COR (`StudentQRCodeGenerated`) and TOR verification.
+ */
+const ensureStudentQrCodes = async (studentNumber) => {
+  if (!studentNumber) return { studentQr: false, torQr: false };
+
+  const frontendUrl = getFrontendBaseUrl();
+  const qrFilename = `${studentNumber}_qrcode.png`;
+  const torQrFilename = `${studentNumber}_tor_qrcode.png`;
+
+  const studentQrDir = path.join(__dirname, "..", "uploads", "StudentQRCodeGenerated");
+  const torQrDir = path.join(__dirname, "..", "uploads", "TORStudentQRCodeGenerated");
+  // Also keep the legacy TOR folder used by student-number assignment.
+  const legacyTorQrDir = path.join(__dirname, "..", "uploads", "TORQrCodeGenerated");
+
+  await fs.promises.mkdir(studentQrDir, { recursive: true });
+  await fs.promises.mkdir(torQrDir, { recursive: true });
+  await fs.promises.mkdir(legacyTorQrDir, { recursive: true });
+
+  const studentQrData = `${frontendUrl}/student_qr_information/${studentNumber}`;
+  const torQrData = `${frontendUrl}/tor_qr_information/${studentNumber}`;
+
+  await QRCode.toFile(path.join(studentQrDir, qrFilename), studentQrData, {
+    color: { dark: "#000", light: "#FFF" },
+    width: 300,
+  });
+
+  await QRCode.toFile(path.join(torQrDir, torQrFilename), torQrData, {
+    color: { dark: "#000", light: "#FFF" },
+    width: 300,
+  });
+
+  await QRCode.toFile(path.join(legacyTorQrDir, qrFilename), torQrData, {
+    color: { dark: "#000", light: "#FFF" },
+    width: 300,
+  });
+
+  return { studentQr: true, torQr: true };
+};
 
 const formatAuditActorRole = (role) => {
   const safeRole = String(role || "registrar").trim();
@@ -374,6 +431,61 @@ const normalizeAcademicYearValue = (yearText) => {
   if (yearMatch) return yearMatch[1];
 
   return text;
+};
+
+/**
+ * Resolve year_table row for a Curriculum metadata value.
+ * Accepts "2019", "2019-2020", or similar.
+ * Prefers the start year (curriculum years are usually stored as "2019"),
+ * then the full range, so school-year rows like "2019-2020" do not win first.
+ */
+const resolveYearTableRow = async (connection, yearText) => {
+  const raw = String(yearText || "").trim();
+  if (!raw) return null;
+
+  const candidates = [];
+  const pushCandidate = (value) => {
+    const v = String(value || "").trim();
+    if (v && !candidates.includes(v)) candidates.push(v);
+  };
+
+  const rangeMatch = raw.match(/(\d{4})\s*-\s*(\d{4})/);
+  if (rangeMatch) {
+    // Curriculum years are typically stored as the starting year only.
+    pushCandidate(rangeMatch[1]);
+    pushCandidate(`${rangeMatch[1]}-${rangeMatch[2]}`);
+  }
+  pushCandidate(normalizeAcademicYearValue(raw));
+  pushCandidate(raw);
+
+  for (const candidate of candidates) {
+    const [[yearRow]] = await connection.query(
+      `SELECT year_id, year_description
+       FROM year_table
+       WHERE TRIM(year_description) = TRIM(?)
+       LIMIT 1`,
+      [candidate],
+    );
+    if (yearRow) return yearRow;
+  }
+
+  const startYear = normalizeAcademicYearValue(raw);
+  if (/^\d{4}$/.test(startYear)) {
+    const [[yearRow]] = await connection.query(
+      `SELECT year_id, year_description
+       FROM year_table
+       WHERE TRIM(year_description) = ?
+          OR TRIM(year_description) LIKE ?
+       ORDER BY
+         CASE WHEN TRIM(year_description) = ? THEN 0 ELSE 1 END,
+         year_id DESC
+       LIMIT 1`,
+      [startYear, `${startYear}-%`, startYear],
+    );
+    if (yearRow) return yearRow;
+  }
+
+  return null;
 };
 
 const branchCache = {
@@ -3459,8 +3571,9 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
     const studentName = metadata["Name"];
     const program_code = metadata["Program"];
     const curriculum_raw = metadata["Curriculum"];
+    // Keep the raw Curriculum value (e.g. "2019-2020"); resolve against year_table below.
     const year_description = curriculum_raw
-      ? curriculum_raw.split("-")[0].trim()
+      ? String(curriculum_raw).trim()
       : null;
 
     if (!studentNumber || !program_code || !year_description) {
@@ -3633,10 +3746,7 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
     }
 
     // --- Step 3: DB lookups for program/year/curriculum ---
-    const [[yearRow]] = await connection.query(
-      "SELECT year_id FROM year_table WHERE year_description = ?",
-      [year_description],
-    );
+    const yearRow = await resolveYearTableRow(connection, year_description);
 
     if (!yearRow) {
       await connection.rollback();
@@ -3672,8 +3782,26 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
         action: "MIGRATION_GRADE_IMPORT_FAILED",
         message: `${roleLabel} (${actorId}) failed to upload ${req.file?.originalname || "migration file"} due to missing curriculum ${year_description} ${program_code}.`,
       });
-      return res.status(400).json({ error: "No matching curriculum found" });
+      return res.status(400).json({
+        error: "No matching curriculum found",
+        details: {
+          curriculum_raw: year_description,
+          resolved_year_description: yearRow.year_description,
+          year_id: yearRow.year_id,
+          program_id: program.program_id,
+          program_code,
+        },
+      });
     }
+
+    console.log("[import-xlsx] Resolved curriculum", {
+      studentNumber,
+      curriculum_raw: year_description,
+      resolved_year_description: yearRow.year_description,
+      year_id: yearRow.year_id,
+      program_id: program.program_id,
+      curriculum_id: curriculum.curriculum_id,
+    });
 
     const [[personCurriculumCheck]] = await connection.query(
       `SELECT
@@ -3723,6 +3851,16 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
        SET program = ?
        WHERE person_id = ?`,
       [curriculum.curriculum_id, person_id],
+    );
+
+    // Student number assignment / older flows may have stored program_id in
+    // student_status.active_curriculum (often on active_school_year_id = 0).
+    // Keep every status row for this student aligned with the imported curriculum_id.
+    await connection.query(
+      `UPDATE student_status_table
+       SET active_curriculum = ?
+       WHERE student_number = ?`,
+      [curriculum.curriculum_id, studentNumber],
     );
 
     // --- Step 4: Process each School Year + Semester block ---
@@ -4219,7 +4357,7 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
         `SELECT 1
          FROM student_status_table
          WHERE student_number = ?
-           AND active_school_year_id IN (?)
+           AND (active_school_year_id IN (?) OR active_school_year_id = 0)
          LIMIT 1`,
         [studentNumber, activeSchoolYearIds],
       );
@@ -4228,10 +4366,18 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
         await connection.query(
           `DELETE FROM student_status_table
            WHERE student_number = ?
-             AND active_school_year_id IN (?)`,
+             AND (active_school_year_id IN (?) OR active_school_year_id = 0)`,
           [studentNumber, activeSchoolYearIds],
         );
       }
+    } else {
+      // Still clear legacy placeholder status rows that may hold program_id.
+      await connection.query(
+        `DELETE FROM student_status_table
+         WHERE student_number = ?
+           AND active_school_year_id = 0`,
+        [studentNumber],
+      );
     }
 
     // --- Step 6: Insert fresh records per block ---
@@ -4327,16 +4473,17 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
 
       const [existingStatus] = await connection.query(
         `SELECT id FROM student_status_table
-         WHERE student_number = ? AND active_curriculum = ? AND year_level_id = ? AND active_school_year_id = ?`,
-        [studentNumber, curriculum.curriculum_id, yearLevel, activeSY.id],
+         WHERE student_number = ? AND year_level_id = ? AND active_school_year_id = ?
+         LIMIT 1`,
+        [studentNumber, yearLevel, activeSY.id],
       );
 
       if (existingStatus.length > 0) {
         await connection.query(
           `UPDATE student_status_table
-           SET enrolled_status = 1
+           SET enrolled_status = 1, active_curriculum = ?
            WHERE id = ?`,
-          [existingStatus[0].id],
+          [curriculum.curriculum_id, existingStatus[0].id],
         );
         console.log(
           `✓ Updated student_status_table for student_number ${studentNumber}, year level ${yearLevel}, school year ${schoolYear} (${semester})`,
@@ -4381,21 +4528,17 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
 
           const [existingStatus] = await connection.query(
             `SELECT id FROM student_status_table
-             WHERE student_number = ? AND active_curriculum = ? AND year_level_id = ? AND active_school_year_id = ?`,
-            [
-              studentNumber,
-              curriculum.curriculum_id,
-              ongoingYearLevel,
-              activeSY.id,
-            ],
+             WHERE student_number = ? AND year_level_id = ? AND active_school_year_id = ?
+             LIMIT 1`,
+            [studentNumber, ongoingYearLevel, activeSY.id],
           );
 
           if (existingStatus.length > 0) {
             await connection.query(
               `UPDATE student_status_table
-               SET enrolled_status = 1
+               SET enrolled_status = 1, active_curriculum = ?
                WHERE id = ?`,
-              [existingStatus[0].id],
+              [curriculum.curriculum_id, existingStatus[0].id],
             );
             console.log(
               `✓ Updated ongoing semester: student_number ${studentNumber}, year level ${ongoingYearLevel}, school year ${latestOngoing.schoolYear} (${latestOngoing.semester})`,
@@ -4425,6 +4568,19 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
     await connection.commit();
     connection.release();
 
+    // Grade migration previously created/linked the student number but never
+    // generated QR images — COR/TOR then had nothing to display.
+    let qrGenerated = false;
+    try {
+      await ensureStudentQrCodes(studentNumber);
+      qrGenerated = true;
+    } catch (qrErr) {
+      console.error(
+        `[import-xlsx] QR generation failed for ${studentNumber}:`,
+        qrErr,
+      );
+    }
+
     const { actorId, actorRole } = getAuditActor(req);
     const roleLabel = formatAuditActorRole(actorRole);
     await insertEnrollmentImportAuditLog({
@@ -4442,7 +4598,10 @@ router.post("/import-xlsx", upload.single("file"), async (req, res) => {
       isNewStudent,
       program_code,
       year_description,
+      resolved_year_description: yearRow.year_description,
+      curriculum_id: curriculum.curriculum_id,
       highestYearLevel: runningYearLevel,
+      qrGenerated,
       warnings: {
         truncatedByMaxRows,
         formulaRowsRemoved: flaggedRows,

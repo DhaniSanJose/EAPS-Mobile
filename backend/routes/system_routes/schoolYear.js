@@ -636,6 +636,37 @@ router.put("/semesters/:id", async (req, res) => {
 });
 
 
+router.get("/summer-school-year-context", async (req, res) => {
+  try {
+    const query = `
+      SELECT
+        asyt.id AS school_year_id,
+        asyt.year_id,
+        asyt.semester_id,
+        yt.year_description AS current_year,
+        yt.year_description + 1 AS next_year,
+        st.semester_description
+      FROM active_school_year_table AS asyt
+      INNER JOIN year_table AS yt ON asyt.year_id = yt.year_id
+      INNER JOIN semester_table AS st ON asyt.semester_id = st.semester_id
+      WHERE asyt.year_id = (
+        SELECT year_id
+        FROM active_school_year_table
+        WHERE astatus = 1
+        LIMIT 1
+      )
+        AND LOWER(st.semester_description) LIKE '%summer%'
+      ORDER BY asyt.id DESC
+      LIMIT 1
+    `;
+    const [result] = await db3.query(query);
+    res.json(result[0] || null);
+  } catch (err) {
+    console.error("Summer school-year context query error:", err);
+    res.status(500).json({ error: "Failed to load Summer school-year context" });
+  }
+});
+
 router.get("/get_semester", async (req, res) => {
   const query = "SELECT * FROM semester_table";
 

@@ -265,7 +265,7 @@ router.post(
         message: `${roleLabel} (${actorId}) created professor account ${employee_id} - ${lname}, ${fname}.`,
       });
 
-      res.status(201).json({ success: true, message: "Professor added successfully" });
+      res.status(201).json({ success: true, message: "Professor added successfully", prof_id });
     } catch (err) {
       console.error("Insert error:", err);
       res.json({ success: false, error: "Failed to add professor" });

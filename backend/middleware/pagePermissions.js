@@ -2,6 +2,10 @@ const {
   db3,
   ensurePageAccessPermissionColumns,
 } = require("../routes/database/database");
+const {
+  USER_PAGE_ACCESS_PAGE_ID,
+  hasGuaranteedUserPageAccess,
+} = require("../utils/userPageAccessGuarantee");
 
 const createPermissionMiddleware = (permissionKey, actionLabel) => {
   return async (req, res, next) => {
@@ -16,6 +20,19 @@ const createPermissionMiddleware = (permissionKey, actionLabel) => {
     }
 
     try {
+      if (
+        Number(pageId) === USER_PAGE_ACCESS_PAGE_ID &&
+        (await hasGuaranteedUserPageAccess(employeeId))
+      ) {
+        req.pageAccess = {
+          page_privilege: 1,
+          can_create: 1,
+          can_edit: 1,
+          can_delete: 1,
+        };
+        return next();
+      }
+
       await ensurePageAccessPermissionColumns();
 
       const [rows] = await db3.query(
@@ -61,15 +78,28 @@ const CanManageUserPagePermissions = async (req, res, next) => {
   const pageId = req.headers["x-page-id"];
   const permission = req.body?.permission;
 
-  if (!employeeId || !pageId) {
-    return res.status(400).json({
-      success: false,
-      message: "Employee ID and page ID are required",
-    });
-  }
+    if (!employeeId || !pageId) {
+      return res.status(400).json({
+        success: false,
+        message: "Employee ID and page ID are required",
+      });
+    }
 
-  try {
-    await ensurePageAccessPermissionColumns();
+    try {
+      if (
+        Number(pageId) === USER_PAGE_ACCESS_PAGE_ID &&
+        (await hasGuaranteedUserPageAccess(employeeId))
+      ) {
+        req.pageAccess = {
+          page_privilege: 1,
+          can_create: 1,
+          can_edit: 1,
+          can_delete: 1,
+        };
+        return next();
+      }
+
+      await ensurePageAccessPermissionColumns();
 
     const [rows] = await db3.query(
       `SELECT page_privilege, can_create, can_delete, can_edit

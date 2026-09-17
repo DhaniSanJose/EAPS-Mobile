@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { db } = require("../database/database");
 const { insertAuditLogAdmission } = require("../../utils/auditLogger");
+const { notifyAttendanceUpdated } = require("../../socket/socketService");
 
 module.exports = (io) => {
   const router = express.Router();
@@ -149,13 +150,11 @@ module.exports = (io) => {
         message: `${scanned_by_role || "Proctor"} (${scanned_by || "unknown"}) scanned Applicant (${record.applicant_id}) as PRESENT for entrance exam schedule ${record.schedule_id}.`,
       });
 
-      if (io) {
-        io.emit("attendance_updated", {
+      notifyAttendanceUpdated({
           schedule_id: record.schedule_id,
           applicant_id: record.applicant_id,
           status: "PRESENT",
         });
-      }
 
       res.json({
         success: true,
@@ -254,8 +253,7 @@ module.exports = (io) => {
         message: `${actor_role || "Registrar"} (${actor_id || "unknown"}) manually set Applicant (${applicant_id}) attendance to ${status} for entrance exam schedule ${schedule_id}.`,
       });
 
-      if (io)
-        io.emit("attendance_updated", { schedule_id, applicant_id, status });
+      notifyAttendanceUpdated({ schedule_id, applicant_id, status });
 
       res.json({ success: true });
     } catch (err) {

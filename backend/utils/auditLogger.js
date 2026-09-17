@@ -210,6 +210,8 @@ const insertAuditLog = async ({
       (req ? await resolveUserMacAddress(req) : null) ||
       null;
 
+    const severityValue = severity || getAuthSeverity({ outcome });
+
     await auditDb.query(
       `INSERT INTO audit_logs
         (actor_id, role, action, message, severity, user_mac_address)
@@ -219,10 +221,24 @@ const insertAuditLog = async ({
         finalRole,
         action,
         normalizedMessage,
-        severity || getAuthSeverity({ outcome }),
+        severityValue,
         resolvedMac,
       ],
     );
+
+    try {
+      const { broadcastNewAuditLog } = require("../socket/socketService");
+      broadcastNewAuditLog({
+        actor_id: safeActorId,
+        role: finalRole,
+        action,
+        message: normalizedMessage,
+        severity: severityValue,
+        user_mac_address: resolvedMac,
+      });
+    } catch (socketErr) {
+      console.error("Failed to broadcast audit log:", socketErr.message);
+    }
   } catch (err) {
     console.error("Audit log insert failed:", err);
   }

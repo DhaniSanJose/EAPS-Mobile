@@ -47,7 +47,7 @@ router.use(async (req, res, next) => {
 
 const saveRegistrarProfilePicture = async ({ personId, file }) => {
   const [existing] = await db3.query(
-    "SELECT * FROM user_accounts WHERE person_id = ? AND role = 'registrar' LIMIT 1",
+    "SELECT * FROM user_accounts WHERE person_id = ? AND role IN ('administrator', 'superadmin', 'technical') LIMIT 1",
     [personId]
   );
 
@@ -83,7 +83,7 @@ const saveRegistrarProfilePicture = async ({ personId, file }) => {
   }
 
   await db3.query(
-    "UPDATE user_accounts SET profile_picture = ? WHERE person_id = ? AND role = 'registrar'",
+    "UPDATE user_accounts SET profile_picture = ? WHERE person_id = ? AND role IN ('administrator', 'superadmin', 'technical')",
     [finalFilename, personId]
   );
 
@@ -225,8 +225,14 @@ router.post("/register_registrar", upload.single("profile_picture"), async (req,
       status,
       dprtmnt_id,
       access_level,
-      curriculum_id
+      curriculum_id,
+      role,
     } = req.body;
+
+    const normalizedRole = String(role || "").trim().toLowerCase();
+    if (!["superadmin", "administrator", "technical"].includes(normalizedRole)) {
+      return res.status(400).json({ message: "Invalid role selected" });
+    }
 
     const file = req.file;
 
@@ -297,7 +303,7 @@ router.post("/register_registrar", upload.single("profile_picture"), async (req,
         last_name,
         middle_name,
         first_name,
-        "registrar",
+        normalizedRole,
         normalizedEmail,
         hashedPassword,
         status || 1,
@@ -310,7 +316,7 @@ router.post("/register_registrar", upload.single("profile_picture"), async (req,
 
     // REPLACE WITH:
     await db3.query(
-      `UPDATE user_accounts SET force_password_change = 1, totp_enabled = 0 WHERE employee_id = ? AND role = 'registrar'`,
+      `UPDATE user_accounts SET force_password_change = 1, totp_enabled = 0 WHERE employee_id = ? AND role IN ('administrator', 'superadmin', 'technical')`,
       [employee_id]
     );
 
@@ -375,6 +381,12 @@ router.put("/update_registrar/:id", upload.single("profile_picture"), async (req
     }
 
     const current = existing[0];
+    const normalizedRole = String(data.role || current.role || "")
+      .trim()
+      .toLowerCase();
+    if (!["superadmin", "administrator", "technical"].includes(normalizedRole)) {
+      return res.status(400).json({ message: "Invalid role selected" });
+    }
     let finalFilename = current.profile_picture;
 
     if (file) {
@@ -429,7 +441,7 @@ router.put("/update_registrar/:id", upload.single("profile_picture"), async (req
         data.last_name || current.last_name,
         data.middle_name || current.middle_name,
         data.first_name || current.first_name,
-        "registrar",
+        normalizedRole,
         data.email?.toLowerCase() || current.email,
         hashedPassword,
         data.status ?? current.status,
@@ -509,166 +521,6 @@ router.put("/update_registrar/:id", upload.single("profile_picture"), async (req
     }
 
     res.json({ success: true, message: "Registrar updated successfully" });
-
-  } catch (error) {
-    console.error("❌ Error updating registrar:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// PUT UPDATE OF DATA AND PROFILE PICTURE
-router.put("/update_registrar/:id", upload.single("profile_picture"), async (req, res) => {
-  const { id } = req.params;
-  const data = req.body;
-  const file = req.file;
-
-  try {
-    const [existing] = await db3.query(
-      "SELECT * FROM user_accounts WHERE id = ?",
-      [id]
-    );
-
-    if (!existing.length) {
-      return res.status(404).json({ message: "Registrar not found" });
-    }
-
-    const current = existing[0];
-    let finalFilename = current.profile_picture;
-
-    // 🖼 SAME IMAGE HANDLING AS POST
-    if (file) {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const year = new Date().getFullYear();
-      finalFilename = `${current.employee_id}_1by1_${year}${ext}`;
-
-      const uploadDir = path.join(__dirname, "../../uploads/Admin1by1");
-      const finalPath = path.join(uploadDir, finalFilename);
-
-      // Ensure directory exists
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-
-      // Delete old images for this employee
-      const files = await fs.promises.readdir(uploadDir);
-      for (const f of files) {
-        if (f.startsWith(`${current.employee_id}_1by1_`)) {
-          await fs.promises.unlink(path.join(uploadDir, f));
-        }
-      }
-
-      // Save new image
-      await fs.promises.writeFile(finalPath, file.buffer);
-    }
-
-    const deptValue = data.dprtmnt_id === "" ? null : data.dprtmnt_id;
-    const passwordValue =
-      typeof data.password === "string" ? data.password.trim() : "";
-    const hashedPassword = passwordValue
-      ? await bcrypt.hash(passwordValue, 10)
-      : null;
-    const nextEmployeeId = data.employee_id || current.employee_id;
-    const nextAccessLevel = data.access_level
-      ? Number(data.access_level)
-      : current.access_level;
-    const accessLevelChanged =
-      data.access_level &&
-      Number(data.access_level) !== Number(current.access_level);
-    const employeeIdChanged =
-      String(nextEmployeeId) !== String(current.employee_id);
-
-    await db3.query(
-      `UPDATE user_accounts 
-       SET employee_id=?, last_name=?, middle_name=?, first_name=?, role=?, email=?, password=COALESCE(?, password), status=?, dprtmnt_id=?, profile_picture=?, access_level=?
-       WHERE id=?`,
-      [
-        nextEmployeeId,
-        data.last_name || current.last_name,
-        data.middle_name || current.middle_name,
-        data.first_name || current.first_name,
-        "registrar",
-        data.email?.toLowerCase() || current.email,
-        hashedPassword,
-        data.status ?? current.status,
-        deptValue,
-        finalFilename,
-        nextAccessLevel,
-        id
-      ]
-    );
-
-    if (accessLevelChanged) {
-      const [accessRows] = await db3.query(
-        "SELECT access_page FROM access_table WHERE access_id = ?",
-        [nextAccessLevel]
-      );
-
-      if (accessRows.length) {
-        const pagePermissions = parseAccessPermissions(accessRows[0].access_page);
-
-        await db3.query("DELETE FROM page_access WHERE user_id IN (?, ?)", [
-          current.employee_id,
-          nextEmployeeId,
-        ]);
-
-        if (pagePermissions.length) {
-          const values = pagePermissions.map((permission) => [
-            permission.page_privilege,
-            permission.page_id,
-            nextEmployeeId,
-            permission.can_create,
-            permission.can_edit,
-            permission.can_delete,
-          ]);
-          await db3.query(
-            "INSERT INTO page_access (page_privilege, page_id, user_id, can_create, can_edit, can_delete) VALUES ?",
-            [values]
-          );
-        }
-      }
-    } else if (employeeIdChanged) {
-      await db3.query("UPDATE page_access SET user_id = ? WHERE user_id = ?", [
-        nextEmployeeId,
-        current.employee_id,
-      ]);
-    }
-
-    const { actorId, actorRole } = getAuditActor(req);
-    const roleLabel = formatAuditActorRole(actorRole);
-    const registrarLabel = getRegistrarLabel({
-      employee_id: data.employee_id || current.employee_id,
-      last_name: data.last_name || current.last_name,
-      first_name: data.first_name || current.first_name,
-      middle_name: data.middle_name || current.middle_name,
-      email: data.email || current.email,
-      id,
-    });
-    await insertRegistrarAuditLog({
-      req,
-      action: "REGISTRAR_ACCOUNT_UPDATE",
-      message: `${roleLabel} (${actorId}) updated registrar account ${registrarLabel}.`,
-    });
-    if (passwordValue) {
-      await insertRegistrarAuditLog({
-        req,
-        action: "REGISTRAR_PASSWORD_CHANGE",
-        severity: "WARN",
-        message: `${roleLabel} (${actorId}) changed the password for registrar account ${registrarLabel}.`,
-      });
-    }
-    if (accessLevelChanged) {
-      await insertRegistrarAuditLog({
-        req,
-        action: "REGISTRAR_ACCESS_LEVEL_CHANGE",
-        severity: "WARN",
-        message: `${roleLabel} (${actorId}) changed access level for registrar account ${registrarLabel} from ${current.access_level || "none"} to ${nextAccessLevel || "none"}.`,
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Registrar updated successfully"
-    });
 
   } catch (error) {
     console.error("❌ Error updating registrar:", error);
@@ -810,7 +662,7 @@ router.post("/send_registrar_password_reminder", async (req, res) => {
     const [registrarRows] = await db3.query(
       `SELECT first_name, middle_name, last_name, employee_id
        FROM user_accounts
-       WHERE employee_id = ? AND role = 'registrar'
+       WHERE employee_id = ? AND role IN ('administrator', 'superadmin', 'technical')
        LIMIT 1`,
       [employee_id]
     );
@@ -915,4 +767,4 @@ router.post("/send_registrar_password_reminder", async (req, res) => {
   }
 });
 
-module.exports = router;  
+module.exports = router;

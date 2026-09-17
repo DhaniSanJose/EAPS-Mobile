@@ -1026,7 +1026,8 @@ router.post("/student-tagging", async (req, res) => {
     FROM student_numbering_table AS sn
     LEFT JOIN student_status_table AS ss ON sn.student_number = ss.student_number
     LEFT JOIN person_table AS ptbl ON sn.person_id = ptbl.person_id
-    LEFT JOIN curriculum_table AS c ON ss.active_curriculum = c.curriculum_id
+    LEFT JOIN curriculum_table AS c
+      ON c.curriculum_id = COALESCE(NULLIF(ss.active_curriculum, 0), ptbl.program)
     LEFT JOIN program_table AS pt ON c.program_id = pt.program_id
     LEFT JOIN year_table AS yt ON c.year_id = yt.year_id
     LEFT JOIN enrolled_subject AS es
@@ -1465,8 +1466,8 @@ router.get("/enrolled_courses/:userId/:currId", async (req, res) => {
         c.lab_unit,
         c.lec_unit,
         ds.id AS department_section_id,
-        IFNULL(pt.program_code, 'TBA') AS program_code,
-        IFNULL(pt.program_description, 'TBA') AS program_description,
+        IFNULL(COALESCE(pt_es.program_code, pt_sec.program_code), 'TBA') AS program_code,
+        IFNULL(COALESCE(pt_es.program_description, pt_sec.program_description), 'TBA') AS program_description,
         IFNULL(st.description, 'TBA') AS section,
         IFNULL(rd.description, 'TBA') AS day_description,
         IFNULL(tt.school_time_start, 'TBA') AS school_time_start,
@@ -1483,10 +1484,14 @@ router.get("/enrolled_courses/:userId/:currId", async (req, res) => {
         ON ds.id = es.department_section_id
       LEFT JOIN section_table AS st
         ON st.id = ds.section_id
-      LEFT JOIN curriculum_table AS cr
-        ON cr.curriculum_id = ds.curriculum_id
-      LEFT JOIN program_table AS pt
-        ON pt.program_id = cr.program_id
+      LEFT JOIN curriculum_table AS cr_es
+        ON cr_es.curriculum_id = es.curriculum_id
+      LEFT JOIN program_table AS pt_es
+        ON pt_es.program_id = cr_es.program_id
+      LEFT JOIN curriculum_table AS cr_sec
+        ON cr_sec.curriculum_id = ds.curriculum_id
+      LEFT JOIN program_table AS pt_sec
+        ON pt_sec.program_id = cr_sec.program_id
       LEFT JOIN time_table AS tt
         ON tt.school_year_id = es.active_school_year_id
         AND tt.department_section_id = es.department_section_id
@@ -1753,9 +1758,9 @@ router.get("/department-sections", async (req, res) => {
   }
 });
 
-// UPDATE ACTIVE CURRICULUM
+// UPDATE ACTIVE CURRICULUM (and remap enrolled subjects to the new section)
 router.put("/update-active-curriculum", async (req, res) => {
-  const { studentId, departmentSectionId } = req.body;
+  const { studentId, departmentSectionId, active_school_year_id } = req.body;
 
   if (!studentId || !departmentSectionId) {
     return res
@@ -1763,16 +1768,15 @@ router.put("/update-active-curriculum", async (req, res) => {
       .json({ error: "studentId and departmentSectionId are required" });
   }
 
-  const fetchCurriculumQuery = `
-    SELECT curriculum_id
-    FROM dprtmnt_section_table
-    WHERE id = ?
-  `;
-
   try {
-    const [curriculumResult] = await db3.query(fetchCurriculumQuery, [
-      departmentSectionId,
-    ]);
+    const [curriculumResult] = await db3.query(
+      `
+      SELECT curriculum_id
+      FROM dprtmnt_section_table
+      WHERE id = ?
+      `,
+      [departmentSectionId],
+    );
 
     if (curriculumResult.length === 0) {
       return res.status(404).json({ error: "Section not found" });
@@ -1780,20 +1784,144 @@ router.put("/update-active-curriculum", async (req, res) => {
 
     const curriculumId = curriculumResult[0].curriculum_id;
 
-    const updateQuery = `
-      UPDATE student_status_table
-      SET active_curriculum = ?
+    let activeSchoolYearId = active_school_year_id;
+    if (!activeSchoolYearId) {
+      const [yearResult] = await db3.query(
+        `SELECT id FROM active_school_year_table WHERE astatus = 1 LIMIT 1`,
+      );
+      if (yearResult.length === 0) {
+        return res.status(404).json({ error: "No active school year found" });
+      }
+      activeSchoolYearId = yearResult[0].id;
+    }
+
+    const [[statusRow]] = await db3.query(
+      `
+      SELECT active_curriculum
+      FROM student_status_table
       WHERE student_number = ?
-    `;
-    const result = await db3.query(updateQuery, [curriculumId, studentId]);
-    const data = result[0];
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [studentId],
+    );
+    // Keep student_status.active_curriculum unchanged (home section is not a curriculum shift).
+    const studentCurriculumId = statusRow?.active_curriculum ?? null;
+
+    // Fill section only on enrolled subjects that still have no section.
+    // Subjects already tagged to a section (including other-section enrollments) stay put.
+    const curriculumIds = [
+      ...new Set(
+        [studentCurriculumId, curriculumId].filter(
+          (id) => id != null && String(id).trim() !== "",
+        ),
+      ),
+    ];
+
+    let remappedEnrolledSubjects = 0;
+    if (curriculumIds.length > 0) {
+      const [remapResult] = await db3.query(
+        `
+        UPDATE enrolled_subject
+        SET department_section_id = ?
+        WHERE student_number = ?
+          AND active_school_year_id = ?
+          AND curriculum_id IN (${curriculumIds.map(() => "?").join(", ")})
+          AND (department_section_id IS NULL OR department_section_id = 0)
+        `,
+        [departmentSectionId, studentId, activeSchoolYearId, ...curriculumIds],
+      );
+      remappedEnrolledSubjects = remapResult.affectedRows || 0;
+    } else {
+      const [remapResult] = await db3.query(
+        `
+        UPDATE enrolled_subject
+        SET department_section_id = ?
+        WHERE student_number = ?
+          AND active_school_year_id = ?
+          AND (department_section_id IS NULL OR department_section_id = 0)
+        `,
+        [departmentSectionId, studentId, activeSchoolYearId],
+      );
+      remappedEnrolledSubjects = remapResult.affectedRows || 0;
+    }
 
     res.status(200).json({
-      message: "Active curriculum updated successfully",
+      message: "Home section updated successfully",
+      curriculumId: studentCurriculumId,
+      sectionCurriculumId: curriculumId,
+      activeCurriculumChanged: false,
+      remappedEnrolledSubjects,
     });
   } catch (err) {
     console.error("Error updating active curriculum:", err);
     res.status(500).json({ error: "Database error", details: err.message });
+  }
+});
+
+// Update section for a single enrolled subject (no unenroll required)
+router.put("/enrolled-courses/:id/section", async (req, res) => {
+  const { id } = req.params;
+  const { department_section_id } = req.body;
+
+  if (
+    department_section_id === undefined ||
+    department_section_id === null ||
+    department_section_id === ""
+  ) {
+    return res.status(400).json({ error: "department_section_id is required" });
+  }
+
+  try {
+    const [[sectionRow]] = await db3.query(
+      `SELECT id FROM dprtmnt_section_table WHERE id = ? LIMIT 1`,
+      [department_section_id],
+    );
+    if (!sectionRow) {
+      return res.status(404).json({ error: "Section not found" });
+    }
+
+    const [[before]] = await db3.query(
+      `
+      SELECT es.id, es.student_number, es.course_id, es.department_section_id,
+             es.active_school_year_id, c.course_code
+      FROM enrolled_subject es
+      LEFT JOIN course_table c ON c.course_id = es.course_id
+      WHERE es.id = ?
+      LIMIT 1
+      `,
+      [id],
+    );
+
+    if (!before) {
+      return res.status(404).json({ error: "Enrolled course not found" });
+    }
+
+    const [result] = await db3.query(
+      `UPDATE enrolled_subject SET department_section_id = ? WHERE id = ?`,
+      [department_section_id, id],
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Enrolled course not found" });
+    }
+
+    const { actorId, actorRole } = getAuditActor(req);
+    const roleLabel = formatAuditActorRole(actorRole);
+    await insertCourseTaggingAuditLog({
+      req,
+      action: "COURSE_TAGGING_SECTION_CHANGE",
+      message: `${roleLabel} (${actorId}) changed section of ${before.course_code || `course ${before.course_id}`} for Student (${before.student_number}) from section ${before.department_section_id || "none"} to ${department_section_id}.`,
+    });
+
+    res.json({
+      message: "Enrolled subject section updated successfully",
+      id: Number(id),
+      department_section_id: Number(department_section_id),
+    });
+  } catch (err) {
+    console.error("Error updating enrolled subject section:", err);
+    return res.status(500).json({ error: "Database error" });
   }
 });
 

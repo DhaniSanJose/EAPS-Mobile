@@ -76,7 +76,7 @@ const getShortLabel = async (desc) => {
 //  POST /student/upload
 // ---------------------
 router.post("/student/upload", upload.single("file"), async (req, res) => {
-  const { requirements_id, person_id } = req.body;
+  const { requirements_id, person_id, remarks } = req.body;
 
   if (!req.file || !person_id || !requirements_id) {
     return res
@@ -145,8 +145,10 @@ router.post("/student/upload", upload.single("file"), async (req, res) => {
     const originalName = req.file.originalname;
 
     await db3.query(
-      "INSERT INTO requirement_uploads (requirements_id, person_id, file_path, original_name) VALUES (?, ?, ?, ?)",
-      [requirements_id, person_id, filePath, originalName],
+      `INSERT INTO requirement_uploads
+        (requirements_id, person_id, file_path, original_name, status, remarks)
+       VALUES (?, ?, ?, ?, 0, ?)`,
+      [requirements_id, person_id, filePath, originalName, remarks || null],
     );
 
     res.status(201).json({ message: "Upload successful", filename });

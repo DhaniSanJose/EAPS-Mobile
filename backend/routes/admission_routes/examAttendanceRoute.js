@@ -8,6 +8,7 @@ const {
   insertAuditLogAdmission,
   resolveAuditActor,
 } = require("../../utils/auditLogger");
+const { notifyAttendanceUpdated } = require("../../socket/socketService");
 
 const router = express.Router();
 
@@ -208,6 +209,12 @@ router.post("/exam-attendance/scan", async (req, res) => {
       message: `${formatActorRole(scanned_by_role || actorRole)} (${scanned_by || actorId}) scanned Applicant (${record.applicant_id} - ${applicantName}) present for ${record.day_description}, ${record.room_description}.`,
     });
 
+    notifyAttendanceUpdated({
+      schedule_id: record.schedule_id,
+      applicant_id: record.applicant_id,
+      status: "present",
+    });
+
     res.json({
       success: true,
       message: `${applicantName} marked PRESENT.`,
@@ -270,6 +277,12 @@ router.put("/exam-attendance/mark-absent/:schedule_id", async (req, res) => {
       action: "EXAM_ATTENDANCE_MARK_ABSENT",
       severity: "INFO",
       message: `${formatActorRole(audit_actor_role)} (${audit_actor_id || "unknown"}) marked ${totalMarked} applicant(s) ABSENT for schedule ${schedule_id}.`,
+    });
+
+    notifyAttendanceUpdated({
+      schedule_id,
+      status: "absent",
+      count: totalMarked,
     });
     res.json({ success: true, marked_absent: totalMarked });
   } catch (err) {

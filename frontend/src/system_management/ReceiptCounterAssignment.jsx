@@ -130,7 +130,7 @@ const ReceiptCounterAssignment = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": localStorage.getItem("role") || "administrator",
         },
     };
 
@@ -146,7 +146,7 @@ const ReceiptCounterAssignment = () => {
         const storedEmployeeID = localStorage.getItem("employee_id");
 
         if (storedUser && storedRole && storedID) {
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -160,7 +160,7 @@ const ReceiptCounterAssignment = () => {
         setLoading(true);
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`,
+                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
@@ -188,7 +188,7 @@ const ReceiptCounterAssignment = () => {
         if (!activeSchoolYearId) return;
 
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/receipt-counter/active/${activeSchoolYearId}`);
+            const res = await axios.get(`${API_BASE_URL}/api/receipt-counter/active/${activeSchoolYearId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             const map = {};
             (res.data || []).forEach((row) => {
                 map[row.employee_id] = row;
@@ -205,12 +205,12 @@ const ReceiptCounterAssignment = () => {
         const fetchInitialData = async () => {
             try {
                 const [employeeRes, departmentRes, schoolYearRes, semesterRes, activeSchoolYearRes, accountTypeRes] = await Promise.all([
-                    axios.get(`${API_BASE_URL}/api/get_employee`),
-                    axios.get(`${API_BASE_URL}/api/get_department`),
-                    axios.get(`${API_BASE_URL}/api/get_school_year`),
-                    axios.get(`${API_BASE_URL}/api/get_school_semester`),
-                    axios.get(`${API_BASE_URL}/api/active_school_year`),
-                    axios.get(`${API_BASE_URL}/api/tosf/account-types`)
+                    axios.get(`${API_BASE_URL}/api/get_employee`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+                    axios.get(`${API_BASE_URL}/api/get_department`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+                    axios.get(`${API_BASE_URL}/api/get_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+                    axios.get(`${API_BASE_URL}/api/get_school_semester`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+                    axios.get(`${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }),
+                    axios.get(`${API_BASE_URL}/api/tosf/account-types`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
                 ]);     
 
                 setEmployeesData(employeeRes.data || []);

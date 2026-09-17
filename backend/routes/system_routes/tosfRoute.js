@@ -151,6 +151,17 @@ router.get("/scholarship_types", async (req, res) => {
   }
 });
 
+// Legacy flat TOSF row used by Certificate of Registration screens (expects an array; UI reads tosf[0]).
+router.get("/tosf", async (req, res) => {
+  try {
+    const [rows] = await db3.query(`SELECT * FROM tosf LIMIT 1`);
+    res.json(Array.isArray(rows) ? rows : []);
+  } catch (error) {
+    console.error("Error fetching tosf:", error);
+    res.status(500).json({ message: "Server error while fetching TOSF" });
+  }
+});
+
 router.post("/insert_scholarship_type", CanCreate, async (req, res) => {
   const { scholarship_code, scholarship_name, scholarship_status, created_at } = req.body;
 

@@ -714,5 +714,157 @@ router.put("/interview_applicants/unassign-all", async (req, res) => {
 
 
 
-module.exports = router;
+const normalizeInterviewApplicantStatus = (value) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
 
+  if (normalized === "1" || normalized === "accepted") return 1;
+  if (normalized === "2" || normalized === "rejected") return 2;
+  if (
+    normalized === "0" ||
+    normalized === "waiting list" ||
+    normalized === "waiting_list" ||
+    normalized === "on process" ||
+    normalized === ""
+  ) {
+    return 0;
+  }
+
+  return value;
+};
+
+const formatInterviewApplicantStatus = (value) => {
+  const normalized = normalizeInterviewApplicantStatus(value);
+
+  if (Number(normalized) === 1) return "Accepted";
+  if (Number(normalized) === 2) return "Rejected";
+  if (Number(normalized) === 0) return "Waiting List";
+
+  return String(value ?? "NONE");
+};
+
+const formatInterviewPersonName = (person, fallback = "Unknown person") => {
+  const fullName = [
+    person?.first_name || person?.fname,
+    person?.middle_name || person?.mname,
+    person?.last_name || person?.lname,
+    person?.extension,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return fullName || fallback;
+};
+
+router.get("/interview_applicants/:applicant_id", async (req, res) => {
+  const { applicant_id } = req.params;
+
+  try {
+    const [[row]] = await db.query(
+      `SELECT
+         ia.applicant_id,
+         ia.status,
+         ia.action,
+         ia.email_sent,
+         COALESCE(ps.interview_status, 0) AS applicant_interview_status
+       FROM interview_applicants ia
+       LEFT JOIN applicant_numbering_table ant ON ant.applicant_number = ia.applicant_id
+       LEFT JOIN person_status_table ps ON ps.person_id = ant.person_id
+       WHERE ia.applicant_id = ?
+       LIMIT 1`,
+      [applicant_id],
+    );
+
+    if (!row) {
+      return res.status(404).json({ message: "Applicant not found" });
+    }
+
+    res.json({
+      ...row,
+      status: formatInterviewApplicantStatus(row.status),
+      locked:
+        Number(row.email_sent) === 1 ||
+        Number(row.applicant_interview_status) === 1,
+    });
+  } catch (err) {
+    console.error("Error fetching applicant interview status:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.put("/interview_applicants/:applicant_id/status", async (req, res) => {
+  const { applicant_id } = req.params;
+  const { status } = req.body;
+  const nextStatusValue = normalizeInterviewApplicantStatus(status);
+
+  try {
+    const [[applicantBefore]] = await db.query(
+      `
+      SELECT
+        ia.status,
+        ia.action,
+        ia.email_sent,
+        COALESCE(ps.interview_status, 0) AS applicant_interview_status,
+        ant.applicant_number,
+        pt.first_name,
+        pt.middle_name,
+        pt.last_name,
+        pt.emailAddress,
+        ps.interview_status
+      FROM interview_applicants ia
+      LEFT JOIN applicant_numbering_table ant ON ant.applicant_number = ia.applicant_id
+      LEFT JOIN person_table pt ON pt.person_id = ant.person_id
+      LEFT JOIN person_status_table ps ON ps.person_id = ant.person_id
+      WHERE ia.applicant_id = ?
+      LIMIT 1
+      `,
+      [applicant_id],
+    );
+
+    if (!applicantBefore) {
+      return res.status(404).json({ message: "Applicant not found" });
+    }
+
+    if (
+      Number(applicantBefore.interview_status) === 1 ||
+      Number(applicantBefore.applicant_interview_status) === 1
+    ) {
+      return res.status(409).json({
+        message: "Status can no longer be changed after email has been sent.",
+      });
+    }
+
+    const [result] = await db.query(
+      "UPDATE interview_applicants SET status = ? WHERE applicant_id = ?",
+      [nextStatusValue, applicant_id],
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Applicant not found" });
+    }
+
+    const previousStatus = formatInterviewApplicantStatus(applicantBefore.status);
+    const nextStatus = formatInterviewApplicantStatus(nextStatusValue);
+
+    if (previousStatus !== nextStatus) {
+      const actor = getAuditActor(req);
+      const roleLabel = formatAuditActorRole(actor.actorRole);
+      const applicantName = formatInterviewPersonName(applicantBefore, "Unknown applicant");
+      const applicantEmail = applicantBefore.emailAddress || "No email";
+
+      await insertAuditLogAdmission({
+        actorId: actor.actorId,
+        role: actor.actorRole,
+        action: "QUALIFYING_INTERVIEW_STATUS_UPDATE",
+        severity: "INFO",
+        message: `${roleLabel} (${actor.actorId}) changed qualifying/interview status of Applicant #${applicant_id} - ${applicantName} (${applicantEmail}): ${previousStatus} -> ${nextStatus}.`,
+      });
+    }
+
+    res.json({ message: "Status updated successfully" });
+  } catch (err) {
+    console.error("Error updating applicant status:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+module.exports = router;

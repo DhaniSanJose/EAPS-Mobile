@@ -302,7 +302,7 @@ const MatriculationPaymentModule = () => {
                 localStorage.getItem("employee_id") ||
                 localStorage.getItem("email") ||
                 "unknown",
-            "x-audit-actor-role": localStorage.getItem("role") || "registrar",
+            "x-audit-actor-role": localStorage.getItem("role") || "administrator",
         },
     };
 
@@ -322,7 +322,7 @@ const MatriculationPaymentModule = () => {
         const storedEmployeeID = localStorage.getItem("employee_id");
 
         if (storedUser && storedRole && storedID) {
-            if (storedRole === "registrar") {
+            if (["administrator", "superadmin", "technical"].includes(storedRole)) {
                 checkAccess(storedEmployeeID);
             } else {
                 window.location.href = "/login";
@@ -336,7 +336,7 @@ const MatriculationPaymentModule = () => {
         setLoading(true);
         try {
             const response = await axios.get(
-                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`,
+                `${API_BASE_URL}/api/page_access/${employeeIDValue}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } },
             );
             if (response.data && response.data.page_privilege === 1) {
                 setHasAccess(true);
@@ -364,7 +364,7 @@ const MatriculationPaymentModule = () => {
 
         if (person_id && role) {
             axios
-                .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`)
+                .get(`${API_BASE_URL}/api/person_data/${person_id}/${role}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } })
                 .then((res) => setPersonData(res.data))
                 .catch((err) => console.error("Failed to fetch person data:", err));
         }
@@ -378,13 +378,13 @@ const MatriculationPaymentModule = () => {
 
             try {
                 const activeSchoolYearRes = await axios.get(
-                    `${API_BASE_URL}/api/active_school_year`
+                    `${API_BASE_URL}/api/active_school_year`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
                 );
                 const activeSchoolYear = activeSchoolYearRes.data?.[0];
                 if (!activeSchoolYear?.school_year_id) return;
 
                 const counterRes = await axios.get(
-                    `${API_BASE_URL}/api/receipt-counter/active/${activeSchoolYear.school_year_id}`
+                    `${API_BASE_URL}/api/receipt-counter/active/${activeSchoolYear.school_year_id}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
                 );
                 const assignment = (counterRes.data || []).find(
                     (row) => String(row.employee_id) === String(employeeId)
@@ -401,7 +401,7 @@ const MatriculationPaymentModule = () => {
 
     const fetchStudentData = async () => {
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/get_student_data_matriculation`);
+            const res = await axios.get(`${API_BASE_URL}/api/get_student_data_matriculation`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             setData(res.data);
         } catch {
             showSnackbar("Failed to fetch matriculation data.", "error");
@@ -521,7 +521,7 @@ const MatriculationPaymentModule = () => {
         setHistoryOpen(true);
         setHistoryLoading(true);
         try {
-            const res = await axios.get(`${API_BASE_URL}/api/payment_matriculation/transactions`);
+            const res = await axios.get(`${API_BASE_URL}/api/payment_matriculation/transactions`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
             const rows = res.data || [];
             setTransactionData(rows);
             setHistoryRenderLimit(Math.min(HISTORY_INITIAL_BATCH, rows.length || HISTORY_INITIAL_BATCH));

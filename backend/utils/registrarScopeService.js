@@ -493,7 +493,7 @@ const migrateLegacyScopes = async () => {
   const [rows] = await db3.query(
     `SELECT ua.employee_id, ua.dprtmnt_id, ua.program_id AS curriculum_id
      FROM user_accounts ua
-     WHERE ua.role = 'registrar'
+     WHERE ua.role IN ('administrator', 'superadmin', 'technical')
        AND (ua.dprtmnt_id IS NOT NULL OR ua.program_id IS NOT NULL)`,
   );
 
@@ -570,7 +570,7 @@ const formatScopesSummary = (scopes = []) => {
 };
 
 const resolveRegistrarLoginFields = async (employeeId, role, legacyDprtmntId = null) => {
-  if (role !== "registrar" || !employeeId) {
+  if (!["administrator", "superadmin", "technical"].includes(String(role || "").toLowerCase()) || !employeeId) {
     return {
       department: legacyDprtmntId ?? null,
       curriculum_id: null,

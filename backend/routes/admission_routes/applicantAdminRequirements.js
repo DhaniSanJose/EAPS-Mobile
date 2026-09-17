@@ -182,9 +182,13 @@ router.get("/person_with_applicant/:id", async (req, res) => {
       `
       SELECT
         pt.*,
-        ant.applicant_number
+        ant.applicant_number,
+        ps.qualifying_result AS qualifying_exam_score,
+        ps.interview_result AS qualifying_interview_score,
+        ps.exam_result AS exam_score
       FROM person_table pt
-      JOIN applicant_numbering_table ant ON pt.person_id = ant.person_id
+      LEFT JOIN applicant_numbering_table ant ON pt.person_id = ant.person_id
+      LEFT JOIN person_status_table ps ON ps.person_id = pt.person_id
       WHERE pt.person_id = ? OR ant.applicant_number = ?
       LIMIT 1
     `,
@@ -575,4 +579,462 @@ router.delete("/admin/uploads/:uploadId", async (req, res) => {
   }
 });
 
-module.exports = router;  
+router.get("/uploads/preview/:uploadId", async (req, res) => {
+  const { uploadId } = req.params;
+
+  try {
+    const [[row]] = await db.query(
+      "SELECT file_path FROM requirement_uploads WHERE upload_id = ?",
+      [uploadId]
+    );
+
+    if (!row || !row.file_path) {
+      return res.status(404).json({ error: "File record not found" });
+    }
+
+    const dir = uploadDir;
+    let fullPath = path.join(dir, row.file_path);
+
+    if (!fs.existsSync(fullPath)) {
+      // Fallback: DB extension is stale — find the actual file on disk
+      // that shares the same base name regardless of extension.
+      const baseName = path.basename(row.file_path, path.extname(row.file_path));
+      const filesInDir = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+      const match = filesInDir.find(
+        (f) => path.basename(f, path.extname(f)) === baseName
+      );
+
+      if (!match) {
+        return res.status(404).json({ error: "File not found on server" });
+      }
+      fullPath = path.join(dir, match);
+    }
+
+    res.sendFile(fullPath);
+  } catch (err) {
+    console.error("Applicant preview error:", err);
+    res.status(500).json({ error: "Failed to load file" });
+  }
+});
+
+router.get("/uploads/:personId", async (req, res) => {
+  const personId = req.params.personId;
+  if (!personId) return res.status(400).json({ error: "Missing person ID" });
+
+  try {
+    const [results] = await db.query(
+      `
+      SELECT
+        ru.upload_id,
+        ru.requirements_id,
+        ru.person_id,
+        ru.file_path,
+        ru.original_name,
+        ru.remarks,
+        ru.status,
+        rt.description,
+        rt.short_label
+      FROM requirement_uploads ru
+      LEFT JOIN requirements_table rt ON ru.requirements_id = rt.id
+      WHERE ru.person_id = ?
+      ORDER BY ru.upload_id DESC
+    `,
+      [personId],
+    );
+
+    res.json(results);
+  } catch (err) {
+    console.error("Fetch uploads failed:", err);
+    res.status(500).json({ error: "Failed to fetch uploads" });
+  }
+});
+
+//  UPDATE Remarks ONLY (no socket emit, no evaluator lookup)
+//  Update remarks only
+router.put("/uploads/remarks/:upload_id", async (req, res) => {
+  const { upload_id } = req.params;
+  const { remarks, user_id } = req.body;
+
+  try {
+    await db.query(
+      `UPDATE requirement_uploads
+       SET remarks = ?, last_updated_by = ?
+       WHERE upload_id = ?`,
+      [remarks || null, user_id, upload_id],
+    );
+
+    res.json({ message: "Remarks updated successfully." });
+  } catch (err) {
+    console.error("Error updating remarks:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+// Update submitted_documents by upload_id (apply to ALL docs of that applicant)
+router.put("/submitted-documents/:upload_id", async (req, res) => {
+  const { upload_id } = req.params;
+  const { submitted_documents, user_person_id } = req.body;
+
+  try {
+    // 1. Find person_id
+    const [[row]] = await db.query(
+      "SELECT person_id FROM admission.requirement_uploads WHERE upload_id = ?",
+      [upload_id]
+    );
+
+    if (!row) {
+      return res.status(404).json({ error: "Upload not found" });
+    }
+
+    const person_id = row.person_id;
+
+    // 2. Applicant info
+    const [[appInfo]] = await db.query(
+      `
+      SELECT ant.applicant_number, pt.last_name, pt.first_name, pt.middle_name
+      FROM applicant_numbering_table ant
+      JOIN person_table pt ON ant.person_id = pt.person_id
+      WHERE ant.person_id = ?
+      `,
+      [person_id]
+    );
+
+    const applicant_number = appInfo?.applicant_number || "Unknown";
+
+    const fullName = `${appInfo?.last_name || ""}, ${appInfo?.first_name || ""
+      } ${appInfo?.middle_name?.charAt(0) || ""}.`;
+
+    // 3. Actor info
+    let actorEmail = "earistmis@gmail.com";
+    let actorName = "SYSTEM";
+
+    if (user_person_id) {
+      const [actorRows] = await db3.query(
+        `
+        SELECT email, role, employee_id, last_name, first_name, middle_name
+        FROM user_accounts
+        WHERE person_id = ?
+        LIMIT 1
+        `,
+        [user_person_id]
+      );
+
+      if (actorRows.length > 0) {
+        const u = actorRows[0];
+
+        const role = u.role?.toUpperCase() || "UNKNOWN";
+        const empId = u.employee_id || "";
+        const lname = u.last_name || "";
+        const fname = u.first_name || "";
+        const mname = u.middle_name || "";
+        const email = u.email || "";
+
+        actorEmail = email;
+        actorName = `${role} (${empId}) - ${lname}, ${fname} ${mname}`.trim();
+      }
+    }
+
+    // 4. Toggle + message
+    let type, message;
+
+    if (submitted_documents === 1) {
+      await db.query(
+        `
+        UPDATE admission.requirement_uploads
+        SET submitted_documents = 1,
+            registrar_status = 1,
+            missing_documents = '[]'
+        WHERE person_id = ?
+        `,
+        [person_id]
+      );
+
+      type = "submit";
+      message = `Requirements submitted by Applicant #${applicant_number} - ${fullName}`;
+    } else {
+      await db.query(
+        `
+        UPDATE admission.requirement_uploads
+        SET submitted_documents = 0,
+            registrar_status = 0,
+            missing_documents = NULL
+        WHERE person_id = ?
+        `,
+        [person_id]
+      );
+
+      type = "unsubmit";
+      message = `Requirements unsubmitted for Applicant #${applicant_number} - ${fullName}`;
+    }
+
+    const actorId = req.body?.user_person_id || req.headers["x-audit-actor-id"] || "unknown";
+    const actorRole = req.headers["x-audit-actor-role"] || "registrar";
+    const roleLabel = formatAuditActorRole(actorRole);
+    await insertAuditLogAdmission({
+      actorId,
+      role: actorRole,
+      action:
+        submitted_documents === 1
+          ? "APPLICATION_ORIGINAL_DOCUMENTS_SUBMIT"
+          : "APPLICATION_ORIGINAL_DOCUMENTS_UNSUBMIT",
+      severity: "INFO",
+      message: `${roleLabel} (${actorId}) marked original documents of Applicant (${applicant_number}) as ${submitted_documents === 1 ? "submitted" : "unsubmitted"}.`,
+    });
+
+    res.json({
+      success: true,
+      message,
+    });
+  } catch (err) {
+    console.error("Error toggling submitted documents:", err);
+
+    res.status(500).json({
+      error: "Failed to toggle submitted documents",
+    });
+  }
+});
+
+router.get("/all-applicants", async (req, res) => {
+  try {
+    const [rows] = await db.execute(`
+      SELECT DISTINCT
+        snt.student_number,
+        p.person_id,
+        p.applyingAs,
+        p.last_name,
+        p.first_name,
+        p.middle_name,
+        p.extension,
+        p.program,
+        pgt.program_code,
+        p.emailAddress,
+        p.generalAverage,
+        p.generalAverage1,
+        p.campus,
+        p.created_at,
+        p.birthOfDate,
+        p.gender,
+        p.strand,
+        a.applicant_number,
+        SUBSTRING(a.applicant_number, 5, 1) AS middle_code,
+        app_sem.semester_id AS applicant_semester_id,
+        app_sem.semester_code AS applicant_semester_code,
+        ea.schedule_id,
+        ees.day_description AS exam_day,
+        ees.room_description AS exam_room,
+        ees.start_time AS exam_start_time,
+        ees.end_time AS exam_end_time,
+        ea.email_sent,
+
+        /* latest prioritized upload id for this person */
+        ruprio.upload_id AS upload_id,
+        ruprio.submitted_medical,
+
+        /*  allow NULL values to pass through */
+        ruprio.submitted_documents,
+        ruprio.registrar_status,
+
+        /* collect missing_documents across uploads if you still want to show aggregated missing docs */
+        ruagg.all_missing_docs,
+
+        ruprio.document_status,
+        ruprio.created_at AS last_updated,
+        ps.exam_status,
+        COALESCE(rtot.total_required_docs, 0) AS total_required_docs,
+
+        /*  NEW: how many required docs are verified */
+        COALESCE(vdocs.verified_count, 0) AS required_docs_verified
+
+      FROM admission.person_table AS p
+      LEFT JOIN enrollment.user_accounts AS ua
+        ON ua.person_id = p.person_id
+      LEFT JOIN admission.applicant_numbering_table AS a
+        ON p.person_id = a.person_id
+      LEFT JOIN enrollment.semester_table AS app_sem
+        ON app_sem.semester_code = SUBSTRING(a.applicant_number, 5, 1)
+      LEFT JOIN admission.exam_applicants AS ea
+        ON a.applicant_number = ea.applicant_id
+      LEFT JOIN admission.entrance_exam_schedule AS ees
+        ON ea.schedule_id = ees.schedule_id
+       LEFT JOIN enrollment.program_table AS pgt ON p.program = pgt.program_id
+      LEFT JOIN enrollment.student_numbering_table AS snt
+        ON p.person_id = snt.person_id
+
+      /* get aggregated missing_documents for display only */
+      LEFT JOIN (
+        SELECT
+          person_id,
+          GROUP_CONCAT(missing_documents SEPARATOR '||') AS all_missing_docs
+        FROM admission.requirement_uploads
+        GROUP BY person_id
+      ) AS ruagg ON ruagg.person_id = p.person_id
+
+      /*  get the prioritized row per applicant */
+      LEFT JOIN admission.requirement_uploads AS ruprio
+        ON ruprio.upload_id = (
+          SELECT ru2.upload_id
+          FROM admission.requirement_uploads ru2
+          WHERE ru2.person_id = p.person_id
+          ORDER BY
+            CASE
+              WHEN ru2.document_status = 'Disapproved' THEN 1
+              WHEN ru2.document_status = 'Program Closed' THEN 2
+              WHEN ru2.document_status = 'Documents Verified & ECAT' THEN 3
+              WHEN ru2.document_status = 'On process' THEN 4
+              ELSE 5
+            END ASC,
+            ru2.upload_id DESC
+          LIMIT 1
+        )
+
+      LEFT JOIN admission.person_status_table AS ps
+        ON p.person_id = ps.person_id
+      LEFT JOIN admission.user_accounts AS aua
+        ON p.person_id = aua.person_id
+
+      LEFT JOIN (
+        SELECT
+          p2.person_id,
+          COUNT(rt.id) AS total_required_docs
+        FROM admission.person_table p2
+        LEFT JOIN admission.requirements_table rt
+          ON rt.applicant_type COLLATE utf8mb4_unicode_ci =
+             p2.applyingAs COLLATE utf8mb4_unicode_ci
+         AND rt.category = 'Main'
+         AND rt.is_verifiable = 1
+        GROUP BY p2.person_id
+      ) AS rtot ON rtot.person_id = p.person_id
+
+      /*  subquery: count verified docs for this applicant */
+      LEFT JOIN (
+        SELECT
+          ru.person_id,
+          COUNT(DISTINCT ru.requirements_id) AS verified_count
+        FROM admission.requirement_uploads ru
+        INNER JOIN admission.requirements_table rt
+          ON ru.requirements_id = rt.id
+        INNER JOIN admission.person_table p3
+          ON rt.applicant_type COLLATE utf8mb4_unicode_ci =
+             p3.applyingAs COLLATE utf8mb4_unicode_ci
+         AND p3.person_id = ru.person_id
+        WHERE ru.document_status = 'Documents Verified & ECAT'
+          AND rt.category = 'Main'
+          AND rt.is_verifiable = 1
+        GROUP BY ru.person_id
+      ) AS vdocs ON vdocs.person_id = p.person_id
+
+      WHERE COALESCE(aua.is_archived, 0) = 0
+
+      ORDER BY p.last_name ASC, p.first_name ASC
+    `);
+
+    // Parse aggregated missing_documents into array (if present)
+    const merged = rows.map((r) => {
+      let mergedDocs = [];
+      if (r.all_missing_docs) {
+        const parts = r.all_missing_docs.split("||");
+        const all = parts.flatMap((item) => {
+          try {
+            if (!item || item === "null") return [];
+            return JSON.parse(item);
+          } catch {
+            return [];
+          }
+        });
+        mergedDocs = [...new Set(all)];
+      }
+      return {
+        ...r,
+        missing_documents: mergedDocs,
+      };
+    });
+
+    res.json(merged);
+  } catch (err) {
+    console.error(" Error fetching all applicants:", err);
+    res.status(500).send("Server error");
+  }
+});
+
+router.get("/search-person", async (req, res) => {
+  const { query } = req.query;
+  if (!query) {
+    return res.status(400).json({ error: "Missing search query" });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        p.*,
+        a.applicant_number
+      FROM person_table p
+      LEFT JOIN applicant_numbering_table a ON p.person_id = a.person_id
+      WHERE a.applicant_number LIKE ?
+         OR p.first_name LIKE ?
+         OR p.last_name LIKE ?
+         OR p.emailAddress LIKE ?
+      LIMIT 1
+    `,
+      [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "No matching applicant found" });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Error searching person:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.put("/missing-documents/:person_id", async (req, res) => {
+  const { person_id } = req.params;
+  let { missing_documents, user_id } = req.body;
+
+  try {
+    if (!Array.isArray(missing_documents)) {
+      missing_documents = [];
+    }
+
+    const jsonDocs = JSON.stringify(missing_documents);
+
+    await db.query(
+      `UPDATE admission.requirement_uploads
+       SET missing_documents = ?, last_updated_by = ?
+       WHERE person_id = ?`,
+      [jsonDocs, user_id || null, person_id],
+    );
+
+    res.json({ success: true, message: "Missing documents updated" });
+  } catch (err) {
+    console.error(" Error updating missing_documents:", err);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to update missing_documents" });
+  }
+});
+
+router.get("/submitted-status/:person_id", async (req, res) => {
+  const { person_id } = req.params;
+
+  try {
+    const [[row]] = await db.query(
+      `
+      SELECT COALESCE(MAX(submitted_documents), 0) AS submitted_documents
+      FROM requirement_uploads
+      WHERE person_id = ?
+      `,
+      [person_id]
+    );
+
+    res.json({ submitted_documents: row.submitted_documents });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch submitted status" });
+  }
+});
+
+module.exports = router;

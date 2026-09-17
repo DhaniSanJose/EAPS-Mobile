@@ -5,6 +5,7 @@ const fs = require("fs");
 const { db, db3 } = require("../database/database");
 const { announcementUpload } = require("../../middleware/uploads");
 const { insertAuditLogAdmission, resolveAuditActor } = require("../../utils/auditLogger");
+const { notifyAnnouncementChanged } = require("../../socket/socketService");
 const {
   CanCreate,
   CanDelete,
@@ -177,6 +178,20 @@ const [result] = await db.execute(
       message: `${roleLabel} (${actorId}) created announcement ${announcementLabel({ id: announcementId, title })}. Target: ${target_role}. Campus: ${campusLabel}.`,
     });
 
+    const [[created]] = await db.execute(
+      "SELECT * FROM announcements WHERE id = ? LIMIT 1",
+      [announcementId],
+    );
+    notifyAnnouncementChanged("created", created || {
+      id: announcementId,
+      title,
+      content,
+      valid_days,
+      target_role,
+      campus,
+      file_path: filename,
+    });
+
     res.json({
       message: "Announcement created",
       id: announcementId,
@@ -272,6 +287,19 @@ router.put("/announcements/:id", CanEdit, announcementUpload.single("image"), as
       message: `${roleLabel} (${actorId}) updated announcement ${announcementLabel(announcementBefore)} to ${announcementLabel({ id, title })}. Target: ${target_role}. Campus: ${campusLabel}.`,
     });
 
+    const [[updated]] = await db.execute(
+      "SELECT * FROM announcements WHERE id = ? LIMIT 1",
+      [id],
+    );
+    notifyAnnouncementChanged("updated", updated || {
+      id,
+      title,
+      content,
+      valid_days,
+      target_role,
+      campus,
+    });
+
     res.json({ message: "Announcement updated successfully" });
 
   } catch (err) {
@@ -304,6 +332,11 @@ router.delete("/announcements/:id", CanDelete, async (req, res) => {
       req,
       action: "ANNOUNCEMENT_DELETE",
       message: `${roleLabel} (${actorId}) deleted announcement ${announcementLabel(announcementBefore)}.`,
+    });
+
+    notifyAnnouncementChanged("deleted", {
+      id: Number(id),
+      ...(announcementBefore || {}),
     });
 
     res.json({ message: "Announcement deleted" });

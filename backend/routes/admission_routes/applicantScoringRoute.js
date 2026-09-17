@@ -1,5 +1,4 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const { db, db3 } = require("../database/database");
 const { insertAuditLogAdmission } = require("../../utils/auditLogger");
 
@@ -45,33 +44,18 @@ const formatPersonExamStatus = (status) => {
   return String(status);
 };
 
-// -----------------------------
-// VERIFY TOKEN
-// -----------------------------
+const { authenticateToken } = require("../../middleware/auth");
+
 function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    req.user = null;
-    return next();
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  try {
-    req.user = jwt.verify(token, "your_secret_key");
-  } catch (err) {
-    req.user = null;
-  }
-
-  next();
+  if (req.user) return next();
+  return authenticateToken(req, res, next);
 }
 
 
 //////////////////////////////////////////////////////////////
 // GET ACTIVE SUBJECTS
 //////////////////////////////////////////////////////////////
-router.get("/subjects", async (req, res) => {
+router.get("/active-subjects", async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT *

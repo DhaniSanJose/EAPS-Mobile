@@ -49,7 +49,7 @@ router.post("/superadmin-get-registrar", async (req, res) => {
         email,
         status
       FROM user_accounts
-      WHERE role = 'registrar'
+      WHERE role IN ('administrator', 'superadmin', 'technical')
       AND (
         employee_id LIKE ? OR
         first_name LIKE ? OR
@@ -111,7 +111,7 @@ router.post("/superadmin-reset-registrar", async (req, res) => {
       SELECT email
       FROM user_accounts
       WHERE email = ?
-      AND role = 'registrar'
+      AND role IN ('administrator', 'superadmin', 'technical')
       `,
       [email]
     );
@@ -164,7 +164,7 @@ router.post("/superadmin-reset-registrar", async (req, res) => {
       SET password = ?,
           force_password_change = 1
       WHERE email = ?
-        AND role = 'registrar'
+        AND role IN ('administrator', 'superadmin', 'technical')
       `,
       [hashedPassword, email]
     );
@@ -230,7 +230,7 @@ router.post("/superadmin-update-status-registrar", async (req, res) => {
 
   try {
     const [result] = await db3.query(
-      `UPDATE user_accounts SET status = ? WHERE email = ? AND role='registrar'`,
+      `UPDATE user_accounts SET status = ? WHERE email = ? AND role IN ('administrator', 'superadmin', 'technical')`,
       [status, email]
     );
 
@@ -270,7 +270,7 @@ router.get("/superadmin-get-all-registrar", async (req, res) => {
         email,
         status
       FROM user_accounts
-      WHERE role = 'registrar'
+      WHERE role IN ('administrator', 'superadmin', 'technical')
       ORDER BY first_name ASC
     `);
 
@@ -297,7 +297,7 @@ router.post("/superadmin-get-registrar-row", async (req, res) => {
       email,
       status
     FROM user_accounts
-    WHERE role='registrar'
+    WHERE role IN ('administrator', 'superadmin', 'technical')
     AND (
       employee_id LIKE ? OR
       first_name LIKE ? OR

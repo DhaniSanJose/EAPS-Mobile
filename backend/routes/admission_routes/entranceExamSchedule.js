@@ -1,6 +1,7 @@
 const express = require("express");
 const { db, db3 } = require("../database/database");
 const { insertAuditLogAdmission, resolveAuditActor } = require("../../utils/auditLogger");
+const { transporter } = require("../../utils/mailer");
 
 const router = express.Router();
 
@@ -437,5 +438,154 @@ router.post("/unassign_schedule", async (req, res) => {
   }
 });
 
-module.exports = router;
+router.get("/verified-ecat-applicants", async (req, res) => {
+  try {
+    const [rows] = await db.execute(`
+      SELECT DISTINCT
+        p.person_id,
+        p.last_name,
+        p.campus,
+        p.first_name,
+        p.middle_name,
+        p.extension,
+        p.emailAddress,
+        p.program,
+        p.created_at,
+        a.applicant_number,
+        SUBSTRING(a.applicant_number, 5, 1) AS middle_code,
+        ea.schedule_id,
+        ea.email_sent,
+        ees.day_description,
+        ees.room_description,
+        ees.start_time,
+        ees.end_time,
+        ps.exam_status
+      FROM admission.person_table AS p
+      LEFT JOIN admission.applicant_numbering_table AS a
+        ON p.person_id = a.person_id
+      LEFT JOIN admission.exam_applicants AS ea
+        ON a.applicant_number = ea.applicant_id
+      LEFT JOIN admission.entrance_exam_schedule AS ees
+        ON ea.schedule_id = ees.schedule_id
+      LEFT JOIN admission.person_status_table AS ps
+        ON p.person_id = ps.person_id
+      WHERE p.person_id IN (
+        SELECT ru.person_id
+        FROM admission.requirement_uploads ru
+        INNER JOIN admission.requirements_table rt
+          ON ru.requirements_id = rt.id
+        WHERE ru.document_status = 'Documents Verified & ECAT'
+          AND rt.category = 'Main'
+        GROUP BY ru.person_id
+        HAVING COUNT(DISTINCT ru.requirements_id) >= (
+          SELECT COUNT(*)
+          FROM admission.requirements_table rt2
+          INNER JOIN admission.person_table p2
+            ON rt2.applicant_type = p2.applyingAs
+            OR rt2.applicant_type = 0
+          WHERE rt2.category = 'Main'
+            AND p2.person_id = ru.person_id  --  correlated to the specific applicant
+        )
+      )
+      AND (ea.email_sent IS NULL OR ea.email_sent = 0)
+      ORDER BY p.last_name ASC, p.first_name ASC;
+    `);
 
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "No verified ECAT applicants found" });
+    }
+
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Error fetching verified ECAT applicants:", err);
+    res.status(500).send("Server error");
+  }
+});
+
+router.post("/cancel-unscheduled-applicants", async (req, res) => {
+  try {
+    // 1¸ Get the short_term from company_settings
+    const [[settings]] = await db.query(`
+      SELECT short_term FROM company_settings WHERE id = 1
+    `);
+    const shortTerm = settings?.short_term || "EARIST"; // fallback
+
+    // 2¸ Get all applicants with NO exam schedule
+    const [rows] = await db.query(`
+      SELECT
+        ea.applicant_id,
+        ant.person_id,
+        pt.emailAddress AS email,
+        pt.first_name,
+        pt.last_name
+      FROM exam_applicants ea
+      JOIN applicant_numbering_table ant
+        ON ant.applicant_number = ea.applicant_id
+      JOIN person_table pt
+        ON pt.person_id = ant.person_id
+      WHERE ea.schedule_id IS NULL
+    `);
+
+    console.log("UNSCHEDULED:", rows);
+
+    if (rows.length === 0) {
+      return res.json({
+        success: true,
+        message: "No unscheduled applicants found.",
+      });
+    }
+
+    let count = 0;
+
+    for (const a of rows) {
+      // 3¸ Update admission_exam †’ status = Cancelled
+      await db.query(
+        `UPDATE admission_exam
+         SET status = 'CANCELLED'
+         WHERE person_id = ?`,
+        [a.person_id],
+      );
+
+      // 4¸ Email contents with short_term applied
+      const mailOptions = {
+        from: `"${shortTerm} - Admission Office" <${process.env.EMAIL_USER}>`,
+        to: a.email,
+        subject: `${shortTerm} Admission  Application Cancelled`,
+        text: `
+Good day ${a.first_name} ${a.last_name},
+
+Thank you for applying to ${shortTerm}.
+
+After a thorough evaluation of your submitted documents, we regret to inform you that your application was not selected to proceed to the next stage of the admission process.
+
+We sincerely appreciate your interest in becoming part of ${shortTerm} and encourage you to explore opportunities that may best align with your academic goals.
+
+Thank you once again for applying.
+
+Sincerely,
+${shortTerm} - Admission Office
+        `,
+      };
+
+      // 5¸ Send email
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log("EMAIL SENT TO:", a.email);
+      } catch (emailErr) {
+        console.error("Email failed:", emailErr);
+      }
+
+      count++;
+    }
+
+    res.json({
+      success: true,
+      message: `${count} unscheduled applicants were cancelled and notified.`,
+    });
+  } catch (error) {
+    console.error(" Error cancelling applicants:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+module.exports = router;

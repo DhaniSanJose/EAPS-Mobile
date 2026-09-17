@@ -101,7 +101,7 @@ async function resolveForgotPasswordAccount(identifier) {
             pt.first_name, pt.middle_name, pt.last_name
      FROM user_accounts ua
      LEFT JOIN person_table pt ON pt.person_id = ua.person_id
-     WHERE ua.employee_id = ? AND ua.role = 'registrar'
+     WHERE ua.employee_id = ? AND ua.role IN ('administrator', 'superadmin', 'technical')
      LIMIT 1`,
     [normalizedIdentifier]
   );
@@ -1201,7 +1201,7 @@ router.post("/login", async (req, res) => {
         accessList,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "24h" }
+      { expiresIn: "1h" }
     );
 
     const loginPayload = {
@@ -2466,6 +2466,125 @@ router.post("/forgot-password-init", async (req, res) => {
   } catch (error) {
     console.error("forgot-password-init error:", error);
     return res.status(500).json({ success: false, message: "Internal server error." });
+  }
+});
+
+router.get("/get_user_account_id/:person_id", async (req, res) => {
+  const { person_id } = req.params;
+  try {
+    const [rows] = await db3.query(
+      "SELECT id FROM user_accounts WHERE person_id = ? LIMIT 1",
+      [person_id],
+    );
+    if (rows.length === 0)
+      return res.status(404).json({ message: "User not found" });
+    res.json({ user_account_id: rows[0].id });
+  } catch (err) {
+    console.error(" Error fetching user_account_id:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+const passwordVerifyAttempts = new Map();
+
+const MAX_ATTEMPTS = 3;
+
+const LOCK_DURATION_MS = 3 * 60 * 1000;
+
+router.get("/check-lock-status/:person_id", (req, res) => {
+  const { person_id } = req.params;
+  const key = `person_${person_id}`;
+  const now = Date.now();
+  const record = passwordVerifyAttempts.get(key) || { attempts: 0, lockedUntil: null };
+
+  if (record.lockedUntil && now < record.lockedUntil) {
+    const remainingMs = record.lockedUntil - now;
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    return res.json({
+      locked: true,
+      remainingSeconds: remainingSec,
+    });
+  }
+
+  if (record.lockedUntil && now >= record.lockedUntil) {
+    passwordVerifyAttempts.set(key, { attempts: 0, lockedUntil: null });
+  }
+
+  res.json({ locked: false, remainingSeconds: 0 });
+});
+
+router.post("/verify-password", async (req, res) => {
+  const { person_id, password } = req.body;
+
+  if (!person_id || !password) {
+    return res.status(400).json({ success: false, message: "Person ID and password required" });
+  }
+
+  const key = `person_${person_id}`;
+  const now = Date.now();
+
+  // 🔒 Check if currently locked
+  const record = passwordVerifyAttempts.get(key) || { attempts: 0, lockedUntil: null };
+
+  if (record.lockedUntil && now < record.lockedUntil) {
+    const remainingMs = record.lockedUntil - now;
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    return res.status(429).json({
+      success: false,
+      locked: true,
+      remainingSeconds: remainingSec,
+      message: `Account locked. Try again in ${Math.ceil(remainingSec / 60)} minute(s).`,
+    });
+  }
+
+  // Reset if lock expired
+  if (record.lockedUntil && now >= record.lockedUntil) {
+    passwordVerifyAttempts.set(key, { attempts: 0, lockedUntil: null });
+  }
+
+  try {
+    const [rows] = await db3.query(
+      "SELECT * FROM user_accounts WHERE person_id = ?",
+      [person_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(400).json({ success: false, message: "User not found" });
+    }
+
+    const user = rows[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      const current = passwordVerifyAttempts.get(key) || { attempts: 0, lockedUntil: null };
+      const newAttempts = current.attempts + 1;
+
+      if (newAttempts >= MAX_ATTEMPTS) {
+        passwordVerifyAttempts.set(key, { attempts: newAttempts, lockedUntil: now + LOCK_DURATION_MS });
+        return res.status(429).json({
+          success: false,
+          locked: true,
+          remainingSeconds: LOCK_DURATION_MS / 1000,
+          message: "Too many failed attempts. Locked for 3 minutes.",
+        });
+      }
+
+      passwordVerifyAttempts.set(key, { attempts: newAttempts, lockedUntil: null });
+      return res.status(401).json({
+        success: false,
+        locked: false,
+        attemptsLeft: MAX_ATTEMPTS - newAttempts,
+        message: `Invalid password. ${MAX_ATTEMPTS - newAttempts} attempt(s) remaining.`,
+      });
+    }
+
+    // ✅ Success — clear attempts
+    passwordVerifyAttempts.delete(key);
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("verify-password error:", err);
+    res.status(500).json({ success: false, message: "Server error during password verification" });
   }
 });
 

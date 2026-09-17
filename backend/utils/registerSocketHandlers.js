@@ -1,52 +1,13 @@
 const nodemailer = require("nodemailer");
+const { insertAuditLogAdmission } = require("./auditLogger");
 const {
-  insertAuditLogAdmission,
-  insertAuditLogEnrollment,
-} = require("./auditLogger");
-const { logStudentHistoryFromActor } = require("./studentHistoryLogger");
-const { ensureAttendanceQr } = require("../utils/examAttendance");
-
-const getConfiguredSenderAccounts = () =>
-  [
-    { user: process.env.EMAIL_USER1, pass: process.env.EMAIL_PASS1 },
-    { user: process.env.EMAIL_USER2, pass: process.env.EMAIL_PASS2 },
-    { user: process.env.EMAIL_USER3, pass: process.env.EMAIL_PASS3 },
-    { user: process.env.EMAIL_USER4, pass: process.env.EMAIL_PASS4 },
-    { user: process.env.EMAIL_USER5, pass: process.env.EMAIL_PASS5 },
-    { user: process.env.EMAIL_USER6, pass: process.env.EMAIL_PASS6 },
-    { user: process.env.EMAIL_USER7, pass: process.env.EMAIL_PASS7 },
-    { user: process.env.EMAIL_USER8, pass: process.env.EMAIL_PASS8 },
-    { user: process.env.EMAIL_USER9, pass: process.env.EMAIL_PASS9 },
-    { user: process.env.EMAIL_USER10, pass: process.env.EMAIL_PASS10 },
-
-  ].filter((account) => account.user && account.pass);
-
-const normalizeSenderEmail = (senderEmail) =>
-  String(senderEmail || "")
-    .trim()
-    .toLowerCase();
-
-const getSenderAccountForEmail = (senderEmail) => {
-  const normalizedSenderEmail = normalizeSenderEmail(senderEmail);
-
-  return getConfiguredSenderAccounts().find(
-    (account) => normalizeSenderEmail(account.user) === normalizedSenderEmail,
-  );
-};
-
-const formatAuditActorRole = (role) => {
-  const safeRole = String(role || "registrar").trim();
-  if (!safeRole) return "Registrar";
-
-  return safeRole
-    .split(/[\s_-]+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ");
-};
+  formatAuditActorRole,
+  getSenderAccountForEmail,
+  createScheduleLabelHelpers,
+} = require("../socket/socketHelpers");
 
 module.exports = function registerSocketHandlers({
   app,
-  io,
   db,
   db3,
   transporter,
@@ -63,137 +24,7 @@ module.exports = function registerSocketHandlers({
   baseDir,
 }) {
   const __dirname = baseDir;
-
-  const getEntranceExamScheduleLabel = async (scheduleId) => {
-    if (!scheduleId) return "No schedule";
-
-    const [rows] = await db.query(
-      `SELECT schedule_id, day_description, building_description, room_description, start_time, end_time
-       FROM entrance_exam_schedule
-       WHERE schedule_id = ?
-       LIMIT 1`,
-      [scheduleId],
-    );
-
-    const schedule = rows?.[0];
-    if (!schedule) return `Schedule ${scheduleId}`;
-
-    return `Schedule ${schedule.schedule_id} (${schedule.day_description}, ${schedule.building_description || "N/A"} ${schedule.room_description || ""}, ${schedule.start_time || ""}-${schedule.end_time || ""})`;
-  };
-
-  const getInterviewScheduleLabel = async (scheduleId) => {
-    if (!scheduleId) return "No schedule";
-
-    const [rows] = await db.query(
-      `SELECT schedule_id, day_description, building_description, room_description, start_time, end_time
-       FROM interview_exam_schedule
-       WHERE schedule_id = ?
-       LIMIT 1`,
-      [scheduleId],
-    );
-
-    const schedule = rows?.[0];
-    if (!schedule) return `Schedule ${scheduleId}`;
-
-    return `Schedule ${schedule.schedule_id} (${schedule.day_description}, ${schedule.building_description || "N/A"} ${schedule.room_description || ""}, ${schedule.start_time || ""}-${schedule.end_time || ""})`;
-  };
-
-  const getVerifyScheduleLabel = async (scheduleId) => {
-    if (!scheduleId) return "No schedule";
-
-    const [rows] = await db.query(
-      `
-      SELECT schedule_id, schedule_date, building_description, room_description, start_time, end_time
-      FROM verify_document_schedule
-      WHERE schedule_id = ?
-      LIMIT 1
-      `,
-      [scheduleId],
-    );
-
-    const schedule = rows?.[0];
-    if (!schedule) return `Schedule ${scheduleId}`;
-
-    return `Schedule ${schedule.schedule_id} (${schedule.schedule_date}, ${schedule.building_description || "N/A"} ${schedule.room_description || ""}, ${schedule.start_time || ""}-${schedule.end_time || ""})`;
-  };
-
-  const applicantOnlineDocsDir = path.join(
-    __dirname,
-    "uploads",
-    "ApplicantOnlineDocuments",
-  );
-  const studentOnlineDocsDir = path.join(
-    __dirname,
-    "uploads",
-    "StudentOnlineDocuments",
-  );
-
-  const buildStudentRequirementFilename = (
-    applicantNumber,
-    studentNumber,
-    filePath,
-    shortLabelFallback = "Unknown",
-  ) => {
-    const sourceFilename = path.basename(String(filePath || ""));
-    if (!sourceFilename) return "";
-
-    const applicantPrefix = applicantNumber
-      ? `${String(applicantNumber).trim()}_`
-      : "";
-    if (applicantPrefix && sourceFilename.startsWith(applicantPrefix)) {
-      return `${studentNumber}_${sourceFilename.slice(applicantPrefix.length)}`;
-    }
-
-    const ext = path.extname(sourceFilename);
-    const yearMatch = sourceFilename.match(/_(\d{4})[^/\\]*$/);
-    const year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
-
-    return `${studentNumber}_${shortLabelFallback}_${year}${ext}`;
-  };
-
-  const copyRequirementFileForEnrollment = async ({
-    sourceFilename,
-    targetFilename,
-    applicantNumber,
-    studentNumber,
-    shortLabelFallback = "Unknown",
-  }) => {
-    if (!sourceFilename) {
-      return { copied: false, filePath: "" };
-    }
-
-    const normalizedSource = path.basename(String(sourceFilename));
-    const normalizedTarget =
-      targetFilename ||
-      buildStudentRequirementFilename(
-        applicantNumber,
-        studentNumber,
-        normalizedSource,
-        shortLabelFallback,
-      );
-
-    if (!normalizedTarget) {
-      return { copied: false, filePath: normalizedSource };
-    }
-
-    if (!fs.existsSync(studentOnlineDocsDir)) {
-      fs.mkdirSync(studentOnlineDocsDir, { recursive: true });
-    }
-
-    const sourcePath = path.join(applicantOnlineDocsDir, normalizedSource);
-    const targetPath = path.join(studentOnlineDocsDir, normalizedTarget);
-
-    if (!fs.existsSync(sourcePath)) {
-      console.warn(
-        `[assign-student-number] requirement file not found: ${sourcePath}`,
-      );
-      return { copied: false, filePath: normalizedTarget };
-    }
-
-    fs.copyFileSync(sourcePath, targetPath);
-    return { copied: true, filePath: normalizedTarget };
-  };
-
+  const { getEntranceExamScheduleLabel } = createScheduleLabelHelpers(db);
 
   app.get("/api/applicant-schedule/:applicantNumber", async (req, res) => {
     try {
@@ -234,1107 +65,258 @@ module.exports = function registerSocketHandlers({
 
 
 
-  io.on("connection", (socket) => {
+  app.get("/api/exam/:personId", async (req, res) => {
+    try {
+      const { personId } = req.params;
 
-    // ---------------------- Forgot Password: Applicant ----------------------
-    socket.on("forgot-password-applicant", async (data) => {
-      const { applicant_number, email, birthdate } = data;
+      const [rows] = await db.query(
+        `SELECT
+      er.id AS exam_result_id,
+      er.person_id,
+      s.id AS subject_id,
+      s.name AS subject,
+      erd.score,
+      s.max_score,
+      er.total_score,
+      er.percentage,
+      er.final_rating,
+      er.status,
+      DATE_FORMAT(er.date_created, '%Y-%m-%d') AS date_created
 
-      const insertForgotPasswordAuditLog = async ({ outcome }) => {
-        await insertAuditLogEnrollment({
-          actorId: applicant_number || email || "unknown",
-          role: "applicant",
-          action: "FORGOT_PASSWORD",
-          outcome,
-          severity: outcome === "SUCCESS" ? "INFO" : "WARN",
-          message:
-            outcome === "SUCCESS"
-              ? "The applicant successfully reset their password through forgot password"
-              : "The applicant failed to reset their password through forgot password",
-        });
-      };
+    FROM exam_results er
+    JOIN exam_result_details erd ON er.id = erd.exam_result_id
+    JOIN subjects s ON erd.subject_id = s.id
 
-      try {
-        // =========================
-        // GET SCHOOL SHORT TERM
-        // =========================
-        const [company] = await db.query(
-          "SELECT short_term FROM company_settings WHERE id = 1",
-        );
+    WHERE er.person_id = ?
+    ORDER BY er.id, s.id`,
+        [personId],
+      );
 
-        const shortTerm = company?.[0]?.short_term || "Institution";
+      res.json(rows);
+    } catch (err) {
+      console.error("GET exam error:", err);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
 
-        // =========================
-        // VALIDATE APPLICANT
-        // =========================
-        const [rows] = await db.query(
-          `SELECT ua.email, p.birthOfDate
-       FROM user_accounts ua
-       JOIN person_table p ON ua.person_id = p.person_id
-       JOIN applicant_numbering_table a ON p.person_id = a.person_id
-       WHERE ua.email = ?
-         AND a.applicant_number = ?
-         AND p.birthOfDate = ?`,
-          [email, applicant_number, birthdate],
-        );
+  // Get person by applicant_number
+  // Get person by applicant_number
+  app.get("/api/person-by-applicant/:applicant_number", async (req, res) => {
+    const { applicant_number } = req.params;
 
-        // Applicant not found
-        if (rows.length === 0) {
-          await insertForgotPasswordAuditLog({ outcome: "FAILED" });
+    try {
+      const [rows] = await db.execute(
+        `SELECT p.*, a.applicant_number, er.final_rating
+     FROM person_table p
+     JOIN applicant_numbering_table a
+       ON p.person_id = a.person_id
+     LEFT JOIN exam_results er ON p.person_id = er.person_id
+     WHERE a.applicant_number = ? `,
+        [applicant_number],
+      );
 
-          return socket.emit("password-reset-result-applicant", {
-            success: false,
-            message: `${shortTerm} applicant account not found. Check your credentials.`,
-          });
-        }
-
-        // =========================
-        // GENERATE TEMP PASSWORD
-        // =========================
-        const generateTempPassword = () => {
-          const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-          return Array.from({ length: 8 }, () =>
-            chars.charAt(Math.floor(Math.random() * chars.length)),
-          ).join("");
-        };
-
-        const tempPassword = generateTempPassword();
-
-        // =========================
-        // HASH PASSWORD
-        // =========================
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-        // =========================
-        // UPDATE PASSWORD
-        // =========================
-        await db.query(
-          "UPDATE user_accounts SET password = ? WHERE email = ?",
-          [hashedPassword, email],
-        );
-
-        // =========================
-        // CREATE EMAIL TRANSPORTER
-        // =========================
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-          },
-        });
-
-        // =========================
-        // SEND EMAIL
-        // =========================
-        const info = await transporter.sendMail({
-          from: `"${shortTerm} - Information System" <${process.env.EMAIL_USER}>`,
-          to: email,
-          subject: `${shortTerm} Applicant Password Reset`,
-          text: `
-Hello Applicant,
-
-Your ${shortTerm} applicant account password has been successfully reset.
-
-Your new temporary password is:
-
-${tempPassword}
-
-Please log in immediately and change your password for security purposes.
-
-Thank you,
-${shortTerm} Information System
-      `,
-        });
-        // =========================
-        // AUDIT LOG
-        // =========================
-        await insertForgotPasswordAuditLog({ outcome: "SUCCESS" });
-
-        // =========================
-        // SUCCESS RESPONSE
-        // =========================
-        socket.emit("password-reset-result-applicant", {
-          success: true,
-          message: `Password has been reset successfully. The user has been notified via email.`,
-        });
-      } catch (error) {
-        console.error("Forgot Password Applicant Error:", error);
-
-        await insertForgotPasswordAuditLog({ outcome: "FAILED" });
-
-        socket.emit("password-reset-result-applicant", {
-          success: false,
-          message: "Server error while resetting password.",
-        });
-      }
-    });
-    // ---------------- Registrar: Reset Password ----------------
-    // FORGOT PASSWORD (handles student, registrar, faculty)
-
-    app.get("/api/exam/:personId", async (req, res) => {
-      try {
-        const { personId } = req.params;
-
-        const [rows] = await db.query(
-          `SELECT
-        er.id AS exam_result_id,
-        er.person_id,
-        s.id AS subject_id,
-        s.name AS subject,
-        erd.score,
-        s.max_score,
-        er.total_score,
-        er.percentage,
-        er.final_rating,
-        er.status,
-        DATE_FORMAT(er.date_created, '%Y-%m-%d') AS date_created
-
-      FROM exam_results er
-      JOIN exam_result_details erd ON er.id = erd.exam_result_id
-      JOIN subjects s ON erd.subject_id = s.id
-
-      WHERE er.person_id = ?
-      ORDER BY er.id, s.id`,
-          [personId],
-        );
-
-        res.json(rows);
-      } catch (err) {
-        console.error("GET exam error:", err);
-        res.status(500).json({ error: "Database error" });
-      }
-    });
-
-    // Get person by applicant_number
-    // Get person by applicant_number
-    app.get("/api/person-by-applicant/:applicant_number", async (req, res) => {
-      const { applicant_number } = req.params;
-
-      try {
-        const [rows] = await db.execute(
-          `SELECT p.*, a.applicant_number, er.final_rating
-       FROM person_table p
-       JOIN applicant_numbering_table a
-         ON p.person_id = a.person_id
-       LEFT JOIN exam_results er ON p.person_id = er.person_id
-       WHERE a.applicant_number = ? `,
-          [applicant_number],
-        );
-
-        if (rows.length === 0) {
-          return res.status(404).json({ error: "Applicant not found" });
-        }
-
-        res.json(rows[0]);
-      } catch (err) {
-        console.error("Error fetching person by applicant_number:", err);
-        res.status(500).json({ error: "Server error" });
-      }
-    });
-
-
-
-
-
-
-    // Get applicants assigned to a proctor
-
-    // Get applicants assigned to a proctor
-    app.get("/api/proctor-applicants/:proctor_name", async (req, res) => {
-      const { proctor_name } = req.params;
-      try {
-        const [rows] = await db.query(
-          `
-      SELECT
-        ea.applicant_id,
-        an.applicant_number,
-        pt.first_name,
-        pt.middle_name,
-        pt.last_name,
-        pt.program,
-        ees.day_description,
-        ees.room_description,
-        ees.building_description,
-        ees.start_time,
-        ees.end_time,
-        ees.proctor
-      FROM exam_applicants ea
-      JOIN applicant_numbering_table an ON ea.applicant_id = an.applicant_number
-      JOIN person_table pt ON an.person_id = pt.person_id
-      JOIN entrance_exam_schedule ees ON ea.schedule_id = ees.schedule_id
-      WHERE ees.proctor = ?
-        AND COALESCE(ea.email_sent, 0) = 1
-    `,
-          [proctor_name],
-        );
-        res.json(rows);
-      } catch (err) {
-        console.error(" Error fetching proctor applicants:", err);
-        res
-          .status(500)
-          .json({ error: "Failed to fetch applicants for proctor" });
-      }
-    });
-
-    // Search proctor by name and return their assigned applicants
-    app.get("/api/proctor-applicants", async (req, res) => {
-      const { query } = req.query;
-
-      if (!query) {
-        return res.status(400).json({ message: "Query is required" });
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Applicant not found" });
       }
 
-      try {
-        // Find schedules where this proctor is assigned
-        const [schedules] = await db.query(
-          `SELECT schedule_id, day_description, room_description, building_description, start_time, end_time, proctor
+      res.json(rows[0]);
+    } catch (err) {
+      console.error("Error fetching person by applicant_number:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+
+
+
+
+
+  // Get applicants assigned to a proctor
+
+  // Get applicants assigned to a proctor
+  app.get("/api/proctor-applicants/:proctor_name", async (req, res) => {
+    const { proctor_name } = req.params;
+    try {
+      const [rows] = await db.query(
+        `
+    SELECT
+      ea.applicant_id,
+      an.applicant_number,
+      pt.first_name,
+      pt.middle_name,
+      pt.last_name,
+      pt.program,
+      ees.day_description,
+      ees.room_description,
+      ees.building_description,
+      ees.start_time,
+      ees.end_time,
+      ees.proctor
+    FROM exam_applicants ea
+    JOIN applicant_numbering_table an ON ea.applicant_id = an.applicant_number
+    JOIN person_table pt ON an.person_id = pt.person_id
+    JOIN entrance_exam_schedule ees ON ea.schedule_id = ees.schedule_id
+    WHERE ees.proctor = ?
+      AND COALESCE(ea.email_sent, 0) = 1
+  `,
+        [proctor_name],
+      );
+      res.json(rows);
+    } catch (err) {
+      console.error(" Error fetching proctor applicants:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch applicants for proctor" });
+    }
+  });
+
+  // Search proctor by name and return their assigned applicants
+  app.get("/api/proctor-applicants", async (req, res) => {
+    const { query } = req.query;
+
+    if (!query) {
+      return res.status(400).json({ message: "Query is required" });
+    }
+
+    try {
+      // Find schedules where this proctor is assigned
+      const [schedules] = await db.query(
+        `SELECT schedule_id, day_description, room_description, building_description, start_time, end_time, proctor
 FROM entrance_exam_schedule
 WHERE proctor LIKE ?
 `,
-          [`%${query}%`],
-        );
-
-        if (schedules.length === 0) {
-          return res
-            .status(404)
-            .json({ message: "Proctor not found in schedules" });
-        }
-
-        // For each schedule, get assigned applicants with email_sent
-        const results = [];
-        for (const sched of schedules) {
-          const [applicants] = await db.query(
-            `SELECT ea.applicant_id, ea.email_sent,
-                an.applicant_number,
-                p.last_name, p.first_name, p.middle_name, p.program
-         FROM exam_applicants ea
-         JOIN applicant_numbering_table an ON ea.applicant_id = an.applicant_number
-         JOIN person_table p ON an.person_id = p.person_id
-         WHERE ea.schedule_id = ?
-           AND COALESCE(ea.email_sent, 0) = 1`,
-            [sched.schedule_id],
-          );
-
-          results.push({
-            schedule: sched,
-            applicants,
-          });
-        }
-
-        res.json(results);
-      } catch (err) {
-        console.error(" Error fetching proctor applicants:", err);
-        res
-          .status(500)
-          .json({ error: "Failed to fetch applicants for proctor" });
-      }
-    });
-
-    // ==================== INTERVIEW ROUTES ====================
-    // ==============================
-    // INTERVIEW ROUTES
-    // ==============================
-
-    // 1. Get interview by applicant_number
-    app.get("/api/interview/:applicant_number", async (req, res) => {
-      const { applicant_number } = req.params;
-
-      try {
-        const [rows] = await db.query(
-          `
-      SELECT
-        a.applicant_number,
-        a.person_id,
-        ps.qualifying_result      AS qualifying_exam_score,
-        ps.interview_result       AS qualifying_interview_score,
-        ps.exam_result            AS total_ave
-      FROM applicant_numbering_table a
-      LEFT JOIN person_status_table ps ON ps.person_id = a.person_id
-      WHERE a.applicant_number = ?
-      `,
-          [applicant_number],
-        );
-
-        if (!rows.length) return res.json(null);
-
-        const row = rows[0];
-        res.json({
-          applicant_number: row.applicant_number,
-          person_id: row.person_id,
-          qualifying_exam_score: row.qualifying_exam_score ?? 0,
-          qualifying_interview_score: row.qualifying_interview_score ?? 0,
-          total_ave: row.total_ave ?? 0,
-        });
-      } catch (err) {
-        console.error(" Error fetching interview:", err);
-        res.status(500).json({ message: "Server error" });
-      }
-    });
-
-    // 2) PUT update (must exist)
-    //   Update single Qualifying/Interview scores
-
-    // ---------------------------------------------------------
-    // 2) SAVE or UPDATE (UPSERT) using person_status_table
-    //    Payload: { applicant_number, qualifying_exam_score, qualifying_interview_score }
-    //    Mapping -> qualifying_result, interview_result, exam_result
-    // ---------------------------------------------------------
-    app.post("/api/interview", async (req, res) => {
-      try {
-        const {
-          applicant_number,
-          qualifying_exam_score,
-          qualifying_interview_score,
-        } = req.body;
-        // 1  Find person_id of applicant
-        const [rows] = await db.query(
-          "SELECT person_id FROM applicant_numbering_table WHERE applicant_number = ?",
-          [applicant_number],
-        );
-        if (rows.length === 0) {
-          return res.status(400).json({ error: "Applicant number not found" });
-        }
-        const person_id = rows[0].person_id;
-
-        // 2  Compute new scores
-        const qExam = Number(qualifying_exam_score) || 0;
-        const qInterview = Number(qualifying_interview_score) || 0;
-        const totalAve = (qExam + qInterview) / 2;
-
-        // 3  Insert or update (Upsert)
-        await db.query(
-          `INSERT INTO person_status_table (person_id, qualifying_result, interview_result, exam_result)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         qualifying_result = VALUES(qualifying_result),
-         interview_result = VALUES(interview_result),
-         exam_result = VALUES(exam_result)`,
-          [person_id, qExam, qInterview, totalAve],
-        );
-
-        // 4  Return success
-        res.json({
-          success: true,
-          message: "Interview and exam scores saved successfully!",
-        });
-      } catch (err) {
-        console.error(" Error saving interview/exam scores:", err);
-        res.status(500).json({ error: "Failed to save interview/exam scores" });
-      }
-    });
-
-    // ---------------------- Assign Student Number ----------------------
-
-
-    const generateStudentNumber = async (person_data) => {
-      const [[yearRow]] = await db3.query(
-        `SELECT yt.year_description AS yr
-     FROM active_school_year_table asy
-     JOIN year_table yt ON asy.year_id = yt.year_id
-     WHERE asy.astatus = 1
-     LIMIT 1`,
-      );
-      const yy = String(yearRow?.yr || new Date().getFullYear()).slice(-2);
-
-      const [[deptRow]] = await db3.query(
-        `SELECT dt.dept_number, dt.components AS dept_components
- FROM dprtmnt_curriculum_table dct
- JOIN dprtmnt_table dt ON dct.dprtmnt_id = dt.dprtmnt_id
- WHERE dct.curriculum_id = ?
- LIMIT 1`,
-        [person_data.program],
+        [`%${query}%`],
       );
 
-      if (!deptRow?.dept_number) {
-        throw new Error(
-          `No dept_number configured for curriculum_id=${person_data.program}. ` +
-          `Open the Student Number Configuration panel and assign a number to the relevant department.`,
-        );
-      }
-      const deptNum = deptRow.dept_number;
-
-      // ── Branch is derived from dprtmnt_table.components, NOT person_data.campus ──
-      // components: 1 = Manila, 2 = Cavite. The department is authoritative here:
-      // e.g. dept 12 "Earist (Cavite Branch)" and dept 13 "Graduate School ... (Cavite Branch)"
-      // are Cavite regardless of what campus the applicant happened to select on the form.
-      const deptComponents = deptRow.dept_components;
-
-      const [[companyRow]] = await db.query(
-        'SELECT branches FROM company_settings WHERE id = 1',
-      );
-      const branchList = JSON.parse(companyRow?.branches || '[]');
-
-      const targetBranchName = Number(deptComponents) === 2 ? 'Cavite' : 'Manila';
-      const branch = branchList.find(
-        (b) => String(b.branch || '').trim().toLowerCase() === targetBranchName.toLowerCase(),
-      );
-
-      if (!branch?.letter_code) {
-        throw new Error(
-          `No letter_code configured for branch "${targetBranchName}" (derived from department components=${deptComponents}, dept_number=${deptNum}). ` +
-          `Open the Student Number Configuration panel → Branch letters.`,
-        );
-      }
-      const letter = branch.letter_code.toUpperCase();
-
-
-      // ── Fixed atomic sequence ────────────────────────────────────────────────
-      // Use a SELECT after upsert to always get the correct next_seq value,
-      // avoiding the LAST_INSERT_ID() confusion between INSERT and UPDATE paths.
-      const conn = await db3.getConnection();
-      let seq;
-      try {
-        await conn.query(
-          `INSERT INTO student_number_sequence (school_year, dept_number, next_seq)
-       VALUES (?, ?, 1)
-       ON DUPLICATE KEY UPDATE next_seq = next_seq + 1`,
-          [yy, deptNum],
-        );
-
-        const [[seqRow]] = await conn.query(
-          `SELECT next_seq FROM student_number_sequence
-       WHERE school_year = ? AND dept_number = ?`,
-          [yy, deptNum],
-        );
-
-        seq = String(seqRow.next_seq).padStart(5, '0');
-      } finally {
-        conn.release();
+      if (schedules.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "Proctor not found in schedules" });
       }
 
-      return `${yy}${deptNum}-${seq}${letter}`;
-    };
-
-
-
-    socket.on("assign-student-number", async (payload) => {
-      const conn = await db3.getConnection();
-      const copiedRequirementFilesForRollback = [];
-      let copiedProfileFileForRollback = "";
-      let enrollmentCommitted = false;
-      let connectionReleased = false;
-      try {
-        const person_id =
-          typeof payload === "object" && payload !== null
-            ? payload.person_id
-            : payload;
-        const auditActorId =
-          typeof payload === "object" && payload !== null
-            ? payload.audit_actor_id || "unknown"
-            : "unknown";
-        const auditActorRole =
-          typeof payload === "object" && payload !== null
-            ? payload.audit_actor_role || "registrar"
-            : "registrar";
-
-        // ── Fetch person from ADMISSION db ──────────────────────────────────────
-        const [rows] = await db.query(
-          `SELECT * FROM person_table AS pt WHERE person_id = ?`,
-          [person_id],
+      // For each schedule, get assigned applicants with email_sent
+      const results = [];
+      for (const sched of schedules) {
+        const [applicants] = await db.query(
+          `SELECT ea.applicant_id, ea.email_sent,
+              an.applicant_number,
+              p.last_name, p.first_name, p.middle_name, p.program
+       FROM exam_applicants ea
+       JOIN applicant_numbering_table an ON ea.applicant_id = an.applicant_number
+       JOIN person_table p ON an.person_id = p.person_id
+       WHERE ea.schedule_id = ?
+         AND COALESCE(ea.email_sent, 0) = 1`,
+          [sched.schedule_id],
         );
 
-        if (rows.length === 0) {
-          conn.release();
-          return socket.emit("assign-student-number-result", {
-            success: false,
-            message: "Person not found.",
-          });
-        }
-
-        const person_data = rows[0];
-        const { emailAddress, first_name, middle_name, last_name } = person_data;
-
-        const [[requirementCountRow]] = await db.query(
-          `SELECT COUNT(*) AS requirement_count FROM requirement_uploads WHERE person_id = ?`,
-          [person_id],
-        );
-        if (Number(requirementCountRow?.requirement_count || 0) === 0) {
-          conn.release();
-          return socket.emit("assign-student-number-result", {
-            success: false,
-            message: "Cannot assign student number because no applicant requirements were found to copy.",
-          });
-        }
-
-        // ── Generate student number ──────────────────────────────────────────────
-        let student_number;
-        try {
-          student_number = await generateStudentNumber(person_data);
-        } catch (genErr) {
-          console.error("[assign-student-number] generateStudentNumber failed:", genErr.message);
-          conn.release();
-          return socket.emit("assign-student-number-result", {
-            success: false,
-            message: genErr.message,
-          });
-        }
-
-        const tempPassword = Math.random().toString(36).slice(-8).toUpperCase();
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
-        let studentProfileImg = person_data.profile_img;
-
-        // ── Copy applicant 1×1 photo to Student1by1 folder ──────────────────────
-        if (person_data.profile_img) {
-          try {
-            const applicantDir = path.join(__dirname, "uploads", "Applicant1by1");
-            const studentDir = path.join(__dirname, "uploads", "Student1by1");
-            const uploadRootDir = path.join(__dirname, "uploads");
-
-            if (!fs.existsSync(studentDir)) fs.mkdirSync(studentDir, { recursive: true });
-
-            const applicantPath = path.join(applicantDir, person_data.profile_img);
-            const uploadRootPath = path.join(uploadRootDir, person_data.profile_img);
-            const sourcePath = fs.existsSync(applicantPath)
-              ? applicantPath
-              : fs.existsSync(uploadRootPath)
-                ? uploadRootPath
-                : null;
-
-            if (sourcePath) {
-              const ext = path.extname(person_data.profile_img) || ".jpg";
-              studentProfileImg = `${student_number}_profile_image${ext}`;
-              fs.copyFileSync(sourcePath, path.join(studentDir, studentProfileImg));
-              copiedProfileFileForRollback = studentProfileImg;
-            } else {
-              console.warn(`[assign-student-number] profile image not found for person_id=${person_id}`);
-            }
-          } catch (imgErr) {
-            console.error(`[assign-student-number] failed to copy profile image for person_id=${person_id}`, imgErr);
-          }
-        }
-
-        // ── Get uploaded requirements from ADMISSION db ──────────────────────────
-        const [requirements] = await db.query(
-          `SELECT * FROM requirement_uploads WHERE person_id = ?`,
-          [person_id],
-        );
-
-        if (!requirements.length) {
-          throw new Error(
-            "Cannot assign student number because no applicant requirements were found to copy.",
-          );
-        }
-
-        const [[applicantNumberRow]] = await db.query(
-          `SELECT applicant_number FROM applicant_numbering_table WHERE person_id = ? LIMIT 1`,
-          [person_id],
-        );
-        const applicantNumber = applicantNumberRow?.applicant_number || null;
-
-        const requirementShortLabels = new Map();
-        if (requirements.length) {
-          const requirementIds = [
-            ...new Set(
-              requirements
-                .map((req) => req.requirements_id)
-                .filter((id) => id !== null && id !== undefined),
-            ),
-          ];
-          if (requirementIds.length) {
-            const [requirementRows] = await db.query(
-              `SELECT id, short_label FROM requirements_table WHERE id IN (?)`,
-              [requirementIds],
-            );
-            for (const row of requirementRows) {
-              requirementShortLabels.set(row.id, row.short_label || "Unknown");
-            }
-          }
-        }
-
-        // ── BEGIN TRANSACTION in ENROLLMENT db ───────────────────────────────────
-        await conn.beginTransaction();
-
-        // ── Build values array matching the 148 columns (skipping person_id) ────
-        // Column order matches your schema exactly: col 2 → col 149
-        const personValues = [
-          student_number,                        // 2   student_number
-          studentProfileImg,                     // 3   profile_img
-          person_data.campus,                    // 4   campus
-          person_data.academicProgram,           // 5   academicProgram
-          person_data.classifiedAs,              // 6   classifiedAs
-          person_data.applyingAs,                // 7   applyingAs
-          person_data.program,                   // 8   program
-          person_data.program2,                  // 9   program2
-          person_data.program3,                  // 10  program3
-          person_data.yearLevel,                 // 11  yearLevel
-          person_data.last_name,                 // 12  last_name
-          person_data.first_name,                // 13  first_name
-          person_data.middle_name,               // 14  middle_name
-          person_data.extension,                 // 15  extension
-          person_data.nickname,                  // 16  nickname
-          person_data.height,                    // 17  height
-          person_data.weight,                    // 18  weight
-          person_data.lrnNumber,                 // 19  lrnNumber
-          person_data.nolrnNumber,               // 20  nolrnNumber
-          person_data.gender,                    // 21  gender
-          person_data.pwdMember,                 // 22  pwdMember
-          person_data.pwdType,                   // 23  pwdType
-          person_data.pwdId,                     // 24  pwdId
-          person_data.birthOfDate,               // 25  birthOfDate
-          person_data.age,                       // 26  age
-          person_data.birthPlace,                // 27  birthPlace
-          person_data.languageDialectSpoken,     // 28  languageDialectSpoken
-          person_data.citizenship,               // 29  citizenship
-          person_data.religion,                  // 30  religion
-          person_data.civilStatus,               // 31  civilStatus
-          person_data.tribeEthnicGroup,          // 32  tribeEthnicGroup
-          person_data.cellphoneNumber,           // 33  cellphoneNumber
-          person_data.emailAddress,              // 34  emailAddress
-          person_data.presentStreet,             // 35  presentStreet
-          person_data.presentBarangay,           // 36  presentBarangay
-          person_data.presentZipCode,            // 37  presentZipCode
-          person_data.presentRegion,             // 38  presentRegion
-          person_data.presentProvince,           // 39  presentProvince
-          person_data.presentMunicipality,       // 40  presentMunicipality
-          person_data.presentDswdHouseholdNumber,// 41  presentDswdHouseholdNumber
-          person_data.sameAsPresentAddress,      // 42  sameAsPresentAddress
-          person_data.permanentStreet,           // 43  permanentStreet
-          person_data.permanentBarangay,         // 44  permanentBarangay
-          person_data.permanentZipCode,          // 45  permanentZipCode
-          person_data.permanentRegion,           // 46  permanentRegion
-          person_data.permanentProvince,         // 47  permanentProvince
-          person_data.permanentMunicipality,     // 48  permanentMunicipality
-          person_data.permanentDswdHouseholdNumber, // 49 permanentDswdHouseholdNumber
-          person_data.solo_parent,               // 50  solo_parent
-          person_data.father_deceased,           // 51  father_deceased
-          person_data.father_family_name,        // 52  father_family_name
-          person_data.father_given_name,         // 53  father_given_name
-          person_data.father_middle_name,        // 54  father_middle_name
-          person_data.father_ext,                // 55  father_ext
-          person_data.father_nickname,           // 56  father_nickname
-          person_data.father_education,          // 57  father_education
-          person_data.father_education_level,    // 58  father_education_level
-          person_data.father_last_school,        // 59  father_last_school
-          person_data.father_course,             // 60  father_course
-          person_data.father_year_graduated,     // 61  father_year_graduated
-          person_data.father_school_address,     // 62  father_school_address
-          person_data.father_contact,            // 63  father_contact
-          person_data.father_occupation,         // 64  father_occupation
-          person_data.father_employer,           // 65  father_employer
-          person_data.father_income,             // 66  father_income
-          person_data.father_email,              // 67  father_email
-          person_data.mother_deceased,           // 68  mother_deceased
-          person_data.mother_family_name,        // 69  mother_family_name
-          person_data.mother_given_name,         // 70  mother_given_name
-          person_data.mother_middle_name,        // 71  mother_middle_name
-          person_data.mother_ext,                // 72  mother_ext
-          person_data.mother_nickname,           // 73  mother_nickname
-          person_data.mother_education,          // 74  mother_education
-          person_data.mother_education_level,    // 75  mother_education_level
-          person_data.mother_last_school,        // 76  mother_last_school
-          person_data.mother_course,             // 77  mother_course
-          person_data.mother_year_graduated,     // 78  mother_year_graduated
-          person_data.mother_school_address,     // 79  mother_school_address
-          person_data.mother_contact,            // 80  mother_contact
-          person_data.mother_occupation,         // 81  mother_occupation
-          person_data.mother_employer,           // 82  mother_employer
-          person_data.mother_income,             // 83  mother_income
-          person_data.mother_email,              // 84  mother_email
-          person_data.guardian,                  // 85  guardian
-          person_data.guardian_family_name,      // 86  guardian_family_name
-          person_data.guardian_given_name,       // 87  guardian_given_name
-          person_data.guardian_middle_name,      // 88  guardian_middle_name
-          person_data.guardian_ext,              // 89  guardian_ext
-          person_data.guardian_nickname,         // 90  guardian_nickname
-          person_data.guardian_address,          // 91  guardian_address
-          person_data.guardian_contact,          // 92  guardian_contact
-          person_data.guardian_email,            // 93  guardian_email
-          person_data.spouse,                    // 94  spouse
-          person_data.facebook_account,          // 95  facebook_account
-          person_data.has_no_siblings,           // 96  has_no_siblings
-          person_data.siblings,                  // 97  siblings
-          person_data.annual_income,             // 98  annual_income
-          person_data.schoolLevel,               // 99  schoolLevel
-          person_data.schoolLastAttended,        // 100 schoolLastAttended
-          person_data.schoolAddress,             // 101 schoolAddress
-          person_data.courseProgram,             // 102 courseProgram
-          person_data.honor,                     // 103 honor
-          person_data.generalAverage,            // 104 generalAverage
-          person_data.yearGraduated,             // 105 yearGraduated
-          person_data.schoolLevel1,              // 106 schoolLevel1
-          person_data.schoolLastAttended1,       // 107 schoolLastAttended1
-          person_data.schoolAddress1,            // 108 schoolAddress1
-          person_data.courseProgram1,            // 109 courseProgram1
-          person_data.honor1,                    // 110 honor1
-          person_data.generalAverage1,           // 111 generalAverage1
-          person_data.yearGraduated1,            // 112 yearGraduated1
-          person_data.strand,                    // 113 strand
-          person_data.cough,                     // 114 cough
-          person_data.colds,                     // 115 colds
-          person_data.fever,                     // 116 fever
-          person_data.asthma,                    // 117 asthma
-          person_data.faintingSpells,            // 118 faintingSpells
-          person_data.heartDisease,              // 119 heartDisease
-          person_data.tuberculosis,              // 120 tuberculosis
-          person_data.frequentHeadaches,         // 121 frequentHeadaches
-          person_data.hernia,                    // 122 hernia
-          person_data.chronicCough,              // 123 chronicCough
-          person_data.headNeckInjury,            // 124 headNeckInjury
-          person_data.hiv,                       // 125 hiv
-          person_data.highBloodPressure,         // 126 highBloodPressure
-          person_data.diabetesMellitus,          // 127 diabetesMellitus
-          person_data.allergies,                 // 128 allergies
-          person_data.cancer,                    // 129 cancer
-          person_data.smokingCigarette,          // 130 smokingCigarette
-          person_data.alcoholDrinking,           // 131 alcoholDrinking
-          person_data.hospitalized,              // 132 hospitalized
-          person_data.hospitalizationDetails,    // 133 hospitalizationDetails
-          person_data.medications,               // 134 medications
-          person_data.hadCovid,                  // 135 hadCovid
-          person_data.covidDate,                 // 136 covidDate
-          person_data.vaccine1Brand,             // 137 vaccine1Brand
-          person_data.vaccine1Date,              // 138 vaccine1Date
-          person_data.vaccine2Brand,             // 139 vaccine2Brand
-          person_data.vaccine2Date,              // 140 vaccine2Date
-          person_data.booster1Brand,             // 141 booster1Brand
-          person_data.booster1Date,              // 142 booster1Date
-          person_data.booster2Brand,             // 143 booster2Brand
-          person_data.booster2Date,              // 144 booster2Date
-          person_data.chestXray,                 // 145 chestXray
-          person_data.cbc,                       // 146 cbc
-          person_data.urinalysis,                // 147 urinalysis
-          person_data.otherworkups,              // 148 otherworkups
-          person_data.symptomsToday,             // 149 symptomsToday
-          person_data.remarks,                   // 150 remarks
-          person_data.termsOfAgreement,          // 151 termsOfAgreement
-          person_data.created_at,                // 152 created_at
-          person_data.current_step,              // 153 current_step
-        ];
-
-        const placeholders = personValues.map(() => "?").join(", ");
-
-        const [personInsertResult] = await conn.query(
-          `INSERT INTO person_table (
-    student_number, profile_img, campus, academicProgram, classifiedAs,
-    applyingAs, program, program2, program3, yearLevel, last_name, first_name,
-    middle_name, extension, nickname, height, weight, lrnNumber, nolrnNumber,
-    gender, pwdMember, pwdType, pwdId, birthOfDate, age, birthPlace,
-    languageDialectSpoken, citizenship, religion, civilStatus, tribeEthnicGroup,
-    cellphoneNumber, emailAddress, presentStreet, presentBarangay, presentZipCode,
-    presentRegion, presentProvince, presentMunicipality, presentDswdHouseholdNumber,
-    sameAsPresentAddress, permanentStreet, permanentBarangay, permanentZipCode,
-    permanentRegion, permanentProvince, permanentMunicipality,
-    permanentDswdHouseholdNumber, solo_parent, father_deceased, father_family_name,
-    father_given_name, father_middle_name, father_ext, father_nickname,
-    father_education, father_education_level, father_last_school, father_course,
-    father_year_graduated, father_school_address, father_contact, father_occupation,
-    father_employer, father_income, father_email, mother_deceased, mother_family_name,
-    mother_given_name, mother_middle_name, mother_ext, mother_nickname,
-    mother_education, mother_education_level, mother_last_school, mother_course,
-    mother_year_graduated, mother_school_address, mother_contact, mother_occupation,
-    mother_employer, mother_income, mother_email, guardian, guardian_family_name,
-    guardian_given_name, guardian_middle_name, guardian_ext, guardian_nickname,
-    guardian_address, guardian_contact, guardian_email, spouse, facebook_account,
-    has_no_siblings, siblings, annual_income, schoolLevel,
-    schoolLastAttended, schoolAddress, courseProgram, honor, generalAverage,
-    yearGraduated, schoolLevel1, schoolLastAttended1, schoolAddress1, courseProgram1,
-    honor1, generalAverage1, yearGraduated1, strand, cough, colds, fever, asthma,
-    faintingSpells, heartDisease, tuberculosis, frequentHeadaches, hernia,
-    chronicCough, headNeckInjury, hiv, highBloodPressure, diabetesMellitus,
-    allergies, cancer, smokingCigarette, alcoholDrinking, hospitalized,
-    hospitalizationDetails, medications, hadCovid, covidDate, vaccine1Brand,
-    vaccine1Date, vaccine2Brand, vaccine2Date, booster1Brand, booster1Date,
-    booster2Brand, booster2Date, chestXray, cbc, urinalysis, otherworkups,
-    symptomsToday, remarks, termsOfAgreement, created_at, current_step
-  ) VALUES (${placeholders})`,
-          personValues,
-        );
-        if (!personInsertResult.insertId) {
-          throw new Error("Cannot assign student number because the enrollment person record was not created.");
-        }
-        // ── Real person_id from MySQL auto-increment ─────────────────────────────
-        const personIdForStudent = personInsertResult.insertId;
-
-        // ── Insert into student_numbering_table ──────────────────────────────────
-        const [studentNumberInsertResult] = await conn.query(
-          `INSERT INTO student_numbering_table (student_number, person_id) VALUES (?, ?)`,
-          [student_number, personIdForStudent],
-        );
-        if ((studentNumberInsertResult.affectedRows || 0) !== 1) {
-          throw new Error("Cannot assign student number because the student numbering record was not created.");
-        }
-
-        // ── Insert into person_status_table ──────────────────────────────────────
-        const [personStatusInsertResult] = await conn.query(
-          `INSERT INTO person_status_table
-        (person_id, exam_status, requirements, residency, student_registration_status, exam_result, hs_ave)
-       VALUES (?, 0, 0, 0, 0, 0, 0)`,
-          [personIdForStudent],
-        );
-        if ((personStatusInsertResult.affectedRows || 0) !== 1) {
-          throw new Error("Cannot assign student number because the enrollment person status was not created.");
-        }
-
-        // ── Insert into student_status_table ─────────────────────────────────────
-        const [studentStatusInsertResult] = await conn.query(
-          `INSERT INTO student_status_table
-        (student_number, active_curriculum, enrolled_status, year_level_id, active_school_year_id, control_status)
-       VALUES (?, ?, 0, 0, 0, 0)`,
-          [student_number, person_data.program],
-        );
-        if ((studentStatusInsertResult.affectedRows || 0) !== 1) {
-          throw new Error("Cannot assign student number because the enrollment student status was not created.");
-        }
-
-        // ── Copy requirements to ENROLLMENT db ───────────────────────────────────
-        let copiedRequirementRows = 0;
-        for (const req of requirements) {
-          const shortLabel = requirementShortLabels.get(req.requirements_id) || "Unknown";
-          const targetFilename = buildStudentRequirementFilename(
-            applicantNumber,
-            student_number,
-            req.file_path,
-            shortLabel,
-          );
-          const {
-            copied: requirementFileCopied,
-            filePath: enrollmentFilePath,
-          } = await copyRequirementFileForEnrollment({
-            sourceFilename: req.file_path,
-            targetFilename,
-            applicantNumber,
-            studentNumber: student_number,
-            shortLabelFallback: shortLabel,
-          });
-          if (req.file_path && !requirementFileCopied) {
-            throw new Error(
-              `Cannot assign student number because requirement file ${req.file_path} could not be copied.`,
-            );
-          }
-          if (requirementFileCopied && enrollmentFilePath) {
-            copiedRequirementFilesForRollback.push(enrollmentFilePath);
-          }
-
-          const [requirementInsertResult] = await conn.query(
-            `INSERT INTO requirement_uploads
-          (requirements_id, person_id, submitted_documents, file_path, original_name,
-           remarks, status, document_status, registrar_status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              req.requirements_id,
-              personIdForStudent,
-              req.submitted_documents,
-              enrollmentFilePath || targetFilename || req.file_path,
-              req.original_name,
-              req.remarks,
-              req.status,
-              req.document_status,
-              req.registrar_status,
-              req.created_at,
-            ],
-          );
-          copiedRequirementRows += requirementInsertResult.affectedRows || 0;
-        }
-
-        if (copiedRequirementRows !== requirements.length) {
-          throw new Error(
-            `Cannot assign student number because only ${copiedRequirementRows} of ${requirements.length} requirements were copied.`,
-          );
-        }
-
-        // ── Mark student registration complete ───────────────────────────────────
-        const [registrationStatusResult] = await conn.query(
-          `UPDATE person_status_table SET student_registration_status = 1 WHERE person_id = ?`,
-          [personIdForStudent],
-        );
-        if ((registrationStatusResult.affectedRows || 0) !== 1) {
-          throw new Error("Cannot assign student number because student registration was not completed.");
-        }
-
-        // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
-        // ── Insert or update login credentials in ENROLLMENT user_accounts ───────
-        const [existingUser] = await conn.query(
-          `SELECT id FROM user_accounts WHERE person_id = ?`,
-          [personIdForStudent],
-        );
-
-        if (existingUser.length === 0) {
-          const [userInsertResult] = await conn.query(
-            `INSERT INTO user_accounts (person_id, email, password, role, status, force_password_change)
- VALUES (?, ?, ?, 'student', 1, 1)`,
-            [personIdForStudent, person_data.emailAddress, hashedPassword],
-          );
-          if ((userInsertResult.affectedRows || 0) !== 1) {
-            throw new Error("Cannot assign student number because the student login account was not created.");
-          }
-        } else {
-          const [userUpdateResult] = await conn.query(
-            `UPDATE user_accounts SET email = ?, password = ?, role = 'student', status = 1, force_password_change = 1
- WHERE person_id = ?`,
-            [person_data.emailAddress, hashedPassword, personIdForStudent],
-          );
-          if ((userUpdateResult.affectedRows || 0) !== 1) {
-            throw new Error("Cannot assign student number because the student login account was not updated.");
-          }
-        }
-
-        // ── Commit transaction ───────────────────────────────────────────────────
-        await conn.commit();
-        enrollmentCommitted = true;
-        conn.release();
-        connectionReleased = true;
-
-        const studentQrDir = path.join(__dirname, "uploads", "StudentQRCodeGenerated");
-        if (!fs.existsSync(studentQrDir)) fs.mkdirSync(studentQrDir, { recursive: true });
-
-        const qrFilename = `${student_number}_qrcode.png`;
-        const studentQrData = `${process.env.DB_HOST_LOCAL}:5173/student_qr_information/${student_number}`;
-        const studentQrPath = path.join(studentQrDir, qrFilename);
-
-        await QRCode.toFile(studentQrPath, studentQrData, {
-          color: { dark: "#000", light: "#FFF" },
-          width: 300,
-        });
-
-        const torQrDir = path.join(__dirname, "uploads", "TORQrCodeGenerated");
-        if (!fs.existsSync(torQrDir)) fs.mkdirSync(torQrDir, { recursive: true });
-
-        const torQrData = `${process.env.DB_HOST_LOCAL}:5173/student_tor_information/${student_number}`;
-        const torQrPath = path.join(torQrDir, qrFilename);
-
-        await QRCode.toFile(torQrPath, torQrData, {
-          color: { dark: "#000", light: "#FFF" },
-          width: 300,
-        });
-
-        // ── Audit log ────────────────────────────────────────────────────────────
-        const roleLabel = formatAuditActorRole(auditActorRole);
-        const studentName = [last_name, first_name, middle_name].filter(Boolean).join(", ");
-
-        await insertAuditLogEnrollment({
-          actorId: auditActorId,
-          role: auditActorRole,
-          action: "STUDENT_NUMBER_ASSIGN",
-          severity: "INFO",
-          message: `${roleLabel} (${auditActorId}) assigned student number ${student_number} to ${studentName || `person_id ${person_id}`}.`,
-        });
-
-        await logStudentHistoryFromActor({
-          actorId: auditActorId,
-          studentNumber: student_number,
-          action: "assign_student_number",
-          details: {
-            student_name: [first_name, middle_name, last_name].filter(Boolean).join(" "),
-            generated_number: student_number,
-          },
-        });
-
-        // ── Send welcome email ───────────────────────────────────────────────────
-        const [[company]] = await db.query(
-          "SELECT company_name, short_term FROM company_settings WHERE id = 1",
-        );
-        const companyName = company?.company_name || "Enrollment Office";
-        const companyShort = company?.short_term || "";
-
-        const mailer = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-          },
-        });
-
-        let emailSent = false;
-        let emailErrorMessage = "";
-
-        try {
-          if (!emailAddress) throw new Error("Student email address is empty.");
-          await mailer.sendMail({
-            from: `"${companyShort} Enrollment Office" <${process.env.EMAIL_USER}>`,
-            to: emailAddress,
-            subject: `Welcome to ${companyName} - Acceptance Confirmation`,
-            text: `
-Hi, ${first_name} ${middle_name || ""} ${last_name},
-
-Congratulations! You are now officially accepted and part of the ${companyName} community.
-
-Please visit your respective college offices to tag your schedule to your account and obtain your class schedule.
-
-Your Student Number is: ${student_number}
-Your Email Address is: ${emailAddress}
-Your temporary password is: ${tempPassword}
-
-You may change your password and keep it secure.
-
-Click the link below to log in:
-    https://ap.earist.edu.ph/login
-
-    
-        `.trim(),
-          });
-          emailSent = true;
-        } catch (emailError) {
-          emailErrorMessage = emailError?.response || emailError?.message || "Failed to send email.";
-          console.error("[assign-student-number] Email send failed:", emailError);
-        }
-
-        // ── Deactivate the applicant account in ADMISSION ────────────────────────
-        await db.query(
-          `UPDATE user_accounts SET status = 0 WHERE person_id = ?`,
-          [person_id],
-        );
-
-        // ── Emit result ──────────────────────────────────────────────────────────
-        socket.emit("assign-student-number-result", {
-          success: true,
-          student_number,
-          email_sent: emailSent,
-          temp_password: tempPassword,
-          student_data: {
-            person_id: personIdForStudent + 1,
-            student_number,
-            first_name,
-            middle_name,
-            last_name,
-            email: emailAddress,
-            profile_img: studentProfileImg,
-            program: person_data.program,
-            campus: person_data.campus,
-          },
-          message: emailSent
-            ? "Student number assigned and email sent successfully."
-            : `Student number assigned, but email was not sent. ${emailErrorMessage}`,
-        });
-
-      } catch (error) {
-        if (!enrollmentCommitted) {
-          try { await conn.rollback(); } catch (_) { }
-          for (const filename of copiedRequirementFilesForRollback) {
-            const cleanupPath = path.join(studentOnlineDocsDir, path.basename(filename));
-            try {
-              if (fs.existsSync(cleanupPath)) fs.unlinkSync(cleanupPath);
-            } catch (cleanupError) {
-              console.error("[assign-student-number] failed to clean copied requirement file:", cleanupError);
-            }
-          }
-          if (copiedProfileFileForRollback) {
-            const cleanupPath = path.join(
-              __dirname,
-              "uploads",
-              "Student1by1",
-              path.basename(copiedProfileFileForRollback),
-            );
-            try {
-              if (fs.existsSync(cleanupPath)) fs.unlinkSync(cleanupPath);
-            } catch (cleanupError) {
-              console.error("[assign-student-number] failed to clean copied profile image:", cleanupError);
-            }
-          }
-        }
-        if (!connectionReleased) conn.release();
-
-        console.error("Error in assign-student-number:", error);
-        socket.emit("assign-student-number-result", {
-          success: false,
-          message: error.message || "Internal server error.",
+        results.push({
+          schedule: sched,
+          applicants,
         });
       }
-    });
 
-
+      res.json(results);
+    } catch (err) {
+      console.error(" Error fetching proctor applicants:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch applicants for proctor" });
+    }
   });
+
+  // ==================== INTERVIEW ROUTES ====================
+  // ==============================
+  // INTERVIEW ROUTES
+  // ==============================
+
+  // 1. Get interview by applicant_number
+  app.get("/api/interview/:applicant_number", async (req, res) => {
+    const { applicant_number } = req.params;
+
+    try {
+      const [rows] = await db.query(
+        `
+    SELECT
+      a.applicant_number,
+      a.person_id,
+      ps.qualifying_result      AS qualifying_exam_score,
+      ps.interview_result       AS qualifying_interview_score,
+      ps.exam_result            AS total_ave
+    FROM applicant_numbering_table a
+    LEFT JOIN person_status_table ps ON ps.person_id = a.person_id
+    WHERE a.applicant_number = ?
+    `,
+        [applicant_number],
+      );
+
+      if (!rows.length) return res.json(null);
+
+      const row = rows[0];
+      res.json({
+        applicant_number: row.applicant_number,
+        person_id: row.person_id,
+        qualifying_exam_score: row.qualifying_exam_score ?? 0,
+        qualifying_interview_score: row.qualifying_interview_score ?? 0,
+        total_ave: row.total_ave ?? 0,
+      });
+    } catch (err) {
+      console.error(" Error fetching interview:", err);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // 2) PUT update (must exist)
+  //   Update single Qualifying/Interview scores
+
+  // ---------------------------------------------------------
+  // 2) SAVE or UPDATE (UPSERT) using person_status_table
+  //    Payload: { applicant_number, qualifying_exam_score, qualifying_interview_score }
+  //    Mapping -> qualifying_result, interview_result, exam_result
+  // ---------------------------------------------------------
+  app.post("/api/interview", async (req, res) => {
+    try {
+      const {
+        applicant_number,
+        qualifying_exam_score,
+        qualifying_interview_score,
+      } = req.body;
+      // 1  Find person_id of applicant
+      const [rows] = await db.query(
+        "SELECT person_id FROM applicant_numbering_table WHERE applicant_number = ?",
+        [applicant_number],
+      );
+      if (rows.length === 0) {
+        return res.status(400).json({ error: "Applicant number not found" });
+      }
+      const person_id = rows[0].person_id;
+
+      // 2  Compute new scores
+      const qExam = Number(qualifying_exam_score) || 0;
+      const qInterview = Number(qualifying_interview_score) || 0;
+      const totalAve = (qExam + qInterview) / 2;
+
+      // 3  Insert or update (Upsert)
+      await db.query(
+        `INSERT INTO person_status_table (person_id, qualifying_result, interview_result, exam_result)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       qualifying_result = VALUES(qualifying_result),
+       interview_result = VALUES(interview_result),
+       exam_result = VALUES(exam_result)`,
+        [person_id, qExam, qInterview, totalAve],
+      );
+
+      // 4  Return success
+      res.json({
+        success: true,
+        message: "Interview and exam scores saved successfully!",
+      });
+    } catch (err) {
+      console.error(" Error saving interview/exam scores:", err);
+      res.status(500).json({ error: "Failed to save interview/exam scores" });
+    }
+  });
+
 
   app.get('/api/admin/dept-numbers', async (req, res) => {
     try {
@@ -1757,318 +739,6 @@ Click the link below to log in:
     }
   });
 
-  // ================== INTERVIEW SOCKET EVENTS ==================
-  io.on("connection", (socket) => {
-
-    // Assign applicants (single, 40, custom  all handled here)
-    socket.on(
-      "update_interview_schedule",
-      async ({ schedule_id, applicant_numbers }) => {
-        try {
-          if (
-            !Array.isArray(applicant_numbers) ||
-            applicant_numbers.length === 0
-          ) {
-            socket.emit("update_schedule_result", {
-              success: false,
-              error: "No applicants provided.",
-            });
-            return;
-          }
-
-          //   1. Get schedule info (quota)
-          const [[schedule]] = await db.query(
-            `SELECT room_quota FROM interview_exam_schedule WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-
-          if (!schedule) {
-            socket.emit("update_schedule_result", {
-              success: false,
-              error: "Schedule not found.",
-            });
-            return;
-          }
-
-          //   2. Get current occupancy
-          const [[{ current_count }]] = await db.query(
-            `SELECT COUNT(*) AS current_count FROM interview_applicants WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-
-          const availableSlots = schedule.room_quota - current_count;
-          if (availableSlots <= 0) {
-            socket.emit("update_schedule_result", {
-              success: false,
-              error: `Schedule is already full (${schedule.room_quota} applicants).`,
-            });
-            return;
-          }
-
-          //   3. Trim applicant_numbers if more than available slots
-          const toAssign = applicant_numbers.slice(0, availableSlots);
-
-          //  4. Update only those applicants
-          const [results] = await db.query(
-            `UPDATE interview_applicants
-         SET schedule_id = ?, action = 1
-         WHERE applicant_id IN (?)`,
-            [schedule_id, toAssign],
-          );
-
-          socket.emit("update_schedule_result", {
-            success: true,
-            assigned: toAssign,
-            updated: results.affectedRows,
-            skipped: applicant_numbers.length - toAssign.length,
-          });
-
-          // Refresh schedule data for connected clients.
-          io.emit("schedule_updated", { schedule_id });
-        } catch (err) {
-          console.error(" Error updating interview schedule:", err);
-          socket.emit("update_schedule_result", {
-            success: false,
-            error: "Failed to update interview schedule.",
-          });
-        }
-      },
-    );
-
-    // Unassign ALL
-    socket.on("unassign_all_from_interview", async ({ schedule_id }) => {
-      try {
-        await db.query(
-          `UPDATE interview_applicants
-         SET schedule_id = NULL, action = 0
-         WHERE schedule_id = ?`,
-          [schedule_id],
-        );
-        socket.emit("unassign_all_result", {
-          success: true,
-          message: "All applicants unassigned.",
-        });
-        io.emit("schedule_updated", { schedule_id });
-      } catch (err) {
-        console.error(" Error unassigning all interview applicants:", err);
-        socket.emit("unassign_all_result", {
-          success: false,
-          error: "Failed to unassign all applicants.",
-        });
-      }
-    });
-
-    function formatTime(timeStr) {
-      if (!timeStr) return "";
-      const [hours, minutes] = timeStr.split(":"); // ignore seconds
-      let h = parseInt(hours, 10);
-      const ampm = h >= 12 ? "PM" : "AM";
-      h = h % 12 || 12; // convert 0 -> 12
-      return `${h}:${minutes} ${ampm}`;
-    }
-
-    //  Handle sending interview schedule emails
-    //  Handle sending interview schedule emails
-    socket.on(
-      "send_interview_emails",
-      async ({
-        schedule_id,
-        applicant_numbers,
-        subject: finalSubject,
-        senderName,
-        message,
-        user_person_id,
-        audit_actor_id,
-        audit_actor_role,
-        department_id,  // ADD THIS
-        program_id,     // ADD THIS
-      }) => {
-        try {
-          const [rows] = await db.query(
-            `SELECT
-            ia.schedule_id,
-            s.day_description,
-            s.building_description,
-            s.room_description,
-            s.start_time,
-            s.end_time,
-            an.applicant_number,
-            p.person_id,
-            p.first_name,
-            p.middle_name,
-            p.last_name,
-            p.emailAddress,
-            dt.dprtmnt_name
-          FROM interview_applicants ia
-          JOIN interview_exam_schedule s 
-            ON ia.schedule_id = s.schedule_id
-          JOIN applicant_numbering_table an 
-            ON ia.applicant_id = an.applicant_number
-          JOIN person_table p 
-            ON an.person_id = p.person_id
-          JOIN enrollment.dprtmnt_curriculum_table dct 
-            ON p.program = dct.curriculum_id
-          JOIN enrollment.dprtmnt_table dt 
-            ON dct.dprtmnt_id = dt.dprtmnt_id
-          WHERE ia.schedule_id = ?
-          AND an.applicant_number IN (?)`,
-            [schedule_id, applicant_numbers],
-          );
-
-          if (rows.length === 0) {
-            return socket.emit("send_schedule_emails_result", {
-              success: false,
-              error: "No applicants found for this interview schedule.",
-            });
-          }
-
-          const [[company]] = await db.query(
-            "SELECT short_term FROM company_settings WHERE id = 1",
-          );
-
-          const shortTerm = company?.short_term || "EARIST";
-
-          const finalSubjectComputed =
-            finalSubject || rows[0]?.dprtmnt_name || "Interview Schedule";
-
-          const [actorRows] = await db3.query(
-            `SELECT
-            email AS actor_email,
-            role,
-            employee_id,
-            last_name,
-            first_name,
-            middle_name
-          FROM user_accounts
-          WHERE person_id = ?
-          LIMIT 1`,
-            [user_person_id],
-          );
-
-          const actor = actorRows[0] || null;
-
-          // UPDATED QUERY - filter by department_id and program_id
-          // NEW — joins email_template_programs to get dprtmnt_id and program_id
-          const [userEmail] = await db.query(
-            `SELECT et.sender_name
-   FROM email_template_employees ete
-   INNER JOIN email_templates et ON ete.template_id = et.template_id
-   INNER JOIN email_template_programs etp ON etp.template_id = et.template_id
-   WHERE ete.employee_id = ?
-     AND etp.dprtmnt_id = ?
-     AND etp.program_id = ?
-     AND et.is_active = 1
-   ORDER BY et.updated_at DESC
-   LIMIT 1`,
-            [actor?.employee_id || null, department_id, program_id],
-          );
-
-          if (userEmail.length === 0) {
-            throw new Error("User not assigned to a matching college email for this program.");
-          }
-
-          const senderEmail = userEmail[0].sender_name;
-          const senderAccount = getSenderAccountForEmail(senderEmail);
-
-          if (!senderAccount) {
-            throw new Error(
-              "Email sender account does not match a configured backend .env account.",
-            );
-          }
-
-          const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: senderAccount,
-          });
-
-          const sent = [];
-          const failed = [];
-
-          function formatTime(timeStr) {
-            if (!timeStr) return "";
-            const [hours, minutes] = timeStr.split(":");
-            let h = parseInt(hours, 10);
-            const ampm = h >= 12 ? "PM" : "AM";
-            h = h % 12 || 12;
-            return `${h}:${minutes} ${ampm}`;
-          }
-
-          for (const row of rows) {
-            if (!row.emailAddress) {
-              failed.push(row.applicant_number);
-              continue;
-            }
-
-            const formattedStart = formatTime(row.start_time);
-            const formattedEnd = formatTime(row.end_time);
-
-            const personalizedMsg = message
-              .replace(/{first_name}/g, row.first_name || "")
-              .replace(/{middle_name}/g, row.middle_name || "")
-              .replace(/{last_name}/g, row.last_name || "")
-              .replace(/{applicant_number}/g, row.applicant_number)
-              .replace(/{day}/g, row.day_description)
-              .replace(/{room}/g, row.room_description)
-              .replace(/{start_time}/g, formattedStart)
-              .replace(/{end_time}/g, formattedEnd);
-
-            const mailOptions = {
-              from: `${shortTerm} - ${row.dprtmnt_name} <${senderAccount.user}>`,
-              to: row.emailAddress,
-              subject: finalSubjectComputed,
-              text: personalizedMsg,
-            };
-
-            await transporter.sendMail(mailOptions);
-
-            try {
-              await db.query(
-                "UPDATE interview_applicants SET email_sent = 1 WHERE applicant_id = ?",
-                [row.applicant_number],
-              );
-              sent.push(row.applicant_number);
-            } catch (err) {
-              console.error(`Failed to send interview email to ${row.emailAddress}:`, err.message);
-              await db.query(
-                "UPDATE interview_applicants SET email_sent = 0 WHERE applicant_id = ?",
-                [row.applicant_number],
-              );
-              failed.push(row.applicant_number);
-            }
-          }
-
-          const safeActor = audit_actor_id || actor?.employee_id || user_person_id || "unknown";
-          const roleLabel = formatAuditActorRole(audit_actor_role || actor?.role);
-          const scheduleLabel = await getInterviewScheduleLabel(schedule_id);
-          const sentList = sent.length > 0 ? sent.join(", ") : "None";
-          const failedNote = failed.length > 0 ? ` Failed applicant(s): ${failed.join(", ")}.` : "";
-
-          await insertAuditLogEnrollment({
-            actorId: safeActor,
-            role: audit_actor_role || actor?.role || "registrar",
-            action: "QUALIFYING_INTERVIEW_SCHEDULE_EMAIL",
-            severity: sent.length > 0 ? "INFO" : "WARNING",
-            message: `${roleLabel} (${safeActor}) sent qualifying/interview schedule email to ${sent.length} applicant(s) for ${scheduleLabel}. Applicant(s): ${sentList}.${failedNote}`,
-          });
-
-          socket.emit("send_schedule_emails_result", {
-            success: true,
-            sent,
-            failed,
-            message: `Interview emails processed: Sent=${sent.length}, Failed=${failed.length}`,
-          });
-
-          io.emit("schedule_updated", { schedule_id });
-        } catch (err) {
-          console.error("Error in send_interview_emails:", err);
-          socket.emit("send_schedule_emails_result", {
-            success: false,
-            error: err.message || "Server error sending interview emails.",
-          });
-        }
-      },
-    );
-  });
 
   // ================== INSERT EXAM SCHEDULE ==================
   app.get("/api/exam_schedules", async (req, res) => {
@@ -2097,484 +767,6 @@ Click the link below to log in:
     }
   });
 
-  io.on("connection", (socket) => {
-    // ENTRANCE EXAM
-    socket.on(
-      "update_schedule",
-      async ({
-        schedule_id,
-        applicant_numbers,
-        audit_actor_id,
-        audit_actor_role,
-      }) => {
-        try {
-          if (
-            !schedule_id ||
-            !applicant_numbers ||
-            applicant_numbers.length === 0
-          ) {
-            return socket.emit("update_schedule_result", {
-              success: false,
-              error: "Schedule ID and applicants required.",
-            });
-          }
-
-          //  Get room quota
-          const [[scheduleInfo]] = await db.query(
-            `SELECT room_quota FROM entrance_exam_schedule WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-          if (!scheduleInfo) {
-            return socket.emit("update_schedule_result", {
-              success: false,
-              error: "Schedule not found.",
-            });
-          }
-          const roomQuota = scheduleInfo.room_quota;
-
-          //  Count how many are already assigned
-          const [[{ currentCount }]] = await db.query(
-            `SELECT COUNT(*) AS currentCount FROM exam_applicants WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-
-          // If total would exceed quota, reject
-          if (currentCount + applicant_numbers.length > roomQuota) {
-            return socket.emit("update_schedule_result", {
-              success: false,
-              error: `Room quota exceeded! Capacity: ${roomQuota}, Currently Assigned: ${currentCount}, Trying to add: ${applicant_numbers.length}.`,
-            });
-          }
-
-          const assigned = [];
-          const updated = [];
-          const skipped = [];
-
-          for (const applicant_number of applicant_numbers) {
-            const [check] = await db.query(
-              `SELECT * FROM exam_applicants WHERE applicant_id = ?`,
-              [applicant_number],
-            );
-
-            if (check.length > 0) {
-              if (check[0].schedule_id === schedule_id) {
-                skipped.push(applicant_number); // already in this schedule
-              } else {
-                await db.query(
-                  `UPDATE exam_applicants SET schedule_id = ?, email_sent = 0 WHERE applicant_id = ?`,
-                  [schedule_id, applicant_number],
-                );
-                updated.push(applicant_number);
-              }
-            } else {
-              await db.query(
-                `INSERT INTO exam_applicants (applicant_id, schedule_id, email_sent) VALUES (?, ?, 0)`,
-                [applicant_number, schedule_id],
-              );
-              assigned.push(applicant_number);
-            }
-          }
-
-          const changedApplicants = [...assigned, ...updated];
-          if (changedApplicants.length > 0) {
-            const safeActor = audit_actor_id || "unknown";
-            const roleLabel = formatAuditActorRole(audit_actor_role);
-            const scheduleLabel =
-              await getEntranceExamScheduleLabel(schedule_id);
-
-            await insertAuditLogAdmission({
-              actorId: safeActor,
-              role: audit_actor_role || "registrar",
-              action: "ENTRANCE_EXAM_SCHEDULE_ASSIGN",
-              severity: "INFO",
-              message: `${roleLabel} (${safeActor}) assigned ${changedApplicants.length} applicant(s) to entrance examination ${scheduleLabel}. Applicant(s): ${changedApplicants.join(", ")}.`,
-            });
-          }
-
-          socket.emit("update_schedule_result", {
-            success: true,
-            assigned,
-            updated,
-            skipped,
-          });
-        } catch (error) {
-          console.error(" Error assigning schedule:", error);
-          socket.emit("update_schedule_result", {
-            success: false,
-            error: "Failed to assign schedule.",
-          });
-        }
-      },
-    );
-
-    // INTERVIEW EXAM
-    socket.on(
-      "update_schedule_for_interview",
-      async ({
-        schedule_id,
-        applicant_numbers,
-        audit_actor_id,
-        audit_actor_role,
-      }) => {
-        try {
-          if (
-            !schedule_id ||
-            !applicant_numbers ||
-            applicant_numbers.length === 0
-          ) {
-            return socket.emit("update_schedule_result", {
-              success: false,
-              error: "Schedule ID and applicants required.",
-            });
-          }
-
-          //  Get room quota
-          const [[scheduleInfo]] = await db.query(
-            `SELECT room_quota FROM interview_exam_schedule WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-          if (!scheduleInfo) {
-            return socket.emit("update_schedule_result", {
-              success: false,
-              error: "Schedule not found.",
-            });
-          }
-          const roomQuota = scheduleInfo.room_quota;
-
-          //  Count how many are already assigned
-          const [[{ currentCount }]] = await db.query(
-            `SELECT COUNT(*) AS currentCount FROM interview_applicants WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-
-          // If total would exceed quota, reject
-          if (currentCount + applicant_numbers.length > roomQuota) {
-            return socket.emit("update_schedule_result", {
-              success: false,
-              error: `Room quota exceeded! Capacity: ${roomQuota}, Currently Assigned: ${currentCount}, Trying to add: ${applicant_numbers.length}.`,
-            });
-          }
-
-          const assigned = [];
-          const updated = [];
-          const skipped = [];
-
-          for (const applicant_number of applicant_numbers) {
-            const [check] = await db.query(
-              `SELECT * FROM interview_applicants WHERE applicant_id = ?`,
-              [applicant_number],
-            );
-
-            if (check.length > 0) {
-              if (check[0].schedule_id === schedule_id) {
-                skipped.push(applicant_number); // already in this schedule
-              } else {
-                await db.query(
-                  `UPDATE interview_applicants SET schedule_id = ?, action = 1 WHERE applicant_id = ?`,
-                  [schedule_id, applicant_number],
-                );
-                updated.push(applicant_number);
-              }
-            } else {
-              await db.query(
-                `INSERT INTO interview_applicants (applicant_id, schedule_id, action, email_sent, status) VALUES (?, ?, 1, 0, 0)`,
-                [applicant_number, schedule_id],
-              );
-              assigned.push(applicant_number);
-            }
-          }
-          const changedApplicants = [...assigned, ...updated];
-          if (changedApplicants.length > 0) {
-            const safeActor = audit_actor_id || "unknown";
-            const roleLabel = formatAuditActorRole(audit_actor_role);
-            const scheduleLabel = await getInterviewScheduleLabel(schedule_id);
-
-            await insertAuditLogEnrollment({
-              actorId: safeActor,
-              role: audit_actor_role || "registrar",
-              action: "QUALIFYING_INTERVIEW_SCHEDULE_ASSIGN",
-              severity: "INFO",
-              message: `${roleLabel} (${safeActor}) assigned ${changedApplicants.length} applicant(s) to qualifying/interview ${scheduleLabel}. Applicant(s): ${changedApplicants.join(", ")}.`,
-            });
-          }
-
-          socket.emit("update_schedule_result", {
-            success: true,
-            assigned,
-            updated,
-            skipped,
-          });
-        } catch (error) {
-          console.error(" Error assigning schedule:", error);
-          socket.emit("update_schedule_result", {
-            success: false,
-            error: "Failed to assign schedule.",
-          });
-        }
-      },
-    );
-
-    function formatTime(timeStr) {
-      if (!timeStr) return "";
-      const [hours, minutes] = timeStr.split(":"); // ignore seconds
-      let h = parseInt(hours, 10);
-      const ampm = h >= 12 ? "PM" : "AM";
-      h = h % 12 || 12; // convert 0 -> 12
-      return `${h}:${minutes} ${ampm}`;
-    }
-
-    socket.on("send_schedule_emails", async (data) => {
-      try {
-        const {
-          schedule_id,
-          user_person_id,
-          subject,
-          message,
-          audit_actor_id,
-          audit_actor_role,
-        } = data;
-
-        /* ================================
-           1  Get Actor Info
-        ================================= */
-        const [actorRows] = await db3.query(
-          `SELECT email, role, employee_id, last_name, first_name, middle_name
-       FROM user_accounts
-       WHERE person_id = ? LIMIT 1`,
-          [user_person_id],
-        );
-
-        let actorEmail = "earistmis@gmail.com";
-        let actorName = "SYSTEM";
-
-        if (actorRows.length > 0) {
-          const u = actorRows[0];
-          actorEmail = u.email || actorEmail;
-
-          actorName =
-            `${(u.role || "").toUpperCase()} (${u.employee_id || ""}) -
-      ${u.last_name || ""}, ${u.first_name || ""} ${u.middle_name || ""}`.trim();
-        }
-
-        /* ================================
-           2  Office Name
-        ================================= */
-        const [[office]] = await db.query(
-          "SELECT short_term FROM company_settings WHERE id = 1",
-        );
-
-        const shortTerm = office?.short_term || "EARIST";
-        const officeName = `${shortTerm} - Admission Office`;
-
-        /* ================================
-           3  Get Applicants
-        ================================= */
-        const [rows] = await db.query(
-          `
-        SELECT
-          ea.schedule_id,
-
-          s.day_description AS day,
-          s.room_description AS room,
-          s.start_time,
-          s.end_time,
-
-          an.applicant_number,
-
-          p.person_id,
-          p.first_name,
-          p.last_name,
-          p.emailAddress
-
-        FROM exam_applicants ea
-
-        JOIN entrance_exam_schedule s
-          ON ea.schedule_id = s.schedule_id
-
-        JOIN applicant_numbering_table an
-          ON ea.applicant_id = an.applicant_number
-
-        JOIN person_table p
-          ON an.person_id = p.person_id
-
-        WHERE ea.schedule_id = ?
-        AND (ea.email_sent IS NULL OR ea.email_sent = 0)
-        `,
-          [schedule_id],
-        );
-
-        if (rows.length === 0) {
-          return socket.emit("send_schedule_emails_result", {
-            success: false,
-            error: "No applicants found for this schedule.",
-          });
-        }
-
-        /* ================================
-           4  Helpers
-        ================================= */
-        const sent = [];
-        const failed = [];
-        const skipped = [];
-
-        const formatTime = (timeStr) => {
-          if (!timeStr) return "";
-          const [h, m] = timeStr.split(":");
-          let hour = parseInt(h);
-          const ampm = hour >= 12 ? "PM" : "AM";
-          hour = hour % 12 || 12;
-          return `${hour}:${m} ${ampm}`;
-        };
-
-        const applyTemplate = (template, row) => {
-          return template
-            .replace(/{first_name}/g, row.first_name || "")
-            .replace(/{last_name}/g, row.last_name || "")
-            .replace(/{applicant_number}/g, row.applicant_number || "")
-            .replace(/{day}/g, row.day || "")
-            .replace(/{room}/g, row.room || "")
-            .replace(/{start_time}/g, formatTime(row.start_time))
-            .replace(/{end_time}/g, formatTime(row.end_time))
-            .replace(/{office}/g, officeName);
-        };
-
-        /* ================================
-           5  Send Email  (UPDATED: attaches attendance QR)
-        ================================= */
-        const sendEmail = async (row) => {
-          if (!row.emailAddress) {
-            skipped.push(row.applicant_number);
-            return;
-          }
-
-          const finalMessage = applyTemplate(message, row);
-
-          // ✅ NEW: generate (or reuse) this applicant's one-time attendance QR
-          // for THIS schedule, and get the local file path to the PNG.
-          let qrPath = null;
-          try {
-            const qrResult = await ensureAttendanceQr(
-              db,
-              row.schedule_id,
-              row.applicant_number,
-            );
-            qrPath = qrResult.qrPath;
-          } catch (qrErr) {
-            console.error(
-              `Failed to generate attendance QR for ${row.applicant_number}:`,
-              qrErr,
-            );
-          }
-
-          const mailOptions = {
-            from: `"${officeName}" <${process.env.EMAIL_USER}>`,
-            to: row.emailAddress,
-            subject: subject || "Entrance Exam Schedule",
-            text: qrPath
-              ? `${finalMessage}\n\nYour Attendance QR Code is attached. Present this at the exam room — it can only be scanned once.`
-              : finalMessage,
-          };
-
-          // ✅ NEW: attach the QR image if it was generated successfully
-          if (qrPath) {
-            mailOptions.attachments = [
-              {
-                filename: "attendance_qr.png",
-                path: qrPath,
-                cid: "attendanceqr",
-              },
-            ];
-          }
-
-          try {
-            await transporter.sendMail(mailOptions);
-
-            await db.query(
-              `UPDATE exam_applicants
-           SET email_sent = 1
-           WHERE applicant_id = ?
-           AND schedule_id = ?`,
-              [row.applicant_number, row.schedule_id],
-            );
-
-            await db.query(
-              `UPDATE person_status_table
-           SET exam_status = 1
-           WHERE person_id = ?`,
-              [row.person_id],
-            );
-
-            sent.push(row.applicant_number);
-          } catch (err) {
-            console.error(" Email failed:", err.message);
-            failed.push(row.applicant_number);
-          }
-        };
-
-        /* ================================
-           6  Batch Sending
-        ================================= */
-        const batchSize = 5;
-        const delayMs = 1000;
-
-        for (let i = 0; i < rows.length; i += batchSize) {
-          const batch = rows.slice(i, i + batchSize);
-          await Promise.all(batch.map(sendEmail));
-
-          if (i + batchSize < rows.length) {
-            await new Promise((r) => setTimeout(r, delayMs));
-          }
-        }
-
-        const safeActor =
-          audit_actor_id ||
-          actorRows?.[0]?.employee_id ||
-          user_person_id ||
-          "unknown";
-        const roleLabel = formatAuditActorRole(
-          audit_actor_role || actorRows?.[0]?.role,
-        );
-        const scheduleLabel = await getEntranceExamScheduleLabel(schedule_id);
-        const sentList = sent.length > 0 ? sent.join(", ") : "None";
-        const failedNote =
-          failed.length > 0
-            ? ` Failed applicant(s): ${failed.join(", ")}.`
-            : "";
-        const skippedNote =
-          skipped.length > 0
-            ? ` Skipped applicant(s): ${skipped.join(", ")}.`
-            : "";
-
-        await insertAuditLogAdmission({
-          actorId: safeActor,
-          role: audit_actor_role || actorRows?.[0]?.role || "registrar",
-          action: "ENTRANCE_EXAM_SCHEDULE_EMAIL",
-          severity: sent.length > 0 ? "INFO" : "WARNING",
-          message: `${roleLabel} (${safeActor}) sent entrance examination schedule email to ${sent.length} applicant(s) for ${scheduleLabel}. Applicant(s): ${sentList}.${failedNote}${skippedNote}`,
-        });
-
-        /* ================================
-           7  Result
-        ================================= */
-        socket.emit("send_schedule_emails_result", {
-          success: true,
-          sent,
-          failed,
-          skipped,
-          message: `Sent=${sent.length}, Failed=${failed.length}, Skipped=${skipped.length}`,
-        });
-
-        io.emit("schedule_updated", { schedule_id });
-      } catch (err) {
-        console.error("send_schedule_emails ERROR:", err);
-
-        socket.emit("send_schedule_emails_result", {
-          success: false,
-          error: "Server error sending emails.",
-        });
-      }
-    });
-  });
 
   // Get current number of applicants assigned to a schedule
   app.get("/api/exam-schedule-count/:schedule_id", async (req, res) => {
@@ -4880,11 +3072,11 @@ Click the link below to log in:
   });
 
   // GET person details by person_id including program and student_number
-  app.get("/api/person/:id", async (req, res) => {
+  app.get("/api/person/enrollment/:id", async (req, res) => {
     const { id } = req.params;
 
     try {
-      const [rows] = await db.execute(
+      const [rows] = await db3.execute(
         `
       SELECT
         p.*,
@@ -5574,63 +3766,6 @@ Click the link below to log in:
     }
   });
 
-  app.get("/api/person_with_applicant/:person_id", (req, res) => {
-    const personId = req.params.person_id;
-    const sql = `
-    SELECT
-      p.*,
-      an.applicant_number,
-      p.applyingAs,
-      ps.qualifying_result   AS qualifying_exam_score,
-      ps.interview_result    AS qualifying_interview_score,
-      ps.exam_result         AS exam_score
-    FROM person_table p
-    LEFT JOIN applicant_numbering_table an ON an.person_id = p.person_id
-    LEFT JOIN person_status_table ps ON ps.person_id = p.person_id
-    WHERE p.person_id = ?
-    LIMIT 1
-  `;
-    db.query(sql, [personId], (err, results) => {
-      if (err) {
-        console.error("person_with_applicant SQL error:", err);
-        return res.status(500).json({ error: err.message });
-      }
-      if (!results[0])
-        return res.status(404).json({ error: "Person not found" });
-      res.json(results[0]);
-    });
-  });
-
-  app.get("/api/person_with_applicant/:id", (req, res) => {
-    const id = req.params.id;
-
-    const sql = `
-    SELECT
-      p.*,
-      an.applicant_number,
-      p.applyingAs,
-      ps.qualifying_result   AS qualifying_exam_score,
-      ps.interview_result    AS qualifying_interview_score,
-      ps.exam_result         AS exam_score
-    FROM person_table p
-    LEFT JOIN applicant_numbering_table an ON an.person_id = p.person_id
-    LEFT JOIN person_status_table ps ON ps.person_id = p.person_id
-    WHERE p.person_id = ? OR an.applicant_number = ?
-    LIMIT 1
-  `;
-
-    // bind the same param twice so the endpoint accepts either numeric person_id or applicant_number
-    db.query(sql, [id, id], (err, results) => {
-      if (err) {
-        console.error("person_with_applicant SQL error:", err);
-        return res.status(500).json({ error: err.message });
-      }
-      if (!results[0])
-        return res.status(404).json({ error: "Person not found" });
-      res.json(results[0]);
-    });
-  });
-
   app.get("/api/person_status_by_applicant/:applicant_number", (req, res) => {
     const applicantNumber = req.params.applicant_number;
     const sql = `
@@ -5754,8 +3889,8 @@ Click the link below to log in:
       const { person_id, role } = req.params;
       let userData;
 
-      if (role === "registrar") {
-        //  Fetch registrar info directly from user_accounts (db3)
+      if (["administrator", "superadmin", "technical"].includes(String(role).toLowerCase())) {
+        // Fetch staff-account info directly from user_accounts (db3)
         const [rows] = await db3.query(
           `SELECT
            ua.person_id,
@@ -5771,7 +3906,7 @@ Click the link below to log in:
            ua.email
          FROM user_accounts AS ua
          LEFT JOIN dprtmnt_table AS dt ON ua.dprtmnt_id = dt.dprtmnt_id 
-         WHERE ua.person_id = ? AND ua.role = 'registrar'`,
+         WHERE ua.person_id = ? AND ua.role IN ('administrator', 'superadmin', 'technical')`,
           [person_id],
         );
         userData = rows[0];
@@ -7781,7 +5916,7 @@ Click the link below to log in:
         ON ua.access_level = at.access_id
       LEFT JOIN page_access pa
         ON pa.user_id = ua.employee_id
-      WHERE ua.role = 'registrar'
+      WHERE ua.role IN ('administrator', 'superadmin', 'technical')
       GROUP BY
         ua.id,
         ua.person_id,
@@ -9460,253 +7595,4 @@ Click the link below to log in:
     }
   });
 
-  io.on("connection", (socket) => {
-
-    socket.on(
-      "send_verify_schedule_emails",
-      async ({
-        schedule_id,
-        applicant_numbers,
-        subject,
-        message,
-        user_person_id,
-        audit_actor_id,
-        audit_actor_role,
-      }) => {
-
-        try {
-          if (
-            !schedule_id ||
-            !Array.isArray(applicant_numbers) ||
-            applicant_numbers.length === 0
-          ) {
-            return socket.emit("send_verify_schedule_emails_result", {
-              success: false,
-              error: "No applicants provided.",
-            });
-          }
-
-          // OFFICE NAME
-          const [[office]] = await db.query(
-            "SELECT short_term FROM company_settings WHERE id = 1",
-          );
-
-          const shortTerm = office?.short_term || "EARIST";
-          const officeName = `${shortTerm} - Admission Office`;
-
-          //  Fetch applicants with email
-          const [rows] = await db.query(
-            `
-      SELECT
-        va.applicant_id,
-        p.first_name,
-        p.middle_name,
-        p.last_name,
-        p.emailAddress
-      FROM verify_applicants va
-      JOIN applicant_numbering_table an
-        ON va.applicant_id = an.applicant_number
-      JOIN person_table p
-        ON an.person_id = p.person_id
-      WHERE va.schedule_id = ?
-      AND va.applicant_id IN (?)
-      AND va.email_sent = 0
-    `,
-            [schedule_id, applicant_numbers],
-          );
-
-          if (rows.length === 0) {
-            return socket.emit("send_verify_schedule_emails_result", {
-              success: false,
-              error: "No pending applicants found.",
-            });
-          }
-
-          const sent = [];
-          const failed = [];
-
-          for (const row of rows) {
-            if (!row.emailAddress) {
-              failed.push(row.applicant_id);
-              continue;
-            }
-
-            const personalizedMsg = message
-              .replace("{first_name}", row.first_name || "")
-              .replace("{middle_name}", row.middle_name || "")
-              .replace("{last_name}", row.last_name || "")
-              .replace("{applicant_number}", row.applicant_id);
-
-            try {
-              await transporter.sendMail({
-                from: `"${officeName}" <${process.env.EMAIL_USER}>`,
-                to: row.emailAddress,
-                subject,
-                text: personalizedMsg,
-              });
-
-              //  Mark sent
-              await db.query(
-                "UPDATE verify_applicants SET email_sent = 1 WHERE applicant_id = ?",
-                [row.applicant_id],
-              );
-
-              sent.push(row.applicant_id);
-            } catch (err) {
-              console.error("Email failed:", err.message);
-
-              await db.query(
-                "UPDATE verify_applicants SET email_sent = -1 WHERE applicant_id = ?",
-                [row.applicant_id],
-              );
-
-              failed.push(row.applicant_id);
-            }
-          }
-
-          const safeActor = audit_actor_id || user_person_id || "unknown";
-          const roleLabel = formatAuditActorRole(audit_actor_role);
-          const scheduleLabel = await getVerifyScheduleLabel(schedule_id);
-          const sentList = sent.length > 0 ? sent.join(", ") : "None";
-          const failedNote =
-            failed.length > 0
-              ? ` Failed applicant(s): ${failed.join(", ")}.`
-              : "";
-
-          await insertAuditLogAdmission({
-            actorId: safeActor,
-            role: audit_actor_role || "registrar",
-            action: "VERIFY_SCHEDULE_EMAIL",
-            severity: sent.length > 0 ? "INFO" : "WARNING",
-            message: `${roleLabel} (${safeActor}) sent document verification schedule email to ${sent.length} applicant(s) for ${scheduleLabel}. Applicant(s): ${sentList}.${failedNote}`,
-          });
-
-          //  Return result
-          socket.emit("send_verify_schedule_emails_result", {
-            success: true,
-            sent,
-            failed,
-            message: `Verify emails: Sent=${sent.length}, Failed=${failed.length}`,
-          });
-
-          io.emit("schedule_updated", { schedule_id });
-        } catch (err) {
-          console.error("Verify email error:", err);
-
-          socket.emit("send_verify_schedule_emails_result", {
-            success: false,
-            error: "Server error sending verify emails.",
-          });
-        }
-      },
-    );
-
-    socket.on(
-      "update_verify_schedule",
-      async ({
-        schedule_id,
-        applicant_numbers,
-        audit_actor_id,
-        audit_actor_role,
-      }) => {
-        try {
-          if (!schedule_id || !applicant_numbers?.length) {
-            return socket.emit("update_verify_schedule_result", {
-              success: false,
-              error: "Schedule ID and applicants required.",
-            });
-          }
-
-          //  Get quota
-          const [[scheduleInfo]] = await db.query(
-            `SELECT room_quota FROM verify_document_schedule WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-
-          if (!scheduleInfo) {
-            return socket.emit("update_verify_schedule_result", {
-              success: false,
-              error: "Schedule not found.",
-            });
-          }
-
-          const roomQuota = scheduleInfo.room_quota;
-
-          //  Current count
-          const [[{ currentCount }]] = await db.query(
-            `SELECT COUNT(*) AS currentCount FROM verify_applicants WHERE schedule_id = ?`,
-            [schedule_id],
-          );
-
-          let runningCount = currentCount;
-
-          const assigned = [];
-          const updated = [];
-          const skipped = [];
-
-          for (const applicant_number of applicant_numbers) {
-            //  STOP when full
-            if (runningCount >= roomQuota) {
-              break;
-            }
-
-            const [check] = await db.query(
-              `SELECT schedule_id FROM verify_applicants WHERE applicant_id = ?`,
-              [applicant_number],
-            );
-
-            if (check.length > 0) {
-              if (check[0].schedule_id === schedule_id) {
-                skipped.push(applicant_number);
-              } else {
-                await db.query(
-                  `UPDATE verify_applicants SET schedule_id = ? WHERE applicant_id = ?`,
-                  [schedule_id, applicant_number],
-                );
-                updated.push(applicant_number);
-                runningCount++; // increase count
-              }
-            } else {
-              await db.query(
-                `INSERT INTO verify_applicants (applicant_id, schedule_id, email_sent)
-            VALUES (?, ?, 0)`,
-                [applicant_number, schedule_id],
-              );
-
-              assigned.push(applicant_number);
-              runningCount++; // increase count
-            }
-          }
-
-          const changedApplicants = [...assigned, ...updated];
-          if (changedApplicants.length > 0) {
-            const safeActor = audit_actor_id || "unknown";
-            const roleLabel = formatAuditActorRole(audit_actor_role);
-            const scheduleLabel = await getVerifyScheduleLabel(schedule_id);
-
-            await insertAuditLogAdmission({
-              actorId: safeActor,
-              role: audit_actor_role || "registrar",
-              action: "VERIFY_SCHEDULE",
-              severity: "INFO",
-              message: `${roleLabel} (${safeActor}) assigned ${changedApplicants.length} applicant(s) to document verification ${scheduleLabel}. Applicant(s): ${changedApplicants.join(", ")}.`,
-            });
-          }
-
-          socket.emit("update_verify_schedule_result", {
-            success: true,
-            assigned,
-            updated,
-            skipped,
-          });
-        } catch (err) {
-          console.error(" Verify assign error:", err);
-          socket.emit("update_verify_schedule_result", {
-            success: false,
-            error: "Failed to assign applicants.",
-          });
-        }
-      },
-    );
-  });
 };

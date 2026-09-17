@@ -66,7 +66,7 @@ const SystemDashboardPanel = () => {
       setUserID(id);
       setEmployeeID(empID);
 
-      if (role === "registrar") {
+      if (["administrator", "superadmin", "technical"].includes(role)) {
         checkAccess(empID);
         fetchUserAccessList(empID);
       } else {
@@ -81,7 +81,7 @@ const SystemDashboardPanel = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`
+        `${API_BASE_URL}/api/page_access/${employeeID}/${pageId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
       setHasAccess(response.data?.page_privilege === 1);
     } catch (error) {
@@ -94,7 +94,7 @@ const SystemDashboardPanel = () => {
   const fetchUserAccessList = async (employeeID) => {
     try {
       const { data } = await axios.get(
-        `${API_BASE_URL}/api/page_access/${employeeID}`
+        `${API_BASE_URL}/api/page_access/${employeeID}`, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } }
       );
 
       const accessMap = data.reduce((acc, item) => {

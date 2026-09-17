@@ -725,7 +725,7 @@ router.get("/enrolled-count", async (req, res) => {
 router.get("/registrar_count", async (req, res) => {
   try {
     const [rows] = await db3.query(
-      "SELECT COUNT(*) AS count FROM user_accounts WHERE role = 'registrar'",
+      "SELECT COUNT(*) AS count FROM user_accounts WHERE role IN ('administrator', 'superadmin', 'technical')",
     );
     res.json({ count: rows[0].count });
   } catch (error) {
