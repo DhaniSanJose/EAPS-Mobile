@@ -5,6 +5,7 @@ import {
     Paper,
     Typography,
     FormControl,
+    InputLabel,
     Select,
     MenuItem,
     TextField,
@@ -27,6 +28,7 @@ import {
 import axios from "axios";
 import API_BASE_URL from "../apiConfig";
 import HistoryToggleOffIcon from '@mui/icons-material/HistoryToggleOff';
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
@@ -44,6 +46,7 @@ import {
     Cell,
 } from "recharts";
 import { TableVirtuoso } from "react-virtuoso";
+import StudentBalanceList from "./StudentBalanceList";
 
 const RECEIPT_STATUS = {
     PAID_NOT_PRINTED: "PAID_NOT_PRINTED",
@@ -186,7 +189,11 @@ const MatriculationPaymentModule = () => {
     // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
     const [data, setData] = useState([]);
-    const [keepVisiblePaidMatriculationId, setKeepVisiblePaidMatriculationId] = useState(null);
+    const [academicTerms, setAcademicTerms] = useState([]);
+    const [selectedYearId, setSelectedYearId] = useState("");
+    const [selectedSemesterId, setSelectedSemesterId] = useState("");
+    const [selectedTermId, setSelectedTermId] = useState("");
+    const [studentSearch, setStudentSearch] = useState("");
     const [cashierAccountTypeId, setCashierAccountTypeId] = useState(null);
     const pageSize = 100; // Number of rows per page
     const getScopedRowTotal = (row) =>
@@ -261,13 +268,49 @@ const MatriculationPaymentModule = () => {
         }, new Map()).values()
     ).sort((a, b) => Number(a.id) - Number(b.id));
 
-    const visibleData = data.filter((row) => {
+    const academicFilteredData = selectedTermId
+        ? data.filter((row) => String(row?.active_school_year_id) === String(selectedTermId))
+        : data;
+
+    const normalizedStudentSearch = studentSearch.trim().toLowerCase();
+    const searchedData = normalizedStudentSearch
+        ? academicFilteredData.filter((row) => {
+            const searchable = [
+                row?.student_number,
+                row?.last_name,
+                row?.given_name,
+                row?.middle_initial,
+                row?.program_description,
+                row?.degree_program,
+            ].filter(Boolean).join(" ").toLowerCase();
+            return searchable.includes(normalizedStudentSearch);
+        })
+        : academicFilteredData;
+
+    const visibleData = searchedData.filter((row) => {
         const scopedBalance = getScopedRowTotal(row);
-        const keepVisible = String(row?.id) === String(keepVisiblePaidMatriculationId);
-        return scopedBalance > 0 || keepVisible;
+        const existingPayment = toAmount(row?.payment_total ?? row?.payment ?? 0);
+
+        // This screen is for students who have not made any payment yet.
+        // A student is hidden after the first payment, even if another fee
+        // remains unpaid.
+        return existingPayment <= 0 && scopedBalance > 0;
     });
 
     const totalPages = Math.max(1, Math.ceil(visibleData.length / pageSize));
+
+    const yearOptions = useMemo(() => (
+        [...new Map(academicTerms.map((term) => [String(term.year_id), term])).values()]
+            .sort((a, b) => Number(a.year_description) - Number(b.year_description))
+    ), [academicTerms]);
+
+    const semesterOptions = useMemo(() => (
+        [...new Map(
+            academicTerms
+                .filter((term) => String(term.year_id) === String(selectedYearId))
+                .map((term) => [String(term.semester_id), term]),
+        ).values()].sort((a, b) => Number(a.semester_id) - Number(b.semester_id))
+    ), [academicTerms, selectedYearId]);
 
     // Dialog states
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -279,6 +322,7 @@ const MatriculationPaymentModule = () => {
     const [receiptData, setReceiptData] = useState(null);
     const [closeWithoutPrintConfirmOpen, setCloseWithoutPrintConfirmOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [balanceListOpen, setBalanceListOpen] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [transactionData, setTransactionData] = useState([]);
     const [historyRenderLimit, setHistoryRenderLimit] = useState(HISTORY_INITIAL_BATCH);
@@ -314,6 +358,35 @@ const MatriculationPaymentModule = () => {
         if (colors.border) setBorderColor(colors.border);
         if (colors.title) setTitleColor(colors.title);
     }, [settings]);
+
+    useEffect(() => {
+        axios
+            .get(`${API_BASE_URL}/api/student-balance-terms`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+            })
+            .then(({ data: terms }) => {
+                const nextTerms = Array.isArray(terms) ? terms : [];
+                setAcademicTerms(nextTerms);
+                const activeTerm = nextTerms.find((term) => Number(term.astatus) === 1) || nextTerms[0];
+                if (activeTerm) {
+                    setSelectedYearId(String(activeTerm.year_id));
+                    setSelectedSemesterId(String(activeTerm.semester_id));
+                    setSelectedTermId(String(activeTerm.id || activeTerm.school_year_id));
+                }
+            })
+            .catch((error) => console.error("Failed to load academic terms:", error));
+    }, []);
+
+    useEffect(() => {
+        if (!selectedYearId || !selectedSemesterId) return;
+        const selectedTerm = academicTerms.find(
+            (term) =>
+                String(term.year_id) === String(selectedYearId) &&
+                String(term.semester_id) === String(selectedSemesterId),
+        );
+        setSelectedTermId(String(selectedTerm?.id || selectedTerm?.school_year_id || ""));
+        setCurrentPage(1);
+    }, [academicTerms, selectedYearId, selectedSemesterId]);
 
     useEffect(() => {
         const storedUser = localStorage.getItem("email");
@@ -391,7 +464,7 @@ const MatriculationPaymentModule = () => {
                 );
                 setCashierAccountTypeId(assignment?.account_type_id ?? null);
             } catch (error) {
-                console.error("Failed to load cashier fund number:", error);
+                console.error("Failed to load cashier account type:", error);
                 setCashierAccountTypeId(null);
             }
         };
@@ -435,7 +508,6 @@ const MatriculationPaymentModule = () => {
                 payment_status: paymentSummary.paymentStatus,
                 employee_id: employeeId,
             }, auditConfig);
-            setKeepVisiblePaidMatriculationId(row?.id ?? null);
             await fetchStudentData();
             setReceiptData({
                 transaction_no: saveRes?.data?.transaction_no || saveRes?.data?.transaction_id || "",
@@ -718,7 +790,6 @@ const MatriculationPaymentModule = () => {
         setViewReceiptPromptOpen(false);
         await markCancelledPrintIfUnprinted();
         receiptPrintedRef.current = false;
-        setKeepVisiblePaidMatriculationId(null);
         await fetchStudentData();
     };
 
@@ -737,7 +808,6 @@ const MatriculationPaymentModule = () => {
         await markCancelledPrintIfUnprinted();
         setReceiptOpen(false);
         receiptPrintedRef.current = false;
-        setKeepVisiblePaidMatriculationId(null);
         await fetchStudentData();
     };
 
@@ -746,7 +816,6 @@ const MatriculationPaymentModule = () => {
         await markCancelledPrintIfUnprinted();
         setReceiptOpen(false);
         receiptPrintedRef.current = false;
-        setKeepVisiblePaidMatriculationId(null);
         await fetchStudentData();
     };
 
@@ -930,7 +999,56 @@ const MatriculationPaymentModule = () => {
             <hr style={{ border: "1px solid #ccc", width: "100%" }} />
             <br />
 
-            <Box fullWidth sx={{ p: '10px 0px', display: "flex", justifyContent: "flex-end" }}>
+            <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", mb: 2 }}>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>School Year</InputLabel>
+                    <Select
+                        value={selectedYearId}
+                        label="School Year"
+                        onChange={(event) => {
+                            const nextYearId = event.target.value;
+                            const firstSemester = academicTerms.find(
+                                (term) => String(term.year_id) === String(nextYearId),
+                            );
+                            setSelectedYearId(nextYearId);
+                            setSelectedSemesterId(String(firstSemester?.semester_id || ""));
+                        }}
+                    >
+                        {yearOptions.map((term) => (
+                            <MenuItem key={term.year_id} value={String(term.year_id)}>
+                                {term.year_description} - {term.next_year || Number(term.year_description || 0) + 1}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>Semester</InputLabel>
+                    <Select
+                        value={selectedSemesterId}
+                        label="Semester"
+                        onChange={(event) => setSelectedSemesterId(event.target.value)}
+                    >
+                        {semesterOptions.map((term) => (
+                            <MenuItem key={term.semester_id} value={String(term.semester_id)}>
+                                {term.semester_description}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <TextField
+                    size="small"
+                    label="Search student"
+                    value={studentSearch}
+                    onChange={(event) => {
+                        setStudentSearch(event.target.value);
+                        setCurrentPage(1);
+                    }}
+                    placeholder="Name or student number"
+                    sx={{ minWidth: 240 }}
+                />
+            </Box>
+
+            <Box fullWidth sx={{ p: '10px 0px', display: "flex", justifyContent: "flex-end", gap: 1 }}>
                 <Button
                     startIcon={<HistoryToggleOffIcon />}
                     sx={{
@@ -941,6 +1059,18 @@ const MatriculationPaymentModule = () => {
                     onClick={openTransactionHistory}
                 >
                     Transaction History
+                </Button>
+                <Button
+                    startIcon={<AccountBalanceWalletOutlinedIcon />}
+                    sx={{
+                        backgroundColor: colors.header || "maroon",
+                        color: "white",
+                        width: "180px",
+                        "&:hover": { backgroundColor: colors.header || "#5b0000" },
+                    }}
+                    onClick={() => setBalanceListOpen(true)}
+                >
+                    View Balances
                 </Button>
             </Box>
 
@@ -1392,7 +1522,7 @@ const MatriculationPaymentModule = () => {
                                             <TableRow>
                                                 <TableCell>Priority</TableCell>
                                                 <TableCell>Fee</TableCell>
-                                                <TableCell>Fund Number</TableCell>
+                                                <TableCell>Account Type</TableCell>
                                                 <TableCell align="right">Fee Amount</TableCell>
                                             </TableRow>
                                         </TableHead>
@@ -2032,6 +2162,45 @@ const MatriculationPaymentModule = () => {
                         Yes, Close
                     </Button>
                 </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={balanceListOpen}
+                onClose={() => setBalanceListOpen(false)}
+                fullWidth
+                maxWidth="xl"
+                PaperProps={{
+                    sx: {
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        minWidth: { xs: "96vw", md: 1200 },
+                        maxHeight: "94vh",
+                        boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+                    },
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        backgroundColor: colors.header || "#6D2323",
+                        color: "white",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontWeight: "bold",
+                        px: 3,
+                        py: 1.5,
+                    }}
+                >
+                    <Typography color="white" fontWeight="bold">
+                        Student Balances
+                    </Typography>
+                    <IconButton onClick={() => setBalanceListOpen(false)} sx={{ color: "white" }}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ p: 0 }}>
+                    <StudentBalanceList />
+                </DialogContent>
             </Dialog>
 
             <Snackbar

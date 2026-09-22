@@ -107,15 +107,19 @@ router.get('/receipt-counter/active/:active_school_year_id', async (req, res) =>
                 rc.counter,
                 rc.employee_id,
                 rc.account_type_id,
-                at.description AS account_type_description,
-                rc.active_school_year_id
+                act.description AS account_type_description,
+                rc.active_school_year_id,
+                asyt.year_id,
+                asyt.semester_id
              FROM receipt_counter rc
-             LEFT JOIN account_type at ON at.id = rc.account_type_id
+             LEFT JOIN account_type act ON act.id = rc.account_type_id
+             LEFT JOIN active_school_year_table asyt ON asyt.id = rc.active_school_year_id
              WHERE rc.active_school_year_id = ?`,
             [active_school_year_id]
         );
 
-        return res.json(rows);
+        res.json(rows);
+        console.log(rows);
     } catch (error) {
         console.error("Error fetching receipt counter assignments:", error);
         return res.status(500).json({ message: "Internal server error." });
@@ -221,7 +225,7 @@ router.put('/receipt-counter/:id', async (req, res) => {
     try {
         await ensureReceiptCounterAuditColumns();
         const { id } = req.params;
-        const { counter, account_type_id } = req.body;
+        const { counter, account_type_id, year_id, semester_id } = req.body;
         const normalizedCounter = normalizeCounter(counter);
         const normalizedAccountTypeId =
             account_type_id === "" || account_type_id == null ? null : Number(account_type_id);
@@ -249,13 +253,42 @@ router.put('/receipt-counter/:id', async (req, res) => {
         }
 
         const activeSchoolYearId = assignmentRows[0].active_school_year_id;
+        let targetSchoolYearId = activeSchoolYearId;
+
+        if (year_id != null && semester_id != null && year_id !== "" && semester_id !== "") {
+            const [[targetSchoolYear]] = await db3.query(
+                `SELECT id
+                 FROM active_school_year_table
+                 WHERE year_id = ? AND semester_id = ?
+                 LIMIT 1`,
+                [year_id, semester_id],
+            );
+
+            if (!targetSchoolYear) {
+                return res.status(404).json({ message: "Selected school year and semester not found." });
+            }
+
+            targetSchoolYearId = targetSchoolYear.id;
+        }
+
+        const [existingEmployee] = await db3.query(
+            `SELECT id
+             FROM receipt_counter
+             WHERE employee_id = ? AND active_school_year_id = ? AND id <> ?
+             LIMIT 1`,
+            [assignmentRows[0].employee_id, targetSchoolYearId, id],
+        );
+
+        if (existingEmployee.length) {
+            return res.status(409).json({ message: "Employee is already assigned for the selected school year and semester." });
+        }
 
         const [existingCounter] = await db3.query(
             `SELECT id
              FROM receipt_counter
              WHERE counter = ? AND active_school_year_id = ? AND id <> ?
              LIMIT 1`,
-            [normalizedCounter, activeSchoolYearId, id]
+            [normalizedCounter, targetSchoolYearId, id]
         );
 
         if (existingCounter.length) {
@@ -268,7 +301,7 @@ router.put('/receipt-counter/:id', async (req, res) => {
              FROM receipt_counter
              WHERE LEFT(counter, 4) = ? AND active_school_year_id = ? AND id <> ?
              LIMIT 1`,
-            [firstFour, activeSchoolYearId, id]
+            [firstFour, targetSchoolYearId, id]
         );
 
         if (existingPrefix.length) {
@@ -277,9 +310,9 @@ router.put('/receipt-counter/:id', async (req, res) => {
 
         const [result] = await db3.query(
             `UPDATE receipt_counter
-             SET counter = ?, account_type_id = ?
+             SET counter = ?, account_type_id = ?, active_school_year_id = ?
              WHERE id = ?`,
-            [normalizedCounter, normalizedAccountTypeId, id]
+            [normalizedCounter, normalizedAccountTypeId, targetSchoolYearId, id]
         );
 
         if (result.affectedRows === 0) {
@@ -289,7 +322,7 @@ router.put('/receipt-counter/:id', async (req, res) => {
         const { actorId, actorRole } = getAuditActor(req);
         const roleLabel = formatAuditActorRole(actorRole);
         const employeeDetails = await getEmployeeAuditDetails(assignmentRows[0].employee_id);
-        const schoolYearDetails = await getActiveSchoolYearAuditDetails(activeSchoolYearId);
+        const schoolYearDetails = await getActiveSchoolYearAuditDetails(targetSchoolYearId);
         await insertReceiptCounterAuditLog({
             req,
             action: "RECEIPT_COUNTER_UPDATE",

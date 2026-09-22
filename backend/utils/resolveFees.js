@@ -18,6 +18,21 @@ const normalizeAmount = (value) => {
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : 0;
 };
 
+const normalizeCurriculumIds = (value) => {
+  if (Array.isArray(value)) return value.map(Number).filter(Number.isInteger);
+  if (value == null || value === "") return [];
+
+  try {
+    const parsed = JSON.parse(String(value));
+    if (Array.isArray(parsed)) return parsed.map(Number).filter(Number.isInteger);
+  } catch {
+    // Legacy fee rates store a single numeric curriculum ID.
+  }
+
+  const numeric = Number(value);
+  return Number.isInteger(numeric) ? [numeric] : [];
+};
+
 const isNstpFeeCode = (code) => String(code || "").toUpperCase().includes("NSTP");
 
 const isBaseTuitionFee = (fee) => {
@@ -67,7 +82,11 @@ const scoreFeeRate = (rate, context) => {
     context.branch_id == null || context.branch_id === ""
       ? null
       : Number(context.branch_id);
-  const curriculumId =
+  const studentCurriculumId =
+    context.curriculum_id == null || context.curriculum_id === ""
+      ? null
+      : Number(context.curriculum_id);
+  const studentDepartmentCurriculumId =
     context.dprtmnt_curriculum_id == null || context.dprtmnt_curriculum_id === ""
       ? null
       : Number(context.dprtmnt_curriculum_id);
@@ -78,10 +97,7 @@ const scoreFeeRate = (rate, context) => {
 
   const rateBranchId =
     rate.branch_id == null || rate.branch_id === "" ? null : Number(rate.branch_id);
-  const rateCurriculumId =
-    rate.dprtmnt_curriculum_id == null || rate.dprtmnt_curriculum_id === ""
-      ? null
-      : Number(rate.dprtmnt_curriculum_id);
+  const rateCurriculumIds = normalizeCurriculumIds(rate.dprtmnt_curriculum_id);
   const rateYearLevelId = Number(rate.applied_to) === 0 ? null : Number(rate.applied_to);
 
   if (rateBranchId !== null && rateBranchId !== branchId) {
@@ -89,7 +105,13 @@ const scoreFeeRate = (rate, context) => {
   }
 
   if (Number(rate.applies_to_all) !== 1) {
-    if (rateCurriculumId === null || rateCurriculumId !== curriculumId) {
+    const mappedCurriculumIds = Array.isArray(rate.mapped_curriculum_ids)
+      ? rate.mapped_curriculum_ids
+      : [];
+    const curriculumMatches = studentCurriculumId !== null
+      ? mappedCurriculumIds.includes(studentCurriculumId)
+      : rateCurriculumIds.includes(studentDepartmentCurriculumId);
+    if (!curriculumMatches) {
       return -1;
     }
   }
@@ -144,7 +166,10 @@ const pickBestRate = (rates, context) => {
     }
   }
 
-  return rates.find((rate) => Number(rate.is_active) === 1) || null;
+  // Do not fall back to an unrelated specific-curriculum fee rate.
+  // A fee should be returned only when its curriculum, branch, and year-level
+  // scope matches the student, or when it is explicitly marked for all curricula.
+  return null;
 };
 
 const buildFeeLineFromRate = (fee, rate, amount, extra = {}) => ({
@@ -198,7 +223,24 @@ const resolveFees = async ({ db, context }) => {
     WHERE fc.is_active = 1 AND fr.is_active = 1`
   );
 
-  const ratesByFeeId = rateRows.reduce((acc, rate) => {
+  const [departmentCurriculumRows] = await db.query(
+    `SELECT dprtmnt_curriculum_id, curriculum_id
+     FROM dprtmnt_curriculum_table`,
+  );
+  const curriculumByDepartmentMappingId = new Map(
+    departmentCurriculumRows.map((row) => [
+      String(row.dprtmnt_curriculum_id),
+      Number(row.curriculum_id),
+    ]),
+  );
+  const scopedRateRows = rateRows.map((rate) => ({
+    ...rate,
+    mapped_curriculum_ids: normalizeCurriculumIds(rate.dprtmnt_curriculum_id)
+      .map((mappingId) => curriculumByDepartmentMappingId.get(String(mappingId)))
+      .filter((curriculumId) => Number.isInteger(curriculumId)),
+  }));
+
+  const ratesByFeeId = scopedRateRows.reduce((acc, rate) => {
     const key = String(rate.fee_id);
     if (!acc[key]) acc[key] = [];
     acc[key].push(rate);

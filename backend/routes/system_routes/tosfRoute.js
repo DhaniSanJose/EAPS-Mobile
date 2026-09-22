@@ -80,14 +80,30 @@ const normalizeFeeCatalogPayload = (body) => ({
 
 const normalizeFeeRatePayload = (body) => {
   const appliesToAll = normalizeTinyInt(body.applies_to_all, 1) === 1 ? 1 : 0;
-  const appliedTo = normalizeNullableInt(body.applied_to) ?? 0;
+  const rawCurriculumIds = Array.isArray(body.dprtmnt_curriculum_ids)
+    ? body.dprtmnt_curriculum_ids
+    : (() => {
+        if (Array.isArray(body.dprtmnt_curriculum_id)) return body.dprtmnt_curriculum_id;
+        if (typeof body.dprtmnt_curriculum_id === "string") {
+          try {
+            const parsed = JSON.parse(body.dprtmnt_curriculum_id);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            // Keep legacy scalar curriculum IDs supported.
+          }
+        }
+        return [body.dprtmnt_curriculum_id];
+      })();
+  const curriculumIds = rawCurriculumIds
+    .map((value) => normalizeNullableInt(value))
+    .filter((value, index, values) => value !== null && values.indexOf(value) === index);
 
   return {
     feeId: normalizeNullableInt(body.fee_id),
-    dprtmntCurriculumId: appliesToAll ? null : normalizeNullableInt(body.dprtmnt_curriculum_id),
+    dprtmntCurriculumId: appliesToAll ? null : JSON.stringify(curriculumIds),
     branchId: normalizeNullableInt(body.branch_id),
     amount: normalizeAmount(body.amount),
-    appliedTo,
+    appliedTo: normalizeNullableInt(body.applied_to) ?? 0,
     appliesToAll,
     isActive: normalizeTinyInt(body.is_active, 1) === 1 ? 1 : 0,
   };
@@ -114,17 +130,15 @@ const findDuplicateFeeRate = async (conn, payload, excludeFeeRateId = null) => {
     payload.feeId,
     payload.appliedTo,
     payload.appliesToAll,
-    payload.dprtmntCurriculumId,
     payload.branchId,
   ];
 
   let sql = `
-    SELECT fee_rate_id
+    SELECT fee_rate_id, dprtmnt_curriculum_id
     FROM fee_rate
     WHERE fee_id = ?
       AND applied_to = ?
       AND applies_to_all = ?
-      AND (dprtmnt_curriculum_id <=> ?)
       AND (branch_id <=> ?)
   `;
 
@@ -136,7 +150,20 @@ const findDuplicateFeeRate = async (conn, payload, excludeFeeRateId = null) => {
   sql += " LIMIT 1";
 
   const [rows] = await conn.query(sql, params);
-  return rows[0] || null;
+  const normalizeScope = (value) => {
+    if (value == null || value === "") return null;
+    try {
+      const parsed = JSON.parse(String(value));
+      return JSON.stringify((Array.isArray(parsed) ? parsed : [parsed]).map(Number).sort((a, b) => a - b));
+    } catch {
+      return JSON.stringify([Number(value)]);
+    }
+  };
+  const expectedScope = payload.appliesToAll ? null : normalizeScope(payload.dprtmntCurriculumId);
+  return rows.find((row) =>
+    normalizeScope(row.dprtmnt_curriculum_id) === expectedScope &&
+    (!excludeFeeRateId || Number(row.fee_rate_id) !== Number(excludeFeeRateId)),
+  ) || null;
 };
 
 router.get("/scholarship_types", async (req, res) => {
@@ -521,6 +548,7 @@ router.get("/tosf/fee-options", async (req, res) => {
         dc.dprtmnt_id,
         d.dprtmnt_name,
         dc.curriculum_id,
+        c.lock_status,
         c.year_id,
         y.year_description,
         p.program_id,
@@ -529,7 +557,9 @@ router.get("/tosf/fee-options", async (req, res) => {
         p.major
       FROM dprtmnt_curriculum_table dc
       INNER JOIN dprtmnt_table d ON d.dprtmnt_id = dc.dprtmnt_id
-      INNER JOIN curriculum_table c ON c.curriculum_id = dc.curriculum_id
+      INNER JOIN curriculum_table c
+        ON c.curriculum_id = dc.curriculum_id
+       AND c.lock_status = 1
       INNER JOIN year_table y ON y.year_id = c.year_id
       INNER JOIN program_table p ON p.program_id = c.program_id
       ORDER BY d.dprtmnt_name, p.program_code, y.year_description
@@ -747,7 +777,7 @@ router.post("/tosf/fee-rates", CanCreate, async (req, res) => {
     return res.status(400).json({ message: "fee_id is required" });
   }
 
-  if (!payload.appliesToAll && !payload.dprtmntCurriculumId) {
+  if (!payload.appliesToAll && payload.dprtmntCurriculumId === "[]") {
     return res.status(400).json({ message: "dprtmnt_curriculum_id is required unless applies_to_all is enabled" });
   }
 
@@ -771,7 +801,7 @@ router.post("/tosf/fee-rates", CanCreate, async (req, res) => {
         payload.appliedTo,
         payload.appliesToAll,
         payload.isActive,
-      ]
+      ],
     );
 
     const { actorId, roleLabel } = getActorLabel(req);
@@ -796,7 +826,7 @@ router.put("/tosf/fee-rates/:fee_rate_id", CanEdit, async (req, res) => {
     return res.status(400).json({ message: "fee_id is required" });
   }
 
-  if (!payload.appliesToAll && !payload.dprtmntCurriculumId) {
+  if (!payload.appliesToAll && payload.dprtmntCurriculumId === "[]") {
     return res.status(400).json({ message: "dprtmnt_curriculum_id is required unless applies_to_all is enabled" });
   }
 
@@ -822,7 +852,7 @@ router.put("/tosf/fee-rates/:fee_rate_id", CanEdit, async (req, res) => {
         payload.appliesToAll,
         payload.isActive,
         fee_rate_id,
-      ]
+      ],
     );
 
     if (result.affectedRows === 0) {
@@ -1100,6 +1130,7 @@ router.post("/tosf/resolve-fees", async (req, res) => {
     const context = {
       branch_id: req.body.branch_id,
       dprtmnt_curriculum_id: dprtmntCurriculumId,
+      curriculum_id: req.body.curriculum_id,
       year_level_id: req.body.year_level_id,
       tuition_amount: req.body.tuition_amount,
       has_nstp: req.body.has_nstp,

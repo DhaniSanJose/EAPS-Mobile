@@ -478,7 +478,7 @@ router.put('/payment_matriculation/:id', async (req, res) => {
         await connection.beginTransaction();
 
         const [matriculationRows] = await connection.query(
-            `SELECT student_number, last_name, given_name, middle_initial, total_tosf
+            `SELECT student_number, last_name, given_name, middle_initial, total_tosf, active_school_year_id
              FROM matriculation
              WHERE id = ?
              LIMIT 1`,
@@ -506,8 +506,9 @@ router.put('/payment_matriculation/:id', async (req, res) => {
             FROM active_school_year_table AS asyt
             INNER JOIN year_table AS yt ON asyt.year_id = yt.year_id
             INNER JOIN semester_table AS st ON asyt.semester_id = st.semester_id
-            WHERE asyt.astatus = 1
+            WHERE asyt.id = ?
             LIMIT 1`
+            , [matriculationRow.active_school_year_id]
         );
 
         if (!activeSchoolYearRows.length) {

@@ -1012,17 +1012,18 @@ const MobileAnnouncementBanner = ({ slides }) => {
 };
 
 const SectionHeader = ({ icon, label, color }) => (
-  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1.25 }}>
+  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.75, mb: 0.75, px: 1, py: 0.5, borderRadius: "6px", border: "1px solid #eadede", backgroundColor: label === "Personal Information" ? color : "#fff" }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
     <Box
       sx={{
-        width: 22,
-        height: 22,
+        width: 20,
+        height: 20,
         borderRadius: "6px",
-        backgroundColor: `${color}1a`, // ~10% tint of mainButtonColor
+        backgroundColor: label === "Personal Information" ? "rgba(255,255,255,0.18)" : `${color}1a`, // ~10% tint of mainButtonColor
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 12,
+        fontSize: 10,
         flexShrink: 0,
       }}
     >
@@ -1030,15 +1031,21 @@ const SectionHeader = ({ icon, label, color }) => (
     </Box>
     <Typography
       sx={{
-        fontSize: 12.5,
+        fontSize: 10.5,
         fontWeight: 700,
-        color,
+        color: label === "Personal Information" ? "#fff" : color,
         textTransform: "uppercase",
         letterSpacing: "0.05em",
       }}
     >
       {label}
     </Typography>
+    </Box>
+    {label === "Personal Information" && (
+      <Box sx={{ color: "#fff", backgroundColor: color, borderRadius: "5px", px: 0.75, py: 0.25, fontSize: 9, fontWeight: 700 }}>
+        🔒 Cannot be changed
+      </Box>
+    )}
   </Box>
 );
 /* ═══════════════════════════════════════════════════════════
@@ -1050,6 +1057,13 @@ const parseDateValue = (value) => {
   if (!value) return null;
   const parsed = dayjs(value, ["YYYY-MM-DD", "MM/DD/YYYY"], true);
   return parsed.isValid() ? parsed : null;
+};
+
+const formatDateInput = (value) => {
+  const digits = String(value ?? "").replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 };
 
 const BIRTH_WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -1115,12 +1129,12 @@ const DateField = React.forwardRef(function DateField(props, ref) {
   };
 
   const handleTextChange = (e) => {
-    const raw = e.target.value;
-    setText(raw);
-    const parsed = dayjs(raw, format, true);
+    const formatted = formatDateInput(e.target.value);
+    setText(formatted);
+    const parsed = dayjs(formatted, format, true);
     if (parsed.isValid()) {
       onChange?.({ target: { name, value: parsed.format("YYYY-MM-DD") } });
-    } else if (raw === "") {
+    } else if (formatted === "") {
       onChange?.({ target: { name, value: "" } });
     }
   };
@@ -1145,6 +1159,7 @@ const DateField = React.forwardRef(function DateField(props, ref) {
         value={text}
         placeholder={placeholder}
         disabled={disabled}
+        maxLength={10}
         onChange={handleTextChange}
         onClick={openCalendar}
         style={{
@@ -1576,7 +1591,7 @@ const PasswordRulesNotice = ({
       {/* Bilingual "important notice" explaining WHY, in plain terms */}
       <Box
         sx={{
-          display: "flex",
+          display: "none",
           gap: 1.25,
           alignItems: "flex-start",
           bgcolor: "#fff8e6",
@@ -1614,7 +1629,6 @@ const PasswordRulesNotice = ({
       </Box>
 
       {/* Live checklist */}
-      {showChecklist && (
         <Box
           sx={{
             border: "1.5px solid #ddd",
@@ -1625,7 +1639,7 @@ const PasswordRulesNotice = ({
         >
           <Typography
             sx={{
-              fontSize: isMobile ? "14px" : "16px",
+              fontSize: isMobile ? "12px" : "14px",
               color: "#666",
               fontWeight: 700,
               mb: 1,
@@ -1644,7 +1658,7 @@ const PasswordRulesNotice = ({
                   style={{
                     flexShrink: 0,
                     marginTop: 1,
-                    fontSize: 14,
+                    fontSize: 12,
                     color: rule.passed ? "#2e7d32" : "#bdbdbd",
                   }}
                 >
@@ -1653,7 +1667,7 @@ const PasswordRulesNotice = ({
                 <Box>
                   <Typography
                     sx={{
-                      fontSize: isMobile ? "15px" : "15.5px",
+                      fontSize: isMobile ? "13px" : "13.5px",
                       color: rule.passed ? "#2e7d32" : "#000000",
                       fontWeight: rule.passed ? 700 : 500,
                       lineHeight: 1.45,
@@ -1663,7 +1677,7 @@ const PasswordRulesNotice = ({
                   </Typography>
                   <Typography
                     sx={{
-                      fontSize: isMobile ? "14px" : "15px",
+                      fontSize: isMobile ? "12px" : "13px",
                       color: rule.passed ? "#2e7d32" : "#000000",
                       fontStyle: "italic",
                       lineHeight: 1.45,
@@ -1674,7 +1688,6 @@ const PasswordRulesNotice = ({
             ))}
           </Box>
         </Box>
-      )}
     </Box>
   );
 };
@@ -2414,9 +2427,9 @@ const ReviewApplicationModal = ({
 }) => {
   if (!open) return null;
 
-  const Field = ({ label, value, size = 14 }) => (
+  const Field = ({ label, value, size = 12 }) => (
     <Box>
-      <Typography sx={{ fontSize: 11, color: "#666" }}>{label}</Typography>
+      <Typography sx={{ fontSize: 9, color: "#666" }}>{label}</Typography>
       <Typography sx={{ fontSize: size, fontWeight: 700, color: "#1a1a1a" }}>
         {value?.toString().trim() ? value : "—"}
       </Typography>
@@ -2443,10 +2456,11 @@ const ReviewApplicationModal = ({
           bgcolor: mainButtonColor,
           color: "white",
           display: "flex",
+          justifyContent: "space-between",
           alignItems: "center",
           fontWeight: "bold",
-          px: 3,
-          py: 2,
+          px: 2,
+          py: 0.75,
         }}
       >
         <Box display="flex" alignItems="center" gap={1.5}>
@@ -2454,8 +2468,8 @@ const ReviewApplicationModal = ({
             sx={{
               backgroundColor: "rgba(255,255,255,0.2)",
               borderRadius: "50%",
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -2467,14 +2481,14 @@ const ReviewApplicationModal = ({
           <Box>
             <Typography
               fontWeight="bold"
-              fontSize={16}
+              fontSize={14}
               color="white"
               lineHeight={1.2}
             >
               Review Your Information
             </Typography>
             <Typography
-              fontSize={13}
+              fontSize={11}
               color="rgba(255,255,255,0.85)"
               lineHeight={1.2}
             >
@@ -2482,11 +2496,20 @@ const ReviewApplicationModal = ({
             </Typography>
           </Box>
         </Box>
+        <IconButton
+          onClick={onClose}
+          disabled={isSubmitting}
+          sx={{ color: "white", p: 0.5 }}
+          aria-label="Close review information"
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1 }}>
+      <DialogContent sx={{ px: { xs: 1.5, sm: 2 }, pt: 0.75, pb: 0.5, backgroundColor: "#fff" }}>
+        <br />
         {/* Icon, same visual language as the success modal */}
-        <Box sx={{ display: "flex", justifyContent: "center", mb: 2, mt: 4 }}>
+        <Box sx={{ display: "none", justifyContent: "center", mb: 2, mt: 4 }}>
           <Box
             sx={{
               width: 64,
@@ -2509,17 +2532,17 @@ const ReviewApplicationModal = ({
             display: "flex",
             gap: 1,
             alignItems: "flex-start",
-            bgcolor: "#fffbf2",
-            border: "1px solid #f5a623",
+            bgcolor: "#fff8e6",
+            border: "1px solid #f5c36a",
             borderRadius: "8px",
-            p: 1.5,
-            mb: 2,
+            p: 1,
+            mb: 1,
           }}
         >
           <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
-          <Typography fontSize={13.5} color="#5d4037" lineHeight={1.5}>
+          <Typography fontSize={9.5} color="#6d4c1d" lineHeight={1.4}>
             After you confirm, you'll be asked to set up Google Authenticator to
-            secure your account. Some fields below cannot be changed later —
+            secure your account. Some fields below cannot be changed later,
             please check them carefully.
           </Typography>
         </Box>
@@ -2528,19 +2551,19 @@ const ReviewApplicationModal = ({
         {/* Single summary card, now organized into three clear sections */}
         <Box
           sx={{
-            border: `1.5px solid ${mainButtonColor}`,
-            borderRadius: "12px",
+            border: "none",
+            borderRadius: "0",
             overflow: "hidden",
             mb: 1,
           }}
         >
-          <Box sx={{ backgroundColor: mainButtonColor, px: 2, py: 1 }}>
+          <Box sx={{ display: "none", backgroundColor: mainButtonColor, px: 2, py: 1 }}>
             <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>
               Application Summary
             </Typography>
           </Box>
 
-          <Box sx={{ p: 2, backgroundColor: "#fafcff" }}>
+          <Box sx={{ p: 0, backgroundColor: "#fff" }}>
             {/* ══════════════ PERSONAL INFORMATION ══════════════ */}
             <SectionHeader
               icon="🧑"
@@ -2548,14 +2571,11 @@ const ReviewApplicationModal = ({
               color={mainButtonColor}
             />
 
-            <Box sx={{ mb: 1.5 }}>
-              <Field label="Campus" value={data.campusLabel} size={14.5} />
+            <Box sx={{ mb: 1 }}>
+              <Field label="Campus" value={data.campusLabel} size={12.5} />
             </Box>
 
-            <Typography sx={{ fontSize: 12.5, color: "#000", mb: 0.25 }}>
-              Applicant Name
-            </Typography>
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1.5 }}>
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1 }}>
               <Box sx={{ flex: "1 1 30%", minWidth: 100 }}>
                 <Field label="First Name" value={data.firstName} />
               </Box>
@@ -2569,10 +2589,10 @@ const ReviewApplicationModal = ({
 
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ flex: "1 1 45%", minWidth: 130 }}>
-                <Field label="Birth Date" value={data.birthday} size={13.5} />
+                <Field label="Birth Date" value={data.birthday} size={11.5} />
               </Box>
               <Box sx={{ flex: "1 1 45%", minWidth: 100 }}>
-                <Field label="Age" value={data.age} size={13.5} />
+                <Field label="Age" value={data.age} size={11.5} />
               </Box>
             </Box>
 
@@ -2582,24 +2602,24 @@ const ReviewApplicationModal = ({
                 display: "flex",
                 gap: 1,
                 alignItems: "flex-start",
-                backgroundColor: "#fff3cd",
-                border: "1px solid #d4a017",
+                backgroundColor: "#fff0f3",
+                border: "1px solid #f1ccd5",
                 borderRadius: "8px",
-                p: 1.1,
-                mt: 1,
+                p: 0.9,
+                mt: 0.75,
               }}
             >
               <span style={{ fontSize: 13, flexShrink: 0 }}>🎂</span>
               <Typography
-                sx={{ fontSize: 11.5, color: "#5d4500", lineHeight: 1.45 }}
+                sx={{ fontSize: 9.5, color: "#5d4500", lineHeight: 1.4 }}
               >
-                Double-check your <strong>Birth Date</strong> and computed{" "}
-                <strong>Age</strong> — used for eligibility checks and cannot be
+                Double-check your <strong>Birth Date</strong> and{" "}
+                <strong>Age</strong>, It used for eligibility checks and cannot be
                 edited after submission.
               </Typography>
             </Box>
 
-            <Box sx={{ borderTop: "1px solid #e8eaff", my: 2 }} />
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1 }} />
 
             {/* ══════════════ ACADEMIC INFORMATION ══════════════ */}
             <SectionHeader
@@ -2608,32 +2628,41 @@ const ReviewApplicationModal = ({
               color={mainButtonColor}
             />
 
-            <Box sx={{ mb: 1 }}>
-              <Field
-                label="Program Level"
-                value={data.academicProgramLabel}
-                size={13.5}
-              />
-            </Box>
-            <Box sx={{ mb: 1.5 }}>
-              <Field
-                label="Applying As"
-                value={data.applyingAsLabel}
-                size={13.5}
-              />
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexWrap: "wrap",
+                mb: 1,
+              }}
+            >
+              <Box sx={{ flex: "1 1 45%", minWidth: 150 }}>
+                <Field
+                  label="Program Level"
+                  value={data.academicProgramLabel}
+                  size={11.5}
+                />
+              </Box>
+              <Box sx={{ flex: "1 1 45%", minWidth: 150 }}>
+                <Field
+                  label="Applying As"
+                  value={data.applyingAsLabel}
+                  size={11.5}
+                />
+              </Box>
             </Box>
 
             <Box
               sx={{
-                backgroundColor: "#fff3cd",
-                border: "1.5px dashed #d4a017",
+                backgroundColor: "#fff0f3",
+                border: "1.5px dashed #f1ccd5",
                 borderRadius: "8px",
-                p: 1.25,
+                p: 1,
               }}
             >
               <Typography
                 sx={{
-                  fontSize: 11,
+                  fontSize: 9,
                   color: "#7a5c00",
                   fontWeight: 700,
                   letterSpacing: "0.04em",
@@ -2643,7 +2672,7 @@ const ReviewApplicationModal = ({
               </Typography>
               <Typography
                 sx={{
-                  fontSize: 13.5,
+                  fontSize: 11.5,
                   fontWeight: 700,
                   color: "#5d4500",
                   mt: 0.25,
@@ -2653,7 +2682,7 @@ const ReviewApplicationModal = ({
               </Typography>
             </Box>
 
-            <Box sx={{ borderTop: "1px solid #e8eaff", my: 2 }} />
+            <Box sx={{ borderTop: "1px solid #e8eaff", my: 1 }} />
 
             {/* ══════════════ ACCOUNT INFORMATION ══════════════ */}
             <SectionHeader
@@ -2662,8 +2691,8 @@ const ReviewApplicationModal = ({
               color={mainButtonColor}
             />
 
-            <Box sx={{ mb: 1.5 }}>
-              <Field label="Email Address" value={data.email} size={13.5} />
+            <Box sx={{ mb: 1 }}>
+              <Field label="Email Address" value={data.email} size={11.5} />
             </Box>
 
             <Box
@@ -2674,12 +2703,12 @@ const ReviewApplicationModal = ({
                 backgroundColor: "#f0f7ff",
                 border: "1px solid #b3d4ff",
                 borderRadius: "8px",
-                p: 1.25,
+                p: 1,
               }}
             >
               <span style={{ fontSize: 14, flexShrink: 0 }}>ℹ️</span>
               <Typography
-                sx={{ fontSize: 12, color: "#1a237e", lineHeight: 1.5 }}
+                sx={{ fontSize: 10, color: "#1a237e", lineHeight: 1.4 }}
               >
                 Your <strong>Applicant Number</strong> will be generated after
                 you complete the next step (Google Authenticator setup). You'll
@@ -2690,9 +2719,9 @@ const ReviewApplicationModal = ({
 
             <Typography
               sx={{
-                fontSize: 11.5,
+                fontSize: 9.5,
                 color: "#888",
-                mt: 2,
+                mt: 1,
                 fontStyle: "italic",
                 lineHeight: 1.5,
               }}
@@ -2713,6 +2742,7 @@ const ReviewApplicationModal = ({
             borderRadius: "8px",
             p: 1.25,
             mt: 1.5,
+            display: "none",
           }}
         >
           <span style={{ fontSize: 14, flexShrink: 0 }}>🎂</span>
@@ -2726,10 +2756,10 @@ const ReviewApplicationModal = ({
 
       <DialogActions
         sx={{
-          px: { xs: 2, sm: 3 },
-          pb: 2.5,
-          pt: 1.5,
-          gap: 1.5,
+          px: { xs: 1.5, sm: 2 },
+          pb: 1.25,
+          pt: 0.75,
+          gap: 1,
           display: "flex",
           flexDirection: isMobile ? "column-reverse" : "row",
         }}
@@ -2741,14 +2771,14 @@ const ReviewApplicationModal = ({
           disabled={isSubmitting}
           onClick={onClose}
           sx={{
-            height: 46,
+            height: 40,
             borderRadius: "10px",
             fontWeight: 600,
-            fontSize: 15,
+            fontSize: 13,
             textTransform: "none",
           }}
         >
-          ← Edit My Information
+          Edit My Information
         </Button>
         <Button
           fullWidth
@@ -2756,12 +2786,12 @@ const ReviewApplicationModal = ({
           disabled={isSubmitting}
           onClick={onConfirm}
           sx={{
-            height: 46,
+            height: 40,
             borderRadius: "10px",
             backgroundColor: mainButtonColor,
             color: "#fff",
             fontWeight: 700,
-            fontSize: 15,
+            fontSize: 13,
             textTransform: "none",
             boxShadow: "none",
             "&:hover": {
@@ -2777,7 +2807,7 @@ const ReviewApplicationModal = ({
               Checking Your Details…
             </Box>
           ) : (
-            "Looks Good — Set Up Security"
+            "Submit"
           )}
         </Button>
       </DialogActions>
@@ -3812,11 +3842,20 @@ const Register = () => {
 
   const handleBranchSelect = (e) => {
     const selectedId = e.target.value;
+    const campusChanged = String(selectedId) !== String(branchId);
+
     setBranchId(selectedId);
     setAcademicProgram("");
     setApplyingAs("");
     setSelectedCurriculum("");
-    if (registerStep >= 3) setRegisterStep(2);
+
+    // A campus change invalidates the later campus-specific steps. Always
+    // return the applicant to the first step so the name and birth details
+    // can be reviewed before continuing with the new campus.
+    if (campusChanged) {
+      setRegisterStep(1);
+      setErrors({});
+    }
   };
 
   useEffect(() => {
@@ -4394,6 +4433,8 @@ const Register = () => {
                       border: fieldBorder(errors.academicProgram),
                       borderRadius: UNIFORM_RADIUS,
                       width: "100%",
+                      outline: "none",
+                      boxShadow: "none",
                       appearance: "none",
                       paddingRight: "2.2rem",
                     }}
@@ -4464,6 +4505,8 @@ const Register = () => {
                       border: fieldBorder(errors.applyingAs),
                       borderRadius: UNIFORM_RADIUS,
                       width: "100%",
+                      outline: "none",
+                      boxShadow: "none",
                       appearance: "none",
                       paddingRight: "2.2rem",
                     }}
@@ -4712,7 +4755,17 @@ const Register = () => {
 
               <div className="TextField" style={{ position: "relative" }}>
                 <label style={{ color: "#333" }}>
-              Email Address<span style={{ color: "red" }}> *</span>
+                  Email Address<span style={{ color: "red" }}> *</span>
+                  <span
+                    style={{
+                      color: "red",
+                      fontSize: "8px",
+                      fontWeight: 500,
+                      marginLeft: "6px",
+                    }}
+                  >
+                    Each email can only be used once.
+                  </span>
                 </label>
                 <input
                   required
@@ -4822,17 +4875,6 @@ const Register = () => {
                     ?
                   </span>
                 )}
-                <span
-                  style={{
-                    fontSize: "16px",
-                    color: "red",
-                    marginTop: "4px",
-                    display: "block",
-                  }}
-                >
-                  Note: Each email can only be used once. Use a valid and unused
-                  email address.
-                </span>
               </div>
 
                 <div
@@ -4865,13 +4907,6 @@ const Register = () => {
               <>
               {/* Bilingual password requirements notice — shown BEFORE the fields
                   so applicants get familiar with the rule before they start typing */}
-              <PasswordRulesNotice
-                password={usersData.password}
-                isMobile={isMobile}
-                mainButtonColor={mainButtonColor}
-                showChecklist={passwordTouched}
-              />
-
               <div
                 style={{
                   display: "flex",
@@ -5004,6 +5039,13 @@ const Register = () => {
                   )}
                 </div>
               </div>
+
+              <PasswordRulesNotice
+                password={usersData.password}
+                isMobile={isMobile}
+                mainButtonColor={mainButtonColor}
+                showChecklist={true}
+              />
 
                 <div
                   tabIndex={0}
@@ -5148,16 +5190,45 @@ const Register = () => {
               )}
 
               <div
-                className="LinkContainer RegistrationLink"
                 style={{
-                  margin: "0.1rem 0rem",
-                  fontSize: isMobile ? "15px" : undefined,
+                  width: "100%",
+                  margin: "10px 0 0",
+                  padding: "9px 10px",
+                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  backgroundColor: "#fff1f1",
+                  borderRadius: "6px",
+                  border: "1px solid #f4d2d2",
                 }}
               >
-                <p>Already have an account?</p>
-                <span>
-                  <Link to={"/login_applicant"}>Login here</Link>
-                </span>
+                <div style={{ textAlign: "left", lineHeight: 1.15 }}>
+                  <div style={{ color: "#7a0000", fontWeight: 700, fontSize: isMobile ? "12px" : "11px" }}>
+                    Already have an account?
+                  </div>
+                  <div style={{ color: "#777", fontSize: isMobile ? "10px" : "9px", marginTop: "3px" }}>
+                    Login to continue your application.
+                  </div>
+                </div>
+                <Link
+                  to="/login_applicant"
+                  style={{
+                    flexShrink: 0,
+                    padding: "6px 14px",
+                    border: "1px solid #b40000",
+                    borderRadius: "5px",
+                    color: "#8b0000",
+                    backgroundColor: "#fff",
+                    fontSize: isMobile ? "10px" : "9px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Login here <span aria-hidden="true">➜</span>
+                </Link>
               </div>
             </div>
 
@@ -5222,7 +5293,13 @@ const Register = () => {
           <Alert
             severity={snack.severity}
             onClose={handleClose}
-            sx={{ width: "100%" }}
+            sx={{
+              width: "100%",
+              fontSize: "12px",
+              "& .MuiAlert-message": {
+                fontSize: "12px",
+              },
+            }}
           >
             {snack.message}
           </Alert>
@@ -5697,7 +5774,7 @@ const Register = () => {
                 },
               }}
             >
-              I Agree — Continue to Registration
+              Continue to Registration
             </Button>
           </DialogActions>
         </Dialog>

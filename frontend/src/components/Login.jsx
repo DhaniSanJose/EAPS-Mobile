@@ -1369,16 +1369,45 @@ const Login = ({ setIsAuthenticated }) => {
                 information.
               </Typography>*/}
               <div
-                className="LinkContainer RegistrationLink"
                 style={{
-                  marginTop: "-20px",
-                  fontSize: isMobile ? "15px" : undefined,
+                  width: "100%",
+                  marginTop: "-8px",
+                  padding: "9px 10px",
+                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  backgroundColor: "#fff1f1",
+                  borderRadius: "6px",
+                  border: "1px solid #f4d2d2",
                 }}
               >
-                <p>For New and Incomplete Applicants.</p>
-                <span>
-                  <Link to={"/register"}>Register for ECAT</Link>
-                </span>
+                <div style={{ textAlign: "left", lineHeight: 1.15 }}>
+                  <div style={{ color: "#7a0000", fontWeight: 700, fontSize: isMobile ? "12px" : "11px" }}>
+                    New applicant?
+                  </div>
+                  <div style={{ color: "#777", fontSize: isMobile ? "10px" : "9px", marginTop: "3px" }}>
+                    Register for ECAT to create your applicant account.
+                  </div>
+                </div>
+                <Link
+                  to="/register"
+                  style={{
+                    flexShrink: 0,
+                    padding: "6px 9px",
+                    border: "1px solid #b40000",
+                    borderRadius: "5px",
+                    color: "#8b0000",
+                    backgroundColor: "#fff",
+                    fontSize: isMobile ? "10px" : "9px",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Register for ECAT <span aria-hidden="true">➜</span>
+                </Link>
               </div>
               
               {/* <Button

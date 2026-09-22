@@ -317,6 +317,20 @@ const renderCorPdf = async (page, student, token) => {
       ),
   );
 
+  // Match the on-screen COR before capturing the PDF. The QR code, logo,
+  // profile image, and tuition mark may finish loading after the data state is
+  // ready, so wait for all rendered images and fonts to settle first.
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) await document.fonts.ready;
+  });
+  await page.waitForFunction(
+    () =>
+      Array.from(document.querySelectorAll("#server-cor-export img")).every(
+        (image) => image.complete,
+      ),
+    { timeout: 15000, polling: 50 },
+  );
+
   const pdf = await withTimeout(
     page.pdf({
       width: "210mm",

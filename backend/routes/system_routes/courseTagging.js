@@ -1733,6 +1733,7 @@ router.get("/department-sections", async (req, res) => {
       c.curriculum_id,
       ds.id as department_and_program_section_id,
       ds.section_id,
+      ds.year_level_id,
       pt.program_description,
       pt.program_code,
       pt.major,

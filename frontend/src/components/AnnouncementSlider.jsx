@@ -268,39 +268,39 @@ const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = fal
                     <IconButton
                         onClick={e => { e.stopPropagation(); closeLightbox(); }}
                         sx={{
-                            position: "fixed", top: 25, left: 50, zIndex: 10000,
-                            width: 75, height: 75,
+                            position: "fixed", top: 18, left: 32, zIndex: 10000,
+                            width: 45, height: 45,
                             background: "rgba(255,255,255,0.15)", color: "#fff",
                             "&:hover": { background: "rgba(220,50,50,0.75)" },
                         }}
                     >
-                        <CloseIcon sx={{ fontSize: 28 }} />
+                        <CloseIcon sx={{ fontSize: 18 }} />
                     </IconButton>
 
                     {/* Prev */}
                     <IconButton
                         onClick={e => { e.stopPropagation(); lightboxPrev(); }}
                         sx={{
-                            position: "fixed", left: 50, top: "50%", transform: "translateY(-50%)",
-                            zIndex: 10000, width: 75, height: 75,
+                            position: "fixed", left: 32, top: "50%", transform: "translateY(-50%)",
+                            zIndex: 10000, width: 45, height: 45,
                             background: "rgba(255,255,255,0.15)", color: "#fff",
                             "&:hover": { background: "rgba(255,255,255,0.3)" },
                         }}
                     >
-                        <ArrowBackIosNewIcon sx={{ fontSize: 28 }} />
+                        <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
                     </IconButton>
 
                     {/* Next */}
                     <IconButton
                         onClick={e => { e.stopPropagation(); lightboxNext(); }}
                         sx={{
-                            position: "fixed", right: 50, top: "50%", transform: "translateY(-50%)",
-                            zIndex: 10000, width: 75, height: 75,
+                            position: "fixed", right: 32, top: "50%", transform: "translateY(-50%)",
+                            zIndex: 10000, width: 45, height: 45,
                             background: "rgba(255,255,255,0.15)", color: "#fff",
                             "&:hover": { background: "rgba(255,255,255,0.3)" },
                         }}
                     >
-                        <ArrowForwardIosIcon sx={{ fontSize: 28 }} />
+                        <ArrowForwardIosIcon sx={{ fontSize: 18 }} />
                     </IconButton>
 
                     {/* ── Main lightbox card: image left + details right ── */}
@@ -480,12 +480,12 @@ const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = fal
                         </AnimatePresence>
 
                         <IconButton onClick={e => { e.stopPropagation(); goPrev(); }}
-                            sx={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.7)", color: "#fff", width: 36, height: 36, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
-                            <ArrowBackIosNewIcon sx={{ fontSize: 16 }} />
+                            sx={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.7)", color: "#fff", width: 26, height: 26, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                            <ArrowBackIosNewIcon sx={{ fontSize: 11 }} />
                         </IconButton>
                         <IconButton onClick={e => { e.stopPropagation(); goNext(); }}
-                            sx={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.7)", color: "#fff", width: 36, height: 36, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
-                            <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
+                            sx={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", zIndex: 10, background: "rgba(0,0,0,0.7)", color: "#fff", width: 26, height: 26, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                            <ArrowForwardIosIcon sx={{ fontSize: 11 }} />
                         </IconButton>
                     </div>
 
@@ -537,12 +537,12 @@ const AnnouncementSlider = ({ alignCenter = false, stack = false, embedded = fal
                 onMouseLeave={() => setIsHovered(false)}
             >
                 <IconButton onClick={goPrev}
-                    sx={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", zIndex: 40, background: "rgba(0,0,0,0.7)", color: "#fff", width: 40, height: 40, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
-                    <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
+                    sx={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", zIndex: 40, background: "rgba(0,0,0,0.7)", color: "#fff", width: 28, height: 28, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                    <ArrowBackIosNewIcon sx={{ fontSize: 13 }} />
                 </IconButton>
                 <IconButton onClick={goNext}
-                    sx={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", zIndex: 40, background: "rgba(0,0,0,0.7)", color: "#fff", width: 40, height: 40, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
-                    <ArrowForwardIosIcon sx={{ fontSize: 18 }} />
+                    sx={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", zIndex: 40, background: "rgba(0,0,0,0.7)", color: "#fff", width: 28, height: 28, "&:hover": { background: "rgba(0,0,0,0.9)" } }}>
+                    <ArrowForwardIosIcon sx={{ fontSize: 13 }} />
                 </IconButton>
 
                 <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: "inherit" }}>

@@ -64,6 +64,7 @@ const isStaffStudentPath = (path) =>
   path === "/student_enrollment" ||
   path === "/student_grade_file" ||
   path === "/student_scholarship_list" ||
+  path === "/student_balance_list" ||
   path === "/student_online_requirements_admin" ||
   path === "/student_online_requirements_college" ||
   path === "/student_online_requirements_registrar";

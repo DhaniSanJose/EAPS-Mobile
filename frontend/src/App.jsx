@@ -274,18 +274,13 @@ const PhysicalNeuroExam = lazy(() => import("./medical_management/PhysicalNeuroE
 // ------------------------------------------------------------
 // PAGES
 // ------------------------------------------------------------
-const AccountDashboard = lazy(() => import("./pages/AccountDashboard"));
-const AdmissionDashboardPanel = lazy(() => import("./pages/AdmissionDashboard"));
 const AdmissionOfficerDashboard = lazy(() => import("./pages/AdmissionOfficerDashboard"));
 const ApplicantDashboard = lazy(() => import("./pages/ApplicantDashboard"));
-const CourseManagement = lazy(() => import("./pages/CourseManagement"));
-const DepartmentManagement = lazy(() => import("./pages/DepartmentDashboard"));
 const EnrollmentOfficerDashboard = lazy(() => import("./pages/EnrollmentOfficerDashboard"));
 const FacultyDashboard = lazy(() => import("./pages/FacultyDashboard"));
 const RegistrarDashboard = lazy(() => import("./pages/RegistrarDashboard"));
 const ScheduleFilterer = lazy(() => import("./pages/SchedulePlottingFilter"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
-const SystemDashboardPanel = lazy(() => import("./pages/SystemDashboard"));
 
 // ------------------------------------------------------------
 // REGISTRAR
@@ -359,6 +354,7 @@ const ChangeGradingPeriod = lazy(() => import("./system_management/ChangeYearGra
 const EmailTemplateManager = lazy(() => import("./system_management/EmailTemplateManager"));
 const EvaluationCRUD = lazy(() => import("./system_management/EvaluationCrud"));
 const MatriculationPaymentModule = lazy(() => import("./system_management/MatriculationPaymentModule"));
+const StudentBalanceList = lazy(() => import("./system_management/StudentBalanceList"));
 const PaymentExportingModule = lazy(() => import("./system_management/PaymentExportingModule"));
 const ProgramSlotLimit = lazy(() => import("./system_management/ProgramSlotLimit"));
 const ReceiptCounterAssignment = lazy(() => import("./system_management/ReceiptCounterAssignment"));
@@ -686,10 +682,12 @@ function App() {
                       <Route path="/applicant_dashboard" element={<ProtectedRoute><ForcePasswordGuard><ApplicantDashboard profileImage={profileImage} setProfileImage={setProfileImage} /></ForcePasswordGuard></ProtectedRoute>} />
                       <Route path="/enrollment_officer_dashboard" element={<ProtectedRoute><ForcePasswordGuard><EnrollmentOfficerDashboard /></ForcePasswordGuard></ProtectedRoute>} />
                       <Route path="/admission_officer_dashboard" element={<ProtectedRoute><ForcePasswordGuard><AdmissionOfficerDashboard /></ForcePasswordGuard></ProtectedRoute>} />
-                      <Route path="/admission_dashboard" element={<ProtectedRoute><AdmissionDashboardPanel /></ProtectedRoute>} />
-                      <Route path="/department_dashboard" element={<ProtectedRoute><DepartmentManagement /></ProtectedRoute>} />
-                      <Route path="/system_dashboard" element={<ProtectedRoute><SystemDashboardPanel /></ProtectedRoute>} />
-                      <Route path="/account_dashboard" element={<ProtectedRoute><AccountDashboard /></ProtectedRoute>} />
+                      {/* Legacy dashboard URLs: keep old bookmarks working while
+                          the Sidebar becomes the direct module navigation. */}
+                      <Route path="/admission_dashboard" element={<Navigate to="/admission_applicant_list" replace />} />
+                      <Route path="/department_dashboard" element={<Navigate to="/department_section_panel" replace />} />
+                      <Route path="/system_dashboard" element={<Navigate to="/settings" replace />} />
+                      <Route path="/account_dashboard" element={<Navigate to="/user_page_access" replace />} />
                       <Route path="/select_college" element={<ProtectedRoute><ScheduleFilterer /></ProtectedRoute>} />
                       <Route path="/student_dashboard" element={<GuardedRoute allowedRoles={"student"}><StudentDashboard profileImage={profileImage} setProfileImage={setProfileImage} /></GuardedRoute>} />
 
@@ -726,7 +724,7 @@ function App() {
                       <Route path="/student_accounts" element={<ProtectedRoute><StudentAccounts /></ProtectedRoute>} />
                       <Route path="/migration_data_panel" element={<ProtectedRoute><MigrationDataPanel /></ProtectedRoute>} />
                       <Route path="/upload_applicants" element={<ProtectedRoute><UploadApplicants /></ProtectedRoute>} />
-                      <Route path="/page_crud" element={<ProtectedRoute><PageManagement /></ProtectedRoute>} />
+                      <Route path="/page_management" element={<ProtectedRoute><PageManagement /></ProtectedRoute>} />
                       <Route path="/user_page_access" element={<ProtectedRoute><UserPageAccess /></ProtectedRoute>} />
 
                       {/* ---------------------------------------------------------- */}
@@ -780,7 +778,7 @@ function App() {
                       {/* COURSE MANAGEMENT                                          */}
                       {/* ---------------------------------------------------------- */}
                       <Route path="/subject_management" element={<ProtectedRoute><SubjectManagement /></ProtectedRoute>} />
-                      <Route path="/course_management" element={<ProtectedRoute><SubjectManagement /></ProtectedRoute>} />
+                      <Route path="/course_management" element={<Navigate to="/program_management" replace />} />
                       <Route path="/program_tagging_management" element={<ProtectedRoute><ProgramTaggingManagement /></ProtectedRoute>} />
                       <Route path="/course_tagged" element={<ProtectedRoute><AcademicSubjectManagement /></ProtectedRoute>} />
                       <Route path="/program_management" element={<ProtectedRoute><ProgramManagement /></ProtectedRoute>} />
@@ -941,6 +939,7 @@ function App() {
                       <Route path="/announcement" element={<ProtectedRoute><Announcement /></ProtectedRoute>} />
                       <Route path="/assign_receipt_counter" element={<ProtectedRoute><ReceiptCounterAssignment /></ProtectedRoute>} />
                       <Route path="/matriculation_payment" element={<ProtectedRoute><MatriculationPaymentModule /></ProtectedRoute>} />
+                      <Route path="/student_balance_list" element={<ProtectedRoute><StudentBalanceList /></ProtectedRoute>} />
                       <Route path="/student_scholarship_list" element={<ProtectedRoute allowedRoles={["administrator", "superadmin", "technical"]}><StudentScholarshipList /></ProtectedRoute>} />
                       <Route path="/admin_branches" element={<ProtectedRoute><AdminBranches /></ProtectedRoute>} />
                     </Routes>
