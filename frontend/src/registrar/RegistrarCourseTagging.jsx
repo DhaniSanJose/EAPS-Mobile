@@ -1013,6 +1013,9 @@ const RegistrarCourseTagging = () => {
       });
       return;
     }
+    // Clear the previous student's section immediately while the new record loads.
+    setSelectedSection("");
+    setPendingSectionId("");
     try {
       const response = await axios.post(
         `${API_BASE_URL}/api/student-tagging`,
@@ -1073,6 +1076,12 @@ const RegistrarCourseTagging = () => {
       if (resolvedDepartmentId != null && String(resolvedDepartmentId).trim() !== "") {
         setPendingSectionId(nextSectionId);
         setSelectedDepartment(String(resolvedDepartmentId));
+        // If the department did not change, its effect will not run. Apply the
+        // new student's section directly in that case.
+        if (String(selectedDepartment) === String(resolvedDepartmentId)) {
+          setSelectedSection(nextSectionId);
+          setPendingSectionId("");
+        }
       } else {
         setSelectedSection(nextSectionId);
       }
@@ -1102,6 +1111,8 @@ const RegistrarCourseTagging = () => {
       setUserFirstName(null);
       setUserMiddleName(null);
       setUserLastName(null);
+      setSelectedSection("");
+      setPendingSectionId("");
       setSnack({
         open: true,
         message: getStudentSearchErrorMessage(error),
