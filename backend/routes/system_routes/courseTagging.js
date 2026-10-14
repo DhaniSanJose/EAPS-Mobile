@@ -16,6 +16,13 @@ const {
 } = require("../../utils/registrarScopeService");
 
 const router = express.Router();
+// Official enrollment mutations remain staff-only; mobile submissions use request tables.
+router.use((req,res,next) => {
+  if (req.method !== "GET" && !["/check-student-balance", "/check-prerequisite", "/check-prerequisites-batch", "/student-tagging", "/student-tagging-batch", "/student-tagging/dprtmnt"].includes(req.path) && req.user?.role === "student") {
+    return res.status(403).json({ error:"Students must submit an enrollment request" });
+  }
+  next();
+});
 
 const formatAuditActorRole = (role) => {
   const safeRole = String(role || "registrar").trim();
@@ -534,15 +541,15 @@ router.post("/add-all-to-enrolled-courses", async (req, res) => {
         await db3.query(
           `UPDATE student_status_table
            SET enrolled_status = 1, active_curriculum = ?, active_school_year_id = ?
-           WHERE student_number = ?`,
-          [curriculumID, activeSchoolYearId, user_id],
+           WHERE student_number = ? AND active_school_year_id = ?`,
+          [curriculumID, activeSchoolYearId, user_id, activeSchoolYearId],
         );
       } else {
         await db3.query(
           `UPDATE student_status_table
            SET enrolled_status = 1, active_curriculum = ?, year_level_id = ?, active_school_year_id = ?
-           WHERE student_number = ?`,
-          [curriculumID, year_level, activeSchoolYearId, user_id],
+           WHERE student_number = ? AND active_school_year_id = ?`,
+          [curriculumID, year_level, activeSchoolYearId, user_id, activeSchoolYearId],
         );
       }
 
@@ -2733,7 +2740,7 @@ router.post("/add-all-to-enrolled-courses-summer", async (req, res) => {
     const updateStatusSql = `
       UPDATE student_status_table
       SET enrolled_status = 1, active_curriculum = ?, year_level_id = ?, active_school_year_id = ?
-      WHERE student_number = ?
+      WHERE student_number = ? AND active_school_year_id = ?
     `;
 
     await db3.query(updateStatusSql, [
@@ -2741,6 +2748,7 @@ router.post("/add-all-to-enrolled-courses-summer", async (req, res) => {
       year_level,
       activeSchoolYearId,
       user_id,
+      activeSchoolYearId,
     ]);
 
     const [getStudentNUmber] = await db3.query(

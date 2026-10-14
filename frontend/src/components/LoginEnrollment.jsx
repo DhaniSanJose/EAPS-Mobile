@@ -249,7 +249,7 @@ const TotpLoginModal = ({
         return;
       }
 
-      onSuccess();
+      onSuccess(verifyRes.data);
     } catch (err) {
       setError(err.response?.data?.message || "Something went wrong. Please try again.");
       setStep("verify");
@@ -971,10 +971,10 @@ const LoginEnrollment = ({ setIsAuthenticated }) => {
     }
   };
 
-  const handleTotpSuccess = () => {
+  const handleTotpSuccess = (completedSession) => {
     setShowTotpModal(false);
     const shouldForceChange = localStorage.getItem("force_password_change") === "true";
-    completeLogin(tempLoginData, shouldForceChange);
+    completeLogin({ ...tempLoginData, ...completedSession }, shouldForceChange);
   };
 
   const handleClose = (_, reason) => {

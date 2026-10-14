@@ -71,6 +71,7 @@ function authenticateToken(req, res, next) {
     if (err) {
       return res.status(403).json({ error: "Invalid token" });
     }
+    if (user.session_complete === false) return res.status(401).json({ error: "Complete TOTP verification first" });
     req.user = user;
     next();
   });

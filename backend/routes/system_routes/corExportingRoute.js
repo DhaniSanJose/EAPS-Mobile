@@ -8,6 +8,11 @@ const { db, db3 } = require("../database/database");
 const { insertAuditLogEnrollment } = require("../../utils/auditLogger");
 
 const router = express.Router();
+// Mobile students use the owned COR endpoint, never the staff bulk exporter.
+router.use((req,res,next)=>{
+  if(req.user?.role==='student' && (req.path.startsWith('/cor-export/') || req.path==='/get_student_number'))return res.status(403).json({message:'Use your student COR endpoint.'});
+  next();
+});
 const exportJobs = new Map();
 const exportDir = path.join(os.tmpdir(), "earist-cor-exports");
 
@@ -785,3 +790,40 @@ router.post("/cor-export/audit", async (req, res) => {
 
 module.exports = router;
 module.exports.closeCorExportBrowser = closeCorExportBrowser;
+module.exports.renderStudentCorPdf = async ({origin,backendOrigin,token,student,expectedSubjects}) => {
+  const browser=await getBrowser();const page=await browser.newPage();
+  const failures=[];
+  try{
+    await page.setViewport({width:1240,height:1754,deviceScaleFactor:1});
+    // Use the same web template, while directing its API calls to this backend.
+    await page.setRequestInterception(true);
+    page.on('request',request=>{
+      const url=new URL(request.url());
+      if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/uploads/')){
+        if(url.pathname.startsWith('/api/enrolled_courses/') &&
+          (!url.pathname.startsWith(`/api/enrolled_courses/${encodeURIComponent(student.student_number)}/`) || Number(url.searchParams.get('activeSchoolYearId'))!==Number(student.active_school_year_id))){
+          failures.push('enrollment identity/period mismatch');request.abort().catch(()=>{});return;
+        }
+        const headers={...request.headers()};
+        if(url.pathname.startsWith('/api/'))headers.authorization=`Bearer ${token}`;
+        const target=new URL(url.pathname+url.search,backendOrigin);
+        request.continue({url:target.toString(),headers}).catch(()=>{});
+      }else request.continue().catch(()=>{});
+    });
+    page.on('response',response=>{
+      const url=new URL(response.url());
+      if(response.status()>=400 && /\/api\/(enrolled_courses|courses|payment-status|get_student_data_|person|user|fees)/.test(url.pathname))failures.push(url.pathname);
+    });
+    await bootstrapPage(page,origin);
+    await page.evaluate(({period,token})=>{
+      localStorage.setItem('token',token);
+      const url=new URL(location.href);url.searchParams.set('active_school_year_id',String(period));history.replaceState(null,'',url);
+    },{period:student.active_school_year_id,token});
+    const rendered=await renderCorPdf(page,student,token);
+    const identity=await page.evaluate(()=>{
+      const root=document.getElementById('server-cor-export');return {text:root?.innerText||'',enrolledCount:Number(window.__COR_ENROLLED_COUNT||0),subjects:root?.querySelectorAll("tr[data-cor-subject='1']").length||0};
+    });
+    if(failures.length||!identity.text.includes(String(student.student_number))||identity.enrolledCount<expectedSubjects||identity.subjects<expectedSubjects)throw new Error(`The COR data did not render completely: ${JSON.stringify({failedPaths:failures,identityMatches:identity.text.includes(String(student.student_number)),renderedSubjects:identity.subjects,enrolledCount:identity.enrolledCount,expectedSubjects})}`);
+    return rendered;
+  }finally{await page.close().catch(()=>{});}
+};

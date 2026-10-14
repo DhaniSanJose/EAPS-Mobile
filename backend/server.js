@@ -196,6 +196,9 @@ const courseTypeRoutes = require("./routes/system_routes/courseTypeRoutes");
 const torRoute = require("./routes/admin_routes/torRoute");
 const graduateVerification = require("./routes/student_routes/graduateVerificationRoute");
 
+app.use("/api", require("./routes/student_routes/mobileEnrollmentRequests"));
+app.use("/api/mobile/enrollment", require("./routes/student_routes/mobileCor"));
+app.use("/api", require("./routes/student_routes/mobileOfficer"));
 app.use("/api", graduateVerification);
 app.use("/api", torRoute);
 app.use("/api", courseTypeRoutes);

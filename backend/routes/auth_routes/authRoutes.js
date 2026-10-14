@@ -1191,6 +1191,7 @@ router.post("/login", async (req, res) => {
 
     const token = webtoken.sign(
       {
+        session_complete: Number(user.totp_enabled) === 0,
         person_id: user.person_id,
         employee_id: user.employee_id,
         email: user.email,
@@ -1258,6 +1259,8 @@ router.post("/login", async (req, res) => {
         email: user.email,
         source: user.source,
         loginSetup: true,
+        loginPayload,
+        attempts: 0,
         totpSecret: null, // filled in by /login-totp-setup
         expiresAt: Date.now() + 10 * 60 * 1000,
       };
@@ -1298,6 +1301,8 @@ router.post("/login", async (req, res) => {
       email: user.email,
       source: user.source,
       loginSetup: true,
+        loginPayload,
+        attempts: 0,
       totpSecret: null, // only populated if the user asks to regenerate
       expiresAt: Date.now() + 10 * 60 * 1000,
     };
@@ -1419,6 +1424,18 @@ router.post("/verify-login-totp", async (req, res) => {
     }
 
     const now = Date.now();
+    const challenge = otpStore[loginSetupId];
+    if (!challenge?.loginPayload || challenge.expiresAt < now || challenge.email !== normalizedEmail || challenge.attempts >= 5) {
+      return res.status(401).json({ success:false, message:"Login challenge expired. Log in again." });
+    }
+    challenge.attempts += 1;
+    const completeSession = () => {
+      const claims = webtoken.verify(challenge.loginPayload.token, process.env.JWT_SECRET);
+      delete claims.iat; delete claims.exp;
+      const completed = { ...challenge.loginPayload, token: webtoken.sign({ ...claims, session_complete:true }, process.env.JWT_SECRET, { expiresIn:"1h" }), requireTotp:false, requireTotpSetup:false };
+      delete otpStore[loginSetupId];
+      return completed;
+    };
 
     if (isSetup) {
       // ── First-time setup OR regeneration after losing the app entry:
@@ -1501,12 +1518,13 @@ router.post("/verify-login-totp", async (req, res) => {
 
       return res.json({
         success: true,
+        ...completeSession(),
         message: "Google Authenticator set up successfully.",
       });
     } else {
       // ── Normal login: verify against the secret stored in DB ─────────────
       let totpSecret = null;
-      const tableSource = source || "user";
+      const tableSource = challenge.source || "user";
 
       if (tableSource === "prof") {
         const [[profRow]] = await db3.query(
@@ -1553,7 +1571,7 @@ router.post("/verify-login-totp", async (req, res) => {
         message: `User (${normalizedEmail}) verified TOTP and logged in successfully.`,
       });
 
-      return res.json({ success: true, message: "TOTP verified successfully." });
+      return res.json({ ...completeSession(), message: "TOTP verified successfully." });
     }
   } catch (error) {
     console.error("Verify login TOTP error:", error);
